@@ -371,6 +371,28 @@ result = NotificationResult(
 | `AckStatus` | PENDING, ACKED, DISMISSED, TIMED_OUT |
 | `DeliveryStatus` | PENDING, DELIVERED, SUCCESS, FAILED, DEDUPLICATED, RATE_LIMITED |
 
+## Running the Service
+
+### HTTP API
+
+UNS provides an HTTP API via FastAPI:
+
+```bash
+# Start the server
+uvicorn mcp_server.app:app --host 0.0.0.0 --port 8000
+```
+
+### Health Check
+
+The service exposes a `/health` endpoint for load balancer and orchestration health checks:
+
+```bash
+curl http://localhost:8000/health
+# Response: {"status": "healthy"}
+```
+
+> **Note:** The `/health` endpoint returns a static healthy status for basic liveness checks. For detailed adapter and channel health information, see [Observability](docs/sections/observability.md).
+
 ## Testing
 
 ```bash
