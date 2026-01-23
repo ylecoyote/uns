@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 def _utc_now() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
@@ -128,6 +128,61 @@ INTENT_DELIVERY_MODE_MAP: dict[NotificationIntent, DeliveryMode] = {
     NotificationIntent.OPERATIONAL: DeliveryMode.BEST_EFFORT,
     NotificationIntent.INFORMATIONAL: DeliveryMode.BEST_EFFORT,
 }
+
+# Helper functions for default value lookups
+def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
+    """Get the default delivery mode for an intent.
+    
+    Args:
+        intent: The notification intent
+    
+    Returns:
+        The appropriate DeliveryMode
+    """
+    return INTENT_DELIVERY_MODE_MAP[intent]
+
+
+def get_default_priority(intent: NotificationIntent) -> Priority:
+    """Get the default priority for an intent.
+    
+    Args:
+        intent: The notification intent
+    
+    Returns:
+        The appropriate Priority
+    """
+    return INTENT_PRIORITY_MAP[intent]
+
+
+def get_default_ack_timeout_minutes(intent: NotificationIntent) -> int | None:
+    """Get the default acknowledgment timeout for an intent.
+    
+    Args:
+        intent: The notification intent
+    
+    Returns:
+        Timeout in minutes, or None if no timeout applies
+    """
+    return DEFAULT_ACK_TIMEOUTS.get(intent)
+
+
+def get_default_require_ack(intent: NotificationIntent, autonomy_mode: AutonomyMode) -> bool:
+    """Determine if acknowledgment is required by default.
+    
+    Per PRD:
+    - SAFETY in LIVE mode -> true
+    - All other cases -> false
+    
+    Args:
+        intent: The notification intent
+        autonomy_mode: Current operating mode
+    
+    Returns:
+        Whether acknowledgment is required
+    """
+    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE
+
+
 class AutonomyContext(BaseModel):
     """Context about the autonomous agent that triggered the notification.
 
