@@ -30,6 +30,25 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Custom exceptions for acknowledgment operations
+class AckEngineError(Exception):
+    """Base exception for acknowledgment engine errors."""
+
+    pass
+
+
+class NotificationNotFoundError(AckEngineError):
+    """Raised when a notification is not found in ack storage."""
+
+    pass
+
+
+class InvalidAckTransitionError(AckEngineError):
+    """Raised when an invalid ack status transition is attempted."""
+
+    pass
+
+
 # Default timeout values per intent (in minutes)
 DEFAULT_ACK_TIMEOUTS = {
     NotificationIntent.SAFETY: 15,
@@ -620,3 +639,56 @@ class LoggingEscalationHandler:
             reason,
             metadata,
         )
+
+
+# Global acknowledgment engine instance
+_ack_engine: AcknowledgmentEngine | None = None
+
+
+def get_ack_engine() -> AcknowledgmentEngine:
+    """Get the global acknowledgment engine instance.
+
+    Returns:
+        The singleton AcknowledgmentEngine instance.
+
+    Raises:
+        RuntimeError: If the engine has not been configured.
+    """
+    global _ack_engine
+    if _ack_engine is None:
+        # Auto-configure with defaults for convenience
+        _ack_engine = AcknowledgmentEngine()
+    return _ack_engine
+
+
+def configure_ack_engine(
+    storage: AckStorageProtocol | None = None,
+    callback: AcknowledgmentCallback | None = None,
+    escalation_handler: EscalationHandler | None = None,
+) -> AcknowledgmentEngine:
+    """Configure the global acknowledgment engine.
+
+    Args:
+        storage: Storage backend for ack state.
+        callback: Callback for ack events.
+        escalation_handler: Handler for escalations on SAFETY timeouts.
+
+    Returns:
+        The configured AcknowledgmentEngine instance.
+    """
+    global _ack_engine
+    _ack_engine = AcknowledgmentEngine(
+        storage=storage,
+        callback=callback,
+        escalation_handler=escalation_handler,
+    )
+    return _ack_engine
+
+
+def reset_ack_engine() -> None:
+    """Reset the global acknowledgment engine (for testing).
+
+    Clears the global engine instance, allowing reconfiguration.
+    """
+    global _ack_engine
+    _ack_engine = None

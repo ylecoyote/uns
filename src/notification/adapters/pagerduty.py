@@ -219,7 +219,7 @@ class PagerDutyClient:
                 original_error=e,
             ) from e
         except Exception as e:
-            if isinstance(e, (AdapterDeliveryError, AdapterTimeoutError)):
+            if isinstance(e, AdapterDeliveryError | AdapterTimeoutError):
                 raise
             raise AdapterDeliveryError(
                 f"PagerDuty delivery failed: {e}",
