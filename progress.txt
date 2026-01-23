@@ -1,0 +1,64 @@
+# Task: Implement deduplication (Redis SETNX + TTL)
+
+## Status: COMPLETED
+
+## Summary
+Implemented the Deduplication Engine for the Unified Notification Service (UNS) as specified in PRD Task 4.
+
+## Files Created/Modified
+
+### New Files
+1. `src/notification/deduplication.py` - Core deduplication engine implementation
+2. `tests/notification/test_deduplication.py` - Comprehensive unit tests (36 tests)
+
+### Supporting Files (Project Scaffolding)
+3. `pyproject.toml` - Project configuration with redis and dev dependencies
+4. `src/__init__.py` - Package init
+5. `src/notification/__init__.py` - Notification package init
+6. `src/notification/models.py` - Core models (copied from agent-2 task)
+7. `src/notification/adapters/__init__.py` - Adapters package init
+8. `src/notification/integrations/__init__.py` - Integrations package init
+9. `tests/__init__.py` - Tests package init
+10. `tests/notification/__init__.py` - Notification tests package init
+
+## Implementation Details
+
+### Deduplication Engine Features
+- **Redis SETNX + TTL behavior**: Uses atomic SET with NX (set if not exists) and EX (expiry) flags
+- **`should_deduplicate(notification) -> bool`**: Main API for checking/marking notifications
+- **Configurable TTL window**: Default 5 minutes, configurable per-call or globally
+- **Stable dedup key generation**: SHA256 hash of (notification_type, source, agent_id, title)
+- **Explicit dedup_key support**: Notifications can provide their own dedup_key
+
+### Strategies Implemented
+1. **RedisDeduplicationStrategy**: Production-ready Redis-backed deduplication
+   - Uses SETNX + TTL for atomic operations
+   - Supports custom key prefix
+   - Distributed-safe for multi-instance deployments
+
+2. **InMemoryDeduplicationStrategy**: For testing and single-instance deployments
+   - Automatic expiry cleanup
+   - Not suitable for distributed deployments
+
+### Factory Functions
+- `create_redis_deduplication_engine(redis_client, default_window_seconds, key_prefix)`
+- `create_inmemory_deduplication_engine(default_window_seconds)`
+
+## Tests Passing
+All 36 unit tests pass:
+- TestRedisDeduplicationStrategy (10 tests)
+- TestInMemoryDeduplicationStrategy (7 tests)
+- TestDeduplicationEngine (11 tests)
+- TestDeduplicationEngineWithMockRedis (3 tests)
+- TestFactoryFunctions (2 tests)
+- TestDeduplicationInvariants (3 tests)
+
+## Acceptance Criteria Met
+Per PRD Task 4:
+- [x] `should_deduplicate(notification) -> bool` implemented
+- [x] Redis SETNX + TTL behavior
+- [x] Second notification with same key within TTL deduplicates
+
+## Linting
+- Ruff check: All checks passed
+- Ruff format: Applied
