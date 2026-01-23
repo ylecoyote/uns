@@ -1,0 +1,93 @@
+# Progress Report: Audit/Persistence Wiring
+
+## Task: Add audit/persistence wiring (if applicable)
+
+### Summary
+Implemented the audit/persistence layer for the Unified Notification Service as specified in PRD Task 11. This includes database models, audit record creation, and multiple storage backends for persisting delivery and acknowledgment audit trails.
+
+### Completed Work
+
+#### 1. Audit Logging Module (`src/notification/audit.py`)
+- Implemented `AuditRecord` - immutable dataclass for delivery audit records
+- Implemented `AckAuditRecord` - immutable dataclass for acknowledgment audit records
+- Created `AuditStore` abstract interface for pluggable storage backends
+- Implemented `InMemoryAuditStore` for testing/development
+- Implemented `FileAuditStore` for simple deployments (JSON-line format)
+- Implemented `PersistentAuditLogger` as the production AuditLogger implementation
+- Added helper functions: `create_audit_record()`, `create_ack_audit_record()`
+- Added global configuration: `get_audit_logger()`, `configure_audit_logger()`
+
+#### 2. Database Models (`src/db/models.py`)
+- SQLAlchemy model `NotificationAuditRecord` with:
+  - All notification metadata and context fields
+  - Delivery outcome (status, channels attempted/succeeded/failed)
+  - Autonomy context (agent_id, plan_id, snapshot IDs)
+  - Optimized indexes for common query patterns
+- SQLAlchemy model `AckAuditRecord` for acknowledgment state transitions
+- SQLAlchemy model `PersistedNotificationPolicy` for runtime policy configuration
+- Proper foreign keys, indexes, and constraints
+
+#### 3. SQLAlchemy Audit Store (`src/db/audit_store.py`)
+- `SQLAlchemyAuditStore` implementing `AuditStore` for production database use
+- Factory function `create_sqlalchemy_audit_store()` for easy setup
+- Full query support for retrieving audit history by notification ID
+
+#### 4. Service Wiring (`src/notification/service.py`)
+- Added `configure_delivery_service_with_audit()` convenience function
+- Updated `NoOpAuditLogger` to use the metadata parameter
+- Maintains backward compatibility with existing `configure_delivery_service()`
+
+#### 5. Package Exports (`src/notification/__init__.py`)
+- Exported all audit-related classes and functions
+- Clean public API for consumers
+
+#### 6. Unit Tests (`tests/notification/test_audit.py`)
+- 26 comprehensive tests covering:
+  - AuditRecord creation and serialization
+  - AckAuditRecord creation and serialization
+  - InMemoryAuditStore CRUD operations
+  - PersistentAuditLogger behavior
+  - Error handling with fail_silently option
+  - Audit records for all delivery outcomes (success, failure, deduplicated, rate-limited)
+  - Invariant verification (immutability, unique IDs, timestamps)
+
+### Test Results
+All 26 tests pass.
+
+### Linting
+All ruff checks pass with no errors.
+
+### Files Created/Modified
+- `src/notification/audit.py` (NEW)
+- `src/db/models.py` (NEW)
+- `src/db/audit_store.py` (NEW)
+- `src/db/__init__.py` (MODIFIED)
+- `src/notification/__init__.py` (MODIFIED)
+- `src/notification/service.py` (MODIFIED)
+- `src/notification/interfaces.py` (MODIFIED - lint fix)
+- `tests/notification/test_audit.py` (NEW)
+- `pyproject.toml` (NEW)
+
+### Usage Example
+
+```python
+# Development with in-memory audit
+from notification.audit import InMemoryAuditStore
+from notification.service import configure_delivery_service_with_audit, SimpleAdapterRegistry
+
+registry = SimpleAdapterRegistry()
+# ... register adapters ...
+service = configure_delivery_service_with_audit(registry)
+
+# Production with database
+from db.audit_store import create_sqlalchemy_audit_store
+db_store = create_sqlalchemy_audit_store("postgresql://user:pass@localhost/uns")
+service = configure_delivery_service_with_audit(registry, audit_store=db_store)
+```
+
+### Acceptance Criteria Met
+✅ Audit record created for delivered/failed/deduped outcomes
+✅ Database models defined for audit persistence
+✅ Multiple storage backends supported (in-memory, file, database)
+✅ All tests pass
+✅ All linting checks pass
