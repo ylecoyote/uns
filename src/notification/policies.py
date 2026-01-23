@@ -26,7 +26,9 @@ intent-based defaults as specified in the PRD.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from notification.models import AutonomyMode, DeliveryMode, NotificationIntent
@@ -36,41 +38,10 @@ from notification.models import (
     Channel,
     DeliveryMode,
     NotificationIntent,
-    get_default_ack_timeout_minutes,
-    get_default_delivery_mode,
-    get_default_require_ack,
+    get_default_ack_timeout_minutes as _get_default_ack_timeout_minutes,
+    get_default_delivery_mode as _get_default_delivery_mode_from_models,
+    get_default_require_ack as _get_default_require_ack_from_models,
 )
-
-
-@dataclass(frozen=True)
-class NotificationPolicy:
-    '''
-    Policy configuration for a notification type.
-
-    Policies can override default behavior for specific notification types.
-    All fields are optional - if not specified, defaults are derived from
-    the notification's intent and autonomy mode.
-    '''
-
-    notification_type: str
-    delivery_mode: DeliveryMode | None = None
-    channels: list[Channel] | None = None
-    require_ack: bool | None = None
-    ack_timeout_minutes: int | None = None
-    dedup_window_seconds: int | None = None
-    mode_overrides: dict[AutonomyMode, "ModeOverride"] | None = None
-
-
-@dataclass(frozen=True)
-class ModeOverride:
-    """Per-autonomy-mode overrides for a policy.
-
-    Allows fine-grained control over routing behavior based on
-    whether the system is in PREVIEW, SHADOW, or LIVE mode.
-    """
-
-    channels: list[Channel] | None = None
-    require_ack: bool | None = None
 
 
 # Default channel mappings per intent for LIVE mode
@@ -293,7 +264,7 @@ class NotificationPolicy(BaseModel):
             return self.delivery_mode
 
         # Fall back to SDK defaults
-        return get_default_delivery_mode(intent)
+        return _get_default_delivery_mode_from_models(intent)
 
     def get_ack_timeout_minutes_for_mode(
         self, autonomy_mode: AutonomyMode, intent: NotificationIntent
@@ -312,7 +283,7 @@ class NotificationPolicy(BaseModel):
             return self.ack_timeout_minutes
 
         # Fall back to SDK defaults
-        return get_default_ack_timeout_minutes(intent)
+        return _get_default_ack_timeout_minutes(intent)
 
 
 def _get_default_channels(
@@ -375,9 +346,7 @@ def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
     Returns:
         The appropriate DeliveryMode
     """
-    if intent in (NotificationIntent.SAFETY, NotificationIntent.GOVERNANCE):
-        return DeliveryMode.GUARANTEED
-    return DeliveryMode.BEST_EFFORT
+    return _get_default_delivery_mode_from_models(intent)
 
 def get_default_channels(
     intent: NotificationIntent,
@@ -436,7 +405,7 @@ def get_default_require_ack(
     Returns:
         Whether acknowledgment is required
     """
-    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE
+    return _get_default_require_ack_from_models(intent, autonomy_mode)
 
 
 def get_default_ack_timeout(intent: NotificationIntent) -> int | None:
@@ -756,19 +725,27 @@ def set_policy_registry(registry: PolicyRegistry) -> None:
     global _policy_registry
     _policy_registry = registry
 
-_policy_registry: PolicyRegistry | None = None
 
-
-def get_policy_registry() -> PolicyRegistry:
-    """Get the global policy registry instance.
-
+def get_default_registry() -> PolicyRegistry:
+    """Get the default policy registry.
+    
+    Alias for get_policy_registry() for backward compatibility.
+    
     Returns:
-        The singleton PolicyRegistry instance
+        The singleton PolicyRegistry instance.
     """
-    global _policy_registry
-    if _policy_registry is None:
-        _policy_registry = PolicyRegistry()
-    return _policy_registry
+    return get_policy_registry()
+
+
+def set_default_registry(registry: PolicyRegistry) -> None:
+    """Set the default policy registry.
+    
+    Alias for set_policy_registry() for backward compatibility.
+    
+    Args:
+        registry: The registry to use as global singleton.
+    """
+    set_policy_registry(registry)
 
 
 def configure_policy_registry(

@@ -359,6 +359,31 @@ Implemented channel adapters for all delivery channels.
 
 ---
 
+## Task 6: Rate Limiting (Token Bucket per Channel) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented per-channel rate limiting to prevent downstream channel throttling.
+
+### Artifacts Created
+1. **src/notification/rate_limiting.py**
+   - Token-bucket style limiter per channel
+   - Simple API used by delivery service:
+     - `acquire_rate_limit(channel) -> bool`
+
+2. **tests/notification/test_rate_limiting.py**
+   - Unit tests verifying:
+     - bucket refill behavior
+     - per-channel isolation
+     - denial when limits exceeded
+
+### Acceptance Criteria Met
+- ✅ Exceeding configured rate returns false
+- ✅ Rate limiter integrates with delivery service
+
+---
+
 ## Task 7: Implement delivery service (GUARANTEED vs BEST_EFFORT orchestration) - COMPLETED
 
 ### Date: 2026-01-22
@@ -384,10 +409,6 @@ Implemented the delivery service with full GUARANTEED vs BEST_EFFORT orchestrati
    - `SimpleAdapterRegistry` for adapter management
    - Protocol interfaces: `AdapterRegistry`, `AuditLogger`, `AckScheduler`
    - No-op implementations for testing
-
-### Key Semantics Implemented:
-- **GUARANTEED**: Must raise if all persistent channels fail, escalates via callback
-- **BEST_EFFORT**: May fail silently, logs failure, returns FAILED status
 
 ### Tests Implemented
 
@@ -418,13 +439,6 @@ This implementation satisfies PRD Task 7 requirements:
 - [x] BEST_EFFORT: Log failure, don't raise
 - [x] Ack timeout scheduling when required
 - [x] Audit log write on all outcomes
-
-### Dependencies
-- pydantic>=2.0.0
-- redis>=5.0.0 (optional, for RedisDeduplicationStore)
-- pytest>=7.0.0 (dev)
-- pytest-asyncio>=0.21.0 (dev)
-- ruff>=0.1.0 (dev)
 
 ---
 
@@ -476,43 +490,6 @@ Implemented the SDK producer interface with send(), validation guards, and polic
    - Dedup key generation and stability
    - Factory functions (create_sdk, get_sdk)
 
-### Validation Rules Implemented (from PRD)
-
-1. **autonomy_context required** - Hard guard enforced
-2. **Title max 200 chars** - Validated by Pydantic
-3. **Message max 4000 chars** - Validated by Pydantic
-4. **DeliveryMode derivation**:
-   - SAFETY → GUARANTEED
-   - GOVERNANCE → GUARANTEED
-   - OPERATIONAL → BEST_EFFORT
-   - INFORMATIONAL → BEST_EFFORT
-5. **Require Ack derivation**:
-   - If policy specifies → use policy
-   - Else if SAFETY AND LIVE → true
-   - Else → false
-6. **Ack Timeout defaults**:
-   - SAFETY → 15 minutes
-   - GOVERNANCE → 30 minutes
-
-### Channel Routing Rules (from PRD Section 6.2)
-
-#### LIVE Mode
-- SAFETY → Slack, WebSocket (+ PagerDuty if irreversible)
-- GOVERNANCE → Slack, WebSocket
-- OPERATIONAL → Slack
-- INFORMATIONAL → WebSocket
-
-#### PREVIEW Mode
-- All intents → WebSocket only
-
-#### SHADOW Mode
-- OPERATIONAL → WebSocket
-- GOVERNANCE → Slack, WebSocket
-
-### Test Results
-- All tests pass
-- Linting passes (ruff check)
-
 ---
 
 ## Task 9: Acknowledgment Engine (ack + timeout handling) - COMPLETED
@@ -520,94 +497,19 @@ Implemented the SDK producer interface with send(), validation guards, and polic
 ### Date: 2026-01-22
 
 ### Summary
-Implemented the acknowledgment engine for the Unified Notification Service as specified in Task 9 of the PRD. The engine handles acknowledgment state transitions, timeout checking, and escalation logic for notifications that require operator acknowledgment.
+Implemented the acknowledgment engine for the Unified Notification Service as specified in Task 9 of the PRD.
 
 ### Files Created/Modified
-
-#### New Files:
-1. `src/notification/acknowledgment.py` - Main acknowledgment engine implementation
-2. `tests/notification/test_acknowledgment.py` - Comprehensive test suite (38 tests)
-
-#### Modified Files:
-1. `src/notification/__init__.py` - Added exports for acknowledgment engine components
-
-### Implementation Details
-
-#### Core Components:
-
-1. **AckState** - Internal state tracking for acknowledgment lifecycle
-   - Tracks notification_id, status, intent, autonomy_context, timeout configuration
-   - Provides timeout_at calculation and is_timed_out() check
-   - Serialization support (to_dict/from_dict) for persistence
-
-2. **AckStorageProtocol** - Protocol for acknowledgment state storage
-   - Defines interface for get_ack_state, set_ack_state, get_pending_notifications
-   - Enables swappable storage backends (Redis, database, etc.)
-
-3. **InMemoryAckStorage** - In-memory storage implementation
-   - Suitable for testing and single-instance deployments
-   - Implements all protocol methods
-
-4. **AcknowledgmentEngine** - Main engine for handling acks and timeouts
-   - `register_notification()` - Register a notification requiring acknowledgment
-   - `ack()` - Handle ACK/DISMISS transitions with idempotency
-   - `check_ack_timeout()` - Check and handle timeout for single notification
-   - `check_all_timeouts()` - Batch check all pending notifications
-   - `get_status()` / `get_state()` - Query current ack state
-
-5. **EscalationHandler Protocol** + **LoggingEscalationHandler**
-   - Protocol for handling escalations on SAFETY timeouts
-   - Logging implementation for testing/development
-
-#### Key Features Implemented:
-
-- **Idempotency**: Repeated ack calls with same status are safe
-- **Timeout calculation**: Per-intent default timeouts (SAFETY=15min, GOVERNANCE=30min)
-- **SAFETY escalation**: SAFETY timeout in LIVE mode triggers re-escalation
-- **Callback integration**: Invokes AcknowledgmentCallback on ack/dismiss/timeout events
-- **State persistence**: Pluggable storage backend via protocol
-
-#### Default Ack Timeouts (per PRD):
-- SAFETY: 15 minutes
-- GOVERNANCE: 30 minutes
-- OPERATIONAL/INFORMATIONAL: No default timeout
-
-### Test Coverage
-
-38 tests covering:
-- AckState creation, serialization, timeout calculation
-- InMemoryAckStorage operations
-- AcknowledgmentEngine registration, ack, dismiss, timeout handling
-- Idempotency verification
-- SAFETY timeout escalation in LIVE mode
-- Non-escalation in PREVIEW/SHADOW modes
-- Non-escalation for GOVERNANCE intent
-- Callback invocation verification
-- LoggingEscalationHandler behavior
+- `src/notification/acknowledgment.py` - Main acknowledgment engine implementation
+- `tests/notification/test_acknowledgment.py` - Comprehensive test suite (38 tests)
+- `src/notification/__init__.py` - Added exports for acknowledgment engine components
 
 ### Acceptance Criteria Met
-
-From PRD Task 9:
-- ✅ `ack(notification_id, ack_status, acked_by, metadata)` implemented
-- ✅ Idempotency: repeated ack is safe
-- ✅ `check_ack_timeout(notification_id, intent, autonomy_context)` implemented
-- ✅ Timeout updates state to TIMED_OUT
-- ✅ SAFETY timeout triggers re-escalation (in LIVE mode only)
-
-### Commands Run
-
-```bash
-# Run tests (all pass)
-PYTHONPATH=src python -m pytest tests/ -v
-# 144 passed
-
-# Run linting (all pass)
-ruff check src/ tests/
-# All checks passed!
-
-# Format code
-ruff format src/ tests/
-```
+✅ `ack(notification_id, ack_status, acked_by, metadata)` implemented
+✅ Idempotency: repeated ack is safe
+✅ `check_ack_timeout(notification_id, intent, autonomy_context)` implemented
+✅ Timeout updates state to TIMED_OUT
+✅ SAFETY timeout triggers re-escalation (in LIVE mode only)
 
 ---
 
@@ -619,38 +521,9 @@ ruff format src/ tests/
 Added API routes for acknowledgment and status queries as specified in PRD Task 10.
 
 ### Files Created
-
-1. **src/mcp_server/app.py**
-   - Application factory `create_app()`
-   - Health check endpoint at `/health`
-   - OpenAPI documentation at `/docs`
-
-2. **src/mcp_server/routes_notification.py**
-   - `POST /v1/notifications/{id}/ack` - Acknowledge a notification
-   - `POST /v1/notifications/{id}/dismiss` - Dismiss a notification
-   - `GET /v1/notifications/{id}` - Get notification status
-   - `GET /v1/notifications/{id}/ack-status` - Get ack status only
-   - Pydantic request/response models with validation
-   - Proper HTTP status codes (200, 404, 409)
-
-3. **tests/mcp_server/test_routes_notification.py** - 15 tests covering:
-   - Ack endpoint success, idempotency, errors
-   - Dismiss endpoint success, conflict errors
-   - Get notification status
-   - Get ack status
-   - Health check
-
-### PRD Compliance
-
-Per PRD Task 10 - API Routes:
-✅ `POST /v1/notifications/{id}/ack` implemented
-✅ `GET /v1/notifications/{id}` (status) implemented
-✅ Ack endpoint writes audit (via logging)
-✅ Ack endpoint triggers callback (via AcknowledgmentCallback protocol)
-
-Additional endpoints added:
-✅ `POST /v1/notifications/{id}/dismiss` - for dismissal workflow
-✅ `GET /v1/notifications/{id}/ack-status` - lightweight status query
+- `src/mcp_server/app.py`
+- `src/mcp_server/routes_notification.py`
+- `tests/mcp_server/test_routes_notification.py`
 
 ---
 
@@ -659,87 +532,16 @@ Additional endpoints added:
 ### Date: 2026-01-22
 
 ### Summary
-Implemented the audit/persistence layer for the Unified Notification Service as specified in PRD Task 11. This includes database models, audit record creation, and multiple storage backends for persisting delivery and acknowledgment audit trails.
+Implemented audit/persistence layer, including database models and audit stores.
 
 ### Completed Work
-
-#### 1. Audit Logging Module (`src/notification/audit.py`)
-- Implemented `AuditRecord` - immutable dataclass for delivery audit records
-- Implemented `AckAuditRecord` - immutable dataclass for acknowledgment audit records
-- Created `AuditStore` abstract interface for pluggable storage backends
-- Implemented `InMemoryAuditStore` for testing/development
-- Implemented `FileAuditStore` for simple deployments (JSON-line format)
-- Implemented `PersistentAuditLogger` as the production AuditLogger implementation
-- Added helper functions: `create_audit_record()`, `create_ack_audit_record()`
-- Added global configuration: `get_audit_logger()`, `configure_audit_logger()`
-
-#### 2. Database Models (`src/db/models.py`)
-- SQLAlchemy model `NotificationAuditRecord` with:
-  - All notification metadata and context fields
-  - Delivery outcome (status, channels attempted/succeeded/failed)
-  - Autonomy context (agent_id, plan_id, snapshot IDs)
-  - Optimized indexes for common query patterns
-- SQLAlchemy model `AckAuditRecord` for acknowledgment state transitions
-- SQLAlchemy model `PersistedNotificationPolicy` for runtime policy configuration
-- Proper foreign keys, indexes, and constraints
-
-#### 3. SQLAlchemy Audit Store (`src/db/audit_store.py`)
-- `SQLAlchemyAuditStore` implementing `AuditStore` for production database use
-- Factory function `create_sqlalchemy_audit_store()` for easy setup
-- Full query support for retrieving audit history by notification ID
-
-#### 4. Service Wiring (`src/notification/service.py`)
-- Added `configure_delivery_service_with_audit()` convenience function
-- Updated `NoOpAuditLogger` to use the metadata parameter
-- Maintains backward compatibility with existing `configure_delivery_service()`
-
-#### 5. Package Exports (`src/notification/__init__.py`)
-- Exported all audit-related classes and functions
-- Clean public API for consumers
-
-#### 6. Unit Tests (`tests/notification/test_audit.py`)
-- 26 comprehensive tests covering:
-  - AuditRecord creation and serialization
-  - AckAuditRecord creation and serialization
-  - InMemoryAuditStore CRUD operations
-  - PersistentAuditLogger behavior
-  - Error handling with fail_silently option
-  - Audit records for all delivery outcomes (success, failure, deduplicated, rate-limited)
-  - Invariant verification (immutability, unique IDs, timestamps)
-
-### Test Results
-All 26 tests pass.
-
-### Linting
-All ruff checks pass with no errors.
-
-### Files Created/Modified
 - `src/notification/audit.py` (NEW)
 - `src/db/models.py` (NEW)
 - `src/db/audit_store.py` (NEW)
-- `src/db/__init__.py` (MODIFIED)
-- `src/notification/__init__.py` (MODIFIED)
+- `src/db/__init__.py` (MODIFIED/NEW)
 - `src/notification/service.py` (MODIFIED)
-- `src/notification/interfaces.py` (MODIFIED - lint fix)
+- `src/notification/__init__.py` (MODIFIED)
 - `tests/notification/test_audit.py` (NEW)
-- `pyproject.toml` (NEW)
-
-### Usage Example
-
-```python
-# Development with in-memory audit
-from notification.audit import InMemoryAuditStore
-from notification.service import configure_delivery_service_with_audit, SimpleAdapterRegistry
-
-registry = SimpleAdapterRegistry()
-# ... register adapters ...
-service = configure_delivery_service_with_audit(registry)
-
-# Production with database
-from db.audit_store import create_sqlalchemy_audit_store
-db_store = create_sqlalchemy_audit_store("postgresql://user:pass@localhost/uns")
-service = configure_delivery_service_with_audit(registry, audit_store=db_store)
-```
 
 ### Acceptance Criteria Met
 ✅ Audit record created for delivered/failed/deduped outcomes
