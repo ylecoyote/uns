@@ -973,3 +973,104 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 ✅ Optional improvements do not contradict core specifications
 ✅ Validation tests created and passing
 ✅ No blocking issues identified
+
+---
+
+## UI Phase 1: Deliveries Explorer Page (list + detail) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Implemented the Deliveries Explorer UI pages as part of Phase 1 of the UNS Dashboard.
+This provides read-only visibility into notification delivery timelines per ui-scope.md.
+
+### Artifacts Created
+
+1. **UI Application Structure** (`apps/ui/`)
+   - `__init__.py` - Package initialization
+   - `app.py` - FastAPI app factory with routes and static file serving
+   - `README.md` - Documentation with local run instructions
+
+2. **Typed API Client** (`apps/ui/src/api/`)
+   - `types.py` - Response models matching ui-data-contracts.md:
+     - `DeliveryTimelineListResponse`
+     - `DeliveryTimelineResponse`
+     - `DeliveryTimelineSummary`
+     - `DeliveryAttempt`
+     - `AutonomyContextResponse`
+     - `PaginationInfo`
+     - `ErrorResponse`
+     - `DeliveryFilterParams`
+   - `client.py` - UNSUIClient with:
+     - `list_deliveries()` with all filter parameters
+     - `get_delivery_timeline()` for detail view
+     - Request ID propagation via X-Request-ID header
+     - Error handling with typed APIError
+
+3. **Deliveries Explorer Pages** (`apps/ui/src/pages/`)
+   - `deliveries.py` - FastAPI router with:
+     - `GET /pages/deliveries/` - List page with filters
+     - `GET /pages/deliveries/{notification_id}` - Detail page
+     - Filter support: status, intent, delivery_mode, autonomy_mode, channel, notification_type, agent_id, time range
+     - Cursor-based pagination
+     - Template rendering via Jinja2
+
+4. **HTML Templates** (`apps/ui/templates/`)
+   - `base.html` - Base layout with navbar and footer
+   - `deliveries/list.html` - List page with:
+     - Filter form (dropdowns + text inputs)
+     - Results table with links to detail pages
+     - Pagination controls
+     - Empty state handling
+   - `deliveries/detail.html` - Detail page with:
+     - Notification summary section
+     - Autonomy context section
+     - Channel results (attempted/succeeded/failed)
+     - Delivery attempts table with timing and errors
+     - Back to list link
+
+5. **Static Assets** (`apps/ui/static/`)
+   - `css/main.css` - Styles including:
+     - Navbar and layout
+     - Filter panel
+     - Data tables
+     - Status badges (success/warning/danger/info)
+     - Channel tags
+     - Responsive design
+
+6. **Tests** (`apps/ui/tests/`)
+   - `test_deliveries_pages.py` - 33 tests covering:
+     - List page rendering
+     - Filter functionality
+     - Pagination
+     - Detail page display
+     - Error handling (404, 422)
+     - Static file serving
+     - Navigation elements
+     - API client imports
+
+### Configuration Updates
+- `pyproject.toml` updated:
+  - Added `apps` to package paths
+  - Added `apps/ui/tests` to test paths
+  - Added `apps` to Python path for imports
+  - Added `apps` to ruff src paths
+  - Added `jinja2>=3.0.0` dependency
+
+### Key Implementation Details
+- Read-only pages per ui-scope.md v1 constraints
+- Uses existing `/ui/deliveries` API endpoints
+- Cursor-based pagination matching ui-data-contracts.md
+- Template filters for datetime, duration, and status badges
+- Error handling with proper HTTP status codes
+
+### Test Results
+- 33 tests passing for UI pages
+- 137 tests passing for all UI-related tests
+- All linting checks pass (ruff check/format)
+
+### Acceptance Criteria Met
+✅ Deliveries list page with filters (intent, delivery_mode, status, time range, agent_id, autonomy_mode, channel)
+✅ Delivery detail view for notification_id showing attempts and timestamps
+✅ Tests written and passing
+✅ Linting passes
