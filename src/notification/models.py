@@ -22,8 +22,9 @@ def _utc_now() -> datetime:
 class NotificationIntent(str, Enum):
     """Classification of notification urgency and handling requirements.
 
-    SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode).
-    OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default.
+    Invariants:
+    - SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)
+    - OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default
     """
 
     SAFETY = "SAFETY"
@@ -66,7 +67,7 @@ class AutonomyMode(str, Enum):
 
 
 class AckStatus(str, Enum):
-    """Acknowledgment lifecycle states."""
+    """Acknowledgment state for notifications requiring human confirmation."""
 
     PENDING = "PENDING"
     ACKED = "ACKED"
@@ -75,7 +76,7 @@ class AckStatus(str, Enum):
 
 
 class Channel(str, Enum):
-    """Delivery channels for notifications."""
+    """Supported delivery channels for notifications."""
 
     SLACK = "SLACK"
     EMAIL = "EMAIL"
@@ -84,7 +85,7 @@ class Channel(str, Enum):
 
 
 class Priority(str, Enum):
-    """Notification priority levels, derived from intent."""
+    """Notification priority level, derived from intent."""
 
     HIGH = "HIGH"
     NORMAL = "NORMAL"
