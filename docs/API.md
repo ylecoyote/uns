@@ -382,19 +382,54 @@ Per-mode override configuration.
 ```python
 class NotificationPolicy(BaseModel):
     notification_type: str
+    intent: NotificationIntent | None = None
     delivery_mode: DeliveryMode | None = None
+    channels: list[Channel] = []
     require_ack: bool | None = None
     ack_timeout_minutes: int | None = None
+    dedup_window_seconds: int | None = None
+    preview_override: ModeOverride | None = None
+    shadow_override: ModeOverride | None = None
+    live_override: ModeOverride | None = None
+    mode_overrides: dict[AutonomyMode, ModeOverride] | None = None
+    channels_by_mode: dict[AutonomyMode, list[Channel]] | None = None
     priority_override: str | None = None
-    mode_overrides: dict[AutonomyMode, ModeOverride] = {}
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `notification_type` | `str` | Unique policy identifier (required) |
+| `intent` | `NotificationIntent \| None` | Default intent if not specified in notification |
+| `delivery_mode` | `DeliveryMode \| None` | Override delivery mode |
+| `channels` | `list[Channel]` | Default channels for delivery |
+| `require_ack` | `bool \| None` | Override acknowledgment requirement |
+| `ack_timeout_minutes` | `int \| None` | Override acknowledgment timeout |
+| `dedup_window_seconds` | `int \| None` | Deduplication window override |
+| `preview_override` | `ModeOverride \| None` | PREVIEW mode-specific overrides |
+| `shadow_override` | `ModeOverride \| None` | SHADOW mode-specific overrides |
+| `live_override` | `ModeOverride \| None` | LIVE mode-specific overrides |
+| `mode_overrides` | `dict \| None` | Alternative dict-based mode overrides |
+| `channels_by_mode` | `dict \| None` | Per-mode channel routing (compatibility) |
+| `priority_override` | `str \| None` | Priority override |
 
 #### Methods
 
 ```python
-def get_channels_for_mode(self, mode: AutonomyMode) -> list[Channel] | None
-def get_require_ack_for_mode(self, mode: AutonomyMode) -> bool | None
-def get_delivery_mode_for_mode(self, mode: AutonomyMode) -> DeliveryMode | None
+def get_channels_for_mode(
+    self, autonomy_mode: AutonomyMode, intent: NotificationIntent | None = None
+) -> list[Channel] | None
+
+def get_require_ack_for_mode(
+    self, autonomy_mode: AutonomyMode, intent: NotificationIntent | None = None
+) -> bool | None
+
+def get_delivery_mode_for_mode(
+    self, autonomy_mode: AutonomyMode, intent: NotificationIntent
+) -> DeliveryMode
+
+def get_ack_timeout_minutes_for_mode(
+    self, autonomy_mode: AutonomyMode, intent: NotificationIntent
+) -> int | None
 ```
 
 ### PolicyRegistry
