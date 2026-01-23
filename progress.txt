@@ -893,3 +893,83 @@ When state management is implemented, the "Current Implementation Note" above wi
 ✅ Rationale explains why planned features are documented upfront
 ✅ Concise and clearly labeled "Current Implementation Note" vs "Planned"
 ✅ Tests verify disclaimer content is present and correct
+
+---
+
+## Optional Improvement Consistency Validation - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Performed final pass to ensure optional improvements documented in UNS documentation do not contradict core specifications from prd.md. Created comprehensive validation tests that verify consistency between optional/future features and core invariants.
+
+### Files Created
+- `tests/docs/test_optional_improvements_consistency.py` - 23 validation tests
+
+### Test Categories
+
+1. **TestOptionalImprovementIdentification** (3 tests)
+   - Verifies policy versioning is marked as future/planned
+   - Verifies policy states limitation (all treated as ACTIVE) is documented
+   - Verifies external metrics marked as not implemented
+
+2. **TestNoRetryContradictions** (3 tests)
+   - Verifies observability clarifies no automatic retry
+   - Verifies delivery-semantics uses fallback not retry terminology
+   - Verifies PRD specifies fallback not retry behavior
+
+3. **TestPolicyStateConsistency** (2 tests)
+   - Verifies all policies treated as ACTIVE is documented
+   - Verifies policy lookup behavior is consistent
+
+4. **TestAckBoundaryNoContradictions** (1 test)
+   - Verifies no optional improvement implies ack can gate execution
+
+5. **TestDeliveryGuaranteeConsistency** (2 tests)
+   - Verifies GUARANTEED always raises on failure
+   - Verifies BEST_EFFORT never raises
+
+6. **TestFutureRecommendationsNonBlocking** (2 tests)
+   - Verifies final audit recommendations are non-blocking
+   - Verifies no critical issues in final audit
+
+7. **TestObservabilityNoContradictions** (3 tests)
+   - Verifies health states documented consistently
+   - Verifies DEGRADED state behavior documented
+   - Verifies DLQ only for GUARANTEED mode
+
+8. **TestCrossDocumentConsistency** (3 tests)
+   - Verifies delivery mode terminology consistent
+   - Verifies channel fallback order consistent
+   - Verifies intent mapping consistent
+
+9. **TestVersioningImprovement** (2 tests)
+   - Verifies policies are immutable (frozen)
+   - Verifies versioning via unregister + register
+
+10. **TestExternalIntegrationImprovements** (2 tests)
+    - Verifies ATP independence maintained
+    - Verifies external metrics are optional
+
+### Key Findings
+- **No contradictions found** between optional improvements and core specifications
+- Optional improvements are properly marked as:
+  - "Future" or "planned" features
+  - "Not implemented" status
+  - "Non-blocking" recommendations
+- Core invariants verified:
+  - No automatic retry (fallback only)
+  - GUARANTEED raises on failure
+  - BEST_EFFORT logs but doesn't raise
+  - Ack never gates execution
+  - ATP independence maintained
+
+### Test Results
+- 23 new tests passing
+- 405 total doc tests passing
+- All linting checks pass
+
+### Acceptance Criteria Met
+✅ Optional improvements do not contradict core specifications
+✅ Validation tests created and passing
+✅ No blocking issues identified
