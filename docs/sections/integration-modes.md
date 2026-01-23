@@ -18,7 +18,7 @@ The following components are fully self-contained and require no external platfo
 |-----------|--------|-------------|
 | **NotificationSDK** | `notification.sdk` | Primary interface for sending notifications |
 | **PolicyRegistry** | `notification.policies` | Routing policy management |
-| **DeliveryService** | `notification.service` | Delivery orchestration pipeline |
+| **DeliveryService** | `notification.service` | Delivery service (orchestrates the delivery pipeline) |
 | **Channel Adapters** | `notification.adapters` | Slack, Email, PagerDuty delivery |
 | **DeduplicationEngine** | `notification.deduplication` | At-most-once delivery semantics |
 | **RateLimiter** | `notification.rate_limiting` | Per-channel rate limiting |
@@ -160,7 +160,7 @@ notification/
 ├── interfaces.py       # Protocol definitions (NOT implementations)
 ├── policies.py         # Policy registry and resolution
 ├── sdk.py              # Producer interface
-├── service.py          # Delivery pipeline
+├── service.py          # Delivery service (orchestrates delivery pipeline)
 ├── deduplication.py    # Dedup engine
 ├── rate_limiting.py    # Rate limiter
 ├── acknowledgment.py   # Ack engine
