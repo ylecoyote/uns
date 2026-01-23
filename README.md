@@ -171,6 +171,8 @@ Controls channel routing:
 
 ### Delivery Pipeline
 
+The delivery service (`DeliveryService`) executes the following pipeline steps:
+
 1. **Deduplication Check** - Skip if duplicate within window
 2. **Rate Limit Check** - Apply per-channel rate limits
 3. **WebSocket Delivery** - Fire-and-forget, non-blocking

@@ -118,6 +118,8 @@ NotificationPolicy
 
 ### Delivery Service
 
+> **Terminology Note:** The **delivery service** refers to the `DeliveryService` component in `notification.service` that orchestrates notification delivery. The **delivery pipeline** refers to the sequence of processing steps (deduplication, rate limiting, channel routing, etc.) that the service executes.
+
 The delivery service (`notification.service`) orchestrates the delivery pipeline:
 
 ```
