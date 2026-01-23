@@ -104,10 +104,11 @@ class NoOpAuditLogger:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         logger.debug(
-            "Audit: notification_id=%s status=%s channels_succeeded=%s",
+            "Audit: notification_id=%s status=%s channels_succeeded=%s metadata=%s",
             notification.notification_id,
             result.status.value,
             [c.value for c in result.channels_succeeded],
+            metadata,
         )
 
 
@@ -592,3 +593,65 @@ async def deliver(notification: Notification) -> NotificationResult:
         DeliveryError: For GUARANTEED mode when all channels fail
     """
     return await get_delivery_service().deliver(notification)
+
+def configure_delivery_service_with_audit(
+    adapter_registry: AdapterRegistry,
+    audit_store: Any = None,
+    fail_silently: bool = False,
+    ack_scheduler: AckScheduler | None = None,
+    escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None,
+) -> DeliveryService:
+    """Configure the delivery service with persistent audit logging.
+
+    This is a convenience function that sets up the delivery service
+    with a PersistentAuditLogger instead of the NoOpAuditLogger.
+
+    Args:
+        adapter_registry: Registry of channel adapters
+        audit_store: AuditStore implementation for persistence
+                    (defaults to InMemoryAuditStore if None)
+        fail_silently: Whether audit failures should be suppressed
+        ack_scheduler: Optional custom ack scheduler
+        escalation_callback: Optional callback for GUARANTEED failures
+
+    Returns:
+        The configured DeliveryService instance
+
+    Example:
+        from notification.audit import InMemoryAuditStore
+        from notification.service import (
+            configure_delivery_service_with_audit,
+            SimpleAdapterRegistry
+        )
+
+        registry = SimpleAdapterRegistry()
+        # ... register adapters ...
+
+        # With in-memory audit (development)
+        service = configure_delivery_service_with_audit(registry)
+
+        # With database audit (production)
+        from db.audit_store import create_sqlalchemy_audit_store
+        db_store = create_sqlalchemy_audit_store("postgresql://...")
+        service = configure_delivery_service_with_audit(
+            registry,
+            audit_store=db_store
+        )
+    """
+    from notification.audit import InMemoryAuditStore, PersistentAuditLogger
+
+    if audit_store is None:
+        audit_store = InMemoryAuditStore()
+
+    audit_logger = PersistentAuditLogger(
+        store=audit_store,
+        fail_silently=fail_silently,
+    )
+
+    return configure_delivery_service(
+        adapter_registry=adapter_registry,
+        audit_logger=audit_logger,
+        ack_scheduler=ack_scheduler,
+        escalation_callback=escalation_callback,
+    )
+
