@@ -1045,6 +1045,517 @@ class TestErrorHandling:
 # =============================================================================
 
 
+# =============================================================================
+# Test: Audit Event Filtering and Pagination (Additional)
+# =============================================================================
+
+
+class TestAuditEventFilteringAdditional:
+    """Additional tests for audit event filtering functionality."""
+
+    def test_filter_audit_by_agent_id(self, client: TestClient, audit_store: InMemoryAuditStore):
+        """Test filtering audit events by agent ID."""
+        target_agent = uuid4()
+        other_agent = uuid4()
+
+        audit_store.save_delivery_audit(create_audit_record(agent_id=target_agent))
+        audit_store.save_delivery_audit(create_audit_record(agent_id=target_agent))
+        audit_store.save_delivery_audit(create_audit_record(agent_id=other_agent))
+
+        response = client.get("/ui/audit", params={"agent_id": str(target_agent)})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 2
+        for item in data["items"]:
+            assert item["autonomy_context"]["agent_id"] == str(target_agent)
+
+    def test_filter_audit_by_time_range(self, client: TestClient, audit_store: InMemoryAuditStore):
+        """Test filtering audit events by time range."""
+        # The audit time filter uses audit_created_at which is set internally
+        # We need to test with distinct times that we control
+        now = datetime.now(UTC)
+        future = now + timedelta(hours=1)
+
+        # Create one record
+        audit_store.save_delivery_audit(create_audit_record())
+
+        # Filter: time range that includes the record
+        response = client.get(
+            "/ui/audit",
+            params={
+                "start_time": (now - timedelta(minutes=1)).isoformat(),
+                "end_time": future.isoformat(),
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 1
+
+        # Filter: time range in the future (should return nothing)
+        response = client.get(
+            "/ui/audit",
+            params={
+                "start_time": future.isoformat(),
+                "end_time": (future + timedelta(hours=1)).isoformat(),
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
+
+    def test_audit_pagination_cursor_navigation(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test navigating audit events using cursors."""
+        # Create 7 records
+        for i in range(7):
+            audit_store.save_delivery_audit(
+                create_audit_record(
+                    notification_type=f"type_{i}",
+                    notification_created_at=datetime.now(UTC) - timedelta(minutes=i),
+                )
+            )
+
+        # Page 1
+        response = client.get("/ui/audit", params={"limit": 3})
+        assert response.status_code == 200
+        page1 = response.json()
+        assert len(page1["items"]) == 3
+        assert page1["pagination"]["has_more"] is True
+        cursor1 = page1["pagination"]["next_cursor"]
+
+        # Page 2
+        response = client.get("/ui/audit", params={"limit": 3, "cursor": cursor1})
+        assert response.status_code == 200
+        page2 = response.json()
+        assert len(page2["items"]) == 3
+        assert page2["pagination"]["has_more"] is True
+        cursor2 = page2["pagination"]["next_cursor"]
+
+        # Page 3 (last page)
+        response = client.get("/ui/audit", params={"limit": 3, "cursor": cursor2})
+        assert response.status_code == 200
+        page3 = response.json()
+        assert len(page3["items"]) == 1
+        assert page3["pagination"]["has_more"] is False
+        assert page3["pagination"]["next_cursor"] is None
+
+        # Verify no duplicates across pages
+        all_ids = [item["audit_id"] for item in page1["items"]]
+        all_ids += [item["audit_id"] for item in page2["items"]]
+        all_ids += [item["audit_id"] for item in page3["items"]]
+        assert len(all_ids) == len(set(all_ids))
+
+    def test_filter_audit_combined_filters(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test combining multiple audit filters."""
+        target_agent = uuid4()
+        now = datetime.now(UTC)
+
+        # Target record: matches all filters
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                status=DeliveryStatus.DELIVERED,
+                agent_id=target_agent,
+                autonomy_mode="LIVE",
+                notification_created_at=now,
+            )
+        )
+        # Non-match: wrong status
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                status=DeliveryStatus.FAILED,
+                agent_id=target_agent,
+                autonomy_mode="LIVE",
+                notification_created_at=now,
+            )
+        )
+        # Non-match: wrong agent
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                status=DeliveryStatus.DELIVERED,
+                agent_id=uuid4(),
+                autonomy_mode="LIVE",
+                notification_created_at=now,
+            )
+        )
+
+        response = client.get(
+            "/ui/audit",
+            params={
+                "event_type": "delivery.succeeded",
+                "agent_id": str(target_agent),
+                "autonomy_mode": "LIVE",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 1
+
+
+# =============================================================================
+# Test: Authorization Boundaries (Additional)
+# =============================================================================
+
+
+class TestAuthorizationBoundariesAdditional:
+    """Additional tests for read-only authorization enforcement."""
+
+    def test_audit_patch_not_allowed(self, client: TestClient):
+        """PATCH /ui/audit should return 405."""
+        response = client.patch("/ui/audit", json={"data": "test"})
+        assert response.status_code == 405
+
+    def test_deliveries_detail_post_not_allowed(self, client: TestClient):
+        """POST /ui/deliveries/{id} should return 405."""
+        response = client.post(f"/ui/deliveries/{uuid4()}", json={"data": "test"})
+        assert response.status_code == 405
+
+    def test_invariants_summary_patch_not_allowed(self, client: TestClient):
+        """PATCH /ui/invariants/summary should return 405."""
+        response = client.patch("/ui/invariants/summary", json={})
+        assert response.status_code == 405
+
+    def test_invariants_summary_delete_not_allowed(self, client: TestClient):
+        """DELETE /ui/invariants/summary should return 405."""
+        response = client.delete("/ui/invariants/summary")
+        assert response.status_code == 405
+
+    def test_policies_patch_not_allowed(self, client: TestClient):
+        """PATCH /ui/policies/effective should return 405."""
+        response = client.patch("/ui/policies/effective", json={})
+        assert response.status_code == 405
+
+    def test_no_mutations_via_query_params(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Verify read endpoints don't accidentally mutate data via query params."""
+        # Create initial record
+        audit_store.save_delivery_audit(create_audit_record())
+        initial_count = len(audit_store.delivery_audits)
+
+        # Make various read requests with unusual params
+        client.get("/ui/deliveries", params={"_method": "DELETE"})
+        client.get("/ui/deliveries", params={"action": "delete"})
+        client.get("/ui/audit", params={"_destroy": "true"})
+
+        # Verify no mutations occurred
+        assert len(audit_store.delivery_audits) == initial_count
+
+
+# =============================================================================
+# Test: Response Shape Mapping (Additional)
+# =============================================================================
+
+
+class TestDeliveryAttemptResponseMappingAdditional:
+    """Additional tests for delivery attempts to response shapes."""
+
+    def test_delivery_with_rate_limited_channel(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test delivery with rate-limited channel in attempts."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.RATE_LIMITED,
+                channels_attempted=(Channel.SLACK, Channel.EMAIL),
+                channels_succeeded=(),
+                channels_failed=(),
+            )
+        )
+
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["status"] == "RATE_LIMITED"
+        assert len(data["attempts"]) == 2
+
+    def test_delivery_with_deduplicated_status(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test delivery with deduplicated status."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.DEDUPLICATED,
+                channels_attempted=(),
+                channels_succeeded=(),
+                channels_failed=(),
+            )
+        )
+
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["status"] == "DEDUPLICATED"
+        assert data["attempts"] == []  # No attempts for deduplicated
+
+    def test_delivery_timeline_null_optional_fields(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test delivery timeline handles null optional fields correctly."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                plan_id=None,
+                decision_snapshot_id=None,
+                execution_snapshot_id=None,
+                skip_snapshot_id=None,
+            )
+        )
+
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        ctx = data["autonomy_context"]
+        assert ctx["plan_id"] is None
+        assert ctx["decision_snapshot_id"] is None
+        assert ctx["execution_snapshot_id"] is None
+        assert ctx["skip_snapshot_id"] is None
+
+    def test_delivery_with_all_channels_failed(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test delivery where all channels failed."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.FAILED,
+                channels_attempted=(Channel.SLACK, Channel.EMAIL, Channel.PAGERDUTY),
+                channels_succeeded=(),
+                channels_failed=(Channel.SLACK, Channel.EMAIL, Channel.PAGERDUTY),
+                error_message="All channels failed",
+            )
+        )
+
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["status"] == "FAILED"
+        assert len(data["channels_attempted"]) == 3
+        assert len(data["channels_succeeded"]) == 0
+        assert len(data["channels_failed"]) == 3
+        assert len(data["attempts"]) == 3
+
+        for attempt in data["attempts"]:
+            assert attempt["status"] == "FAILED"
+            assert attempt["error_message"] is not None
+
+
+class TestAuditEventResponseMappingAdditional:
+    """Additional tests for audit event response shapes."""
+
+    def test_escalation_triggered_from_timeout(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test that ack timeouts can indicate escalation events."""
+        notif_id = uuid4()
+
+        # First, create a delivery for SAFETY intent (would require ack)
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                intent="SAFETY",
+                status=DeliveryStatus.DELIVERED,
+            )
+        )
+
+        # Then create ack timeout (escalation trigger)
+        audit_store.save_ack_audit(
+            create_ack_audit_record(
+                notification_id=notif_id,
+                old_status=AckStatus.PENDING,
+                new_status=AckStatus.TIMED_OUT,
+            )
+        )
+
+        # Query for timeout events
+        response = client.get("/ui/audit", params={"event_type": "ack.timed_out"})
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["items"]) == 1
+        event = data["items"][0]
+        assert event["event_type"] == "ack.timed_out"
+        assert event["notification_id"] == str(notif_id)
+        assert event["payload"]["new_status"] == "TIMED_OUT"
+        assert event["payload"]["old_status"] == "PENDING"
+
+    def test_audit_event_payload_contains_channel_info(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test audit event payload includes channel information."""
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                channels_attempted=(Channel.SLACK, Channel.EMAIL),
+                channels_succeeded=(Channel.SLACK,),
+                channels_failed=(Channel.EMAIL,),
+                error_message="Email gateway timeout",
+            )
+        )
+
+        response = client.get("/ui/audit")
+        assert response.status_code == 200
+        data = response.json()
+
+        event = data["items"][0]
+        payload = event["payload"]
+
+        assert "channels_attempted" in payload
+        assert "channels_succeeded" in payload
+        assert "channels_failed" in payload
+        assert "error_message" in payload
+        assert set(payload["channels_attempted"]) == {"SLACK", "EMAIL"}
+        assert payload["channels_succeeded"] == ["SLACK"]
+        assert payload["channels_failed"] == ["EMAIL"]
+        assert payload["error_message"] == "Email gateway timeout"
+
+    def test_ack_dismissed_event_structure(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test dismissed acknowledgment event structure."""
+        notif_id = uuid4()
+
+        audit_store.save_ack_audit(
+            create_ack_audit_record(
+                notification_id=notif_id,
+                old_status=AckStatus.PENDING,
+                new_status=AckStatus.DISMISSED,
+                acked_by="admin@example.com",
+            )
+        )
+
+        response = client.get("/ui/audit", params={"event_type": "ack.dismissed"})
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["items"]) == 1
+        event = data["items"][0]
+        assert event["event_type"] == "ack.dismissed"
+        assert event["payload"]["new_status"] == "DISMISSED"
+        assert event["payload"]["acked_by"] == "admin@example.com"
+
+
+# =============================================================================
+# Test: Edge Cases
+# =============================================================================
+
+
+class TestEdgeCases:
+    """Tests for edge cases and boundary conditions."""
+
+    def test_empty_channels_list(self, client: TestClient, audit_store: InMemoryAuditStore):
+        """Test handling of empty channels list."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.DEDUPLICATED,
+                channels_attempted=(),
+                channels_succeeded=(),
+                channels_failed=(),
+            )
+        )
+
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["channels_attempted"] == []
+        assert data["channels_succeeded"] == []
+        assert data["channels_failed"] == []
+        assert data["attempts"] == []
+
+    def test_large_pagination_request(self, client: TestClient, audit_store: InMemoryAuditStore):
+        """Test pagination with max limit."""
+        # Create 100 records
+        for i in range(100):
+            audit_store.save_delivery_audit(
+                create_audit_record(
+                    notification_created_at=datetime.now(UTC) - timedelta(minutes=i)
+                )
+            )
+
+        response = client.get("/ui/deliveries", params={"limit": 100})
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["items"]) == 100
+        assert data["pagination"]["total_count"] == 100
+        assert data["pagination"]["has_more"] is False
+
+    def test_filter_with_no_data(self, client: TestClient):
+        """Test filtering on empty database returns empty results."""
+        response = client.get(
+            "/ui/deliveries",
+            params={
+                "status": "DELIVERED",
+                "intent": "SAFETY",
+                "autonomy_mode": "LIVE",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["items"] == []
+        assert data["pagination"]["total_count"] == 0
+        assert data["pagination"]["has_more"] is False
+
+    def test_multiple_records_same_notification_id(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test handling multiple audit records for same notification."""
+        notif_id = uuid4()
+
+        # Create multiple records for same notification (e.g., status changes)
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.PENDING,
+                notification_created_at=datetime.now(UTC) - timedelta(minutes=2),
+            )
+        )
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                status=DeliveryStatus.DELIVERED,
+                notification_created_at=datetime.now(UTC) - timedelta(minutes=1),
+            )
+        )
+
+        # Get timeline should return the most recent
+        response = client.get(f"/ui/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should get most recent record (DELIVERED)
+        assert data["status"] == "DELIVERED"
+
+    def test_special_characters_in_notification_type(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test notification types with special characters."""
+        special_type = "app.trading/order:created"
+        audit_store.save_delivery_audit(create_audit_record(notification_type=special_type))
+
+        response = client.get("/ui/deliveries", params={"notification_type": special_type})
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["items"]) == 1
+        assert data["items"][0]["notification_type"] == special_type
+
+
 class TestResponseStructure:
     """Tests validating response structures match contracts."""
 
