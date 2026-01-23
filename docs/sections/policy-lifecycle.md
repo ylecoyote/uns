@@ -23,7 +23,19 @@ Policies transition through defined lifecycle states:
 | **ACTIVE** | Production policy | Applied to all matching notifications |
 | **RETIRED** | Deprecated, kept for audit | Not applied, retained for compliance history |
 
-**Current Implementation Note:** The current implementation treats all registered policies as ACTIVE. State management and versioning are planned features. Policies are either registered (active) or not present (falling back to SDK defaults).
+### Current Implementation Note
+
+The current implementation treats all registered policies as **ACTIVE**. Policies are either registered (active) or not present (falling back to SDK defaults).
+
+### Planned: State Lifecycle Management
+
+The DRAFT, PREVIEW, ACTIVE, and RETIRED states documented above represent the **intended lifecycle contract** for future implementation. This section is documented now to:
+
+1. **Prevent documentation churn** — Defining the contract upfront avoids rework when states are implemented
+2. **Guide implementation** — Developers implementing state management have a clear target specification
+3. **Communicate design intent** — Operators understand the planned evolution without inferring from code
+
+When state management is implemented, the "Current Implementation Note" above will be removed and this section will be updated to document the actual behavior.
 
 ## Policy Loading
 
@@ -119,7 +131,7 @@ new_policy = NotificationPolicy(
 registry.register(new_policy)
 ```
 
-### Planned Features
+### Planned: Version Management
 
 Future versions will support:
 
@@ -127,6 +139,8 @@ Future versions will support:
 - **Hash-based integrity**: SHA256 hash of policy configuration for change detection
 - **Audit trail**: Policy changes recorded with timestamp and actor
 - **Rollback**: Ability to revert to previous policy version
+
+> **Note:** These features are documented as the intended contract. See [Policy States](#policy-states) for rationale on documenting planned features.
 
 ## Policy Application
 
@@ -297,6 +311,8 @@ Future versions will support policy content hashing for:
 - Change detection during reloads
 - Audit trail integrity verification
 - Distributed cache invalidation
+
+> **Note:** See [Policy States](#policy-states) for rationale on documenting planned features.
 
 ## Best Practices
 

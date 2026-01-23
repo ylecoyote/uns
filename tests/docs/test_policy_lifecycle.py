@@ -40,7 +40,9 @@ POLICY_LIFECYCLE_PATH = (
 @pytest.fixture
 def policy_lifecycle_doc() -> str:
     """Load the policy lifecycle documentation."""
-    assert POLICY_LIFECYCLE_PATH.exists(), f"policy-lifecycle.md not found at {POLICY_LIFECYCLE_PATH}"
+    assert POLICY_LIFECYCLE_PATH.exists(), (
+        f"policy-lifecycle.md not found at {POLICY_LIFECYCLE_PATH}"
+    )
     return POLICY_LIFECYCLE_PATH.read_text()
 
 
@@ -111,6 +113,72 @@ class TestPolicyLifecycleDocStructure:
         assert "## API Reference" in policy_lifecycle_doc
 
 
+class TestPolicyStateDisclaimerRationale:
+    """Test the policy state disclaimer and planned vs implemented rationale.
+
+    These tests verify that the documentation clearly distinguishes between
+    current implementation behavior and planned features, with explicit
+    rationale for documenting planned features upfront.
+    """
+
+    def test_has_current_implementation_note(self, policy_lifecycle_doc: str) -> None:
+        """Verify document has current implementation note section."""
+        assert "### Current Implementation Note" in policy_lifecycle_doc
+
+    def test_current_implementation_describes_active_behavior(
+        self, policy_lifecycle_doc: str
+    ) -> None:
+        """Verify current implementation note explains ACTIVE-only behavior."""
+        assert "treats all registered policies as **ACTIVE**" in policy_lifecycle_doc
+        assert "registered (active) or not present" in policy_lifecycle_doc
+
+    def test_has_planned_state_lifecycle_section(self, policy_lifecycle_doc: str) -> None:
+        """Verify document has planned state lifecycle management section."""
+        assert "### Planned: State Lifecycle Management" in policy_lifecycle_doc
+
+    def test_planned_section_explains_rationale(self, policy_lifecycle_doc: str) -> None:
+        """Verify planned section explains why planned features are documented."""
+        assert "intended lifecycle contract" in policy_lifecycle_doc
+        assert "Prevent documentation churn" in policy_lifecycle_doc
+        assert "Guide implementation" in policy_lifecycle_doc
+        assert "Communicate design intent" in policy_lifecycle_doc
+
+    def test_planned_section_references_future_removal(self, policy_lifecycle_doc: str) -> None:
+        """Verify planned section mentions when note will be removed."""
+        assert 'Current Implementation Note" above will be removed' in policy_lifecycle_doc
+
+    def test_has_planned_version_management_section(self, policy_lifecycle_doc: str) -> None:
+        """Verify document has planned version management section."""
+        assert "### Planned: Version Management" in policy_lifecycle_doc
+
+    def test_planned_version_management_references_rationale(
+        self, policy_lifecycle_doc: str
+    ) -> None:
+        """Verify planned version management section references the rationale."""
+        # The section should reference the Policy States section for rationale
+        assert "See [Policy States](#policy-states) for rationale" in policy_lifecycle_doc
+
+    def test_has_planned_policy_hashing_section(self, policy_lifecycle_doc: str) -> None:
+        """Verify document has planned policy content hashing section."""
+        assert "### Planned: Policy Content Hashing" in policy_lifecycle_doc
+
+    def test_distinguishes_planned_from_implemented(self, policy_lifecycle_doc: str) -> None:
+        """Verify document clearly distinguishes planned from implemented features.
+
+        The documentation should clearly label what is currently implemented
+        versus what is planned for future implementation.
+        """
+        # Current behavior sections exist
+        assert (
+            "### Current Behavior" in policy_lifecycle_doc
+            or "### Current Implementation Note" in policy_lifecycle_doc
+        )
+
+        # Planned sections are labeled with "Planned:"
+        planned_sections = policy_lifecycle_doc.count("### Planned:")
+        assert planned_sections >= 2, "Should have multiple planned sections"
+
+
 class TestPolicyLifecycleDocContent:
     """Test the content completeness of the documentation."""
 
@@ -178,18 +246,20 @@ class TestPolicyRegistrationExample:
     def test_configure_with_policy_list(self) -> None:
         """Test example: configuring with policy list."""
         # From documentation example
-        registry = configure_policy_registry(policies=[
-            {
-                "notification_type": "risk.breach.detected",
-                "delivery_mode": "GUARANTEED",
-                "require_ack": True,
-                "channels_by_mode": {
-                    "LIVE": ["SLACK", "WEBSOCKET", "PAGERDUTY"],
-                    "SHADOW": ["WEBSOCKET"],
-                    "PREVIEW": ["WEBSOCKET"],
+        registry = configure_policy_registry(
+            policies=[
+                {
+                    "notification_type": "risk.breach.detected",
+                    "delivery_mode": "GUARANTEED",
+                    "require_ack": True,
+                    "channels_by_mode": {
+                        "LIVE": ["SLACK", "WEBSOCKET", "PAGERDUTY"],
+                        "SHADOW": ["WEBSOCKET"],
+                        "PREVIEW": ["WEBSOCKET"],
+                    },
                 },
-            },
-        ])
+            ]
+        )
 
         # Verify configuration
         policy = registry.get_sync("risk.breach.detected")
@@ -285,9 +355,7 @@ class TestPolicyResolutionPriority:
         )
         assert shadow_channels == [Channel.SLACK, Channel.WEBSOCKET]
 
-    def test_policy_takes_precedence_over_sdk_default(
-        self, clean_registry: PolicyRegistry
-    ) -> None:
+    def test_policy_takes_precedence_over_sdk_default(self, clean_registry: PolicyRegistry) -> None:
         """Test that policy value takes precedence over SDK default."""
         # OPERATIONAL default is BEST_EFFORT
         sdk_default = get_default_delivery_mode(NotificationIntent.OPERATIONAL)
@@ -422,7 +490,11 @@ class TestChannelDefaultsTable:
             (AutonomyMode.PREVIEW, NotificationIntent.INFORMATIONAL, [Channel.WEBSOCKET]),
             # SHADOW mode
             (AutonomyMode.SHADOW, NotificationIntent.OPERATIONAL, [Channel.WEBSOCKET]),
-            (AutonomyMode.SHADOW, NotificationIntent.GOVERNANCE, [Channel.SLACK, Channel.WEBSOCKET]),
+            (
+                AutonomyMode.SHADOW,
+                NotificationIntent.GOVERNANCE,
+                [Channel.SLACK, Channel.WEBSOCKET],
+            ),
         ],
     )
     def test_channel_defaults_match_documentation(
@@ -478,9 +550,7 @@ class TestDedupWindowDocumentation:
         window = clean_registry.get_dedup_window("test.notification")
         assert window == 600
 
-    def test_missing_policy_uses_default_dedup_window(
-        self, clean_registry: PolicyRegistry
-    ) -> None:
+    def test_missing_policy_uses_default_dedup_window(self, clean_registry: PolicyRegistry) -> None:
         """Test that missing policy uses default dedup window."""
         window = clean_registry.get_dedup_window("missing.policy")
         assert window == DEFAULT_DEDUP_WINDOW_SECONDS
