@@ -2,6 +2,17 @@
 
 This document defines the response shapes, filters, pagination, and error semantics for all UI data endpoints in the Unified Notification Service (UNS).
 
+## Endpoint Path Convention
+
+All UI endpoints use the `/api/v1/` prefix for versioning (e.g., `/api/v1/notifications`, `/api/v1/audit-events`). Implementation endpoints may use `/ui/` internally.
+
+## Phase Scope
+
+| Phase | Status | Endpoints |
+|-------|--------|-----------|
+| **Phase 0/1** | Implemented | Delivery timelines, effective policy, invariants, audit events |
+| **Phase 2** | Planned | Escalations, audit statistics, policy simulation |
+
 ## Design Principles
 
 1. **Read-only** - All endpoints are read-only per [UI Scope v1](ui-scope.md)
@@ -288,14 +299,28 @@ View how a notification's routing was determined, showing the resolution chain f
 GET /api/v1/notifications/{notification_id}/policy-trace
 ```
 
+For live resolution preview (without a notification):
+
+```
+GET /api/v1/policy-trace
+```
+
+#### Query Parameters (Required)
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `notification_type` | string | The notification type to resolve |
+| `intent` | string | SAFETY, GOVERNANCE, OPERATIONAL, or INFORMATIONAL |
+| `autonomy_mode` | string | PREVIEW, SHADOW, or LIVE |
+| `irreversible` | bool | Whether the action is irreversible (default: false) |
+
 ### Response Shape
 
 ```typescript
 interface PolicyResolutionTraceResponse {
-  notification_id: string;
   notification_type: string;
 
-  // Effective values (what was actually used)
+  // Effective values (what would be used)
   effective: {
     delivery_mode: "GUARANTEED" | "BEST_EFFORT";
     channels: Channel[];
@@ -342,13 +367,19 @@ The `resolution` field shows the full resolution chain per [Policy Lifecycle](..
 4. sdk_default        - SDK default derived from intent + autonomy_mode
 ```
 
-### Simulate Policy Resolution
+### Errors
 
-Preview how a hypothetical notification would be resolved.
+| Code | Condition |
+|------|-----------|
+| `invalid_parameter` | Missing required parameters or invalid enum value |
+
+### Policy Simulation
 
 ```
 POST /api/v1/policy-trace/simulate
 ```
+
+Preview how a hypothetical notification would be resolved without sending it.
 
 #### Request Body
 
@@ -371,13 +402,6 @@ interface PolicySimulationRequest {
 #### Response
 
 Returns `PolicyResolutionTraceResponse` showing how the notification would be resolved.
-
-### Errors
-
-| Code | Condition |
-|------|-----------|
-| `not_found` | notification_id does not exist |
-| `invalid_parameter` | Invalid simulation parameters |
 
 ---
 
@@ -490,6 +514,12 @@ View the audit trail of all notification-related events.
 GET /api/v1/audit-events
 ```
 
+For notification-specific audit events:
+
+```
+GET /api/v1/notifications/{notification_id}/audit-events
+```
+
 ### Query Parameters
 
 | Parameter | Type | Description |
@@ -552,17 +582,17 @@ interface AuditEvent {
   correlation_id?: string;
 }
 
-// Union type for event payloads
+// Type union for event-specific payloads
 type AuditEventPayload =
   | NotificationCreatedPayload
-  | DeliveryStartedPayload
-  | ChannelAttemptedPayload
   | DeliveryOutcomePayload
+  | ChannelAttemptPayload
   | AckStatusChangePayload
-  | EscalationTriggeredPayload;
+  | EscalationPayload;
 
 interface NotificationCreatedPayload {
   type: "notification.created";
+  notification_type: string;
   intent: string;
   delivery_mode: string;
   channels: Channel[];
@@ -571,27 +601,25 @@ interface NotificationCreatedPayload {
   source: string;
 }
 
-interface DeliveryStartedPayload {
-  type: "delivery.started";
-  delivery_mode: string;
-  channels_to_attempt: Channel[];
-}
-
-interface ChannelAttemptedPayload {
-  type: "delivery.channel_attempted";
-  channel: Channel;
-  success: boolean;
-  error_message?: string;
-  duration_ms: number;
-  message_id?: string;
-}
-
 interface DeliveryOutcomePayload {
-  type: "delivery.succeeded" | "delivery.failed" | "delivery.deduplicated" | "delivery.rate_limited";
+  type: "delivery.started" | "delivery.succeeded" | "delivery.failed" | "delivery.deduplicated" | "delivery.rate_limited";
   status: string;
+  channels_attempted: Channel[];
   channels_succeeded: Channel[];
   channels_failed: Channel[];
   error_message?: string;
+  error_code?: string;
+  duration_ms?: number;
+}
+
+interface ChannelAttemptPayload {
+  type: "delivery.channel_attempted";
+  channel: Channel;
+  status: "SUCCESS" | "FAILED" | "RATE_LIMITED" | "SKIPPED";
+  error_message?: string;
+  error_code?: string;
+  duration_ms: number;
+  metadata?: Record<string, unknown>;
 }
 
 interface AckStatusChangePayload {
@@ -599,31 +627,26 @@ interface AckStatusChangePayload {
   old_status: string | null;
   new_status: string;
   acked_by?: string;
-  metadata?: Record<string, unknown>;
+  acked_at?: string;
+  timeout_minutes?: number;
 }
 
-interface EscalationTriggeredPayload {
+interface EscalationPayload {
   type: "escalation.triggered";
   escalation_type: "delivery_failure" | "ack_timeout";
-  channel_errors?: ChannelError[];
+  escalation_id: string;
+  callback_invoked: boolean;
+  callback_result?: string;
 }
 ```
 
-### Get Events for Notification
+### Errors
 
-```
-GET /api/v1/notifications/{notification_id}/audit-events
-```
-
-Returns all audit events for a specific notification in chronological order.
-
-#### Query Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `cursor` | string | Pagination cursor |
-| `limit` | number | Items per page (default: 25, max: 100) |
-| `event_type` | string | Filter by event type |
+| Code | Condition |
+|------|-----------|
+| `not_found` | notification_id does not exist |
+| `invalid_parameter` | Invalid filter value or time range |
+| `invalid_cursor` | Cursor expired or malformed |
 
 ### Audit Event Statistics
 
@@ -680,15 +703,76 @@ interface TimeSeriesBucket {
 }
 ```
 
-### Errors
+---
 
-| Code | Condition |
-|------|-----------|
-| `not_found` | notification_id does not exist |
-| `invalid_parameter` | Invalid filter value or time range |
-| `invalid_cursor` | Cursor expired or malformed |
+# Future Endpoints (Planned)
+
+The following endpoints are designed but not yet fully implemented. They are documented here for planning purposes.
+
+## F1. Real-time Event Streaming
+
+> **Status**: Planned for Phase 3
+
+WebSocket endpoint for real-time audit event streaming.
+
+### Endpoint
+
+```
+WS /api/v1/audit-events/stream
+```
+
+### Connection Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `event_types` | string[] | Filter by event types (optional) |
+| `agent_id` | string | Filter by agent UUID (optional) |
+| `autonomy_mode` | string | Filter by autonomy mode (optional) |
+
+### Message Format
+
+```typescript
+interface StreamMessage {
+  type: "event" | "heartbeat" | "error";
+  timestamp: string;
+  payload: AuditEvent | HeartbeatPayload | ErrorPayload;
+}
+```
 
 ---
+
+## F2. Batch Operations
+
+> **Status**: Planned for Phase 3
+
+Batch queries for multiple notifications.
+
+### Endpoint
+
+```
+POST /api/v1/batch/delivery-timelines
+```
+
+### Request Body
+
+```typescript
+interface BatchTimelineRequest {
+  notification_ids: string[];       // Max 100
+}
+```
+
+### Response
+
+```typescript
+interface BatchTimelineResponse {
+  results: Record<string, DeliveryTimelineResponse | null>;
+  errors: Record<string, ErrorDetail>;
+}
+```
+
+---
+
+# Reference
 
 ## HTTP Status Code Summary
 
