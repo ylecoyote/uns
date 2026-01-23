@@ -973,3 +973,170 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 ✅ Optional improvements do not contradict core specifications
 ✅ Validation tests created and passing
 ✅ No blocking issues identified
+
+---
+
+## UI Phase 1: Build Invariants Viewer (List + Summary) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Implemented the Invariants Viewer feature for the UNS UI dashboard. This provides a read-only interface for viewing system invariants with filtering, pagination, and summary statistics per the uns-ui-phase-1.yaml task specification.
+
+### Components Created
+
+#### Frontend (apps/ui/)
+
+1. **Type Definitions** (`apps/ui/src/types/`)
+   - `invariants.ts` - TypeScript types matching docs/ui/ui-data-contracts.md:
+     - InvariantSeverity, EnforcementType, InvariantStatus
+     - EvidenceLink, InvariantEnforcement, InvariantEntry
+     - PaginationInfo, InvariantListResponse, InvariantSummaryResponse
+     - InvariantFilters
+   - `common.ts` - Shared types (ErrorDetail, ErrorResponse, ApiError)
+   - `index.ts` - Type exports
+
+2. **API Client** (`apps/ui/src/api/`)
+   - `client.ts` - Base API client with:
+     - Request ID propagation (X-Request-ID header)
+     - Consistent error handling per ErrorResponse contract
+     - Query string builder utility
+   - `invariants.ts` - Typed client for:
+     - `fetchInvariants(filters)` - GET /ui/invariants
+     - `fetchInvariantsSummary()` - GET /ui/invariants/summary
+   - `index.ts` - API exports
+
+3. **React Hooks** (`apps/ui/src/hooks/`)
+   - `useInvariants.ts`:
+     - `useInvariants(filters)` - Fetch invariants list with pagination
+     - `useInvariantsSummary()` - Fetch summary statistics
+   - `index.ts` - Hook exports
+
+4. **Components** (`apps/ui/src/components/`)
+   - `InvariantsSummary.tsx` - Summary panel displaying:
+     - Total invariant count
+     - Breakdown by severity (HIGH/MEDIUM/LOW)
+     - Breakdown by enforcement type (guard/isolation/test/exception)
+     - Breakdown by status (active/inactive)
+     - Exceptions requiring review count
+     - Degraded state warning banner
+     - Last updated timestamp
+   - `InvariantsFilter.tsx` - Filter controls for:
+     - Severity dropdown
+     - Enforcement type dropdown
+     - Status dropdown
+     - Full-text search with Enter key support
+     - Clear filters button
+   - `InvariantsList.tsx` - Paginated list displaying:
+     - Invariant cards with ID, statement, badges
+     - Evidence links with file paths and notes
+     - Mitigation details for exceptions
+     - Owner and last reviewed date
+     - Load More pagination button
+     - Total count display
+   - `index.ts` - Component exports
+
+5. **Pages** (`apps/ui/src/pages/`)
+   - `InvariantsPage.tsx` - Main page combining:
+     - Summary panel (sidebar)
+     - Filter controls
+     - Error display with request ID
+     - Paginated invariants list
+     - Degraded state handling
+   - `index.ts` - Page exports
+
+6. **Documentation** (`apps/ui/README.md`)
+   - Non-authoritative rules (read-only posture)
+   - Feature description
+   - Local development instructions
+   - API endpoints used
+
+#### Backend Tests
+
+1. **tests/mcp_server/test_routes_ui_invariants.py** - 42 comprehensive tests:
+
+   **TestInvariantsList** (17 tests)
+   - List returns items from YAML
+   - Entry structure matches ui-data-contracts.md
+   - Filter by severity (HIGH, MEDIUM, LOW)
+   - Filter by enforcement type (guard, isolation, test, exception)
+   - Filter by status (active, inactive)
+   - Search by statement
+   - Combined filters
+   - Pagination limit
+   - Pagination info structure
+   - Evidence links structure
+   - Mitigation for exceptions
+
+   **TestInvariantsSummary** (8 tests)
+   - Returns statistics
+   - Severity breakdown
+   - Enforcement type breakdown
+   - Status breakdown
+   - Total count matches list
+   - Breakdowns sum to total
+   - Exceptions count matches
+   - Last updated is valid timestamp
+
+   **TestInvariantsReadOnly** (8 tests)
+   - POST /ui/invariants returns 405
+   - PUT /ui/invariants returns 405
+   - PATCH /ui/invariants returns 405
+   - DELETE /ui/invariants returns 405
+   - POST /ui/invariants/summary returns 405
+   - PUT /ui/invariants/summary returns 405
+   - PATCH /ui/invariants/summary returns 405
+   - DELETE /ui/invariants/summary returns 405
+
+   **TestInvariantsEdgeCases** (9 tests)
+   - Invalid severity returns 422
+   - Invalid enforcement_type returns 422
+   - Invalid status returns 422
+   - Empty search returns all
+   - Search is case-insensitive
+   - Limit bounds (min=1, max=100)
+   - Limit over max returns 422
+   - Limit under min returns 422
+
+#### Frontend Tests
+
+1. **apps/ui/tests/InvariantsPage.test.tsx** - Component tests for:
+   - Initial render (title, list, summary)
+   - Filtering by severity, enforcement type, status, search
+   - Clear filters functionality
+   - Pagination (info, Load More, cursor navigation)
+   - Error handling (API failures, request ID display)
+   - Degraded state warning display
+   - Empty state message
+
+### Files Created
+- `apps/ui/README.md`
+- `apps/ui/src/types/invariants.ts`
+- `apps/ui/src/types/common.ts`
+- `apps/ui/src/types/index.ts`
+- `apps/ui/src/api/client.ts`
+- `apps/ui/src/api/invariants.ts`
+- `apps/ui/src/api/index.ts`
+- `apps/ui/src/hooks/useInvariants.ts`
+- `apps/ui/src/hooks/index.ts`
+- `apps/ui/src/components/InvariantsSummary.tsx`
+- `apps/ui/src/components/InvariantsFilter.tsx`
+- `apps/ui/src/components/InvariantsList.tsx`
+- `apps/ui/src/components/index.ts`
+- `apps/ui/src/pages/InvariantsPage.tsx`
+- `apps/ui/src/pages/index.ts`
+- `apps/ui/tests/InvariantsPage.test.tsx`
+- `tests/mcp_server/test_routes_ui_invariants.py`
+
+### Test Results
+- 42 new backend tests passing
+- 104 existing UI route tests passing (unchanged)
+- All linting checks pass (ruff check + ruff format)
+
+### Acceptance Criteria Met (per uns-ui-phase-1.yaml)
+✅ Invariants list with filters (severity, enforcement_type, status, search)
+✅ Pagination support (cursor-based)
+✅ Summary panel using /ui/invariants/summary
+✅ Degraded state display when API returns errors
+✅ Read-only posture (all endpoints are GET-only)
+✅ Apps/ui/* components created
