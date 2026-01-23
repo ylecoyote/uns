@@ -1,0 +1,123 @@
+# Progress Report: Add API routes for ack/status
+
+## Task: Add API routes for ack/status (if applicable)
+
+## What was implemented
+
+### 1. Acknowledgment Engine (`src/notification/acknowledgment.py`)
+- `AcknowledgmentEngine` class with full ack lifecycle management
+- `ack()` method - Acknowledge a notification (idempotent)
+- `dismiss()` method - Dismiss a notification
+- `check_ack_timeout()` method - Handle timeout with SAFETY escalation
+- `get_status()` and `get_notification()` query methods
+- `register_notification()` - Register notification for ack tracking
+- Valid status transitions: PENDING → ACKED/DISMISSED/TIMED_OUT, TIMED_OUT → ACKED
+- In-memory storage implementation for testing
+- Protocol definitions for `AckStorage` and `EscalationHandler`
+- Exception classes: `NotificationNotFoundError`, `InvalidAckTransitionError`
+- Global engine configuration via `configure_ack_engine()` and `get_ack_engine()`
+
+### 2. API Routes (`src/mcp_server/routes_notification.py`)
+Per PRD Task 10 requirements:
+
+**Endpoints:**
+- `POST /v1/notifications/{id}/ack` - Acknowledge a notification
+  - Request body: `{acked_by?: string, metadata?: object}`
+  - Returns 200 with ack details on success
+  - Returns 404 if notification not found
+  - Returns 409 if invalid status transition
+
+- `POST /v1/notifications/{id}/dismiss` - Dismiss a notification
+  - Request body: `{dismissed_by?: string, metadata?: object}`
+  - Same response codes as ack endpoint
+
+- `GET /v1/notifications/{id}` - Get notification status
+  - Returns full notification details + ack status
+  - Returns `found: false` if notification not in storage
+
+- `GET /v1/notifications/{id}/ack-status` - Get ack status only
+  - Returns just the ack status or null if not tracked
+
+**Features:**
+- Pydantic request/response models with validation
+- Proper HTTP status codes (200, 404, 409)
+- Structured error responses
+- Logging for audit trail
+- Auto-initialization of ack engine
+
+### 3. FastAPI Application (`src/mcp_server/app.py`)
+- Application factory `create_app()`
+- Health check endpoint at `/health`
+- OpenAPI documentation at `/docs`
+
+### 4. Supporting Code
+- Core models in `src/notification/models.py` (Notification, AckStatus, etc.)
+- Interfaces in `src/notification/interfaces.py` (AcknowledgmentCallback protocol)
+- Project configuration in `pyproject.toml` with FastAPI, uvicorn dependencies
+
+## Tests Written
+
+### `tests/notification/test_acknowledgment.py` (19 tests)
+- TestAck: success, callback triggers, idempotency, not found, invalid transitions
+- TestDismiss: success, callback triggers, invalid transitions
+- TestCheckAckTimeout: timeout handling, SAFETY escalation, skip already acked
+- TestGetStatus: pending, not found
+- TestRegisterNotification: with/without require_ack
+- TestGlobalEngine: configuration and retrieval
+
+### `tests/mcp_server/test_routes_notification.py` (15 tests)
+- TestAckEndpoint: success, no body, idempotent, not found, dismissed conflict
+- TestDismissEndpoint: success, no body, acked conflict
+- TestGetNotificationStatus: found, after ack, not found
+- TestGetAckStatus: pending, acked, not tracked
+- TestHealthEndpoint: health check
+
+**Total: 34 tests, all passing**
+
+## Test Results
+```
+============================== 34 passed in 0.55s ==============================
+```
+
+## Linting Results
+```
+All checks passed!
+```
+
+## Files Created/Modified
+- src/notification/models.py (new)
+- src/notification/interfaces.py (new)
+- src/notification/acknowledgment.py (new)
+- src/mcp_server/routes_notification.py (new)
+- src/mcp_server/app.py (new)
+- src/__init__.py (new)
+- src/notification/__init__.py (new)
+- src/notification/adapters/__init__.py (new)
+- src/notification/integrations/__init__.py (new)
+- src/mcp_server/__init__.py (new)
+- tests/__init__.py (new)
+- tests/notification/__init__.py (new)
+- tests/notification/test_acknowledgment.py (new)
+- tests/mcp_server/__init__.py (new)
+- tests/mcp_server/test_routes_notification.py (new)
+- pyproject.toml (new)
+- progress.txt (this file)
+
+## PRD Compliance
+
+Per PRD Task 10 - API Routes:
+✅ `POST /v1/notifications/{id}/ack` implemented
+✅ `GET /v1/notifications/{id}` (status) implemented
+✅ Ack endpoint writes audit (via logging)
+✅ Ack endpoint triggers callback (via AcknowledgmentCallback protocol)
+
+Additional endpoints added:
+✅ `POST /v1/notifications/{id}/dismiss` - for dismissal workflow
+✅ `GET /v1/notifications/{id}/ack-status` - lightweight status query
+
+Per PRD Task 9 - Acknowledgment Engine (prerequisite):
+✅ `ack(notification_id, ack_status, acked_by, metadata)` implemented
+✅ Idempotency: repeated ack is safe
+✅ `check_ack_timeout(notification_id, intent, autonomy_context)` implemented
+✅ Timeout updates state to TIMED_OUT
+✅ SAFETY timeout triggers re-escalation
