@@ -11,7 +11,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 
 def _utc_now() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
@@ -301,3 +302,45 @@ class AckEvent(BaseModel):
             data["ack_status"] = data["status"]
 
         return data
+
+
+# Helper functions for default value derivation
+
+
+def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
+    """Derive delivery mode from intent.
+
+    SAFETY and GOVERNANCE imply GUARANTEED delivery mode.
+    OPERATIONAL and INFORMATIONAL use BEST_EFFORT.
+    """
+    return INTENT_DELIVERY_MODE_MAP[intent]
+
+
+def get_default_priority(intent: NotificationIntent) -> Priority:
+    """Derive priority from intent.
+
+    SAFETY and GOVERNANCE are HIGH priority.
+    OPERATIONAL is NORMAL priority.
+    INFORMATIONAL is LOW priority.
+    """
+    return INTENT_PRIORITY_MAP[intent]
+
+
+def get_default_ack_timeout_minutes(intent: NotificationIntent) -> int | None:
+    """Get default ack timeout for the given intent.
+
+    Returns:
+        Timeout in minutes for SAFETY (15) and GOVERNANCE (30).
+        None for OPERATIONAL and INFORMATIONAL.
+    """
+    return DEFAULT_ACK_TIMEOUTS.get(intent)
+
+
+def get_default_require_ack(intent: NotificationIntent, autonomy_mode: AutonomyMode) -> bool:
+    """Determine if acknowledgment is required based on intent and mode.
+
+    From PRD section 7:
+    - If intent == SAFETY and autonomy_mode == LIVE: require_ack = true
+    - Otherwise: require_ack = false (by default)
+    """
+    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE

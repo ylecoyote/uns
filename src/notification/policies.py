@@ -26,10 +26,9 @@ intent-based defaults as specified in the PRD.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    from notification.models import AutonomyMode, DeliveryMode, NotificationIntent
+from pydantic import BaseModel, Field
 
 from notification.models import (
     AutonomyMode,
@@ -40,38 +39,6 @@ from notification.models import (
     get_default_delivery_mode,
     get_default_require_ack,
 )
-
-
-@dataclass(frozen=True)
-class NotificationPolicy:
-    '''
-    Policy configuration for a notification type.
-
-    Policies can override default behavior for specific notification types.
-    All fields are optional - if not specified, defaults are derived from
-    the notification's intent and autonomy mode.
-    '''
-
-    notification_type: str
-    delivery_mode: DeliveryMode | None = None
-    channels: list[Channel] | None = None
-    require_ack: bool | None = None
-    ack_timeout_minutes: int | None = None
-    dedup_window_seconds: int | None = None
-    mode_overrides: dict[AutonomyMode, "ModeOverride"] | None = None
-
-
-@dataclass(frozen=True)
-class ModeOverride:
-    """Per-autonomy-mode overrides for a policy.
-
-    Allows fine-grained control over routing behavior based on
-    whether the system is in PREVIEW, SHADOW, or LIVE mode.
-    """
-
-    channels: list[Channel] | None = None
-    require_ack: bool | None = None
-
 
 # Default channel mappings per intent for LIVE mode
 _DEFAULT_CHANNELS_LIVE: dict[NotificationIntent, list[Channel]] = {
@@ -97,13 +64,6 @@ _DEFAULT_CHANNELS_SHADOW: dict[NotificationIntent, list[Channel]] = {
     NotificationIntent.INFORMATIONAL: [Channel.WEBSOCKET],
 }
 
-# Default ack timeout per intent (in minutes)
-_DEFAULT_ACK_TIMEOUTS: dict[NotificationIntent, int] = {
-    NotificationIntent.SAFETY: 15,
-    NotificationIntent.GOVERNANCE: 30,
-    NotificationIntent.OPERATIONAL: 60,
-    NotificationIntent.INFORMATIONAL: 120,
-}
 # Default dedup window (in seconds)
 DEFAULT_DEDUP_WINDOW_SECONDS = 300  # 5 minutes
 
@@ -142,18 +102,10 @@ class NotificationPolicy(BaseModel):
     delivery_mode: DeliveryMode | None = Field(
         default=None, description="Base delivery mode override"
     )
-    channels: list[Channel] = Field(
-        default_factory=list, description="Default channels"
-    )
-    require_ack: bool | None = Field(
-        default=None, description="Base ack requirement"
-    )
-    ack_timeout_minutes: int | None = Field(
-        default=None, description="Base ack timeout"
-    )
-    dedup_window_seconds: int | None = Field(
-        default=None, description="Deduplication window"
-    )
+    channels: list[Channel] = Field(default_factory=list, description="Default channels")
+    require_ack: bool | None = Field(default=None, description="Base ack requirement")
+    ack_timeout_minutes: int | None = Field(default=None, description="Base ack timeout")
+    dedup_window_seconds: int | None = Field(default=None, description="Deduplication window")
 
     # Mode-specific overrides
     preview_override: ModeOverride | None = Field(
@@ -162,9 +114,7 @@ class NotificationPolicy(BaseModel):
     shadow_override: ModeOverride | None = Field(
         default=None, description="SHADOW mode overrides"
     )
-    live_override: ModeOverride | None = Field(
-        default=None, description="LIVE mode overrides"
-    )
+    live_override: ModeOverride | None = Field(default=None, description="LIVE mode overrides")
 
     # Alternative: dict-based mode overrides for compatibility
     mode_overrides: dict[AutonomyMode, ModeOverride] | None = Field(
@@ -175,9 +125,7 @@ class NotificationPolicy(BaseModel):
     channels_by_mode: dict[AutonomyMode, list[Channel]] | None = Field(
         default=None, description="Per-mode channel routing configuration"
     )
-    priority_override: str | None = Field(
-        default=None, description="Priority override"
-    )
+    priority_override: str | None = Field(default=None, description="Priority override")
 
     model_config = {"frozen": True}
 
@@ -362,23 +310,6 @@ def _get_default_channels(
     return [Channel.WEBSOCKET]
 
 
-def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
-    """Get the default delivery mode for an intent.
-
-    Per PRD:
-    - SAFETY and GOVERNANCE -> GUARANTEED
-    - OPERATIONAL and INFORMATIONAL -> BEST_EFFORT
-
-    Args:
-        intent: The notification intent
-
-    Returns:
-        The appropriate DeliveryMode
-    """
-    if intent in (NotificationIntent.SAFETY, NotificationIntent.GOVERNANCE):
-        return DeliveryMode.GUARANTEED
-    return DeliveryMode.BEST_EFFORT
-
 def get_default_channels(
     intent: NotificationIntent,
     autonomy_mode: AutonomyMode,
@@ -419,26 +350,6 @@ def get_default_channels(
     return channels
 
 
-def get_default_require_ack(
-    intent: NotificationIntent,
-    autonomy_mode: AutonomyMode,
-) -> bool:
-    """Determine if acknowledgment is required by default.
-
-    Per PRD:
-    - SAFETY in LIVE mode -> true
-    - All other cases -> false
-
-    Args:
-        intent: The notification intent
-        autonomy_mode: Current operating mode
-
-    Returns:
-        Whether acknowledgment is required
-    """
-    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE
-
-
 def get_default_ack_timeout(intent: NotificationIntent) -> int | None:
     """Get the default acknowledgment timeout for an intent.
 
@@ -449,21 +360,6 @@ def get_default_ack_timeout(intent: NotificationIntent) -> int | None:
         Timeout in minutes, or None if no timeout applies
     """
     return get_default_ack_timeout_minutes(intent)
-    """Get the default acknowledgment timeout for an intent.
-
-    Args:
-        intent: The notification intent
-
-    Returns:
-    Get the default acknowledgment timeout for an intent.
-
-    Args:
-        intent: The notification intent
-
-    Returns:
-        Timeout in minutes, or None if no timeout applies
-    """
-    return _DEFAULT_ACK_TIMEOUTS.get(intent, 60)
 
 
 @dataclass
@@ -484,7 +380,7 @@ class PolicyRegistry:
         """Register a policy for a notification type.
 
         Args:
-        policy: The policy to register.
+            policy: The policy to register.
         """
         self._policies[policy.notification_type] = policy
 
@@ -562,7 +458,7 @@ class PolicyRegistry:
         """
         for policy_data in policies_data:
             # Convert string keys to enums for channels_by_mode
-            channels_by_mode = {}
+            channels_by_mode: dict[AutonomyMode, list[Channel]] = {}
             for mode_str, channels_list in policy_data.get("channels_by_mode", {}).items():
                 mode = AutonomyMode(mode_str)
                 channels = [Channel(c) for c in channels_list]
@@ -586,6 +482,7 @@ class PolicyRegistry:
     def __len__(self) -> int:
         """Return the number of registered policies."""
         return len(self._policies)
+
     def get_channels_for_mode(
         self,
         notification_type: str,
@@ -596,9 +493,10 @@ class PolicyRegistry:
         """Get channels for a notification, considering policy overrides.
 
         Resolution order:
-        1. Policy mode-specific override
-        2. Policy default channels
-        3. SDK default channels
+        1. Policy mode-specific override (individual fields or dict)
+        2. Policy channels_by_mode (compatibility)
+        3. Policy default channels
+        4. SDK default channels
 
         Args:
             notification_type: The notification type
@@ -611,18 +509,10 @@ class PolicyRegistry:
         """
         policy = self.get_sync(notification_type)
         if policy is not None:
-            # Check mode-specific override first
-            channels = None
-            if policy.mode_overrides and autonomy_mode in policy.mode_overrides:
-                mode_override = policy.mode_overrides[autonomy_mode]
-                if mode_override.channels is not None:
-                    channels = mode_override.channels.copy()
-
-            # Then check policy default channels
-            if channels is None and policy.channels is not None:
-                channels = policy.channels.copy()
-
+            # Use the policy's get_channels_for_mode which handles all override types
+            channels = policy.get_channels_for_mode(autonomy_mode, intent)
             if channels is not None:
+                channels = list(channels)  # Make a copy
                 # Add PagerDuty for irreversible SAFETY in LIVE mode
                 if (
                     intent == NotificationIntent.SAFETY
@@ -630,7 +520,7 @@ class PolicyRegistry:
                     and autonomy_mode == AutonomyMode.LIVE
                     and Channel.PAGERDUTY not in channels
                 ):
-                    return channels + [Channel.PAGERDUTY]
+                    channels.append(Channel.PAGERDUTY)
                 return channels
 
         # Fall back to SDK defaults
@@ -645,9 +535,10 @@ class PolicyRegistry:
         """Determine if ack is required, considering policy overrides.
 
         Resolution order:
-        1. Policy mode-specific override
+        1. Policy mode-specific override (individual fields or dict)
         2. Policy default require_ack
         3. SDK default (SAFETY + LIVE only)
+
         Args:
             notification_type: The notification type
             intent: The notification intent
@@ -658,15 +549,10 @@ class PolicyRegistry:
         """
         policy = self.get_sync(notification_type)
         if policy is not None:
-            # Check mode-specific override first
-            if policy.mode_overrides and autonomy_mode in policy.mode_overrides:
-                mode_override = policy.mode_overrides[autonomy_mode]
-                if mode_override.require_ack is not None:
-                    return mode_override.require_ack
-
-            # Then check policy default
-            if policy.require_ack is not None:
-                return policy.require_ack
+            # Use the policy's get_require_ack_for_mode which handles all override types
+            result = policy.get_require_ack_for_mode(autonomy_mode, intent)
+            if result is not None:
+                return result
 
         # Fall back to SDK defaults
         return get_default_require_ack(intent, autonomy_mode)
@@ -756,20 +642,6 @@ def set_policy_registry(registry: PolicyRegistry) -> None:
     global _policy_registry
     _policy_registry = registry
 
-_policy_registry: PolicyRegistry | None = None
-
-
-def get_policy_registry() -> PolicyRegistry:
-    """Get the global policy registry instance.
-
-    Returns:
-        The singleton PolicyRegistry instance
-    """
-    global _policy_registry
-    if _policy_registry is None:
-        _policy_registry = PolicyRegistry()
-    return _policy_registry
-
 
 def configure_policy_registry(
     registry: PolicyRegistry | None = None,
@@ -789,3 +661,80 @@ def configure_policy_registry(
     if policies:
         _policy_registry.load_from_dict(policies)
     return _policy_registry
+
+
+# Aliases for backward compatibility
+def get_default_registry() -> PolicyRegistry:
+    """Alias for get_policy_registry() for backward compatibility."""
+    return get_policy_registry()
+
+
+def set_default_registry(registry: PolicyRegistry) -> None:
+    """Alias for set_policy_registry() for backward compatibility."""
+    set_policy_registry(registry)
+
+
+# Top-level resolution functions for convenience
+def resolve_channels(
+    notification_type: str,
+    autonomy_mode: AutonomyMode,
+    intent: NotificationIntent,
+    irreversible: bool = False,
+    registry: PolicyRegistry | None = None,
+) -> list[Channel]:
+    """Resolve channels using specified or global registry.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode
+        intent: The notification intent
+        irreversible: Whether action is irreversible
+        registry: Optional registry to use (defaults to global)
+
+    Returns:
+        List of channels for delivery
+    """
+    reg = registry if registry is not None else get_policy_registry()
+    return reg.get_channels_for_mode(notification_type, intent, autonomy_mode, irreversible)
+
+
+def resolve_require_ack(
+    notification_type: str,
+    autonomy_mode: AutonomyMode,
+    intent: NotificationIntent,
+    registry: PolicyRegistry | None = None,
+) -> bool:
+    """Resolve ack requirement using specified or global registry.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode
+        intent: The notification intent
+        registry: Optional registry to use (defaults to global)
+
+    Returns:
+        Whether acknowledgment is required
+    """
+    reg = registry if registry is not None else get_policy_registry()
+    return reg.get_require_ack_for_mode(notification_type, intent, autonomy_mode)
+
+
+def resolve_delivery_mode(
+    notification_type: str,
+    autonomy_mode: AutonomyMode,
+    intent: NotificationIntent,
+    registry: PolicyRegistry | None = None,
+) -> DeliveryMode:
+    """Resolve delivery mode using specified or global registry.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode
+        intent: The notification intent
+        registry: Optional registry to use (defaults to global)
+
+    Returns:
+        The delivery mode to use
+    """
+    reg = registry if registry is not None else get_policy_registry()
+    return reg.get_delivery_mode(notification_type, intent)
