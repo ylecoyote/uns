@@ -205,9 +205,7 @@ class MetricsCollector:
         prefix = f"{method}:{endpoint}:"
         return sum(v for k, v in self._error_counts.items() if k.startswith(prefix))
 
-    def get_latency_stats(
-        self, endpoint: str, method: str = "GET"
-    ) -> dict[str, float] | None:
+    def get_latency_stats(self, endpoint: str, method: str = "GET") -> dict[str, float] | None:
         """Get latency statistics for an endpoint.
 
         Returns:
