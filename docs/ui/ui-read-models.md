@@ -15,6 +15,22 @@ The read model adapters provide an abstraction layer between the HTTP endpoints 
 - Easy testing with mock data
 - Clean separation of concerns
 
+## Quick Start
+
+**For local demo (no database required):**
+```bash
+# In-memory storage, data lost on restart
+uvicorn mcp_server.app:app --reload
+```
+
+**For production (with database persistence):**
+```bash
+export DATABASE_URL="postgresql://user:pass@localhost/uns"
+uvicorn mcp_server.app:app
+```
+
+The application automatically configures the appropriate storage backend at startup based on the `DATABASE_URL` environment variable. See [Configuration](#configuration) for details.
+
 ## Architecture
 
 ```
@@ -149,36 +165,67 @@ Filter criteria for audit event queries:
 
 ## Configuration
 
-### Default Configuration
+### Automatic Startup Configuration
 
-By default, the system uses `InMemoryReadModelAdapter`:
+The application automatically configures persistence at startup via `configure_persistence()` in `app.py`. Configuration is controlled by environment variables:
 
-```python
-# Automatic on first access
-from mcp_server.read_models import get_read_model_adapter
-adapter = get_read_model_adapter()  # Returns InMemoryReadModelAdapter
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | SQLAlchemy database URL | Not set (uses in-memory) |
+| `UNS_CREATE_TABLES` | Create tables on startup | `true` |
+
+**Local Demo Mode (no DATABASE_URL):**
+```bash
+# Uses shared in-memory storage
+# Data is NOT persisted across restarts
+uvicorn mcp_server.app:app --reload
 ```
 
-### Production Configuration
+**Production Mode (DATABASE_URL set):**
+```bash
+# Uses SQLAlchemy with PostgreSQL
+export DATABASE_URL="postgresql://user:pass@localhost/uns"
+export UNS_CREATE_TABLES="true"
+uvicorn mcp_server.app:app
+```
 
-For production, configure before starting the application:
+### Manual Configuration
+
+For custom setups or testing, you can configure adapters manually:
 
 ```python
-# In app startup (e.g., app.py or main.py)
-import os
+# Create app without automatic persistence config
+from mcp_server.app import create_app
+app = create_app(skip_persistence_config=True)
+
+# Then configure manually
 from mcp_server.read_models import (
     create_sqlalchemy_adapter,
     configure_read_model_adapter,
 )
-
-database_url = os.environ.get("DATABASE_URL", "sqlite:///uns.db")
 adapter = create_sqlalchemy_adapter(database_url, create_tables=True)
 configure_read_model_adapter(adapter)
 ```
 
 ### Integration with AuditStore
 
-For in-memory adapter, share the audit store with the notification service:
+The startup configuration automatically wires the audit store and read model adapter to share data:
+
+**In-Memory Mode (local demo):**
+- Creates a shared `InMemoryAuditStore`
+- Configures `PersistentAuditLogger` with the shared store (writes)
+- Configures `InMemoryReadModelAdapter` with the shared store (reads)
+- Notifications written by the service are immediately visible in UI endpoints
+
+**Database Mode (production):**
+- Both audit logger and read adapter connect to the same database
+- Uses `SQLAlchemyAuditStore` for writes
+- Uses `SQLAlchemyReadModelAdapter` for reads
+- Data persists across restarts
+
+### Manual Integration (for testing)
+
+For unit tests, you can manually share the audit store:
 
 ```python
 from notification.audit import (

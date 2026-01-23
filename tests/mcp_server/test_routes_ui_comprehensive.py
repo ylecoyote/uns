@@ -55,7 +55,8 @@ def adapter(audit_store: InMemoryAuditStore) -> InMemoryReadModelAdapter:
 @pytest.fixture
 def client(adapter: InMemoryReadModelAdapter) -> TestClient:
     """Create a test client with fresh read model adapter."""
-    app = create_app()
+    # Skip automatic persistence configuration to use our manually configured adapter
+    app = create_app(skip_persistence_config=True)
     return TestClient(app)
 
 
