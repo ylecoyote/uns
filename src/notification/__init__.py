@@ -11,7 +11,10 @@ This package provides the core notification infrastructure including:
 - Policy registry and routing rules
 - Deduplication and rate limiting
 - Acknowledgment handling
+- SDK for notification sending
 """
+
+__version__ = "0.1.0"
 
 from .interfaces import (
     AcknowledgmentCallback,
@@ -38,8 +41,27 @@ from .models import (
     get_default_priority,
     get_default_require_ack,
 )
-
-__version__ = "0.1.0"
+from .policies import (
+    ModeOverride,
+    NotificationPolicy,
+    PolicyRegistry,
+    configure_policy_registry,
+    get_default_ack_timeout,
+    get_default_channels,
+    get_default_registry,
+    get_policy_registry,
+    resolve_channels,
+    resolve_delivery_mode,
+    resolve_require_ack,
+    set_default_registry,
+)
+from .sdk import (
+    NotificationSDK,
+    ValidationError,
+    configure_sdk,
+    create_sdk,
+    get_sdk,
+)
 
 __all__ = [
     # Enums
@@ -63,9 +85,28 @@ __all__ = [
     "NoOpAcknowledgmentCallback",
     "LoggingAcknowledgmentCallback",
     "CompositeAcknowledgmentCallback",
-    # Helper functions
+    # Helper functions from models
     "get_default_delivery_mode",
     "get_default_priority",
     "get_default_ack_timeout_minutes",
     "get_default_require_ack",
+    # Policies
+    "ModeOverride",
+    "NotificationPolicy",
+    "PolicyRegistry",
+    "get_policy_registry",
+    "configure_policy_registry",
+    "get_default_registry",
+    "set_default_registry",
+    "get_default_channels",
+    "get_default_ack_timeout",
+    "resolve_channels",
+    "resolve_require_ack",
+    "resolve_delivery_mode",
+    # SDK
+    "NotificationSDK",
+    "ValidationError",
+    "create_sdk",
+    "get_sdk",
+    "configure_sdk",
 ]

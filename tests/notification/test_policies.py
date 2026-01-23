@@ -402,6 +402,10 @@ class TestDefaultAckTimeout:
         """Test GOVERNANCE has 30 minute timeout."""
         assert get_default_ack_timeout(NotificationIntent.GOVERNANCE) == 30
 
+    def test_operational_no_timeout(self):
+        """Test OPERATIONAL has no timeout."""
+        assert get_default_ack_timeout(NotificationIntent.OPERATIONAL) is None
+
 
 class TestPolicyRegistry:
     """Tests for PolicyRegistry class."""
@@ -461,6 +465,18 @@ class TestPolicyRegistry:
         registry.register(NotificationPolicy(notification_type="b"))
         types = registry.list_notification_types()
         assert set(types) == {"a", "b"}
+
+    def test_get_all(self, registry: PolicyRegistry) -> None:
+        """get_all returns all policies."""
+        policy1 = NotificationPolicy(notification_type="test.event1")
+        policy2 = NotificationPolicy(notification_type="test.event2")
+        registry.register(policy1)
+        registry.register(policy2)
+
+        all_policies = registry.get_all()
+        assert len(all_policies) == 2
+        assert "test.event1" in all_policies
+        assert "test.event2" in all_policies
 
     def test_clear_registry(self, registry: PolicyRegistry) -> None:
         """clear removes all policies."""
@@ -591,6 +607,40 @@ class TestPolicyRegistry:
         """Test dedup window falls back to default."""
         window = registry.get_dedup_window("nonexistent")
         assert window == DEFAULT_DEDUP_WINDOW_SECONDS
+
+    def test_load_from_dict(self, registry: PolicyRegistry) -> None:
+        """Test loading policies from dictionary data."""
+        policies_data = [
+            {
+                "notification_type": "trading.order_placed",
+                "delivery_mode": "GUARANTEED",
+                "require_ack": True,
+                "channels_by_mode": {
+                    "LIVE": ["SLACK", "WEBSOCKET"],
+                    "PREVIEW": ["WEBSOCKET"],
+                },
+                "ack_timeout_minutes": 15,
+            },
+            {
+                "notification_type": "trading.price_update",
+                "delivery_mode": "BEST_EFFORT",
+            },
+        ]
+
+        registry.load_from_dict(policies_data)
+
+        policy1 = registry.get_sync("trading.order_placed")
+        assert policy1 is not None
+        assert policy1.delivery_mode == DeliveryMode.GUARANTEED
+        assert policy1.require_ack is True
+        assert policy1.get_channels_for_mode(AutonomyMode.LIVE) == [
+            Channel.SLACK,
+            Channel.WEBSOCKET,
+        ]
+
+        policy2 = registry.get_sync("trading.price_update")
+        assert policy2 is not None
+        assert policy2.delivery_mode == DeliveryMode.BEST_EFFORT
 
 
 class TestDefaultRegistry:

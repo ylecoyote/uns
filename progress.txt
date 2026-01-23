@@ -425,3 +425,90 @@ This implementation satisfies PRD Task 7 requirements:
 - pytest>=7.0.0 (dev)
 - pytest-asyncio>=0.21.0 (dev)
 - ruff>=0.1.0 (dev)
+
+---
+
+## Task 8: SDK (Producer Interface) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented the SDK producer interface with send(), validation guards, and policy overrides.
+
+### Files Created
+
+1. **src/notification/sdk.py**
+   - `NotificationSDK` class with hard validation guards:
+     - `autonomy_context` REQUIRED (hard guard)
+     - `autonomy_mode` must be set in context
+     - `agent_id` must be present in context
+   - Primary `send()` method with:
+     - Policy lookup and override behavior
+     - Delivery mode derivation (policy → intent default)
+     - Channel derivation (override → policy → intent/mode default)
+     - Require_ack derivation (override → policy → SAFETY+LIVE rule)
+     - Priority derivation (override → policy → intent default)
+     - Ack timeout derivation (policy → intent default)
+     - Auto-generated dedup_key (SHA256 of type+agent_id)
+     - Configurable delivery_handler for RQ integration
+   - Convenience methods:
+     - `send_safety()` - SAFETY intent with GUARANTEED delivery
+     - `send_governance()` - GOVERNANCE intent with GUARANTEED delivery
+     - `send_operational()` - OPERATIONAL intent with BEST_EFFORT delivery
+     - `send_info()` - INFORMATIONAL intent with BEST_EFFORT delivery
+   - Factory functions:
+     - `create_sdk()` - Create configured SDK instance
+     - `get_sdk()` - Get global singleton SDK
+     - `configure_sdk()` - Configure global SDK
+
+2. **tests/notification/test_sdk.py** - 34 tests covering:
+   - Validation guards (autonomy_context required)
+   - Context provider integration
+   - Delivery mode derivation (GUARANTEED vs BEST_EFFORT)
+   - Channel derivation by intent and mode
+   - PagerDuty escalation for irreversible SAFETY notifications
+   - PREVIEW mode WebSocket-only routing
+   - Require_ack derivation (SAFETY+LIVE rule)
+   - Ack timeout derivation
+   - Policy overrides (delivery_mode, channels, require_ack)
+   - Explicit override precedence over policy
+   - Priority derivation by intent
+   - Dedup key generation and stability
+   - Factory functions (create_sdk, get_sdk)
+
+### Validation Rules Implemented (from PRD)
+
+1. **autonomy_context required** - Hard guard enforced
+2. **Title max 200 chars** - Validated by Pydantic
+3. **Message max 4000 chars** - Validated by Pydantic
+4. **DeliveryMode derivation**:
+   - SAFETY → GUARANTEED
+   - GOVERNANCE → GUARANTEED
+   - OPERATIONAL → BEST_EFFORT
+   - INFORMATIONAL → BEST_EFFORT
+5. **Require Ack derivation**:
+   - If policy specifies → use policy
+   - Else if SAFETY AND LIVE → true
+   - Else → false
+6. **Ack Timeout defaults**:
+   - SAFETY → 15 minutes
+   - GOVERNANCE → 30 minutes
+
+### Channel Routing Rules (from PRD Section 6.2)
+
+#### LIVE Mode
+- SAFETY → Slack, WebSocket (+ PagerDuty if irreversible)
+- GOVERNANCE → Slack, WebSocket
+- OPERATIONAL → Slack
+- INFORMATIONAL → WebSocket
+
+#### PREVIEW Mode
+- All intents → WebSocket only
+
+#### SHADOW Mode
+- OPERATIONAL → WebSocket
+- GOVERNANCE → Slack, WebSocket
+
+### Test Results
+- All tests pass
+- Linting passes (ruff check)
