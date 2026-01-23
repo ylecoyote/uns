@@ -338,34 +338,24 @@ This section defines the **explicit sequence of generation tasks** Ralphy should
 **Must include:**
 
 * `NotificationContextProvider` protocol
+  * `get_current_context() -> AutonomyContext`
+  * `get_context_for_agent(agent_id: UUID) -> AutonomyContext` (optional but recommended)
+  * `get_autonomy_mode() -> AutonomyMode` (convenience)
 * `AcknowledgmentCallback` protocol
-* `DefaultContextProvider`
+  * `on_ack(event: AckEvent)`
+  * `on_dismiss(event: AckEvent)`
+  * `on_timeout(event: AckEvent)`
+  * `on_status_change(notification_id, old_status, new_status, metadata)` (optional general hook)
+* Default implementations:
+  * `DefaultContextProvider`
+  * `NoOpAcknowledgmentCallback`
+  * `LoggingAcknowledgmentCallback`
+  * `CompositeAcknowledgmentCallback`
 
 **Acceptance:**
 
 * Core SDK can run without ATP imports
-
----
-
-## Task 3 — Policy Schema + Registry
-
-**Goal:** Define canonical policy object, loader, and lookup.
-
-**Artifacts:**
-
-* `src/notification/policies.py`
-
-**Must include:**
-
-* `NotificationPolicy` (typed object)
-* `get_channels_for_mode(autonomy_mode)`
-* `get_require_ack_for_mode(autonomy_mode)`
-* `PolicyRegistry` with `get_sync(notification_type)`
-
-**Acceptance:**
-
-* Policy lookup failure falls back to SDK defaults
-* Mode overrides apply deterministically
+* Protocols are runtime-checkable (optional but recommended)
 
 ---
 
@@ -468,11 +458,15 @@ This section defines the **explicit sequence of generation tasks** Ralphy should
 * Hard validation for autonomy_context + autonomy_mode + agent_id
 * Policy lookup override behavior
 * Default channel derivation by mode + intent
+* Delivery dispatch via **configurable handler** (e.g., enqueue to RQ if provided)
 * `send_safety`, `send_governance`, `send_operational`, `send_info`
 
 **Acceptance:**
 
-* Calls enqueue RQ job with serialized notification payload
+* `send()` produces a serialized `Notification` payload and passes it to an injected `delivery_handler`
+  * If using RQ, the handler enqueues an RQ job
+  * If not using RQ, a synchronous handler is allowed (tests/dev)
+
 
 ---
 

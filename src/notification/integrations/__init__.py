@@ -1,4 +1,4 @@
-"""Integration interfaces and implementations for UNS.
+"""Integrations interfaces and implementations for UNS.
 
 This module provides protocols for external system integration,
 allowing UNS to remain ATP-agnostic through dependency injection interfaces.
