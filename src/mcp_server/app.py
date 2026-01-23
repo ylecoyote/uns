@@ -10,6 +10,7 @@ import logging
 
 from fastapi import FastAPI
 
+from mcp_server.observability import ObservabilityMiddleware
 from mcp_server.routes_notification import router as notification_router
 from mcp_server.routes_ui import router as ui_router
 
@@ -29,6 +30,10 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # Add observability middleware for UI endpoints
+    # This provides request ID generation, metrics, and structured logging
+    app.add_middleware(ObservabilityMiddleware, ui_prefix="/ui")
 
     # Include notification routes
     app.include_router(notification_router)
