@@ -17,11 +17,15 @@ Read Model Adapters:
 - Endpoints are wired to read model adapters (see read_models.py)
 - Default: InMemoryReadModelAdapter for local demo (data lost on restart)
 - Production: Configure SQLAlchemyReadModelAdapter for persistence
+
+Observability:
+- All endpoints emit request metrics via ObservabilityMiddleware
+- Structured logs include request IDs for correlation
+- Error metrics are recorded for 4xx/5xx responses
 """
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -30,6 +34,12 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from mcp_server.observability import (
+    create_error_response_with_request_id,
+    get_structured_logger,
+    log_endpoint_call,
+    record_endpoint_error,
+)
 from mcp_server.read_models import (
     AuditEventFilter,
     DeliveryFilter,
@@ -51,7 +61,7 @@ from notification.policies import (
     get_policy_registry,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_structured_logger(__name__)
 
 router = APIRouter(prefix="/ui", tags=["ui"])
 
@@ -372,10 +382,15 @@ async def list_deliveries(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    logger.info(
-        "list_deliveries called: cursor=%s, limit=%d, filters applied",
-        cursor,
-        limit,
+    log_endpoint_call(
+        logger,
+        "list_deliveries",
+        cursor=cursor,
+        limit=limit,
+        status=status.value if status else None,
+        intent=intent.value if intent else None,
+        delivery_mode=delivery_mode.value if delivery_mode else None,
+        autonomy_mode=autonomy_mode.value if autonomy_mode else None,
     )
 
     # Build filter criteria
@@ -444,22 +459,34 @@ async def get_delivery_timeline(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    logger.info("get_delivery_timeline called: notification_id=%s", notification_id)
+    log_endpoint_call(
+        logger,
+        "get_delivery_timeline",
+        notification_id=str(notification_id),
+    )
 
     # Query read model adapter
     adapter = get_read_model_adapter()
     timeline = adapter.get_delivery_timeline(notification_id)
 
     if timeline is None:
+        error_response = create_error_response_with_request_id(
+            code="not_found",
+            message=f"Notification not found: {notification_id}",
+        )
+        record_endpoint_error(
+            endpoint="/ui/deliveries/{id}",
+            error_code="not_found",
+            error_message=f"Notification not found: {notification_id}",
+            status_code=404,
+        )
+        logger.warning(
+            "Delivery timeline not found",
+            extra={"notification_id": str(notification_id)},
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": {
-                    "code": "not_found",
-                    "message": f"Notification not found: {notification_id}",
-                },
-                "request_id": "stub-request-id",
-            },
+            detail=error_response,
         )
 
     # Convert attempts to response model
@@ -525,11 +552,13 @@ async def get_effective_policy(
     3. policy_base - Policy base value
     4. sdk_default - SDK default derived from intent + autonomy_mode
     """
-    logger.info(
-        "get_effective_policy called: notification_type=%s, intent=%s, mode=%s",
-        notification_type,
-        intent.value,
-        autonomy_mode.value,
+    log_endpoint_call(
+        logger,
+        "get_effective_policy",
+        notification_type=notification_type,
+        intent=intent.value,
+        autonomy_mode=autonomy_mode.value,
+        irreversible=irreversible,
     )
 
     registry = get_policy_registry()
@@ -743,11 +772,20 @@ async def list_invariants(
     Returns invariants from docs/verification/invariants.yml.
     Filters can be applied to narrow results.
     """
-    logger.info(
-        "list_invariants called: cursor=%s, limit=%d, severity=%s",
-        cursor,
-        limit,
-        severity,
+    # Handle case when called internally (params may not be resolved Query objects)
+    severity_val = severity.value if severity and hasattr(severity, "value") else None
+    enforcement_val = enforcement_type.value if enforcement_type and hasattr(enforcement_type, "value") else None
+    status_val = invariant_status.value if invariant_status and hasattr(invariant_status, "value") else None
+
+    log_endpoint_call(
+        logger,
+        "list_invariants",
+        cursor=cursor,
+        limit=limit,
+        severity=severity_val,
+        enforcement_type=enforcement_val,
+        status=status_val,
+        search=search,
     )
 
     # Load invariants from YAML file
@@ -794,14 +832,14 @@ async def list_invariants(
                     mitigation=inv.get("mitigation"),
                 )
 
-                # Apply filters
-                if severity and entry.severity != severity:
+                # Apply filters (check hasattr in case called internally without FastAPI resolution)
+                if severity and hasattr(severity, "value") and entry.severity != severity:
                     continue
-                if enforcement_type and entry.enforcement.type != enforcement_type:
+                if enforcement_type and hasattr(enforcement_type, "value") and entry.enforcement.type != enforcement_type:
                     continue
-                if invariant_status and entry.status != invariant_status:
+                if invariant_status and hasattr(invariant_status, "value") and entry.status != invariant_status:
                     continue
-                if search and search.lower() not in entry.statement.lower():
+                if search and isinstance(search, str) and search.lower() not in entry.statement.lower():
                     continue
 
                 items.append(entry)
@@ -819,9 +857,21 @@ async def list_invariants(
                 ),
             )
         else:
-            logger.warning("Invariants file not found at %s", invariants_path)
+            logger.warning(
+                "Invariants file not found",
+                extra={"path": str(invariants_path)},
+            )
     except Exception as e:
-        logger.error("Error loading invariants: %s", e)
+        logger.error(
+            "Error loading invariants",
+            extra={"error": str(e)},
+        )
+        record_endpoint_error(
+            endpoint="/ui/invariants",
+            error_code="invariants_load_error",
+            error_message=str(e),
+            status_code=200,  # Still returns empty response, not a 500
+        )
 
     # Fallback empty response
     return InvariantListResponse(
@@ -845,7 +895,7 @@ async def list_invariants(
 )
 async def get_invariants_summary() -> InvariantSummaryResponse:
     """Get summary statistics for invariants."""
-    logger.info("get_invariants_summary called")
+    log_endpoint_call(logger, "get_invariants_summary")
 
     # Reuse list_invariants logic
     result = await list_invariants(limit=100)
@@ -901,11 +951,16 @@ async def list_audit_events(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    logger.info(
-        "list_audit_events called: cursor=%s, limit=%d, event_type=%s",
-        cursor,
-        limit,
-        event_type,
+    log_endpoint_call(
+        logger,
+        "list_audit_events",
+        cursor=cursor,
+        limit=limit,
+        event_type=event_type.value if event_type else None,
+        notification_id=str(notification_id) if notification_id else None,
+        agent_id=str(agent_id) if agent_id else None,
+        autonomy_mode=autonomy_mode.value if autonomy_mode else None,
+        correlation_id=correlation_id,
     )
 
     # Build filter criteria
