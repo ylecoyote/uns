@@ -1,0 +1,106 @@
+# Progress Log - Unified Notification Service
+
+## Task: Implement policy schema + registry (mode-aware routing)
+
+### Completed Work
+
+#### 1. Project Scaffolding (Task 0 prerequisite)
+Created the package structure:
+- `src/__init__.py`
+- `src/notification/__init__.py`
+- `src/notification/adapters/__init__.py`
+- `src/notification/integrations/__init__.py`
+- `tests/__init__.py`
+- `tests/notification/__init__.py`
+- `pyproject.toml` with dependencies and tool configuration
+
+#### 2. Core Enums and Models (Task 1 prerequisite)
+Created `src/notification/models.py` with:
+- `NotificationIntent` enum (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL)
+- `DeliveryMode` enum (GUARANTEED, BEST_EFFORT)
+- `AutonomyMode` enum (PREVIEW, SHADOW, LIVE)
+- `AckStatus` enum (PENDING, ACKED, DISMISSED, TIMED_OUT)
+- `Channel` enum (SLACK, EMAIL, WEBSOCKET, PAGERDUTY)
+- `Priority` enum (HIGH, NORMAL, LOW)
+- `DeliveryStatus` enum
+- `AutonomyContext` model (frozen, requires agent_id and autonomy_mode)
+- `Notification` model with validation guards (title <= 200 chars, message <= 4000 chars)
+- `NotificationResult` and `AckEvent` models
+- Helper functions: `get_default_delivery_mode`, `get_default_priority`, `get_default_ack_timeout_minutes`, `get_default_require_ack`
+
+#### 3. Integration Interfaces (Task 2 prerequisite)
+Created `src/notification/interfaces.py` with:
+- `NotificationContextProvider` protocol
+- `AcknowledgmentCallback` protocol
+- `DefaultContextProvider` implementation
+- `NoOpAcknowledgmentCallback` implementation
+
+#### 4. Policy Schema + Registry (Task 3 - Main Task)
+Created `src/notification/policies.py` with:
+
+**ModeOverride model:**
+- Mode-specific configuration for channels, require_ack, delivery_mode
+
+**NotificationPolicy model:**
+- notification_type identifier
+- Base configuration (intent, delivery_mode, channels, require_ack, ack_timeout_minutes, dedup_window_seconds)
+- Mode overrides (preview_override, shadow_override, live_override)
+- Methods:
+  - `get_channels_for_mode(autonomy_mode, intent)` - deterministic channel resolution
+  - `get_require_ack_for_mode(autonomy_mode, intent)` - ack requirement resolution
+  - `get_delivery_mode_for_mode(autonomy_mode, intent)` - delivery mode resolution
+  - `get_ack_timeout_minutes_for_mode(autonomy_mode, intent)` - timeout resolution
+
+**PolicyRegistry class:**
+- `register(policy)` - add policy
+- `register_many(policies)` - batch add
+- `unregister(notification_type)` - remove policy
+- `get_sync(notification_type)` - lookup policy (returns None for fallback)
+- `has_policy(notification_type)` - check existence
+- `list_notification_types()` - list all registered types
+- `clear()` - remove all policies
+
+**Helper functions:**
+- `get_default_registry()` - global singleton registry
+- `set_default_registry(registry)` - replace default
+- `resolve_channels(...)` - top-level channel resolution with PagerDuty handling
+- `resolve_require_ack(...)` - top-level ack resolution
+- `resolve_delivery_mode(...)` - top-level delivery mode resolution
+
+**SDK Default Channel Rules implemented:**
+- PREVIEW mode: All intents -> WebSocket only
+- SHADOW mode: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket
+- LIVE mode: SAFETY -> Slack + WebSocket, GOVERNANCE -> Slack + WebSocket, OPERATIONAL -> Slack, INFORMATIONAL -> WebSocket
+- Irreversible SAFETY adds PagerDuty
+
+#### 5. Tests
+Created comprehensive test suites:
+
+**tests/notification/test_models.py (25 tests):**
+- Enum value tests
+- AutonomyContext creation and immutability
+- Notification creation with validation guards
+- NotificationResult and AckEvent tests
+- Default derivation function tests
+
+**tests/notification/test_policies.py (53 tests):**
+- ModeOverride creation tests
+- NotificationPolicy creation and configuration tests
+- Channel resolution with mode overrides
+- Ack requirement resolution with mode overrides
+- Delivery mode resolution tests
+- SDK default channel rules tests
+- PolicyRegistry operations (register, unregister, lookup, clear)
+- Default registry singleton tests
+- Resolve helper function tests
+- PRD invariant verification tests
+
+### Test Results
+- All 78 tests pass
+- Linting passes (ruff check)
+
+### PRD Acceptance Criteria Met
+1. Policy lookup failure falls back to SDK defaults
+2. Mode overrides apply deterministically
+3. All routing rules from PRD section 6 implemented
+4. All acknowledgment rules from PRD section 7 implemented
