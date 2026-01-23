@@ -610,3 +610,57 @@ Implemented audit/persistence layer, including database models and audit stores.
 ✅ Multiple storage backends supported (in-memory, file, database)
 ✅ All tests pass
 ✅ All linting checks pass
+
+---
+
+## Task 1 (Agent 2 - Branch Fix): Core Enums and Models Bug Fixes - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Fixed critical bugs in the core models and policies modules that were preventing tests from passing.
+
+### Issues Fixed
+
+#### 1. Missing ConfigDict Import in models.py
+- Added `ConfigDict` import from pydantic which was used but not imported
+
+#### 2. Missing Helper Functions in models.py
+- Added `get_default_delivery_mode(intent)` - derive delivery mode from intent
+- Added `get_default_priority(intent)` - derive priority from intent
+- Added `get_default_ack_timeout_minutes(intent)` - get default ack timeout
+- Added `get_default_require_ack(intent, autonomy_mode)` - determine ack requirement
+
+#### 3. Major Fixes in policies.py
+The file had multiple critical issues:
+- Duplicate class definitions (ModeOverride, NotificationPolicy defined twice - once as dataclass, once as Pydantic)
+- Missing `BaseModel` and `Field` imports from pydantic
+- Missing `Any` type import
+- Duplicate function definitions (get_default_delivery_mode, get_default_require_ack, get_policy_registry)
+- Duplicate global variable declarations
+- Corrupted docstring in `get_default_ack_timeout`
+
+Rewrote the entire file with:
+- Clean Pydantic-based ModeOverride and NotificationPolicy classes
+- Proper PolicyRegistry implementation with all required methods
+- Helper functions with correct signatures matching test expectations
+- Fixed resolve_* functions to accept optional `registry` parameter
+- Fixed PolicyRegistry.get_channels_for_mode to use policy's get_channels_for_mode method
+- Fixed PolicyRegistry.get_require_ack_for_mode to use policy's get_require_ack_for_mode method
+
+### Test Results
+- **58 model tests passing** (tests/notification/test_models.py)
+- **77 policy tests passing** (tests/notification/test_policies.py)
+- **135 total tests passing**
+- All ruff linting checks passing
+
+### Files Modified
+- `src/notification/models.py` - Fixed imports, added helper functions
+- `src/notification/policies.py` - Complete rewrite to fix all issues
+
+### Verified Invariants
+- SAFETY/GOVERNANCE → GUARANTEED delivery mode
+- OPERATIONAL/INFORMATIONAL → BEST_EFFORT delivery mode
+- SAFETY + LIVE → require_ack = true
+- Policy mode overrides apply correctly (preview_override, shadow_override, live_override)
+- SDK default channel routing rules working correctly

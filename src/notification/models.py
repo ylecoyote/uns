@@ -205,8 +205,6 @@ class AutonomyContext(BaseModel):
         default=None, description="Optional skip snapshot identifier"
     )
 
-# (merge conflict resolved: nothing needed here, as model_config is already set above with ConfigDict(frozen=True))
-
 class Notification(BaseModel):
     """Core notification domain object.
 
@@ -356,47 +354,3 @@ class AckEvent(BaseModel):
             data["ack_status"] = data["status"]
 
         return data
-
-
-def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
-    """Derive default delivery mode from intent.
-
-    Per PRD:
-    - SAFETY -> GUARANTEED
-    - GOVERNANCE -> GUARANTEED
-    - OPERATIONAL -> BEST_EFFORT
-    - INFORMATIONAL -> BEST_EFFORT
-    """
-    return INTENT_DELIVERY_MODE_MAP[intent]
-
-
-def get_default_priority(intent: NotificationIntent) -> Priority:
-    """Derive default priority from intent.
-
-    Per PRD:
-    - SAFETY, GOVERNANCE -> HIGH
-    - OPERATIONAL -> NORMAL
-    - INFORMATIONAL -> LOW
-    """
-    return INTENT_PRIORITY_MAP[intent]
-
-
-def get_default_ack_timeout_minutes(intent: NotificationIntent) -> int | None:
-    """Get default ack timeout for an intent.
-
-    Per PRD:
-    - SAFETY: 15 minutes
-    - GOVERNANCE: 30 minutes
-    - Others: None
-    """
-    return DEFAULT_ACK_TIMEOUTS.get(intent)
-
-
-def get_default_require_ack(intent: NotificationIntent, autonomy_mode: AutonomyMode) -> bool:
-    """Determine if acknowledgment is required by default.
-
-    Per PRD:
-    - SAFETY + LIVE -> true
-    - Otherwise -> false
-    """
-    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE
