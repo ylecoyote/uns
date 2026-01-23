@@ -6,6 +6,8 @@ This document describes the architecture of the Unified Notification Service (UN
 
 UNS is a control-plane notification and acknowledgment service designed for autonomous agent systems. It provides:
 
+> **Note:** UNS is ATP-agnostic (Autonomous Trading Platform agnostic). The core SDK and delivery pipeline function independently of any specific trading platform. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation.
+
 - Policy-driven, multi-channel notification delivery
 - Intent-based routing with delivery guarantees
 - Mode-aware behavior for different operational contexts
@@ -363,6 +365,10 @@ else:
 
 ## Integration Points
 
+UNS uses protocol-based interfaces for external integration. These protocols allow UNS to remain ATP-agnostic while supporting rich integration with external systems.
+
+> **Note:** All integration points are optional. UNS functions in standalone mode with default implementations. See [Integration Modes](sections/integration-modes.md) for detailed integration options.
+
 ### Context Provider Protocol
 
 ```python
@@ -371,6 +377,8 @@ class NotificationContextProvider(Protocol):
     def get_context_for_agent(agent_id: UUID) -> AutonomyContext
     def get_autonomy_mode(self) -> AutonomyMode
 ```
+
+**Default:** `DefaultContextProvider` provides minimal standalone functionality.
 
 ### Acknowledgment Callback Protocol
 
@@ -382,6 +390,8 @@ class AcknowledgmentCallback(Protocol):
     def on_status_change(notification_id, old, new, metadata) -> None
 ```
 
+**Default:** `NoOpAcknowledgmentCallback` silently accepts events. `LoggingAcknowledgmentCallback` logs events for debugging.
+
 ### Delivery Handler
 
 ```python
@@ -389,6 +399,10 @@ delivery_handler: Callable[[Notification], NotificationResult]
 ```
 
 Can be synchronous (testing) or queue-based (RQ, Celery) for production.
+
+### WebSocket Connections
+
+UNS does NOT manage WebSocket connections. The `WebSocketAdapter` accepts an injected connection manager. Connection lifecycle (establishment, authentication, reconnection) is the responsibility of the integrating system.
 
 ## Configuration Architecture
 
