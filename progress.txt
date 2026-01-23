@@ -1,0 +1,95 @@
+# Progress: Implement Integration Interfaces (Task 2)
+
+## Completed Tasks
+
+### 1. Project Scaffolding
+- Created `pyproject.toml` with:
+  - Python 3.11+ requirement
+  - Dependencies: pydantic, redis, rq
+  - Dev dependencies: pytest, ruff, mypy
+  - Hatch build configuration for src layout
+- Created directory structure:
+  - `src/notification/` - main package
+  - `src/notification/adapters/` - for future adapter implementations
+  - `tests/notification/` - test suite
+
+### 2. Core Models (`src/notification/models.py`)
+- Implemented all required enums:
+  - `NotificationIntent` (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL)
+  - `DeliveryMode` (GUARANTEED, BEST_EFFORT)
+  - `AutonomyMode` (PREVIEW, SHADOW, LIVE)
+  - `AckStatus` (PENDING, ACKED, DISMISSED, TIMED_OUT)
+  - `Channel` (SLACK, EMAIL, WEBSOCKET, PAGERDUTY)
+  - `Priority` (HIGH, NORMAL, LOW)
+  - `DeliveryStatus` (SUCCESS, FAILED, DEDUPLICATED, RATE_LIMITED)
+- Implemented Pydantic models:
+  - `AutonomyContext` - frozen/immutable context with required autonomy_mode and agent_id
+  - `Notification` - main domain object with validation guards (title <= 200 chars, message <= 4000 chars, autonomy_context required)
+  - `NotificationResult` - delivery outcome tracking
+  - `AckEvent` - acknowledgment event tracking
+
+### 3. Integration Interfaces (`src/notification/interfaces.py`)
+- **`NotificationContextProvider` Protocol**
+  - `get_current_context() -> AutonomyContext` - retrieve current context
+  - `get_context_for_agent(agent_id: UUID) -> AutonomyContext` - get context for specific agent
+  - `get_autonomy_mode() -> AutonomyMode` - convenience method for routing decisions
+  - Runtime checkable for isinstance() support
+
+- **`AcknowledgmentCallback` Protocol**
+  - `on_ack(event: AckEvent)` - called when notification is acknowledged
+  - `on_dismiss(event: AckEvent)` - called when notification is dismissed
+  - `on_timeout(event: AckEvent)` - called when acknowledgment times out
+  - `on_status_change(notification_id, old_status, new_status, metadata)` - general status transition hook
+  - Runtime checkable for isinstance() support
+
+- **Default Implementations**
+  - `DefaultContextProvider` - fallback implementation with registration/lookup of contexts
+  - `NoOpAcknowledgmentCallback` - silent implementation for testing
+  - `LoggingAcknowledgmentCallback` - logs all events for debugging
+  - `CompositeAcknowledgmentCallback` - delegates to multiple callbacks
+
+### 4. Tests (`tests/notification/`)
+- `test_models.py` - 29 tests covering:
+  - All enum values
+  - AutonomyContext required/optional fields, immutability
+  - Notification validation guards (title/message length, autonomy_context required)
+  - NotificationResult and AckEvent creation
+
+- `test_interfaces.py` - 36 tests covering:
+  - Protocol runtime checkability
+  - Custom implementations satisfying protocols
+  - DefaultContextProvider registration, lookup, default context
+  - NoOpAcknowledgmentCallback silent operation
+  - LoggingAcknowledgmentCallback log levels
+  - CompositeAcknowledgmentCallback delegation
+  - **ATP-agnostic tests** - verifying core SDK runs without ATP imports
+
+## Key Design Decisions
+
+1. **Protocol-based Interfaces**: Using Python `typing.Protocol` with `@runtime_checkable` decorator allows:
+   - Structural subtyping (duck typing with type hints)
+   - Runtime isinstance() checks for validation
+   - Clean separation from ATP-specific implementations
+
+2. **ATP-Agnostic Core**: UNS core can run completely standalone without any ATP imports. External systems inject their own implementations at runtime via dependency injection.
+
+3. **Frozen AutonomyContext**: Made immutable using Pydantic's `frozen=True` to ensure context cannot be modified after creation.
+
+4. **Composite Pattern for Callbacks**: `CompositeAcknowledgmentCallback` allows combining multiple handlers (logging, metrics, ATP integration) into a single callback instance.
+
+## Test Results
+- **65 tests passed**
+- **0 warnings**
+- **Linting: All checks passed (ruff)**
+
+## Files Created/Modified
+- `pyproject.toml` - project configuration
+- `README.md` - basic readme
+- `src/notification/__init__.py` - package exports
+- `src/notification/models.py` - core enums and Pydantic models
+- `src/notification/interfaces.py` - integration protocols and default implementations
+- `src/notification/adapters/__init__.py` - adapter package stub
+- `tests/__init__.py` - test package
+- `tests/notification/__init__.py` - notification tests package
+- `tests/notification/test_models.py` - model tests
+- `tests/notification/test_interfaces.py` - interface tests
