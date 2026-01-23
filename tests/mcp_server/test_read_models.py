@@ -219,9 +219,7 @@ class TestInMemoryAdapterDeliveries:
         assert item.notification_type == "test.notification"
         assert item.status == DeliveryStatus.DELIVERED
 
-    def test_get_deliveries_filter_by_status(
-        self, populated_adapter: InMemoryReadModelAdapter
-    ):
+    def test_get_deliveries_filter_by_status(self, populated_adapter: InMemoryReadModelAdapter):
         """Test filtering deliveries by status."""
         result = populated_adapter.get_deliveries(
             DeliveryFilter(status=DeliveryStatus.DELIVERED),
@@ -232,9 +230,7 @@ class TestInMemoryAdapterDeliveries:
         for item in result.items:
             assert item.status == DeliveryStatus.DELIVERED
 
-    def test_get_deliveries_filter_by_intent(
-        self, populated_adapter: InMemoryReadModelAdapter
-    ):
+    def test_get_deliveries_filter_by_intent(self, populated_adapter: InMemoryReadModelAdapter):
         """Test filtering deliveries by intent."""
         result = populated_adapter.get_deliveries(
             DeliveryFilter(intent=NotificationIntent.SAFETY),
@@ -271,9 +267,7 @@ class TestInMemoryAdapterDeliveries:
         for item in result.items:
             assert item.notification_type == "app.alert"
 
-    def test_get_deliveries_filter_by_time_range(
-        self, populated_adapter: InMemoryReadModelAdapter
-    ):
+    def test_get_deliveries_filter_by_time_range(self, populated_adapter: InMemoryReadModelAdapter):
         """Test filtering deliveries by time range."""
         now = datetime.now(UTC)
 
@@ -289,9 +283,7 @@ class TestInMemoryAdapterDeliveries:
         # Should only get the most recent record
         assert result.total_count == 1
 
-    def test_get_deliveries_pagination(
-        self, populated_adapter: InMemoryReadModelAdapter
-    ):
+    def test_get_deliveries_pagination(self, populated_adapter: InMemoryReadModelAdapter):
         """Test pagination of deliveries."""
         # Get first page
         result1 = populated_adapter.get_deliveries(DeliveryFilter(), limit=2)
@@ -323,9 +315,7 @@ class TestInMemoryAdapterDeliveries:
 class TestInMemoryAdapterDeliveryTimeline:
     """Tests for single delivery timeline queries."""
 
-    def test_get_delivery_timeline_not_found(
-        self, adapter: InMemoryReadModelAdapter
-    ):
+    def test_get_delivery_timeline_not_found(self, adapter: InMemoryReadModelAdapter):
         """Test getting non-existent delivery returns None."""
         result = adapter.get_delivery_timeline(uuid4())
         assert result is None
@@ -388,9 +378,7 @@ class TestInMemoryAdapterAuditEvents:
         for event in result.items:
             assert event.event_type == "delivery.succeeded"
 
-    def test_get_audit_events_filter_by_notification_id(
-        self, audit_store: InMemoryAuditStore
-    ):
+    def test_get_audit_events_filter_by_notification_id(self, audit_store: InMemoryAuditStore):
         """Test filtering audit events by notification ID."""
         target_id = uuid4()
         record1 = create_test_audit_record(notification_id=target_id)
@@ -474,6 +462,7 @@ class TestGlobalConfiguration:
         """Test default adapter is InMemoryReadModelAdapter."""
         # Reset global state
         import mcp_server.read_models as rm
+
         rm._read_model_adapter = None
 
         adapter = get_read_model_adapter()
@@ -542,8 +531,8 @@ class TestUIEndpointIntegration:
         adapter = InMemoryReadModelAdapter(audit_store=audit_store)
         configure_read_model_adapter(adapter)
 
-        # Test endpoint
-        app = create_app()
+        # Create app without auto-configuration to use our manually configured adapter
+        app = create_app(skip_persistence_config=True)
         client = TestClient(app)
 
         response = client.get("/ui/deliveries")
@@ -554,9 +543,7 @@ class TestUIEndpointIntegration:
         assert len(data["items"]) == 1
         assert data["items"][0]["notification_id"] == str(record.notification_id)
 
-    def test_delivery_timeline_endpoint_uses_adapter(
-        self, audit_store: InMemoryAuditStore
-    ):
+    def test_delivery_timeline_endpoint_uses_adapter(self, audit_store: InMemoryAuditStore):
         """Test /ui/deliveries/{id} endpoint uses configured adapter."""
         from fastapi.testclient import TestClient
 
@@ -570,8 +557,8 @@ class TestUIEndpointIntegration:
         adapter = InMemoryReadModelAdapter(audit_store=audit_store)
         configure_read_model_adapter(adapter)
 
-        # Test endpoint - found
-        app = create_app()
+        # Create app without auto-configuration to use our manually configured adapter
+        app = create_app(skip_persistence_config=True)
         client = TestClient(app)
 
         response = client.get(f"/ui/deliveries/{record.notification_id}")
@@ -600,8 +587,8 @@ class TestUIEndpointIntegration:
         adapter = InMemoryReadModelAdapter(audit_store=audit_store)
         configure_read_model_adapter(adapter)
 
-        # Test endpoint
-        app = create_app()
+        # Create app without auto-configuration to use our manually configured adapter
+        app = create_app(skip_persistence_config=True)
         client = TestClient(app)
 
         response = client.get("/ui/audit")
