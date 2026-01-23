@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from notification.models import AckEvent, AckStatus, AutonomyContext, AutonomyMode
+    from .models import AckEvent, AckStatus, AutonomyContext, AutonomyMode
 
 
 @runtime_checkable
@@ -176,7 +176,7 @@ class DefaultContextProvider:
             default_agent_id: Default agent ID to use
         """
         # Import here to avoid circular imports at module level
-        from notification.models import AutonomyMode
+        from .models import AutonomyMode
 
         self._default_mode = default_mode or AutonomyMode.PREVIEW
         self._default_agent_id = default_agent_id
@@ -214,7 +214,7 @@ class DefaultContextProvider:
         Raises:
             RuntimeError: If no default agent_id is configured
         """
-        from notification.models import AutonomyContext
+        from .models import AutonomyContext
 
         if self._default_agent_id is None:
             raise RuntimeError(
@@ -242,7 +242,7 @@ class DefaultContextProvider:
         Raises:
             KeyError: If agent is not registered and strict mode is desired
         """
-        from notification.models import AutonomyContext
+        from .models import AutonomyContext
 
         if agent_id in self._contexts:
             return self._contexts[agent_id]
@@ -260,6 +260,10 @@ class DefaultContextProvider:
             The configured default AutonomyMode
         """
         return self._default_mode
+
+    def update_mode(self, mode: AutonomyMode) -> None:
+        """Update the default autonomy mode (for testing/configuration)."""
+        self._default_mode = mode
 
 
 class NoOpAcknowledgmentCallback:

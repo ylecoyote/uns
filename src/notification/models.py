@@ -1,7 +1,7 @@
 """Core data contracts for the Unified Notification Service.
 
-This module defines all enums and models as specified in the UNS PRD.
-These are the foundational types used throughout the notification system.
+This module defines all enums, models, and validation guards as specified
+in the PRD. These are the foundational types used throughout the notification system.
 """
 
 from __future__ import annotations
@@ -285,3 +285,38 @@ class AckEvent(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional ack metadata"
     )
+
+
+# Helper functions for default derivations
+def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
+    """Derive delivery mode from intent when no policy override exists."""
+    if intent in (NotificationIntent.SAFETY, NotificationIntent.GOVERNANCE):
+        return DeliveryMode.GUARANTEED
+    return DeliveryMode.BEST_EFFORT
+
+
+def get_default_priority(intent: NotificationIntent) -> Priority:
+    """Derive priority from intent."""
+    if intent == NotificationIntent.SAFETY:
+        return Priority.HIGH
+    if intent == NotificationIntent.GOVERNANCE:
+        return Priority.HIGH
+    if intent == NotificationIntent.OPERATIONAL:
+        return Priority.NORMAL
+    return Priority.LOW
+
+
+def get_default_ack_timeout_minutes(intent: NotificationIntent) -> int | None:
+    """Get default ack timeout based on intent."""
+    if intent == NotificationIntent.SAFETY:
+        return 15
+    if intent == NotificationIntent.GOVERNANCE:
+        return 30
+    return None
+
+
+def get_default_require_ack(
+    intent: NotificationIntent, autonomy_mode: AutonomyMode
+) -> bool:
+    """Determine if ack is required based on intent and mode."""
+    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE

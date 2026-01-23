@@ -24,12 +24,14 @@ wheels/
 .venv/
 venv/
 ENV/
+env/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # Testing
 .pytest_cache/

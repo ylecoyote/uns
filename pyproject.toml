@@ -14,8 +14,6 @@ authors = [
 ]
 dependencies = [
     "pydantic>=2.0.0",
-    "redis>=5.0.0",
-    "rq>=1.15.0",
 ]
 
 [project.optional-dependencies]
@@ -28,12 +26,11 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*", "tests*"]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -50,9 +47,11 @@ select = [
     "W",   # pycodestyle warnings
     "F",   # Pyflakes
     "I",   # isort
+    "N",   # pep8-naming
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
+    "SIM", # flake8-simplify
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
