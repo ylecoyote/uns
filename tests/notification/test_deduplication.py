@@ -14,21 +14,26 @@ from uuid import uuid4
 
 import pytest
 
-from src.notification.deduplication import (
+from notification.deduplication import (
     DEDUP_KEY_PREFIX,
     DEFAULT_DEDUP_WINDOW_SECONDS,
     DeduplicationEngine,
     InMemoryDeduplicationStrategy,
+    InMemoryDeduplicationStore,
     RedisDeduplicationStrategy,
     create_inmemory_deduplication_engine,
     create_redis_deduplication_engine,
+    configure_deduplication_engine,
+    generate_dedup_key,
+    should_deduplicate,
 )
-from src.notification.models import (
+from notification.models import (
     AutonomyContext,
     AutonomyMode,
     Notification,
     NotificationIntent,
 )
+from notification.policies import PolicyRegistry, configure_policy_registry
 
 
 # Test fixtures
@@ -83,6 +88,13 @@ def mock_redis_client():
 def inmemory_engine() -> DeduplicationEngine:
     """Create an in-memory deduplication engine for testing."""
     return create_inmemory_deduplication_engine()
+
+
+@pytest.fixture(autouse=True)
+def reset_globals():
+    """Reset global state before each test."""
+    configure_deduplication_engine(InMemoryDeduplicationStore())
+    configure_policy_registry(PolicyRegistry())
 
 
 class TestRedisDeduplicationStrategy:
@@ -239,6 +251,42 @@ class TestInMemoryDeduplicationStrategy:
         assert strategy.mark_seen("short-lived", 300) is True
 
 
+class TestInMemoryDeduplicationStore:
+    """Tests for InMemoryDeduplicationStore (alias for Strategy)."""
+
+    def test_set_if_not_exists_new_key(self):
+        """Test setting a new key succeeds."""
+        store = InMemoryDeduplicationStore()
+        result = store.set_if_not_exists("key1", ttl_seconds=300)
+        assert result is True
+
+    def test_set_if_not_exists_existing_key(self):
+        """Test setting an existing key fails."""
+        store = InMemoryDeduplicationStore()
+        store.set_if_not_exists("key1", ttl_seconds=300)
+        result = store.set_if_not_exists("key1", ttl_seconds=300)
+        assert result is False
+
+    def test_exists(self):
+        """Test exists returns correct value."""
+        store = InMemoryDeduplicationStore()
+        assert store.exists("key1") is False
+        store.set_if_not_exists("key1", ttl_seconds=300)
+        assert store.exists("key1") is True
+
+    def test_delete(self):
+        """Test delete removes key."""
+        store = InMemoryDeduplicationStore()
+        store.set_if_not_exists("key1", ttl_seconds=300)
+        assert store.delete("key1") is True
+        assert store.exists("key1") is False
+
+    def test_delete_nonexistent(self):
+        """Test delete nonexistent key returns False."""
+        store = InMemoryDeduplicationStore()
+        assert store.delete("nonexistent") is False
+
+
 class TestDeduplicationEngine:
     """Tests for the main DeduplicationEngine."""
 
@@ -391,6 +439,19 @@ class TestDeduplicationEngine:
         # Should no longer be a duplicate
         assert inmemory_engine.is_duplicate(sample_notification) is False
 
+    def test_clear_dedup_alias(
+        self, inmemory_engine: DeduplicationEngine, sample_notification: Notification
+    ):
+        """Test clearing dedup record using alias method."""
+        # Record the notification
+        inmemory_engine.should_deduplicate(sample_notification)
+        assert inmemory_engine.is_duplicate(sample_notification) is True
+
+        # Clear it using alias
+        result = inmemory_engine.clear_dedup(sample_notification)
+        assert result is True
+        assert inmemory_engine.is_duplicate(sample_notification) is False
+
     def test_default_window_seconds_property(self, inmemory_engine: DeduplicationEngine):
         """Test that default window seconds is accessible."""
         assert inmemory_engine.default_window_seconds == DEFAULT_DEDUP_WINDOW_SECONDS
@@ -454,6 +515,45 @@ class TestFactoryFunctions:
 
         assert isinstance(engine, DeduplicationEngine)
         assert engine.default_window_seconds == 180
+
+
+class TestGenerateDedupKey:
+    """Tests for module-level dedup key generation."""
+
+    def test_explicit_dedup_key_used(self, notification_with_dedup_key: Notification):
+        """Test explicit dedup_key is used if provided."""
+        key = generate_dedup_key(notification_with_dedup_key)
+        assert key == "explicit-dedup-key-123"
+
+    def test_generated_key_is_stable(self, sample_notification: Notification):
+        """Test generated key is deterministic for same notification properties."""
+        key1 = generate_dedup_key(sample_notification)
+        key2 = generate_dedup_key(sample_notification)
+        assert key1 == key2
+
+
+class TestGlobalFunctions:
+    """Tests for global deduplication functions."""
+
+    def test_should_deduplicate_global(self, sample_notification: Notification):
+        """Test global should_deduplicate function."""
+        # First call should not deduplicate
+        assert should_deduplicate(sample_notification) is False
+
+        # Second call should deduplicate
+        assert should_deduplicate(sample_notification) is True
+
+    def test_configure_deduplication_engine(self, sample_notification: Notification):
+        """Test configuring global engine with custom store."""
+        store = InMemoryDeduplicationStore()
+        configure_deduplication_engine(store)
+
+        # Record via global function
+        should_deduplicate(sample_notification)
+
+        # Verify key is in custom store
+        dedup_key = generate_dedup_key(sample_notification)
+        assert store.exists(dedup_key)
 
 
 class TestDeduplicationInvariants:
