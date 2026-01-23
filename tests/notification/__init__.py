@@ -1,1 +1,1 @@
-# Notification tests package
+"""Tests for notification module."""
