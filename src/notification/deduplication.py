@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from src.notification.models import Notification
+    from notification.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +127,10 @@ class DeduplicationStrategy(ABC):
         ...
 
 
+# Alias for compatibility with Task 7 code
+DeduplicationStore = DeduplicationStrategy
+
+
 class RedisDeduplicationStrategy(DeduplicationStrategy):
     """Redis-backed deduplication using SETNX + TTL.
 
@@ -206,6 +210,19 @@ class RedisDeduplicationStrategy(DeduplicationStrategy):
         redis_key = self._make_redis_key(dedup_key)
         return self._redis.ttl(redis_key)
 
+    # Compatibility methods for DeduplicationStore interface
+    def set_if_not_exists(self, key: str, ttl_seconds: int) -> bool:
+        """Alias for mark_seen for Store interface compatibility."""
+        return self.mark_seen(key, ttl_seconds)
+
+    def exists(self, key: str) -> bool:
+        """Check if key exists (Store interface compatibility)."""
+        return self.is_duplicate(key, 0)
+
+    def delete(self, key: str) -> bool:
+        """Delete a key (Store interface compatibility)."""
+        return self.clear(key)
+
 
 class InMemoryDeduplicationStrategy(DeduplicationStrategy):
     """In-memory deduplication for testing and single-instance deployments.
@@ -253,6 +270,24 @@ class InMemoryDeduplicationStrategy(DeduplicationStrategy):
             return True
         return False
 
+    # Compatibility methods for DeduplicationStore interface
+    def set_if_not_exists(self, key: str, ttl_seconds: int) -> bool:
+        """Alias for mark_seen for Store interface compatibility."""
+        return self.mark_seen(key, ttl_seconds)
+
+    def exists(self, key: str) -> bool:
+        """Check if key exists (Store interface compatibility)."""
+        return self.is_duplicate(key, 0)
+
+    def delete(self, key: str) -> bool:
+        """Delete a key (Store interface compatibility)."""
+        return self.clear(key)
+
+
+# Aliases for compatibility with Task 7 code
+InMemoryDeduplicationStore = InMemoryDeduplicationStrategy
+RedisDeduplicationStore = RedisDeduplicationStrategy
+
 
 class DeduplicationEngine:
     """Main deduplication engine for the Unified Notification Service.
@@ -273,17 +308,24 @@ class DeduplicationEngine:
 
     def __init__(
         self,
-        strategy: DeduplicationStrategy,
+        strategy: DeduplicationStrategy | None = None,
         default_window_seconds: int = DEFAULT_DEDUP_WINDOW_SECONDS,
+        store: DeduplicationStrategy | None = None,  # Alias for strategy
     ):
         """Initialize the deduplication engine.
 
         Args:
             strategy: The deduplication strategy to use
             default_window_seconds: Default deduplication window in seconds
+            store: Alias for strategy (for compatibility)
         """
-        self._strategy = strategy
+        self._strategy = strategy or store or InMemoryDeduplicationStrategy()
         self._default_window_seconds = default_window_seconds
+
+    @property
+    def store(self) -> DeduplicationStrategy:
+        """Return the strategy (alias for store compatibility)."""
+        return self._strategy
 
     @staticmethod
     def generate_dedup_key(notification: Notification) -> str:
@@ -395,6 +437,11 @@ class DeduplicationEngine:
         dedup_key = self.generate_dedup_key(notification)
         return self._strategy.clear(dedup_key)
 
+    # Alias for compatibility with Task 7 code
+    def clear_dedup(self, notification: Notification) -> bool:
+        """Alias for clear_dedup_key for compatibility."""
+        return self.clear_dedup_key(notification)
+
     @property
     def default_window_seconds(self) -> int:
         """Get the default deduplication window in seconds."""
@@ -435,3 +482,66 @@ def create_inmemory_deduplication_engine(
     """
     strategy = InMemoryDeduplicationStrategy()
     return DeduplicationEngine(strategy, default_window_seconds)
+
+
+# Module-level function as specified in PRD
+def generate_dedup_key(notification: Notification) -> str:
+    """Generate a stable dedup key for a notification.
+
+    This is the module-level function as specified in the PRD.
+
+    Args:
+        notification: The notification to generate key for
+
+    Returns:
+        A stable dedup key string
+    """
+    return DeduplicationEngine.generate_dedup_key(notification)
+
+
+# Global deduplication engine instance for convenience
+_dedup_engine: DeduplicationEngine | None = None
+
+
+def get_deduplication_engine() -> DeduplicationEngine:
+    """Get the global deduplication engine instance.
+
+    Returns:
+        The singleton DeduplicationEngine instance
+    """
+    global _dedup_engine
+    if _dedup_engine is None:
+        _dedup_engine = DeduplicationEngine()
+    return _dedup_engine
+
+
+def configure_deduplication_engine(
+    store: DeduplicationStrategy | None = None,
+) -> DeduplicationEngine:
+    """Configure the global deduplication engine.
+
+    Args:
+        store: Custom strategy to use, or None to use in-memory default
+
+    Returns:
+        The configured DeduplicationEngine instance
+    """
+    global _dedup_engine
+    _dedup_engine = DeduplicationEngine(
+        strategy=store if store is not None else InMemoryDeduplicationStrategy()
+    )
+    return _dedup_engine
+
+
+def should_deduplicate(notification: Notification) -> bool:
+    """Check if notification should be deduplicated.
+
+    This is the primary interface as specified in the PRD.
+
+    Args:
+        notification: The notification to check
+
+    Returns:
+        True if notification is a duplicate and should be skipped
+    """
+    return get_deduplication_engine().should_deduplicate(notification)

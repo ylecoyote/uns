@@ -356,3 +356,72 @@ Implemented channel adapters for all delivery channels.
 - pydantic (for models)
 - pytest, pytest-asyncio, pytest-cov (dev)
 - ruff, mypy (dev)
+
+---
+
+## Task 7: Implement delivery service (GUARANTEED vs BEST_EFFORT orchestration) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented the delivery service with full GUARANTEED vs BEST_EFFORT orchestration semantics as specified in the PRD Task 7.
+
+### Components Implemented
+
+1. **src/notification/service.py**
+   - `DeliveryService` - Main orchestration class implementing PRD strict step order:
+     1. Deduplication check
+     2. Rate limit check (per channel)
+     3. WebSocket delivery (fire-and-forget)
+     4. Persistent channel delivery:
+        - GUARANTEED: Sequential fallback (Slack -> Email -> PagerDuty)
+        - BEST_EFFORT: Concurrent delivery to all channels
+     5. Ack timeout scheduling (if required)
+     6. Audit log write
+     7. GUARANTEED failure raises DeliveryError
+
+   - `DeliveryError` exception for GUARANTEED mode failures
+   - `SimpleAdapterRegistry` for adapter management
+   - Protocol interfaces: `AdapterRegistry`, `AuditLogger`, `AckScheduler`
+   - No-op implementations for testing
+
+### Key Semantics Implemented:
+- **GUARANTEED**: Must raise if all persistent channels fail, escalates via callback
+- **BEST_EFFORT**: May fail silently, logs failure, returns FAILED status
+
+### Tests Implemented
+
+**tests/notification/test_service.py (30 tests)**
+- Basic delivery tests
+- GUARANTEED delivery semantics:
+  - Sequential fallback
+  - Stops after first success
+  - Raises on all failures
+  - Escalation callback
+  - Handles adapter exceptions
+- BEST_EFFORT delivery semantics:
+  - Concurrent channel delivery
+  - Does not raise on failure
+  - Partial success handling
+- Deduplication integration
+- Rate limiting integration
+- Ack timeout scheduling
+- Audit logging
+- Policy integration
+
+### PRD Compliance
+This implementation satisfies PRD Task 7 requirements:
+- [x] Strict step order (Dedup -> Rate limit -> WebSocket -> Persistent -> Ack -> Audit)
+- [x] GUARANTEED: Sequential fallback (Slack -> Email -> PagerDuty)
+- [x] GUARANTEED: Raises on all persistent failures
+- [x] BEST_EFFORT: Attempt all channels concurrently
+- [x] BEST_EFFORT: Log failure, don't raise
+- [x] Ack timeout scheduling when required
+- [x] Audit log write on all outcomes
+
+### Dependencies
+- pydantic>=2.0.0
+- redis>=5.0.0 (optional, for RedisDeduplicationStore)
+- pytest>=7.0.0 (dev)
+- pytest-asyncio>=0.21.0 (dev)
+- ruff>=0.1.0 (dev)

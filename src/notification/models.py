@@ -97,6 +97,7 @@ class DeliveryStatus(str, Enum):
 
     PENDING = "PENDING"
     DELIVERED = "DELIVERED"
+    SUCCESS = "SUCCESS"  # Alias for compatibility
     FAILED = "FAILED"
     DEDUPLICATED = "DEDUPLICATED"
     RATE_LIMITED = "RATE_LIMITED"
@@ -279,6 +280,7 @@ class AckEvent(BaseModel):
 
     notification_id: UUID = Field(..., description="ID of the notification being acknowledged")
     status: AckStatus = Field(..., description="Acknowledgment status")
+    ack_status: AckStatus | None = Field(default=None, description="Alias for status (compatibility)")
     acked_by: str | None = Field(default=None, description="User/system that acknowledged")
     acked_at: datetime = Field(
         default_factory=_utc_now, description="Ack timestamp (UTC)"
@@ -286,6 +288,22 @@ class AckEvent(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional ack metadata"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_status_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Sync status and ack_status fields for compatibility."""
+        if not isinstance(data, dict):
+            return data
+
+        # If ack_status is provided but status is not, use ack_status as status
+        if data.get("ack_status") is not None and data.get("status") is None:
+            data["status"] = data["ack_status"]
+        # If status is provided, also set ack_status for compatibility
+        elif data.get("status") is not None and data.get("ack_status") is None:
+            data["ack_status"] = data["status"]
+
+        return data
 
 
 # Helper functions for default derivations
