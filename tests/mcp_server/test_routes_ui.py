@@ -32,7 +32,15 @@ from notification.policies import (
 
 @pytest.fixture
 def client() -> TestClient:
-    """Create a test client."""
+    """Create a test client with fresh read model adapter."""
+    # Reset the global read model adapter to ensure clean state
+    from mcp_server.read_models import InMemoryReadModelAdapter, configure_read_model_adapter
+    from notification.audit import InMemoryAuditStore
+
+    fresh_store = InMemoryAuditStore()
+    fresh_adapter = InMemoryReadModelAdapter(audit_store=fresh_store)
+    configure_read_model_adapter(fresh_adapter)
+
     app = create_app()
     return TestClient(app)
 
