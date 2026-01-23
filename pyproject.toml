@@ -19,6 +19,7 @@ dependencies = [
     "rq>=1.15.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0",
+    "sqlalchemy>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -74,17 +75,21 @@ ignore = [
     "C901",   # too complex
     "ARG001", # unused function argument
     "ARG002", # unused method argument
+    "B905",   # zip without explicit strict
+    "SIM108", # use ternary operator instead of if-else
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["src", "notification", "mcp_server"]
+known-first-party = ["notification", "mcp_server", "db"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+warn_unused_configs = true
 disallow_untyped_defs = true
+strict_optional = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]

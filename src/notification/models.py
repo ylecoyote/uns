@@ -11,8 +11,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
+from pydantic import BaseModel, Field, field_validator
 
 def _utc_now() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
@@ -59,6 +58,7 @@ class AutonomyMode(str, Enum):
     - PREVIEW: All intents -> WebSocket only
     - SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket
     - LIVE: Full channel routing based on intent
+
     """
 
     PREVIEW = "PREVIEW"
@@ -67,7 +67,7 @@ class AutonomyMode(str, Enum):
 
 
 class AckStatus(str, Enum):
-    """Acknowledgment state for notifications requiring human confirmation."""
+    """Acknowledgment lifecycle states."""
 
     PENDING = "PENDING"
     ACKED = "ACKED"
@@ -85,7 +85,7 @@ class Channel(str, Enum):
 
 
 class Priority(str, Enum):
-    """Notification priority level, derived from intent."""
+    """Notification priority levels."""
 
     HIGH = "HIGH"
     NORMAL = "NORMAL"
@@ -128,8 +128,6 @@ INTENT_DELIVERY_MODE_MAP: dict[NotificationIntent, DeliveryMode] = {
     NotificationIntent.OPERATIONAL: DeliveryMode.BEST_EFFORT,
     NotificationIntent.INFORMATIONAL: DeliveryMode.BEST_EFFORT,
 }
-
-
 class AutonomyContext(BaseModel):
     """Context about the autonomous agent that triggered the notification.
 
@@ -152,6 +150,7 @@ class AutonomyContext(BaseModel):
         default=None, description="Optional skip snapshot identifier"
     )
 
+# (merge conflict resolved: nothing needed here, as model_config is already set above with ConfigDict(frozen=True))
 
 class Notification(BaseModel):
     """Core notification domain object.
@@ -195,6 +194,7 @@ class Notification(BaseModel):
     delivery_mode: DeliveryMode | None = Field(
         default=None, description="Derived from intent or policy"
     )
+
     require_ack: bool | None = Field(
         default=None, description="Derived from intent + mode + policy"
     )
@@ -251,39 +251,36 @@ class Notification(BaseModel):
 
         return data
 
-
 class NotificationResult(BaseModel):
     """Outcome of a notification delivery attempt."""
 
-    model_config = ConfigDict(frozen=True)
-
-    notification_id: UUID = Field(..., description="ID of the notification")
-    status: DeliveryStatus = Field(..., description="Overall delivery outcome")
+    notification_id: UUID = Field(description="ID of the notification")
+    status: DeliveryStatus = Field(description="Overall delivery outcome")
     channels_attempted: list[Channel] = Field(
         default_factory=list, description="Channels that were attempted"
     )
     channels_succeeded: list[Channel] = Field(
         default_factory=list, description="Channels that succeeded"
     )
-    channels_failed: list[Channel] = Field(
-        default_factory=list, description="Channels that failed"
-    )
+    channels_failed: list[Channel] = Field(default_factory=list, description="Channels that failed")
     error_message: str | None = Field(default=None, description="Error details if failed")
-    delivered_at: datetime | None = Field(default=None, description="When delivery completed")
+    delivered_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Delivery attempt timestamp"
+    )
     deduplicated: bool = Field(default=False, description="Whether notification was deduplicated")
 
 
 class AckEvent(BaseModel):
     """Acknowledgment event for a notification."""
 
-    model_config = ConfigDict(frozen=True)
-
     notification_id: UUID = Field(..., description="ID of the notification being acknowledged")
-    status: AckStatus = Field(default=None, description="Acknowledgment status")
+    # Both 'status' and 'ack_status' supported for compatibility;
+    # 'status' is the preferred field, but 'ack_status' is maintained for legacy/compat.
+    status: AckStatus | None = Field(default=None, description="Acknowledgment status")
     ack_status: AckStatus | None = Field(default=None, description="Alias for status (compatibility)")
     acked_by: str | None = Field(default=None, description="User/system that acknowledged")
     acked_at: datetime = Field(
-        default_factory=_utc_now, description="Ack timestamp (UTC)"
+        default_factory=lambda: datetime.now(UTC), description="Ack timestamp (UTC)"
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional ack metadata"
@@ -304,38 +301,3 @@ class AckEvent(BaseModel):
             data["ack_status"] = data["status"]
 
         return data
-
-
-# Helper functions for default derivations
-def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
-    """Derive delivery mode from intent when no policy override exists."""
-    if intent in (NotificationIntent.SAFETY, NotificationIntent.GOVERNANCE):
-        return DeliveryMode.GUARANTEED
-    return DeliveryMode.BEST_EFFORT
-
-
-def get_default_priority(intent: NotificationIntent) -> Priority:
-    """Derive priority from intent."""
-    if intent == NotificationIntent.SAFETY:
-        return Priority.HIGH
-    if intent == NotificationIntent.GOVERNANCE:
-        return Priority.HIGH
-    if intent == NotificationIntent.OPERATIONAL:
-        return Priority.NORMAL
-    return Priority.LOW
-
-
-def get_default_ack_timeout_minutes(intent: NotificationIntent) -> int | None:
-    """Get default ack timeout based on intent."""
-    if intent == NotificationIntent.SAFETY:
-        return 15
-    if intent == NotificationIntent.GOVERNANCE:
-        return 30
-    return None
-
-
-def get_default_require_ack(
-    intent: NotificationIntent, autonomy_mode: AutonomyMode
-) -> bool:
-    """Determine if ack is required based on intent and mode."""
-    return intent == NotificationIntent.SAFETY and autonomy_mode == AutonomyMode.LIVE

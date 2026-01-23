@@ -12,6 +12,7 @@ This package provides the core notification infrastructure including:
 - Deduplication and rate limiting
 - Acknowledgment handling
 - SDK for notification sending
+- Audit logging and persistence
 """
 
 __version__ = "0.1.0"
@@ -23,6 +24,19 @@ from .acknowledgment import (
     EscalationHandler,
     InMemoryAckStorage,
     LoggingEscalationHandler,
+)
+from .audit import (
+    AckAuditRecord,
+    AuditPersistenceError,
+    AuditRecord,
+    AuditStore,
+    FileAuditStore,
+    InMemoryAuditStore,
+    PersistentAuditLogger,
+    configure_audit_logger,
+    create_ack_audit_record,
+    create_audit_record,
+    get_audit_logger,
 )
 from .interfaces import (
     AcknowledgmentCallback,
@@ -124,4 +138,16 @@ __all__ = [
     "create_sdk",
     "get_sdk",
     "configure_sdk",
+    # Audit
+    "AckAuditRecord",
+    "AuditPersistenceError",
+    "AuditRecord",
+    "AuditStore",
+    "FileAuditStore",
+    "InMemoryAuditStore",
+    "PersistentAuditLogger",
+    "configure_audit_logger",
+    "create_ack_audit_record",
+    "create_audit_record",
+    "get_audit_logger",
 ]

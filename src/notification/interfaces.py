@@ -265,7 +265,6 @@ class DefaultContextProvider:
         """Update the default autonomy mode (for testing/configuration)."""
         self._default_mode = mode
 
-
 class NoOpAcknowledgmentCallback:
     """No-operation implementation of AcknowledgmentCallback.
 
@@ -349,10 +348,11 @@ class LoggingAcknowledgmentCallback:
     ) -> None:
         """Log status change event."""
         self._logger.info(
-            "Notification status changed: notification_id=%s, %s -> %s",
+            "Notification status changed: notification_id=%s, %s -> %s, metadata=%s",
             notification_id,
             old_status,
             new_status,
+            metadata,
         )
 
 

@@ -75,3 +75,7 @@ Thumbs.db
 
 # Environment files
 .env
+
+__pycache__/
+*.pyc
+.ralphy-worktrees/

@@ -566,16 +566,16 @@ This section defines the **explicit sequence of generation tasks** Ralphy should
 ---
 
 ## Tasks
-- [ ] Project scaffolding: create src/notification package skeleton
-- [ ] Implement core enums + models (Notification, AutonomyContext, etc.)
-- [ ] Implement integration interfaces (ContextProvider, AckCallback)
-- [ ] Implement policy schema + registry (mode-aware routing)
-- [ ] Implement deduplication (Redis SETNX + TTL)
-- [ ] Implement rate limiting (token bucket per channel)
-- [ ] Implement adapters (Slack, Email, WebSocket, PagerDuty)
-- [ ] Implement delivery service (GUARANTEED vs BEST_EFFORT orchestration)
-- [ ] Implement SDK (send(), validation guards, policy overrides)
-- [ ] Implement acknowledgment engine (ack + timeout handling)
-- [ ] Add API routes for ack/status (if applicable)
-- [ ] Add audit/persistence wiring (if applicable)
-- [ ] Add unit tests for invariants and core flows
+- [x] Project scaffolding: create src/notification package skeleton
+- [x] Implement core enums + models (Notification, AutonomyContext, etc.)
+- [x] Implement integration interfaces (ContextProvider, AckCallback)
+- [x] Implement policy schema + registry (mode-aware routing)
+- [x] Implement deduplication (Redis SETNX + TTL)
+- [x] Implement rate limiting (token bucket per channel)
+- [x] Implement adapters (Slack, Email, WebSocket, PagerDuty)
+- [x] Implement delivery service (GUARANTEED vs BEST_EFFORT orchestration)
+- [x] Implement SDK (send(), validation guards, policy overrides)
+- [x] Implement acknowledgment engine (ack + timeout handling)
+- [x] Add API routes for ack/status (if applicable)
+- [x] Add audit/persistence wiring (if applicable)
+- [x] Add unit tests for invariants and core flows
