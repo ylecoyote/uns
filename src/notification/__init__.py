@@ -16,6 +16,14 @@ This package provides the core notification infrastructure including:
 
 __version__ = "0.1.0"
 
+from .acknowledgment import (
+    AcknowledgmentEngine,
+    AckState,
+    AckStorageProtocol,
+    EscalationHandler,
+    InMemoryAckStorage,
+    LoggingEscalationHandler,
+)
 from .interfaces import (
     AcknowledgmentCallback,
     CompositeAcknowledgmentCallback,
@@ -80,11 +88,18 @@ __all__ = [
     # Interfaces (Protocols)
     "NotificationContextProvider",
     "AcknowledgmentCallback",
+    "AckStorageProtocol",
+    "EscalationHandler",
     # Default Implementations
     "DefaultContextProvider",
     "NoOpAcknowledgmentCallback",
     "LoggingAcknowledgmentCallback",
     "CompositeAcknowledgmentCallback",
+    # Acknowledgment Engine
+    "AcknowledgmentEngine",
+    "AckState",
+    "InMemoryAckStorage",
+    "LoggingEscalationHandler",
     # Helper functions from models
     "get_default_delivery_mode",
     "get_default_priority",

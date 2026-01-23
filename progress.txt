@@ -512,3 +512,99 @@ Implemented the SDK producer interface with send(), validation guards, and polic
 ### Test Results
 - All tests pass
 - Linting passes (ruff check)
+
+---
+
+## Task 9: Acknowledgment Engine (ack + timeout handling) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented the acknowledgment engine for the Unified Notification Service as specified in Task 9 of the PRD. The engine handles acknowledgment state transitions, timeout checking, and escalation logic for notifications that require operator acknowledgment.
+
+### Files Created/Modified
+
+#### New Files:
+1. `src/notification/acknowledgment.py` - Main acknowledgment engine implementation
+2. `tests/notification/test_acknowledgment.py` - Comprehensive test suite (38 tests)
+
+#### Modified Files:
+1. `src/notification/__init__.py` - Added exports for acknowledgment engine components
+
+### Implementation Details
+
+#### Core Components:
+
+1. **AckState** - Internal state tracking for acknowledgment lifecycle
+   - Tracks notification_id, status, intent, autonomy_context, timeout configuration
+   - Provides timeout_at calculation and is_timed_out() check
+   - Serialization support (to_dict/from_dict) for persistence
+
+2. **AckStorageProtocol** - Protocol for acknowledgment state storage
+   - Defines interface for get_ack_state, set_ack_state, get_pending_notifications
+   - Enables swappable storage backends (Redis, database, etc.)
+
+3. **InMemoryAckStorage** - In-memory storage implementation
+   - Suitable for testing and single-instance deployments
+   - Implements all protocol methods
+
+4. **AcknowledgmentEngine** - Main engine for handling acks and timeouts
+   - `register_notification()` - Register a notification requiring acknowledgment
+   - `ack()` - Handle ACK/DISMISS transitions with idempotency
+   - `check_ack_timeout()` - Check and handle timeout for single notification
+   - `check_all_timeouts()` - Batch check all pending notifications
+   - `get_status()` / `get_state()` - Query current ack state
+
+5. **EscalationHandler Protocol** + **LoggingEscalationHandler**
+   - Protocol for handling escalations on SAFETY timeouts
+   - Logging implementation for testing/development
+
+#### Key Features Implemented:
+
+- **Idempotency**: Repeated ack calls with same status are safe
+- **Timeout calculation**: Per-intent default timeouts (SAFETY=15min, GOVERNANCE=30min)
+- **SAFETY escalation**: SAFETY timeout in LIVE mode triggers re-escalation
+- **Callback integration**: Invokes AcknowledgmentCallback on ack/dismiss/timeout events
+- **State persistence**: Pluggable storage backend via protocol
+
+#### Default Ack Timeouts (per PRD):
+- SAFETY: 15 minutes
+- GOVERNANCE: 30 minutes
+- OPERATIONAL/INFORMATIONAL: No default timeout
+
+### Test Coverage
+
+38 tests covering:
+- AckState creation, serialization, timeout calculation
+- InMemoryAckStorage operations
+- AcknowledgmentEngine registration, ack, dismiss, timeout handling
+- Idempotency verification
+- SAFETY timeout escalation in LIVE mode
+- Non-escalation in PREVIEW/SHADOW modes
+- Non-escalation for GOVERNANCE intent
+- Callback invocation verification
+- LoggingEscalationHandler behavior
+
+### Acceptance Criteria Met
+
+From PRD Task 9:
+- ✅ `ack(notification_id, ack_status, acked_by, metadata)` implemented
+- ✅ Idempotency: repeated ack is safe
+- ✅ `check_ack_timeout(notification_id, intent, autonomy_context)` implemented
+- ✅ Timeout updates state to TIMED_OUT
+- ✅ SAFETY timeout triggers re-escalation (in LIVE mode only)
+
+### Commands Run
+
+```bash
+# Run tests (all pass)
+PYTHONPATH=src python -m pytest tests/ -v
+# 144 passed
+
+# Run linting (all pass)
+ruff check src/ tests/
+# All checks passed!
+
+# Format code
+ruff format src/ tests/
+```

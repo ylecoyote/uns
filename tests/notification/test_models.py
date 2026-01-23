@@ -550,6 +550,17 @@ class TestAckEvent:
         assert event.acked_by == "user@example.com"
         assert event.acked_at is not None
 
+    def test_ack_event_with_ack_status_field(self):
+        """Test using ack_status field (alias for status)."""
+        notif_id = uuid4()
+        event = AckEvent(
+            notification_id=notif_id,
+            ack_status=AckStatus.ACKED,
+            acked_by="operator@example.com",
+        )
+        assert event.ack_status == AckStatus.ACKED
+        assert event.status == AckStatus.ACKED  # Should be synced
+
     def test_timeout_event(self):
         event = AckEvent(
             notification_id=uuid4(),
@@ -585,6 +596,23 @@ class TestAckEvent:
         )
         json_str = event.model_dump_json()
         assert "PENDING" in json_str
+
+    def test_acked_at_auto_generated(self):
+        """Test that acked_at is auto-generated."""
+        event = AckEvent(
+            notification_id=uuid4(),
+            status=AckStatus.ACKED,
+        )
+        assert event.acked_at is not None
+        assert isinstance(event.acked_at, datetime)
+
+    def test_metadata_default_empty(self):
+        """Test that metadata defaults to empty dict."""
+        event = AckEvent(
+            notification_id=uuid4(),
+            status=AckStatus.PENDING,
+        )
+        assert event.metadata == {}
 
 
 class TestInvariants:
