@@ -608,3 +608,46 @@ ruff check src/ tests/
 # Format code
 ruff format src/ tests/
 ```
+
+---
+
+## Task 10: API Routes for Ack/Status - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Added API routes for acknowledgment and status queries as specified in PRD Task 10.
+
+### Files Created
+
+1. **src/mcp_server/app.py**
+   - Application factory `create_app()`
+   - Health check endpoint at `/health`
+   - OpenAPI documentation at `/docs`
+
+2. **src/mcp_server/routes_notification.py**
+   - `POST /v1/notifications/{id}/ack` - Acknowledge a notification
+   - `POST /v1/notifications/{id}/dismiss` - Dismiss a notification
+   - `GET /v1/notifications/{id}` - Get notification status
+   - `GET /v1/notifications/{id}/ack-status` - Get ack status only
+   - Pydantic request/response models with validation
+   - Proper HTTP status codes (200, 404, 409)
+
+3. **tests/mcp_server/test_routes_notification.py** - 15 tests covering:
+   - Ack endpoint success, idempotency, errors
+   - Dismiss endpoint success, conflict errors
+   - Get notification status
+   - Get ack status
+   - Health check
+
+### PRD Compliance
+
+Per PRD Task 10 - API Routes:
+✅ `POST /v1/notifications/{id}/ack` implemented
+✅ `GET /v1/notifications/{id}` (status) implemented
+✅ Ack endpoint writes audit (via logging)
+✅ Ack endpoint triggers callback (via AcknowledgmentCallback protocol)
+
+Additional endpoints added:
+✅ `POST /v1/notifications/{id}/dismiss` - for dismissal workflow
+✅ `GET /v1/notifications/{id}/ack-status` - lightweight status query
