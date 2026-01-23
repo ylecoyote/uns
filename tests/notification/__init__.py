@@ -1,1 +1,1 @@
-# tests/notification package
+# Notification tests package

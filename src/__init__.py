@@ -1,1 +1,1 @@
-# src package
+# Unified Notification Service
