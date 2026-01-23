@@ -357,3 +357,219 @@ class TestVerificationReportAccuracy:
         """Report claims all tests pass - this test suite validates that."""
         # If this test runs successfully along with others, the claim is valid
         pass
+
+
+# =============================================================================
+# Test: Read Model Adapter Interface Verification
+# =============================================================================
+
+
+class TestReadModelAdapterInterface:
+    """Verify that ReadModelAdapter ABC defines only read operations."""
+
+    def test_adapter_interface_has_no_write_methods(self):
+        """ReadModelAdapter ABC should only define get_* methods."""
+        import inspect
+
+        from mcp_server.read_models import ReadModelAdapter
+
+        # Get all abstract methods from the ABC
+        abstract_methods = []
+        for name, method in inspect.getmembers(ReadModelAdapter, predicate=inspect.isfunction):
+            if hasattr(method, "__isabstractmethod__") and method.__isabstractmethod__:
+                abstract_methods.append(name)
+
+        # All abstract methods should be read operations (get_*)
+        for method_name in abstract_methods:
+            assert method_name.startswith("get_"), (
+                f"ReadModelAdapter has non-read method: {method_name}. "
+                "This could introduce write operations to UI endpoints."
+            )
+
+    def test_in_memory_adapter_read_only(self):
+        """InMemoryReadModelAdapter should not expose write methods."""
+        from mcp_server.read_models import InMemoryReadModelAdapter
+
+        # These are write operations that should NOT exist on the adapter
+        write_methods = ["save", "update", "delete", "create", "insert", "remove"]
+
+        for method in write_methods:
+            assert not hasattr(InMemoryReadModelAdapter, method), (
+                f"InMemoryReadModelAdapter has write method: {method}"
+            )
+
+    def test_sqlalchemy_adapter_read_only(self):
+        """SQLAlchemyReadModelAdapter should not expose write methods."""
+        from mcp_server.read_models import SQLAlchemyReadModelAdapter
+
+        # These are write operations that should NOT exist on the adapter
+        write_methods = ["save", "update", "delete", "create", "insert", "remove"]
+
+        for method in write_methods:
+            assert not hasattr(SQLAlchemyReadModelAdapter, method), (
+                f"SQLAlchemyReadModelAdapter has write method: {method}"
+            )
+
+
+# =============================================================================
+# Test: System Invariant Preservation
+# =============================================================================
+
+
+class TestSystemInvariantPreservation:
+    """Verify UI Phase 0 does not violate system invariants."""
+
+    def test_ui_code_has_no_notification_mutations(self):
+        """routes_ui.py should not contain notification mutation code."""
+        routes_path = (
+            Path(__file__).parent.parent.parent / "src" / "mcp_server" / "routes_ui.py"
+        )
+        content = routes_path.read_text()
+
+        # Patterns that would indicate actual write operations (method calls)
+        # Note: "notification.created" as a string enum value is acceptable
+        mutation_patterns = [
+            ".save(",           # Method call to save
+            ".create(",         # Method call to create
+            ".delete(",         # Method call to delete
+            ".update(",         # Method call to update
+            "audit_store.save", # Direct store save
+            ".commit(",         # Session commit
+            "session.flush",    # Session flush
+            "INSERT INTO",      # Raw SQL insert
+            "UPDATE ",          # Raw SQL update
+            "DELETE FROM",      # Raw SQL delete
+        ]
+
+        for pattern in mutation_patterns:
+            # Skip if pattern is in a string literal or comment
+            if pattern.lower() in content.lower():
+                # Check if it's in actual code (not docstrings, comments, or string literals)
+                lines_with_pattern = [
+                    line for line in content.split("\n")
+                    if pattern.lower() in line.lower()
+                    and not line.strip().startswith("#")
+                    and not line.strip().startswith('"""')
+                    and not line.strip().startswith("'''")
+                    and not ('"' in line and pattern.lower() in line.lower().split('"')[1] if '"' in line else False)
+                ]
+                # Filter out string literal occurrences (like enum values)
+                actual_code_lines = [
+                    line for line in lines_with_pattern
+                    if not ('= "' in line or "= '" in line)  # Skip assignment to string literals
+                ]
+                assert len(actual_code_lines) == 0, (
+                    f"Potential mutation pattern found in routes_ui.py: {pattern}\n"
+                    f"Lines: {actual_code_lines}"
+                )
+
+    def test_ui_endpoints_use_read_model_adapter(self, client: TestClient):
+        """Verify endpoints use the read model adapter (not direct store access)."""
+        routes_path = (
+            Path(__file__).parent.parent.parent / "src" / "mcp_server" / "routes_ui.py"
+        )
+        content = routes_path.read_text()
+
+        # Should use get_read_model_adapter()
+        assert "get_read_model_adapter()" in content, (
+            "routes_ui.py should use get_read_model_adapter() for data access"
+        )
+
+        # Should NOT directly access audit stores
+        assert "InMemoryAuditStore(" not in content, (
+            "routes_ui.py should not directly instantiate InMemoryAuditStore"
+        )
+        assert "SQLAlchemyAuditStore(" not in content, (
+            "routes_ui.py should not directly instantiate SQLAlchemyAuditStore"
+        )
+
+    def test_invariants_yml_contains_required_invariants(self):
+        """Verify invariants.yml contains all required system invariants."""
+        invariants_path = (
+            Path(__file__).parent.parent.parent
+            / "docs"
+            / "verification"
+            / "invariants.yml"
+        )
+        if not invariants_path.exists():
+            pytest.skip("invariants.yml not found")
+
+        with open(invariants_path) as f:
+            yaml_data = yaml.safe_load(f)
+
+        invariant_ids = {inv["id"] for inv in yaml_data.get("invariants", [])}
+
+        # These are the invariants mentioned in the verification report
+        required_invariants = {
+            "INV-ACK-001",  # Acks must not gate execution
+            "INV-POL-001",  # Policy absence must not block delivery
+            "INV-DEL-001",  # GUARANTEED must attempt all fallbacks
+            "INV-WS-001",   # WebSocket is non-authoritative
+            "INV-CTX-001",  # autonomy_context required
+            "INV-CTX-002",  # autonomy_mode + agent_id required
+            "INV-MSG-001",  # Title/message length limits
+        }
+
+        missing = required_invariants - invariant_ids
+        assert not missing, f"Missing invariants in registry: {missing}"
+
+
+# =============================================================================
+# Test: Verification Report Consistency
+# =============================================================================
+
+
+class TestVerificationReportConsistency:
+    """Verify the verification report is internally consistent."""
+
+    def test_verification_report_exists(self):
+        """Verification report file must exist."""
+        report_path = (
+            Path(__file__).parent.parent.parent
+            / "docs"
+            / "reports"
+            / "ui"
+            / "phase-0-verify.md"
+        )
+        assert report_path.exists(), "phase-0-verify.md not found"
+
+    def test_verification_report_has_pass_status(self):
+        """Verification report should indicate PASS status."""
+        report_path = (
+            Path(__file__).parent.parent.parent
+            / "docs"
+            / "reports"
+            / "ui"
+            / "phase-0-verify.md"
+        )
+        content = report_path.read_text()
+
+        assert "PASS" in content, "Verification report should indicate PASS status"
+        assert "**Status**: PASS" in content, (
+            "Verification report should have explicit status line"
+        )
+
+    def test_verification_report_lists_all_endpoints(self):
+        """Verification report should list all 6 endpoints."""
+        report_path = (
+            Path(__file__).parent.parent.parent
+            / "docs"
+            / "reports"
+            / "ui"
+            / "phase-0-verify.md"
+        )
+        content = report_path.read_text()
+
+        endpoints = [
+            "/ui/deliveries",
+            "/ui/deliveries/{notification_id}",
+            "/ui/policies/effective",
+            "/ui/invariants",
+            "/ui/invariants/summary",
+            "/ui/audit",
+        ]
+
+        for endpoint in endpoints:
+            assert endpoint in content, (
+                f"Verification report missing endpoint: {endpoint}"
+            )
