@@ -192,6 +192,52 @@ PENDING ────────────────────────
 - SAFETY intent + LIVE mode + timeout → Triggers EscalationHandler
 - Other cases → Logs and notifies via callback
 
+> ⚠️ **CRITICAL: Acknowledgment Scope Restriction**
+>
+> **Acknowledgments exist ONLY to gate autonomy state transitions.** They are a governance mechanism for human-in-the-loop approval workflows, NOT an execution control mechanism.
+>
+> | ✅ Acknowledgments MAY Gate | ❌ Acknowledgments MUST NEVER Gate |
+> |----------------------------|-----------------------------------|
+> | Autonomy mode transitions (PREVIEW → SHADOW → LIVE) | Order execution or routing |
+> | Policy configuration changes | Risk unwind operations |
+> | Non-time-sensitive approval workflows | Emergency stop/halt procedures |
+> | Agent capability escalation | Real-time execution loops |
+>
+> **Anti-Pattern Examples (DO NOT IMPLEMENT):**
+> ```python
+> # ❌ WRONG: Blocking order execution on ack status
+> def execute_order(order):
+>     if get_ack_status(order.approval_notification_id) != ACKED:
+>         raise BlockedError("Waiting for acknowledgment")  # NEVER DO THIS
+>     return execute(order)
+>
+> # ❌ WRONG: Gating risk unwind on acknowledgment
+> def unwind_position(position):
+>     notification = send_safety("Unwinding position...")
+>     wait_for_ack(notification.id)  # NEVER BLOCK RISK OPERATIONS
+>     return unwind(position)
+> ```
+>
+> **Correct Pattern:**
+> ```python
+> # ✅ CORRECT: Acknowledgment gates mode transition, not execution
+> def request_mode_transition(agent_id, target_mode):
+>     notification = send_governance(
+>         "Mode transition requested",
+>         f"Agent {agent_id} requests transition to {target_mode}"
+>     )
+>     # Transition happens via separate approval workflow
+>     # Execution continues independently
+>     return notification
+>
+> # ✅ CORRECT: Fire-and-forget notification during execution
+> def unwind_position(position):
+>     send_safety("Unwinding position", f"Emergency unwind: {position}")
+>     return unwind(position)  # Execute immediately, don't wait for ack
+> ```
+>
+> If your design requires blocking execution on acknowledgment, you have a fundamental architectural flaw that must be corrected.
+
 ### Audit System
 
 The audit system (`notification.audit`) provides compliance logging:

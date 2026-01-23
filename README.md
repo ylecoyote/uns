@@ -116,6 +116,25 @@ sdk.send_info(
 
 ### Core Concepts
 
+#### Acknowledgment Scope
+
+> ⚠️ **CRITICAL: Acknowledgments are for Autonomy State Transitions ONLY**
+>
+> Acknowledgments exist to gate **autonomy mode transitions** (PREVIEW → SHADOW → LIVE) and similar **human-in-the-loop governance decisions**. They are NOT designed to block or gate real-time operations.
+>
+> **Acknowledgments MAY gate:**
+> - Autonomy mode transitions (e.g., approving move from SHADOW to LIVE)
+> - Policy changes or configuration updates
+> - Approval workflows for non-time-sensitive decisions
+>
+> **Acknowledgments MUST NEVER gate:**
+> - Order execution or routing
+> - Risk unwind operations
+> - Emergency stop/halt procedures
+> - Any real-time trading or execution loop
+>
+> **Anti-Pattern Warning:** Do NOT use acknowledgment timeouts to halt execution pipelines. If your system blocks order routing waiting for an ack, you have a critical design flaw. Execution paths must remain independent of notification acknowledgment state.
+
 #### Notification Intent
 
 Determines urgency and delivery guarantees:
