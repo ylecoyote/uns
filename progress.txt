@@ -786,3 +786,40 @@ Created `tests/docs/test_terminology_consistency.py` with 15 tests:
 |------|-----------|-------|
 | Delivery Service | `DeliveryService` class in `notification.service` | Component references, class mentions, configuration |
 | Delivery Pipeline | Sequence of processing steps | Workflow descriptions, step documentation |
+
+---
+
+## Task: Add /health endpoint reminder to root README - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Added a "Running the Service" section to the root README.md that documents the `/health` endpoint for developers running UNS as a service.
+
+### Changes Made
+
+1. **README.md** - Added new section before "Testing":
+   - `## Running the Service` - Instructions for starting the HTTP API server
+   - `### HTTP API` - Shows uvicorn command to start the server
+   - `### Health Check` - Documents the `/health` endpoint
+     - Shows curl example for checking health
+     - Shows response format: `{"status": "healthy"}`
+     - Notes that this is a basic liveness check
+     - Links to observability documentation for detailed health info
+
+2. **tests/docs/test_readme_health_endpoint.py** - New test file with 8 tests:
+   - `test_readme_exists` - Verifies README.md exists
+   - `test_readme_mentions_health_endpoint` - Verifies `/health` is mentioned
+   - `test_readme_has_running_the_service_section` - Verifies section exists
+   - `test_readme_has_health_check_section` - Verifies health check section exists
+   - `test_readme_shows_health_endpoint_response` - Verifies response format is shown
+   - `test_readme_shows_curl_example` - Verifies curl example is included
+   - `test_readme_links_to_observability_docs` - Verifies link to observability docs
+   - `test_readme_mentions_uvicorn_command` - Verifies server start command
+
+### Test Results
+- All 8 new tests pass
+- Ruff linting passes
+
+### Documentation Link
+The README now points to [docs/sections/observability.md](docs/sections/observability.md) for comprehensive health state and metrics documentation
