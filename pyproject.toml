@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "unified-notification-service"
+version = "0.1.0"
+description = "Unified Notification Service (UNS) - Control-plane notification and acknowledgment service"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["notifications", "alerts", "messaging"]
+dependencies = [
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+adapters = [
+    "httpx>=0.25.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+all = [
+    "unified-notification-service[adapters,dev]",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/notification"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "C901",   # too complex
+    "ARG001", # unused function argument
+    "ARG002", # unused method argument
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["notification"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
