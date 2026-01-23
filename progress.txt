@@ -973,3 +973,148 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 ✅ Optional improvements do not contradict core specifications
 ✅ Validation tests created and passing
 ✅ No blocking issues identified
+
+---
+
+## UI Phase 1 Task: Initialize apps/ui project scaffolding (read-only) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Created the UI app skeleton under apps/ui with routing, layout shell, environment configuration, minimal auth integration placeholder, and basic navigation structure. All components follow the v1 read-only posture per the UI scope specification.
+
+### Files Created
+
+#### Directory Structure
+```
+apps/
+├── __init__.py                    # Apps package init
+└── ui/
+    ├── __init__.py               # UI package (version 0.1.0)
+    ├── README.md                 # Local run instructions + non-authoritative rules
+    ├── src/
+    │   ├── __init__.py
+    │   ├── config.py             # Env config for API base URL
+    │   ├── auth.py               # Minimal auth integration placeholder
+    │   ├── router.py             # Route definitions (GET only)
+    │   ├── api/
+    │   │   └── __init__.py       # API client placeholder
+    │   ├── pages/
+    │   │   ├── __init__.py
+    │   │   ├── deliveries.py     # Deliveries explorer stub
+    │   │   ├── policy.py         # Policy inspector stub
+    │   │   ├── invariants.py     # Invariants viewer stub
+    │   │   └── audit.py          # Audit timeline stub
+    │   ├── components/
+    │   │   └── __init__.py
+    │   ├── layouts/
+    │   │   ├── __init__.py
+    │   │   └── main_layout.py    # Navigation and layout shell
+    │   ├── hooks/
+    │   │   └── __init__.py
+    │   └── utils/
+    │       └── __init__.py
+    └── tests/
+        ├── __init__.py
+        └── test_package_structure.py  # 44 tests
+```
+
+### Key Components
+
+#### 1. Configuration (`config.py`)
+- `UIConfig` dataclass with frozen=True (immutable)
+- Environment variables:
+  - `UNS_API_BASE_URL` (default: http://localhost:8000)
+  - `UNS_UI_DEBUG` (default: false)
+  - `UNS_UI_REQUEST_TIMEOUT` (default: 30)
+  - `UNS_API_VERSION` (default: v1)
+- `get_config()` with caching, `reset_config()` for testing
+
+#### 2. Authentication Placeholder (`auth.py`)
+- `AuthStatus` enum: AUTHENTICATED, ANONYMOUS, EXPIRED
+- `UserContext` dataclass with `is_authenticated` property
+- `AuthProvider` Protocol for dependency injection
+- `NoOpAuthProvider` for local development (anonymous access)
+- Global provider management: `get_auth_provider()`, `configure_auth_provider()`, `reset_auth_provider()`
+
+#### 3. Router (`router.py`)
+- `HTTPMethod` enum: GET only (read-only posture)
+- `Route` dataclass for route definitions
+- Routes defined:
+  - `/deliveries` - List delivery timelines
+  - `/deliveries/{notification_id}` - Delivery detail
+  - `/policy` - Policy inspector
+  - `/invariants` - Invariants list
+  - `/invariants/summary` - Invariants summary
+  - `/audit` - Audit timeline
+- Helper functions: `get_all_routes()`, `get_route_by_name()`, `build_path()`
+
+#### 4. Layout (`main_layout.py`)
+- `NavigationRoute` enum: DELIVERIES, POLICY, INVARIANTS, AUDIT
+- `NavigationItem` dataclass with label, icon, description
+- `NAVIGATION_ITEMS` tuple with 4 nav items
+- Helper functions: `get_navigation_items()`, `get_route_for_label()`
+
+#### 5. Page Stubs
+Each page module provides:
+- Page state dataclass (frozen)
+- Filter definitions
+- Title helpers
+- Placeholder for Phase 1 implementation
+
+### Tests (44 tests)
+
+**TestPackageStructure** (8 tests)
+- Package import tests for all subpackages
+
+**TestConfigModule** (6 tests)
+- Config defaults, api_prefix, frozen, caching, reset
+
+**TestAuthModule** (7 tests)
+- Auth imports, status enum, user context, NoOpAuthProvider
+
+**TestRouterModule** (6 tests)
+- Router imports, GET-only method, routes exist, path building
+
+**TestMainLayout** (4 tests)
+- Layout imports, navigation routes, navigation items, route lookup
+
+**TestPageModules** (8 tests)
+- Page module imports, filters, options for each page
+
+**TestReadOnlyPosture** (2 tests)
+- All routes are GET only
+- HTTPMethod enum only has GET
+
+**TestFileStructure** (3 tests)
+- README exists
+- README contains required sections
+- All __init__.py files exist
+
+### pyproject.toml Updates
+- Added `apps` to `tool.setuptools.packages.find.where`
+- Added `apps/ui/tests` to `tool.pytest.ini_options.testpaths`
+- Added `apps` to `tool.pytest.ini_options.pythonpath`
+- Added `apps` to `tool.ruff.src`
+- Added `apps` to `tool.ruff.lint.isort.known-first-party`
+
+### Test Results
+- 44 tests passing
+- Ruff check: All checks passed
+- Ruff format: Applied
+
+### Acceptance Criteria Met
+Per uns-ui-phase-1.yaml task requirements:
+✅ Created UI app skeleton under apps/ui
+✅ Routing and layout shell implemented
+✅ Env config for API base URL (UNS_API_BASE_URL)
+✅ Minimal auth integration placeholder (read-only posture)
+✅ Basic navigation: Deliveries, Policy, Invariants, Audit
+✅ apps/ui/README.md with local run instructions and non-authoritative rules
+
+### Read-Only Posture Enforced
+- All routes use GET method only
+- HTTPMethod enum only defines GET
+- README clearly states UI is non-authoritative
+- Auth placeholder uses anonymous access by default
+- No write operations available in v1
