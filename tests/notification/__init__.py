@@ -1,1 +1,1 @@
-"""Tests for notification module."""
+"""Tests for the notification package."""
