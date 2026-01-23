@@ -823,3 +823,73 @@ Added a "Running the Service" section to the root README.md that documents the `
 
 ### Documentation Link
 The README now points to [docs/sections/observability.md](docs/sections/observability.md) for comprehensive health state and metrics documentation
+
+---
+
+## Task: Clarify Policy State Disclaimer Rationale (Planned vs Implemented) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Enhanced the policy lifecycle documentation to clearly explain the rationale for documenting planned features alongside current implementation behavior. This prevents confusion about what is currently implemented versus what is planned for future releases.
+
+### Files Modified
+
+1. **docs/sections/policy-lifecycle.md**
+   - Restructured the "Current Implementation Note" from a single inline note to a proper subsection
+   - Added new "Planned: State Lifecycle Management" subsection with rationale explaining:
+     1. **Prevent documentation churn** — Defining the contract upfront avoids rework when states are implemented
+     2. **Guide implementation** — Developers implementing state management have a clear target specification
+     3. **Communicate design intent** — Operators understand the planned evolution without inferring from code
+   - Renamed "Planned Features" to "Planned: Version Management" for consistency
+   - Added cross-references from other "Planned:" sections back to the rationale in Policy States
+   - Added note to "Planned: Policy Content Hashing" section referencing the rationale
+
+2. **tests/docs/test_policy_lifecycle.py**
+   - Added new `TestPolicyStateDisclaimerRationale` test class with 10 tests:
+     - `test_has_current_implementation_note` — Verifies section exists
+     - `test_current_implementation_describes_active_behavior` — Verifies ACTIVE-only behavior is explained
+     - `test_has_planned_state_lifecycle_section` — Verifies planned section exists
+     - `test_planned_section_explains_rationale` — Verifies all three rationale points are present
+     - `test_planned_section_references_future_removal` — Verifies update instructions for when implemented
+     - `test_has_planned_version_management_section` — Verifies renamed section exists
+     - `test_planned_version_management_references_rationale` — Verifies cross-reference
+     - `test_has_planned_policy_hashing_section` — Verifies planned hashing section exists
+     - `test_distinguishes_planned_from_implemented` — Verifies clear labeling of planned vs current
+
+### Documentation Changes Summary
+
+**Before:**
+```markdown
+**Current Implementation Note:** The current implementation treats all registered policies as ACTIVE. State management and versioning are planned features. Policies are either registered (active) or not present (falling back to SDK defaults).
+```
+
+**After:**
+```markdown
+### Current Implementation Note
+
+The current implementation treats all registered policies as **ACTIVE**. Policies are either registered (active) or not present (falling back to SDK defaults).
+
+### Planned: State Lifecycle Management
+
+The DRAFT, PREVIEW, ACTIVE, and RETIRED states documented above represent the **intended lifecycle contract** for future implementation. This section is documented now to:
+
+1. **Prevent documentation churn** — Defining the contract upfront avoids rework when states are implemented
+2. **Guide implementation** — Developers implementing state management have a clear target specification
+3. **Communicate design intent** — Operators understand the planned evolution without inferring from code
+
+When state management is implemented, the "Current Implementation Note" above will be removed and this section will be updated to document the actual behavior.
+```
+
+### Test Results
+- All 69 policy lifecycle documentation tests pass
+- All 391 docs tests pass
+- Ruff linting passes
+- Ruff formatting applied
+
+### Acceptance Criteria Met
+✅ Policy states documented as intended lifecycle contract
+✅ Current implementation clearly describes ACTIVE-only behavior
+✅ Rationale explains why planned features are documented upfront
+✅ Concise and clearly labeled "Current Implementation Note" vs "Planned"
+✅ Tests verify disclaimer content is present and correct
