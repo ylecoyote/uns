@@ -1,7 +1,10 @@
 """Core data contracts for the Unified Notification Service.
 
 This module defines all enums and models as specified in the UNS PRD.
+These are the foundational types used throughout the notification system.
 """
+
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
@@ -17,11 +20,10 @@ def _utc_now() -> datetime:
 
 
 class NotificationIntent(str, Enum):
-    """Classification of notification purpose.
+    """Classification of notification urgency and handling requirements.
 
-    Invariants:
-    - SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)
-    - OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default
+    SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode).
+    OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default.
     """
 
     SAFETY = "SAFETY"
@@ -31,7 +33,10 @@ class NotificationIntent(str, Enum):
 
 
 class DeliveryMode(str, Enum):
-    """Delivery guarantee level.
+    """Delivery reliability semantics.
+
+    GUARANTEED: Must raise error if all persistent channels fail.
+    BEST_EFFORT: May fail silently but must log failure.
 
     Invariants:
     - SAFETY -> GUARANTEED
@@ -45,7 +50,9 @@ class DeliveryMode(str, Enum):
 
 
 class AutonomyMode(str, Enum):
-    """Agent autonomy level affecting routing behavior.
+    """Operating mode of the autonomous agent.
+
+    Affects channel routing and acknowledgment requirements.
 
     Channel routing varies by mode:
     - PREVIEW: All intents -> WebSocket only
@@ -59,7 +66,7 @@ class AutonomyMode(str, Enum):
 
 
 class AckStatus(str, Enum):
-    """Acknowledgment state for notifications requiring human confirmation."""
+    """Acknowledgment lifecycle states."""
 
     PENDING = "PENDING"
     ACKED = "ACKED"
@@ -68,7 +75,7 @@ class AckStatus(str, Enum):
 
 
 class Channel(str, Enum):
-    """Supported delivery channels."""
+    """Delivery channels for notifications."""
 
     SLACK = "SLACK"
     EMAIL = "EMAIL"
@@ -77,7 +84,7 @@ class Channel(str, Enum):
 
 
 class Priority(str, Enum):
-    """Notification priority level, derived from intent."""
+    """Notification priority levels, derived from intent."""
 
     HIGH = "HIGH"
     NORMAL = "NORMAL"
@@ -122,29 +129,32 @@ INTENT_DELIVERY_MODE_MAP: dict[NotificationIntent, DeliveryMode] = {
 
 
 class AutonomyContext(BaseModel):
-    """Context capturing the autonomy state when a notification is created.
+    """Context about the autonomous agent that triggered the notification.
 
+    This is a REQUIRED field for all notifications - creation fails without it.
     Hard Guard: Notification creation MUST FAIL if autonomy_context is missing.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    autonomy_mode: AutonomyMode = Field(..., description="Routing key for channel selection")
-    agent_id: UUID = Field(..., description="Attribution - which agent triggered this")
-    plan_id: UUID | None = Field(default=None, description="Optional plan reference")
+    autonomy_mode: AutonomyMode = Field(..., description="Current operating mode - routing key")
+    agent_id: UUID = Field(..., description="Unique identifier of the agent for attribution")
+    plan_id: UUID | None = Field(default=None, description="Optional plan identifier")
     decision_snapshot_id: UUID | None = Field(
-        default=None, description="Optional decision snapshot reference"
+        default=None, description="Optional decision snapshot identifier"
     )
     execution_snapshot_id: UUID | None = Field(
-        default=None, description="Optional execution snapshot reference"
+        default=None, description="Optional execution snapshot identifier"
     )
     skip_snapshot_id: UUID | None = Field(
-        default=None, description="Optional skip snapshot reference"
+        default=None, description="Optional skip snapshot identifier"
     )
 
 
 class Notification(BaseModel):
-    """Core notification data contract.
+    """Core notification domain object.
+
+    Represents a notification to be delivered through the UNS system.
 
     Validation guards:
     - autonomy_context is required (hard guard)
@@ -162,11 +172,11 @@ class Notification(BaseModel):
 
     # Required fields
     notification_type: str = Field(
-        ..., description="Namespaced type (domain.event)", min_length=1
+        ..., description="Namespaced notification type (domain.event format)", min_length=1
     )
-    intent: NotificationIntent = Field(..., description="Notification intent classification")
+    intent: NotificationIntent = Field(..., description="Notification classification")
     autonomy_context: AutonomyContext = Field(
-        ..., description="Required autonomy context (hard guard)"
+        ..., description="Required agent context (hard guard)"
     )
     title: str = Field(..., description="Notification title", max_length=TITLE_MAX_LENGTH)
     message: str = Field(..., description="Notification body", max_length=MESSAGE_MAX_LENGTH)
@@ -174,7 +184,7 @@ class Notification(BaseModel):
 
     # Optional fields
     irreversible: bool = Field(
-        default=False, description="If true, may trigger PagerDuty for SAFETY"
+        default=False, description="Whether action is irreversible - may trigger PagerDuty for SAFETY"
     )
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional JSON metadata")
     correlation_id: str | None = Field(default=None, description="Optional correlation ID")
@@ -186,23 +196,25 @@ class Notification(BaseModel):
     require_ack: bool | None = Field(
         default=None, description="Derived from intent + mode + policy"
     )
-    ack_timeout_minutes: int | None = Field(default=None, description="Intent-based timeout")
+    ack_timeout_minutes: int | None = Field(
+        default=None, description="Acknowledgment timeout based on intent"
+    )
     priority: Priority | None = Field(default=None, description="Derived from intent")
-    channels: list[Channel] = Field(default_factory=list, description="Router output")
-    dedup_key: str | None = Field(default=None, description="Stable within dedup window")
+    channels: list[Channel] = Field(default_factory=list, description="Router-derived channels")
+    dedup_key: str | None = Field(default=None, description="Stable key within dedup window")
 
     @field_validator("title")
     @classmethod
     def validate_title_length(cls, v: str) -> str:
         if len(v) > TITLE_MAX_LENGTH:
-            raise ValueError(f"title must be at most {TITLE_MAX_LENGTH} characters")
+            raise ValueError(f"Title must be {TITLE_MAX_LENGTH} characters or less")
         return v
 
     @field_validator("message")
     @classmethod
     def validate_message_length(cls, v: str) -> str:
         if len(v) > MESSAGE_MAX_LENGTH:
-            raise ValueError(f"message must be at most {MESSAGE_MAX_LENGTH} characters")
+            raise ValueError(f"Message must be {MESSAGE_MAX_LENGTH} characters or less")
         return v
 
     @model_validator(mode="before")
@@ -239,12 +251,12 @@ class Notification(BaseModel):
 
 
 class NotificationResult(BaseModel):
-    """Result of a notification delivery attempt."""
+    """Outcome of a notification delivery attempt."""
 
     model_config = ConfigDict(frozen=True)
 
-    notification_id: UUID = Field(..., description="Reference to the notification")
-    status: DeliveryStatus = Field(..., description="Delivery outcome")
+    notification_id: UUID = Field(..., description="ID of the notification")
+    status: DeliveryStatus = Field(..., description="Overall delivery outcome")
     channels_attempted: list[Channel] = Field(
         default_factory=list, description="Channels that were attempted"
     )
@@ -260,16 +272,16 @@ class NotificationResult(BaseModel):
 
 
 class AckEvent(BaseModel):
-    """Record of an acknowledgment action."""
+    """Acknowledgment event for a notification."""
 
     model_config = ConfigDict(frozen=True)
 
-    notification_id: UUID = Field(..., description="Reference to the notification")
-    status: AckStatus = Field(..., description="New acknowledgment status")
-    acked_by: str | None = Field(default=None, description="User who acknowledged")
+    notification_id: UUID = Field(..., description="ID of the notification being acknowledged")
+    status: AckStatus = Field(..., description="Acknowledgment status")
+    acked_by: str | None = Field(default=None, description="User/system that acknowledged")
     acked_at: datetime = Field(
-        default_factory=_utc_now, description="When acknowledgment occurred (UTC)"
+        default_factory=_utc_now, description="Ack timestamp (UTC)"
     )
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional acknowledgment metadata"
+        default_factory=dict, description="Additional ack metadata"
     )

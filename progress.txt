@@ -80,5 +80,70 @@ Implemented core data contracts for the Unified Notification Service as specifie
 - Linting (ruff) passed
 - No deprecation warnings
 
+---
+
+## Task 2: Integration Interfaces - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented integration protocols and default implementations for ATP-agnostic operation.
+
+### Artifacts Created
+
+1. **Integration Interfaces** (`src/notification/interfaces.py`)
+
+   **Protocols:**
+   - `NotificationContextProvider` Protocol
+     - `get_current_context() -> AutonomyContext` - retrieve current context
+     - `get_context_for_agent(agent_id: UUID) -> AutonomyContext` - get context for specific agent
+     - `get_autonomy_mode() -> AutonomyMode` - convenience method for routing decisions
+     - Runtime checkable for isinstance() support
+
+   - `AcknowledgmentCallback` Protocol
+     - `on_ack(event: AckEvent)` - called when notification is acknowledged
+     - `on_dismiss(event: AckEvent)` - called when notification is dismissed
+     - `on_timeout(event: AckEvent)` - called when acknowledgment times out
+     - `on_status_change(notification_id, old_status, new_status, metadata)` - general status transition hook
+     - Runtime checkable for isinstance() support
+
+   **Default Implementations:**
+   - `DefaultContextProvider` - fallback implementation with registration/lookup of contexts
+   - `NoOpAcknowledgmentCallback` - silent implementation for testing
+   - `LoggingAcknowledgmentCallback` - logs all events for debugging
+   - `CompositeAcknowledgmentCallback` - delegates to multiple callbacks
+
+2. **Tests** (`tests/notification/test_interfaces.py`)
+   - 36 tests covering:
+     - Protocol runtime checkability
+     - Custom implementations satisfying protocols
+     - DefaultContextProvider registration, lookup, default context
+     - NoOpAcknowledgmentCallback silent operation
+     - LoggingAcknowledgmentCallback log levels
+     - CompositeAcknowledgmentCallback delegation
+     - ATP-agnostic tests - verifying core SDK runs without ATP imports
+
+### Key Design Decisions
+
+1. **Protocol-based Interfaces**: Using Python `typing.Protocol` with `@runtime_checkable` decorator allows:
+   - Structural subtyping (duck typing with type hints)
+   - Runtime isinstance() checks for validation
+   - Clean separation from ATP-specific implementations
+
+2. **ATP-Agnostic Core**: UNS core can run completely standalone without any ATP imports. External systems inject their own implementations at runtime via dependency injection.
+
+3. **Frozen AutonomyContext**: Made immutable using Pydantic's `frozen=True` to ensure context cannot be modified after creation.
+
+4. **Composite Pattern for Callbacks**: `CompositeAcknowledgmentCallback` allows combining multiple handlers (logging, metrics, ATP integration) into a single callback instance.
+
+### Test Results
+- 65+ tests passed (combined with Task 1 tests)
+- 0 warnings
+- Linting: All checks passed (ruff)
+
+### Files Created/Modified
+- `src/notification/interfaces.py` - integration protocols and default implementations
+- `tests/notification/test_interfaces.py` - interface tests
+
 ### Next Steps
-- Task 2: Implement integration interfaces (ContextProvider, AckCallback)
+- Task 3: Implement notification routing and channel selection

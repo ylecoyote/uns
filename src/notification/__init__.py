@@ -13,6 +13,14 @@ This package provides the core notification infrastructure including:
 - Acknowledgment handling
 """
 
+from src.notification.interfaces import (
+    AcknowledgmentCallback,
+    CompositeAcknowledgmentCallback,
+    DefaultContextProvider,
+    LoggingAcknowledgmentCallback,
+    NoOpAcknowledgmentCallback,
+    NotificationContextProvider,
+)
 from src.notification.models import (
     AckEvent,
     AckStatus,
@@ -30,6 +38,7 @@ from src.notification.models import (
 __version__ = "0.1.0"
 
 __all__ = [
+    # Enums
     "NotificationIntent",
     "DeliveryMode",
     "AutonomyMode",
@@ -37,8 +46,17 @@ __all__ = [
     "Channel",
     "Priority",
     "DeliveryStatus",
+    # Models
     "AutonomyContext",
     "Notification",
     "NotificationResult",
     "AckEvent",
+    # Interfaces (Protocols)
+    "NotificationContextProvider",
+    "AcknowledgmentCallback",
+    # Default Implementations
+    "DefaultContextProvider",
+    "NoOpAcknowledgmentCallback",
+    "LoggingAcknowledgmentCallback",
+    "CompositeAcknowledgmentCallback",
 ]
