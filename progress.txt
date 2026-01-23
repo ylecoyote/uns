@@ -731,3 +731,58 @@ Performed a comprehensive baseline scan of all UNS documentation for terminology
 - [x] All cross-references valid
 - [x] Terminology consistent across documents
 - [x] API.md NotificationPolicy matches implementation
+
+---
+
+## Documentation Nits: Terminology Standardization - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Standardized terminology across documentation for "delivery service" vs "delivery pipeline" per task in uns-doc-nits.yaml.
+
+### Analysis Results
+Found the existing usage was semantically correct but lacked explicit documentation:
+- **"Delivery Service"** (14 occurrences) - refers to the `DeliveryService` component/class in `notification.service`
+- **"Delivery Pipeline"** (6 occurrences) - refers to the sequence of processing steps (dedup → rate limit → deliver → audit)
+
+The relationship is defined in ARCHITECTURE.md:121: "The delivery service (`notification.service`) orchestrates the delivery pipeline"
+
+### Changes Made
+
+#### 1. Added Terminology Note to ARCHITECTURE.md
+Added explicit terminology clarification in the Delivery Service section:
+> **Terminology Note:** The **delivery service** refers to the `DeliveryService` component in `notification.service` that orchestrates notification delivery. The **delivery pipeline** refers to the sequence of processing steps (deduplication, rate limiting, channel routing, etc.) that the service executes.
+
+#### 2. Fixed integration-modes.md Inconsistencies
+- Fixed component table: "Delivery orchestration pipeline" → "Delivery service (orchestrates the delivery pipeline)"
+- Fixed file tree comment: "# Delivery pipeline" → "# Delivery service (orchestrates delivery pipeline)"
+
+#### 3. Updated README.md
+Added clarifying text under "### Delivery Pipeline" section:
+> The delivery service (`DeliveryService`) executes the following pipeline steps:
+
+### Tests Created
+Created `tests/docs/test_terminology_consistency.py` with 15 tests:
+- `TestDeliveryTerminologyStandardization` - 6 tests verifying terminology is correctly used
+- `TestTerminologyConsistencyPatterns` - 6 tests verifying no conflated terminology
+- `TestTerminologyDefinitions` - 2 tests verifying terminology note exists and is complete
+
+### Files Modified
+- `docs/ARCHITECTURE.md` - Added terminology note
+- `docs/sections/integration-modes.md` - Fixed 2 inconsistent usages
+- `README.md` - Added clarifying text connecting service to pipeline
+
+### Files Created
+- `tests/docs/test_terminology_consistency.py` - 15 terminology consistency tests
+
+### Test Results
+- All 15 terminology tests passing
+- All 397 docs tests passing
+- Ruff linting passing
+
+### Terminology Guidelines Established
+| Term | Refers To | Usage |
+|------|-----------|-------|
+| Delivery Service | `DeliveryService` class in `notification.service` | Component references, class mentions, configuration |
+| Delivery Pipeline | Sequence of processing steps | Workflow descriptions, step documentation |
