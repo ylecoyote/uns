@@ -973,3 +973,80 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 ✅ Optional improvements do not contradict core specifications
 ✅ Validation tests created and passing
 ✅ No blocking issues identified
+
+---
+
+## UI Phase 1 Bounded Verification Report - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Produced Phase 1 bounded verification report for UI + contracts. The report verifies that UI calls only GET endpoints, uses only /ui contracts as documented, introduces no mutation routes or privileged actions, and that all basic UI tests pass.
+
+### Artifacts Created
+
+1. **docs/verification/invariants.yml** (NEW)
+   - Created system invariants registry as YAML file
+   - Includes 8 invariants:
+     - INV-ACK-001: Acks don't gate execution
+     - INV-POL-001: Policy absence doesn't block delivery
+     - INV-DEL-001: GUARANTEED attempts all fallbacks
+     - INV-WS-001: WebSocket non-authoritative
+     - INV-CTX-001: autonomy_context required
+     - INV-CTX-002: autonomy_mode + agent_id required
+     - INV-MSG-001: Title/message length limits
+     - INV-UI-001: UI endpoints read-only (NEW)
+
+2. **docs/reports/ui/phase-1-verify.md** (NEW)
+   - Full bounded verification report following Phase 0 template
+   - Sections include:
+     - Executive Summary with PASS status
+     - Scope Limits (what is/isn't verified)
+     - Unverifiable Claims
+     - Endpoint Verification (6 endpoints verified)
+     - Query Parameter Alignment (all parameters match docs)
+     - Response Shape Alignment (all match TypeScript interfaces)
+     - Read-Only Verification (GET only, no mutations)
+     - Contract Compliance Verification
+     - Invariant Integrity
+     - Test Evidence (152 tests passing)
+     - Verification Checklist (all PASS)
+
+3. **tests/docs/test_ui_phase1_verification.py** (NEW)
+   - 25 tests validating Phase 1 verification claims
+   - Test classes:
+     - TestPhase1ReportExists (3 tests)
+     - TestGetOnlyEnforcement (5 tests)
+     - TestContractCompliance (6 tests)
+     - TestInvariantRegistryCompliance (4 tests)
+     - TestReadModelAdapterCompliance (2 tests)
+     - TestRouteCodeInspection (2 tests)
+     - TestTestCoverage (3 tests)
+
+### Verification Results
+
+| Verification Claim | Status | Evidence |
+|-------------------|--------|----------|
+| UI calls only GET endpoints | PASS | All 6 endpoints use @router.get() |
+| UI uses only /ui contracts | PASS | All parameters/responses match docs |
+| No mutation routes | PASS | POST/PUT/PATCH/DELETE return 405 |
+| Basic UI tests pass | PASS | 152 tests passing |
+
+### Test Results
+- 104 UI tests pass (test_routes_ui.py + test_routes_ui_comprehensive.py)
+- 23 Phase 0 verification tests pass
+- 25 Phase 1 verification tests pass
+- **152 total tests pass**
+- Ruff linting passes
+
+### Files Created
+- `docs/verification/invariants.yml`
+- `docs/reports/ui/phase-1-verify.md`
+- `tests/docs/test_ui_phase1_verification.py`
+
+### Acceptance Criteria Met
+✅ UI calls only GET endpoints - VERIFIED
+✅ UI uses only /ui contracts as documented - VERIFIED
+✅ No mutation routes or privileged actions introduced - VERIFIED
+✅ Basic UI tests pass - VERIFIED (152 tests)
+✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
