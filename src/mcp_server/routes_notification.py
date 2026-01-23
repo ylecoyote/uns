@@ -24,7 +24,6 @@ from pydantic import BaseModel, Field
 from notification.acknowledgment import (
     AcknowledgmentEngine,
     InvalidAckTransitionError,
-    NotificationNotFoundError,
     configure_ack_engine,
     get_ack_engine,
 )
@@ -148,6 +147,7 @@ async def acknowledge_notification(
     try:
         event = engine.ack(
             notification_id=notification_id,
+            ack_status=AckStatus.ACKED,
             acked_by=request.acked_by,
             metadata=request.metadata,
         )
@@ -166,13 +166,13 @@ async def acknowledge_notification(
             metadata=event.metadata,
         )
 
-    except NotificationNotFoundError as e:
+    except KeyError as e:
         logger.warning("Ack failed - notification not found: %s", notification_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "error": "not_found",
-                "message": str(e),
+                "message": f"Notification not found: {notification_id}",
                 "notification_id": str(notification_id),
             },
         ) from e
@@ -229,9 +229,10 @@ async def dismiss_notification(
     request = request or DismissRequest()
 
     try:
-        event = engine.dismiss(
+        event = engine.ack(
             notification_id=notification_id,
-            dismissed_by=request.dismissed_by,
+            ack_status=AckStatus.DISMISSED,
+            acked_by=request.dismissed_by,
             metadata=request.metadata,
         )
 
@@ -249,13 +250,13 @@ async def dismiss_notification(
             metadata=event.metadata,
         )
 
-    except NotificationNotFoundError as e:
+    except KeyError as e:
         logger.warning("Dismiss failed - notification not found: %s", notification_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "error": "not_found",
-                "message": str(e),
+                "message": f"Notification not found: {notification_id}",
                 "notification_id": str(notification_id),
             },
         ) from e
@@ -294,33 +295,31 @@ async def get_notification_status(
     Returns notification details including the current acknowledgment status.
     If the notification is not found, returns a response with found=False.
 
+    Note: The engine only stores ack state, not full notification details.
+    So this endpoint returns ack state info only.
+
     Args:
         notification_id: UUID of the notification
 
     Returns:
-        NotificationStatusResponse with notification details and ack status
+        NotificationStatusResponse with ack status
     """
     engine = get_engine()
 
-    notification = engine.get_notification(notification_id)
-    ack_status = engine.get_status(notification_id)
+    state = engine.get_state(notification_id)
 
-    if notification is None:
+    if state is None:
         return NotificationStatusResponse(
             notification_id=notification_id,
             found=False,
-            ack_status=ack_status,
+            ack_status=None,
         )
 
     return NotificationStatusResponse(
-        notification_id=notification.notification_id,
-        notification_type=notification.notification_type,
-        intent=notification.intent.value,
-        title=notification.title,
-        message=notification.message,
-        ack_status=ack_status,
-        require_ack=notification.require_ack,
-        created_at=notification.created_at,
+        notification_id=notification_id,
+        intent=state.intent.value if state.intent else None,
+        ack_status=state.status,
+        created_at=state.created_at,
         found=True,
     )
 

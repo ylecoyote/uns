@@ -120,7 +120,7 @@ class SQLAlchemyAuditStore(AuditStore):
                 acked_by=record.acked_by,
                 acked_at=record.acked_at,
                 created_at=record.audit_created_at,
-                metadata=record.metadata,
+                ack_metadata=record.metadata,
             )
             session.add(db_record)
             session.commit()
@@ -220,7 +220,7 @@ class SQLAlchemyAuditStore(AuditStore):
                     acked_by=r.acked_by,
                     acked_at=r.acked_at,
                     audit_created_at=r.created_at,
-                    metadata=r.metadata,
+                    metadata=r.ack_metadata,
                 )
                 for r in results
             ]

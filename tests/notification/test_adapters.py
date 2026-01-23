@@ -310,6 +310,85 @@ class TestSlackAdapter:
             result = await slack_adapter.health_check()
             assert result.status == AdapterStatus.UNHEALTHY
 
+    @pytest.mark.asyncio
+    async def test_health_check_general_exception(self, slack_adapter: SlackAdapter) -> None:
+        """Test health check with a general exception."""
+        with patch.object(
+            slack_adapter._client,
+            "auth_test",
+            new_callable=AsyncMock,
+            side_effect=Exception("Network error"),
+        ):
+            result = await slack_adapter.health_check()
+            assert result.status == AdapterStatus.UNHEALTHY
+            assert "failed" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_non_retryable_error(
+        self, slack_adapter: SlackAdapter, sample_notification: Notification
+    ) -> None:
+        """Test delivery with a non-retryable error."""
+        with patch.object(
+            slack_adapter._client,
+            "post_message",
+            new_callable=AsyncMock,
+            side_effect=AdapterDeliveryError("channel_not_found", retryable=False),
+        ):
+            result = await slack_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "channel_not_found" in result.error
+
+    @pytest.mark.asyncio
+    async def test_deliver_unexpected_exception(
+        self, slack_adapter: SlackAdapter, sample_notification: Notification
+    ) -> None:
+        """Test delivery with an unexpected exception."""
+        with patch.object(
+            slack_adapter._client,
+            "post_message",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("Unexpected error"),
+        ):
+            result = await slack_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "Unexpected" in result.error
+
+    def test_get_target_channel_from_metadata(
+        self, slack_adapter: SlackAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test that slack_channel in metadata overrides default."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            metadata={"slack_channel": "#custom-channel"},
+        )
+        channel = slack_adapter._get_target_channel(notification)
+        assert channel == "#custom-channel"
+
+    def test_build_blocks_without_ack(
+        self, slack_adapter: SlackAdapter, info_notification: Notification
+    ) -> None:
+        """Test block building without ack buttons."""
+        blocks = slack_adapter._build_blocks(info_notification)
+        # Should not have action buttons for non-ack notifications
+        actions = [b for b in blocks if b.get("type") == "actions"]
+        assert len(actions) == 0
+
+    @pytest.mark.asyncio
+    async def test_close(self, slack_adapter: SlackAdapter) -> None:
+        """Test adapter close method."""
+        with patch.object(
+            slack_adapter._client,
+            "close",
+            new_callable=AsyncMock,
+        ) as mock_close:
+            await slack_adapter.close()
+            mock_close.assert_called_once()
+
 
 # ============================================================================
 # Email Adapter Tests
@@ -411,6 +490,22 @@ class TestEmailAdapter:
         recipients = email_adapter._get_recipients(sample_notification)
         assert recipients == ["custom@example.com"]
 
+    def test_get_recipients_from_metadata_string(
+        self, email_adapter: EmailAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test that a single string email_to is converted to a list."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            metadata={"email_to": "single@example.com"},
+        )
+        recipients = email_adapter._get_recipients(notification)
+        assert recipients == ["single@example.com"]
+
     @pytest.mark.asyncio
     async def test_deliver_success(
         self, email_adapter: EmailAdapter, sample_notification: Notification
@@ -425,6 +520,79 @@ class TestEmailAdapter:
             assert result.channel == Channel.EMAIL
 
     @pytest.mark.asyncio
+    async def test_deliver_timeout(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test email delivery timeout handling."""
+        with patch.object(
+            email_adapter,
+            "_send_email_sync",
+            side_effect=TimeoutError("Connection timed out"),
+        ):
+            result = await email_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_auth_error(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test email delivery authentication error handling."""
+        import smtplib
+        with patch.object(
+            email_adapter,
+            "_send_email_sync",
+            side_effect=smtplib.SMTPAuthenticationError(535, b"Authentication failed"),
+        ):
+            result = await email_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "authentication" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_recipients_refused(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test email delivery when recipients are refused."""
+        import smtplib
+        with patch.object(
+            email_adapter,
+            "_send_email_sync",
+            side_effect=smtplib.SMTPRecipientsRefused({"test@example.com": (550, b"User unknown")}),
+        ):
+            result = await email_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "refused" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_smtp_exception(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test email delivery with general SMTP exception (retryable)."""
+        import smtplib
+        with patch.object(
+            email_adapter,
+            "_send_email_sync",
+            side_effect=smtplib.SMTPException("Connection reset"),
+        ):
+            result = await email_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "SMTP" in result.error or "error" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_unexpected_exception(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test email delivery with unexpected exception."""
+        with patch.object(
+            email_adapter,
+            "_send_email_sync",
+            side_effect=RuntimeError("Unexpected error"),
+        ):
+            result = await email_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "Unexpected" in result.error
+
+    @pytest.mark.asyncio
     async def test_health_check_success(self, email_adapter: EmailAdapter) -> None:
         with patch.object(
             email_adapter,
@@ -434,6 +602,47 @@ class TestEmailAdapter:
             result = await email_adapter.health_check()
             assert result.status == AdapterStatus.HEALTHY
             assert "smtp.example.com" in result.metadata.get("smtp_host", "")
+
+    @pytest.mark.asyncio
+    async def test_health_check_timeout(self, email_adapter: EmailAdapter) -> None:
+        """Test health check timeout handling."""
+        with patch.object(
+            email_adapter,
+            "_check_connection_sync",
+            side_effect=TimeoutError("Connection timed out"),
+        ):
+            result = await email_adapter.health_check()
+            assert result.status == AdapterStatus.UNHEALTHY
+            assert "timed out" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_health_check_exception(self, email_adapter: EmailAdapter) -> None:
+        """Test health check with general exception."""
+        with patch.object(
+            email_adapter,
+            "_check_connection_sync",
+            side_effect=Exception("Connection failed"),
+        ):
+            result = await email_adapter.health_check()
+            assert result.status == AdapterStatus.UNHEALTHY
+            assert "failed" in result.message.lower()
+
+    def test_build_html_body(
+        self, email_adapter: EmailAdapter, sample_notification: Notification
+    ) -> None:
+        """Test HTML body generation."""
+        html = email_adapter._build_html_body(sample_notification)
+        assert "Test Alert" in html
+        assert "SAFETY" in html
+        assert "requires acknowledgment" in html.lower()
+
+    def test_build_html_body_no_ack(
+        self, email_adapter: EmailAdapter, info_notification: Notification
+    ) -> None:
+        """Test HTML body without ack requirement."""
+        html = email_adapter._build_html_body(info_notification)
+        assert "Test Info" in html
+        assert "acknowledgment" not in html.lower()
 
 
 # ============================================================================
@@ -529,6 +738,123 @@ class TestInMemoryConnectionManager:
         await manager.register("conn1", conn1)
 
         assert manager.get_connection_count() == 1
+
+    @pytest.mark.asyncio
+    async def test_broadcast_handles_disconnected(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that broadcast cleans up disconnected connections."""
+        conn1 = MockWebSocketConnection()
+        conn2 = MockWebSocketConnection(is_connected=False)  # Disconnected
+
+        await manager.register("conn1", conn1)
+        await manager.register("conn2", conn2)
+
+        count = await manager.broadcast('{"test": "message"}')
+
+        # Only conn1 should receive the message
+        assert count == 1
+        assert len(conn1.sent_messages) == 1
+
+    @pytest.mark.asyncio
+    async def test_broadcast_handles_send_error(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that broadcast handles send errors gracefully."""
+        class FailingConnection(MockWebSocketConnection):
+            async def send(self, message: str) -> None:
+                raise ConnectionError("Send failed")
+
+        conn1 = MockWebSocketConnection()
+        conn2 = FailingConnection()
+
+        await manager.register("conn1", conn1)
+        await manager.register("conn2", conn2)
+
+        count = await manager.broadcast('{"test": "message"}')
+
+        # Only conn1 should have succeeded
+        assert count == 1
+
+    @pytest.mark.asyncio
+    async def test_send_to_user_unknown_user(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test sending to unknown user returns False."""
+        sent = await manager.send_to_user("unknown_user", '{"test": "message"}')
+        assert sent is False
+
+    @pytest.mark.asyncio
+    async def test_send_to_user_handles_send_error(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that send_to_user handles errors gracefully."""
+        class FailingConnection(MockWebSocketConnection):
+            async def send(self, message: str) -> None:
+                raise ConnectionError("Send failed")
+
+        conn1 = FailingConnection()
+        await manager.register("conn1", conn1, user_id="user1")
+
+        sent = await manager.send_to_user("user1", '{"test": "message"}')
+        assert sent is False
+
+    @pytest.mark.asyncio
+    async def test_send_to_agent_unknown_agent(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test sending to unknown agent returns False."""
+        sent = await manager.send_to_agent(uuid4(), '{"test": "message"}')
+        assert sent is False
+
+    @pytest.mark.asyncio
+    async def test_send_to_agent_handles_send_error(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that send_to_agent handles errors gracefully."""
+        class FailingConnection(MockWebSocketConnection):
+            async def send(self, message: str) -> None:
+                raise ConnectionError("Send failed")
+
+        agent_id = uuid4()
+        conn1 = FailingConnection()
+        await manager.register("conn1", conn1, agent_ids=[agent_id])
+
+        sent = await manager.send_to_agent(agent_id, '{"test": "message"}')
+        assert sent is False
+
+    @pytest.mark.asyncio
+    async def test_unregister_cleans_up_user_mappings(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that unregister cleans up user mappings."""
+        conn1 = MockWebSocketConnection()
+        await manager.register("conn1", conn1, user_id="user1")
+
+        # Verify user mapping exists
+        assert "user1" in manager._user_connections
+
+        await manager.unregister("conn1")
+
+        # User mapping should be cleaned up
+        assert "user1" not in manager._user_connections
+
+    @pytest.mark.asyncio
+    async def test_unregister_cleans_up_agent_subscriptions(
+        self, manager: InMemoryConnectionManager
+    ) -> None:
+        """Test that unregister cleans up agent subscriptions."""
+        agent_id = uuid4()
+        conn1 = MockWebSocketConnection()
+        await manager.register("conn1", conn1, agent_ids=[agent_id])
+
+        # Verify agent subscription exists
+        assert agent_id in manager._agent_subscriptions
+
+        await manager.unregister("conn1")
+
+        # Agent subscription should be cleaned up
+        assert agent_id not in manager._agent_subscriptions
 
 
 class TestWebSocketAdapter:
@@ -735,6 +1061,217 @@ class TestPagerDutyAdapter:
         result = await pd_adapter.health_check()
         assert result.status == AdapterStatus.HEALTHY
 
+    @pytest.mark.asyncio
+    async def test_health_check_missing_routing_key(self) -> None:
+        """Test health check with missing routing key."""
+        # Create a config with an invalid routing key by patching post_init
+        config = PagerDutyConfig.__new__(PagerDutyConfig)
+        config.routing_key = ""
+        config.timeout_seconds = 30.0
+        config.retry_attempts = 3
+        config.default_severity = PagerDutySeverity.ERROR
+        config.source = "UNS"
+
+        adapter = PagerDutyAdapter.__new__(PagerDutyAdapter)
+        adapter.config = config
+        adapter._client = None
+
+        result = await adapter.health_check()
+        assert result.status == AdapterStatus.UNHEALTHY
+        assert "not configured" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_health_check_invalid_routing_key_length(self) -> None:
+        """Test health check with invalid routing key length."""
+        config = PagerDutyConfig(routing_key="short-key")  # Less than 32 chars
+        adapter = PagerDutyAdapter(config=config)
+
+        result = await adapter.health_check()
+        assert result.status == AdapterStatus.DEGRADED
+        assert "invalid" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_timeout(
+        self, pd_adapter: PagerDutyAdapter, sample_notification: Notification
+    ) -> None:
+        """Test delivery timeout handling."""
+        with patch.object(
+            pd_adapter._client,
+            "send_event",
+            new_callable=AsyncMock,
+            side_effect=AdapterTimeoutError("timeout", channel=Channel.PAGERDUTY),
+        ):
+            result = await pd_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_deliver_unexpected_exception(
+        self, pd_adapter: PagerDutyAdapter, sample_notification: Notification
+    ) -> None:
+        """Test delivery with an unexpected exception."""
+        with patch.object(
+            pd_adapter._client,
+            "send_event",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("Unexpected error"),
+        ):
+            result = await pd_adapter.deliver(sample_notification)
+            assert result.success is False
+            assert "Unexpected" in result.error
+
+    @pytest.mark.asyncio
+    async def test_acknowledge_incident_failure(self, pd_adapter: PagerDutyAdapter) -> None:
+        """Test acknowledgment failure."""
+        with patch.object(
+            pd_adapter._client,
+            "send_event",
+            new_callable=AsyncMock,
+            side_effect=Exception("API error"),
+        ):
+            result = await pd_adapter.acknowledge_incident("test-dedup-key")
+            assert result.success is False
+            assert "API error" in result.error
+
+    @pytest.mark.asyncio
+    async def test_resolve_incident_failure(self, pd_adapter: PagerDutyAdapter) -> None:
+        """Test resolution failure."""
+        with patch.object(
+            pd_adapter._client,
+            "send_event",
+            new_callable=AsyncMock,
+            side_effect=Exception("API error"),
+        ):
+            result = await pd_adapter.resolve_incident("test-dedup-key")
+            assert result.success is False
+            assert "API error" in result.error
+
+    def test_determine_severity_from_metadata(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test severity override from metadata."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.INFORMATIONAL,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            metadata={"pagerduty_severity": "critical"},
+        )
+        severity = pd_adapter._determine_severity(notification)
+        assert severity == PagerDutySeverity.CRITICAL
+
+    def test_determine_severity_invalid_metadata(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test invalid severity in metadata falls back to intent."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.INFORMATIONAL,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            metadata={"pagerduty_severity": "invalid_severity"},
+        )
+        severity = pd_adapter._determine_severity(notification)
+        assert severity == PagerDutySeverity.INFO  # Falls back to intent-based
+
+    def test_determine_severity_from_priority(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test severity based on priority when intent doesn't map."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.OPERATIONAL,  # Maps to WARNING
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            priority=Priority.HIGH,
+        )
+        severity = pd_adapter._determine_severity(notification)
+        # Intent mapping takes precedence, so this should be WARNING
+        assert severity == PagerDutySeverity.WARNING
+
+    def test_get_dedup_key_from_notification(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test dedup key when notification has a dedup_key."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            dedup_key="custom-dedup-key",
+        )
+        dedup_key = pd_adapter._get_dedup_key(notification)
+        assert dedup_key == "uns-custom-dedup-key"
+
+    def test_get_dedup_key_fallback(
+        self, pd_adapter: PagerDutyAdapter, sample_notification: Notification
+    ) -> None:
+        """Test dedup key falls back to notification ID."""
+        dedup_key = pd_adapter._get_dedup_key(sample_notification)
+        assert dedup_key == f"uns-{sample_notification.notification_id}"
+
+    def test_build_custom_details_with_metadata(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test custom details include notification metadata."""
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=autonomy_context,
+            title="Test Alert",
+            message="Test message",
+            source="test-suite",
+            correlation_id="corr-123",
+            priority=Priority.HIGH,
+            metadata={"custom_key": "custom_value", "_internal": "hidden"},
+        )
+        details = pd_adapter._build_custom_details(notification)
+
+        assert details["correlation_id"] == "corr-123"
+        assert details["priority"] == "HIGH"
+        assert "metadata" in details
+        assert details["metadata"]["custom_key"] == "custom_value"
+        assert "_internal" not in details["metadata"]  # Internal keys filtered
+
+    def test_build_summary_truncation(
+        self, pd_adapter: PagerDutyAdapter, autonomy_context: AutonomyContext
+    ) -> None:
+        """Test that summary is truncated to 1024 chars."""
+        # Title has a 200 char max, so use max allowed title and long message
+        max_title = "A" * 200
+        notification = Notification(
+            notification_type="test.alert",
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=autonomy_context,
+            title=max_title,
+            message="Test message",
+            source="test-suite",
+        )
+        summary = pd_adapter._build_summary(notification)
+        # Summary should not exceed 1024 chars
+        assert len(summary) <= 1024
+        # But should include the title
+        assert max_title in summary
+
+    @pytest.mark.asyncio
+    async def test_close(self, pd_adapter: PagerDutyAdapter) -> None:
+        """Test adapter close method."""
+        with patch.object(
+            pd_adapter._client,
+            "close",
+            new_callable=AsyncMock,
+        ) as mock_close:
+            await pd_adapter.close()
+            mock_close.assert_called_once()
+
 
 # ============================================================================
 # Factory and Registry Tests
@@ -794,6 +1331,54 @@ class TestGetAdapter:
         )
         with pytest.raises(AdapterConfigurationError, match="Expected SlackConfig"):
             get_adapter(Channel.SLACK, config=config)
+
+    def test_get_adapter_email_wrong_config_type(self) -> None:
+        """Test error when wrong config type is provided for Email adapter."""
+        config = SlackConfig(
+            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            default_channel="#alerts",
+        )
+        with pytest.raises(AdapterConfigurationError, match="Expected EmailConfig"):
+            get_adapter(Channel.EMAIL, config=config)
+
+    def test_get_adapter_websocket_wrong_config_type(self) -> None:
+        """Test error when wrong config type is provided for WebSocket adapter."""
+        config = SlackConfig(
+            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            default_channel="#alerts",
+        )
+        with pytest.raises(AdapterConfigurationError, match="Expected WebSocketConfig"):
+            get_adapter(Channel.WEBSOCKET, config=config)
+
+    def test_get_adapter_pagerduty_wrong_config_type(self) -> None:
+        """Test error when wrong config type is provided for PagerDuty adapter."""
+        config = SlackConfig(
+            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            default_channel="#alerts",
+        )
+        with pytest.raises(AdapterConfigurationError, match="Expected PagerDutyConfig"):
+            get_adapter(Channel.PAGERDUTY, config=config)
+
+    def test_get_adapter_with_no_config_creates_email(self) -> None:
+        """Test that adapters can be created with kwargs and no config object."""
+        adapter = get_adapter(
+            Channel.EMAIL,
+            smtp_host="smtp.example.com",
+            smtp_port=587,
+            username="user",
+            password="pass",
+            from_address="from@example.com",
+            default_to_addresses=["to@example.com"],
+        )
+        assert isinstance(adapter, EmailAdapter)
+
+    def test_get_adapter_pagerduty_with_kwargs(self) -> None:
+        """Test PagerDuty adapter creation with kwargs."""
+        adapter = get_adapter(
+            Channel.PAGERDUTY,
+            routing_key="a" * 32,
+        )
+        assert isinstance(adapter, PagerDutyAdapter)
 
 
 class TestAdapterRegistry:
