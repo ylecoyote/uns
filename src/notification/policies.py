@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from notification.models import AutonomyMode, DeliveryMode, NotificationIntent
+    pass
 
 from notification.models import (
     AutonomyMode,
@@ -42,7 +42,6 @@ from notification.models import (
     get_default_delivery_mode as _get_default_delivery_mode_from_models,
     get_default_require_ack as _get_default_require_ack_from_models,
 )
-
 
 # Default channel mappings per intent for LIVE mode
 _DEFAULT_CHANNELS_LIVE: dict[NotificationIntent, list[Channel]] = {
@@ -75,6 +74,7 @@ _DEFAULT_ACK_TIMEOUTS: dict[NotificationIntent, int] = {
     NotificationIntent.OPERATIONAL: 60,
     NotificationIntent.INFORMATIONAL: 120,
 }
+
 # Default dedup window (in seconds)
 DEFAULT_DEDUP_WINDOW_SECONDS = 300  # 5 minutes
 
@@ -417,22 +417,7 @@ def get_default_ack_timeout(intent: NotificationIntent) -> int | None:
     Returns:
         Timeout in minutes, or None if no timeout applies
     """
-    return get_default_ack_timeout_minutes(intent)
-    """Get the default acknowledgment timeout for an intent.
-
-    Args:
-        intent: The notification intent
-
-    Returns:
-    Get the default acknowledgment timeout for an intent.
-
-    Args:
-        intent: The notification intent
-
-    Returns:
-        Timeout in minutes, or None if no timeout applies
-    """
-    return _DEFAULT_ACK_TIMEOUTS.get(intent, 60)
+    return _get_default_ack_timeout_minutes(intent)
 
 
 @dataclass
@@ -453,7 +438,7 @@ class PolicyRegistry:
         """Register a policy for a notification type.
 
         Args:
-        policy: The policy to register.
+            policy: The policy to register.
         """
         self._policies[policy.notification_type] = policy
 
@@ -531,7 +516,7 @@ class PolicyRegistry:
         """
         for policy_data in policies_data:
             # Convert string keys to enums for channels_by_mode
-            channels_by_mode = {}
+            channels_by_mode: dict[AutonomyMode, list[Channel]] = {}
             for mode_str, channels_list in policy_data.get("channels_by_mode", {}).items():
                 mode = AutonomyMode(mode_str)
                 channels = [Channel(c) for c in channels_list]
@@ -555,6 +540,7 @@ class PolicyRegistry:
     def __len__(self) -> int:
         """Return the number of registered policies."""
         return len(self._policies)
+
     def get_channels_for_mode(
         self,
         notification_type: str,
@@ -565,7 +551,7 @@ class PolicyRegistry:
         """Get channels for a notification, considering policy overrides.
 
         Resolution order:
-        1. Policy mode-specific override
+        1. Policy mode-specific override (via _get_mode_override)
         2. Policy default channels
         3. SDK default channels
 
@@ -580,16 +566,15 @@ class PolicyRegistry:
         """
         policy = self.get_sync(notification_type)
         if policy is not None:
-            # Check mode-specific override first
+            # Check mode-specific override first using policy's resolution method
             channels = None
-            if policy.mode_overrides and autonomy_mode in policy.mode_overrides:
-                mode_override = policy.mode_overrides[autonomy_mode]
-                if mode_override.channels is not None:
-                    channels = mode_override.channels.copy()
+            mode_override = policy._get_mode_override(autonomy_mode)
+            if mode_override is not None and mode_override.channels is not None:
+                channels = list(mode_override.channels)
 
             # Then check policy default channels
-            if channels is None and policy.channels is not None:
-                channels = policy.channels.copy()
+            if channels is None and policy.channels:
+                channels = list(policy.channels)
 
             if channels is not None:
                 # Add PagerDuty for irreversible SAFETY in LIVE mode
@@ -614,9 +599,10 @@ class PolicyRegistry:
         """Determine if ack is required, considering policy overrides.
 
         Resolution order:
-        1. Policy mode-specific override
+        1. Policy mode-specific override (via _get_mode_override)
         2. Policy default require_ack
         3. SDK default (SAFETY + LIVE only)
+
         Args:
             notification_type: The notification type
             intent: The notification intent
@@ -627,11 +613,10 @@ class PolicyRegistry:
         """
         policy = self.get_sync(notification_type)
         if policy is not None:
-            # Check mode-specific override first
-            if policy.mode_overrides and autonomy_mode in policy.mode_overrides:
-                mode_override = policy.mode_overrides[autonomy_mode]
-                if mode_override.require_ack is not None:
-                    return mode_override.require_ack
+            # Check mode-specific override first using policy's resolution method
+            mode_override = policy._get_mode_override(autonomy_mode)
+            if mode_override is not None and mode_override.require_ack is not None:
+                return mode_override.require_ack
 
             # Then check policy default
             if policy.require_ack is not None:
@@ -766,3 +751,93 @@ def configure_policy_registry(
     if policies:
         _policy_registry.load_from_dict(policies)
     return _policy_registry
+
+
+def resolve_channels(
+    notification_type: str,
+    autonomy_mode: AutonomyMode | None = None,
+    intent: NotificationIntent | None = None,
+    irreversible: bool = False,
+    policy_registry: PolicyRegistry | None = None,
+    *,
+    registry: PolicyRegistry | None = None,
+) -> list[Channel]:
+    """Top-level channel resolution helper.
+
+    Uses the provided or global policy registry to resolve channels.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode
+        intent: The notification intent
+        irreversible: Whether action is irreversible
+        policy_registry: Optional custom registry (positional)
+        registry: Optional custom registry (keyword-only)
+
+    Returns:
+        List of channels for delivery
+    """
+    effective_registry = registry or policy_registry or get_policy_registry()
+    # Default values for optional parameters
+    effective_intent = intent or NotificationIntent.INFORMATIONAL
+    effective_mode = autonomy_mode or AutonomyMode.LIVE
+    return effective_registry.get_channels_for_mode(
+        notification_type, effective_intent, effective_mode, irreversible
+    )
+
+
+def resolve_require_ack(
+    notification_type: str,
+    autonomy_mode: AutonomyMode | None = None,
+    intent: NotificationIntent | None = None,
+    policy_registry: PolicyRegistry | None = None,
+    *,
+    registry: PolicyRegistry | None = None,
+) -> bool:
+    """Top-level ack requirement resolution helper.
+
+    Uses the provided or global policy registry to resolve ack requirement.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode
+        intent: The notification intent
+        policy_registry: Optional custom registry (positional)
+        registry: Optional custom registry (keyword-only)
+
+    Returns:
+        Whether acknowledgment is required
+    """
+    effective_registry = registry or policy_registry or get_policy_registry()
+    effective_intent = intent or NotificationIntent.INFORMATIONAL
+    effective_mode = autonomy_mode or AutonomyMode.LIVE
+    return effective_registry.get_require_ack_for_mode(
+        notification_type, effective_intent, effective_mode
+    )
+
+
+def resolve_delivery_mode(
+    notification_type: str,
+    autonomy_mode: AutonomyMode | None = None,
+    intent: NotificationIntent | None = None,
+    policy_registry: PolicyRegistry | None = None,
+    *,
+    registry: PolicyRegistry | None = None,
+) -> DeliveryMode:
+    """Top-level delivery mode resolution helper.
+
+    Uses the provided or global policy registry to resolve delivery mode.
+
+    Args:
+        notification_type: The notification type
+        autonomy_mode: Current operating mode (for consistency, not used in resolution)
+        intent: The notification intent
+        policy_registry: Optional custom registry (positional)
+        registry: Optional custom registry (keyword-only)
+
+    Returns:
+        The delivery mode to use
+    """
+    effective_registry = registry or policy_registry or get_policy_registry()
+    effective_intent = intent or NotificationIntent.INFORMATIONAL
+    return effective_registry.get_delivery_mode(notification_type, effective_intent)

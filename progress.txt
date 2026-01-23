@@ -527,6 +527,67 @@ Added API routes for acknowledgment and status queries as specified in PRD Task 
 
 ---
 
+## Task 0 - Package Fixes: COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Fixed package skeleton issues including merge conflict artifacts, missing imports, missing classes, and parameter order mismatches that prevented tests from passing.
+
+### Issues Fixed
+
+1. **src/notification/models.py**
+   - Added missing pydantic imports: `ConfigDict`, `model_validator`
+   - Added missing helper functions:
+     - `get_default_delivery_mode(intent)`
+     - `get_default_priority(intent)`
+     - `get_default_ack_timeout_minutes(intent)`
+     - `get_default_require_ack(intent, autonomy_mode)`
+
+2. **src/notification/policies.py**
+   - Completely rewrote file to remove merge conflict artifacts
+   - Fixed duplicate class definitions (ModeOverride, NotificationPolicy)
+   - Fixed missing pydantic imports (BaseModel, Field)
+   - Fixed duplicate function definitions
+   - Corrected parameter order in resolve_* functions:
+     - Changed from `(notification_type, intent, autonomy_mode)`
+     - To `(notification_type, autonomy_mode, intent)` matching test expectations
+   - Fixed PolicyRegistry methods to use `policy._get_mode_override()` for proper mode override resolution
+
+3. **src/notification/deduplication.py**
+   - Removed duplicate imports (logging, abc imports duplicated)
+   - Added missing Strategy classes:
+     - `DeduplicationStrategy` (abstract base)
+     - `InMemoryDeduplicationStrategy`
+     - `RedisDeduplicationStrategy`
+     - `StoreToStrategyAdapter` (to wrap stores as strategies)
+   - Fixed `generate_dedup_key` to return 32-char hash only (not prefixed)
+   - Removed intent from dedup key generation (per test invariants)
+
+4. **src/notification/acknowledgment.py**
+   - Added missing exception classes:
+     - `AckEngineError`
+     - `NotificationNotFoundError`
+     - `InvalidAckTransitionError`
+   - Added global configuration functions:
+     - `get_ack_engine()`
+     - `configure_ack_engine()`
+     - `reset_ack_engine()`
+
+5. **src/notification/adapters/pagerduty.py** and **src/notification/adapters/slack.py**
+   - Fixed ruff UP038 lint error: changed tuple-based isinstance to union type syntax
+   - `isinstance(e, (A, B))` → `isinstance(e, A | B)`
+
+6. **src/notification/integrations/__init__.py**
+   - Fixed docstring to include "Integrations" (capital I) for test assertion
+
+### Test Results
+- All 221 core notification tests pass
+- All 6 package structure tests pass
+- All ruff linting checks pass
+
+---
+
 ## Task 11: Audit/Persistence Wiring - COMPLETED
 
 ### Date: 2026-01-22

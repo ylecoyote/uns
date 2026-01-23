@@ -16,10 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Protocol, Any
-import logging
-from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from notification.models import Notification
@@ -93,18 +92,28 @@ class InMemoryDeduplicationStore(DeduplicationStore):
 
     def set_if_not_exists(self, key: str, ttl_seconds: int) -> bool:
         """Set key if not exists. TTL is tracked but not auto-expired."""
+        # Check if key exists and is not expired
         if key in self._keys:
-            return False
-        self._keys.add(key)
-        # Track expiry for potential manual cleanup
-        import time
+            if key in self._expiry and time.time() < self._expiry[key]:
+                return False
+            # Key expired, remove it
+            self._keys.discard(key)
+            self._expiry.pop(key, None)
 
+        self._keys.add(key)
         self._expiry[key] = time.time() + ttl_seconds
         return True
 
     def exists(self, key: str) -> bool:
-        """Check if key exists."""
-        return key in self._keys
+        """Check if key exists and is not expired."""
+        if key not in self._keys:
+            return False
+        if key in self._expiry and time.time() >= self._expiry[key]:
+            # Key expired
+            self._keys.discard(key)
+            self._expiry.pop(key, None)
+            return False
+        return True
 
     def delete(self, key: str) -> bool:
         """Delete a key."""
@@ -180,9 +189,109 @@ class RedisDeduplicationStore(DeduplicationStore):
         redis_key = self._make_redis_key(key)
         return self._redis.ttl(redis_key)
 
-class DeduplicationEngine:
+
+class DeduplicationStrategy(ABC):
+    """Abstract strategy interface for deduplication.
+
+    This is an alternative interface to DeduplicationStore that uses
+    mark_seen/is_duplicate semantics instead of set_if_not_exists/exists.
     """
-    Engine for checking and recording notification deduplication.
+
+    @abstractmethod
+    def mark_seen(self, key: str, ttl_seconds: int) -> bool:
+        """Mark a key as seen.
+
+        Args:
+            key: The dedup key
+            ttl_seconds: Time-to-live in seconds
+
+        Returns:
+            True if key was new (not a duplicate), False if already seen
+        """
+        ...
+
+    @abstractmethod
+    def is_duplicate(self, key: str, ttl_seconds: int) -> bool:
+        """Check if a key is a duplicate without marking it.
+
+        Args:
+            key: The dedup key
+            ttl_seconds: TTL for consistency (may not be used)
+
+        Returns:
+            True if key exists (duplicate), False if not seen
+        """
+        ...
+
+    @abstractmethod
+    def clear(self, key: str) -> bool:
+        """Clear a key from the store.
+
+        Args:
+            key: The dedup key
+
+        Returns:
+            True if key was cleared, False if not found
+        """
+        ...
+
+
+class InMemoryDeduplicationStrategy(DeduplicationStrategy):
+    """In-memory deduplication strategy for testing.
+
+    Wraps InMemoryDeduplicationStore with the strategy interface.
+    """
+
+    def __init__(self) -> None:
+        self._store = InMemoryDeduplicationStore()
+
+    def mark_seen(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.set_if_not_exists(key, ttl_seconds)
+
+    def is_duplicate(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.exists(key)
+
+    def clear(self, key: str) -> bool:
+        return self._store.delete(key)
+
+    def clear_all(self) -> None:
+        """Clear all keys (for testing)."""
+        self._store.clear()
+
+
+class RedisDeduplicationStrategy(DeduplicationStrategy):
+    """Redis-backed deduplication strategy for production.
+
+    Wraps RedisDeduplicationStore with the strategy interface.
+    """
+
+    def __init__(
+        self,
+        redis_client: RedisClientProtocol,
+        key_prefix: str = DEDUP_KEY_PREFIX,
+    ):
+        self._store = RedisDeduplicationStore(redis_client, key_prefix)
+
+    def mark_seen(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.set_if_not_exists(key, ttl_seconds)
+
+    def is_duplicate(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.exists(key)
+
+    def clear(self, key: str) -> bool:
+        return self._store.delete(key)
+
+    def _make_redis_key(self, dedup_key: str) -> str:
+        """Expose internal key construction for testing."""
+        return self._store._make_redis_key(dedup_key)
+
+    def get_ttl(self, key: str) -> int:
+        """Get TTL for a key."""
+        return self._store.ttl(key)
+
+
+class DeduplicationEngine:
+    """Engine for checking and recording notification deduplication.
 
     This is the main interface for the delivery service to use
     for deduplication checks.
@@ -190,9 +299,9 @@ class DeduplicationEngine:
 
     def __init__(
         self,
-        strategy: "DeduplicationStrategy" = None,
+        strategy: DeduplicationStrategy | None = None,
         default_window_seconds: int = DEFAULT_DEDUP_WINDOW_SECONDS,
-        store: "DeduplicationStrategy" = None,  # Alias for strategy
+        store: DeduplicationStrategy | None = None,  # Alias for strategy
     ):
         """Initialize the deduplication engine.
 
@@ -205,53 +314,56 @@ class DeduplicationEngine:
         self._default_window_seconds = default_window_seconds
 
     @property
-    def store(self) -> "DeduplicationStrategy":
+    def store(self) -> DeduplicationStrategy:
         """Return the strategy (alias for store compatibility)."""
         return self._strategy
 
     @staticmethod
-    def generate_dedup_key(notification: "Notification") -> str:
+    def generate_dedup_key(notification: Notification) -> str:
         """Generate a stable deduplication key for a notification.
 
         If the notification has an explicit dedup_key, use it.
         Otherwise, generate one from notification properties that
         should be stable across duplicate submissions.
 
+        Key is generated from:
+        - notification_type
+        - agent_id (from autonomy_context)
+        - source
+        - title
+
+        Note: intent is NOT included because the same notification content
+        should deduplicate regardless of intent classification.
+
         Args:
             notification: The notification to generate a key for
 
         Returns:
-            A stable deduplication key
+            A stable deduplication key (32-char hash)
         """
         if hasattr(notification, "dedup_key") and notification.dedup_key:
             return notification.dedup_key
 
         key_parts = [
             getattr(notification, "notification_type", ""),
-            # Support for .intent as optional (may not be present in all heads)
-            getattr(getattr(notification, "intent", None), "value", ""),
             str(getattr(getattr(notification, "autonomy_context", None), "agent_id", "")),
             getattr(notification, "source", ""),
             getattr(notification, "title", ""),
         ]
-        # Optionally add .correlation_id if it exists
         correlation_id = getattr(notification, "correlation_id", None)
         if correlation_id:
             key_parts.append(correlation_id)
 
-        # Remove empty fields for compatibility if optional fields were missing
         key_parts = [part for part in key_parts if part]
         key_string = "|".join(key_parts)
         key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:32]
 
-        # Use notification_type as prefix if available, else "notification"
-        prefix = getattr(notification, "notification_type", "notification")
-        return f"{prefix}:{key_hash}"
+        return key_hash
 
     def should_deduplicate(
         self,
-        notification: "Notification",
-        window_seconds: int = None,
+        notification: Notification,
+        window_seconds: int | None = None,
     ) -> bool:
         """Check if a notification should be deduplicated.
 
@@ -296,8 +408,8 @@ class DeduplicationEngine:
 
     def is_duplicate(
         self,
-        notification: "Notification",
-        window_seconds: int = None,
+        notification: Notification,
+        window_seconds: int | None = None,
     ) -> bool:
         """Check if a notification is a duplicate WITHOUT marking it.
 
@@ -314,7 +426,7 @@ class DeduplicationEngine:
         dedup_key = self.generate_dedup_key(notification)
         return self._strategy.is_duplicate(dedup_key, window)
 
-    def clear_dedup_key(self, notification: "Notification") -> bool:
+    def clear_dedup_key(self, notification: Notification) -> bool:
         """Clear the deduplication key for a notification.
 
         Useful for testing or administrative purposes.
@@ -328,8 +440,7 @@ class DeduplicationEngine:
         dedup_key = self.generate_dedup_key(notification)
         return self._strategy.clear(dedup_key)
 
-    # Alias for compatibility
-    def clear_dedup(self, notification: "Notification") -> bool:
+    def clear_dedup(self, notification: Notification) -> bool:
         """Alias for clear_dedup_key for compatibility."""
         return self.clear_dedup_key(notification)
 
@@ -340,7 +451,7 @@ class DeduplicationEngine:
 
 
 def create_redis_deduplication_engine(
-    redis_client: "RedisClientProtocol",
+    redis_client: RedisClientProtocol,
     default_window_seconds: int = DEFAULT_DEDUP_WINDOW_SECONDS,
     key_prefix: str = DEDUP_KEY_PREFIX,
 ) -> DeduplicationEngine:
@@ -375,8 +486,7 @@ def create_inmemory_deduplication_engine(
     return DeduplicationEngine(strategy, default_window_seconds)
 
 
-# Module-level function as specified in PRD
-def generate_dedup_key(notification: "Notification") -> str:
+def generate_dedup_key(notification: Notification) -> str:
     """Generate a stable dedup key for a notification.
 
     This is the module-level function as specified in the PRD.
@@ -388,27 +498,10 @@ def generate_dedup_key(notification: "Notification") -> str:
     Returns:
         A stable dedup key string
     """
-    if notification.dedup_key:
-        return notification.dedup_key
+    return DeduplicationEngine.generate_dedup_key(notification)
 
-    # Generate key from stable properties
-    key_parts = [
-        notification.notification_type,
-        notification.intent.value,
-        str(notification.autonomy_context.agent_id),
-        notification.source,
-        notification.title,
-    ]
 
-    # Add correlation_id if present
-    if notification.correlation_id:
-        key_parts.append(notification.correlation_id)
-
-    # Create hash of combined parts
-    key_string = ":".join(key_parts)
-    key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:32]
-
-    return f"{notification.notification_type}:{key_hash}"
+# Global deduplication engine instance
 _dedup_engine: DeduplicationEngine | None = None
 
 
@@ -424,33 +517,79 @@ def get_deduplication_engine() -> DeduplicationEngine:
     return _dedup_engine
 
 
+class StoreToStrategyAdapter(DeduplicationStrategy):
+    """Adapter to use a DeduplicationStore as a DeduplicationStrategy."""
+
+    def __init__(self, store: DeduplicationStore):
+        self._store = store
+
+    def mark_seen(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.set_if_not_exists(key, ttl_seconds)
+
+    def is_duplicate(self, key: str, ttl_seconds: int) -> bool:
+        return self._store.exists(key)
+
+    def clear(self, key: str) -> bool:
+        return self._store.delete(key)
+
+
 def configure_deduplication_engine(
-    store: DeduplicationStore | None = None,
+    store: DeduplicationStore | DeduplicationStrategy | None = None,
+    strategy: DeduplicationStrategy | None = None,
+    default_window_seconds: int = DEFAULT_DEDUP_WINDOW_SECONDS,
 ) -> DeduplicationEngine:
     """Configure the global deduplication engine.
 
     Args:
-        store: Custom store to use, or None to use in-memory default
+        store: Custom store or strategy to use (alias for strategy)
+        strategy: Custom strategy to use
+        default_window_seconds: Default deduplication window
 
     Returns:
         The configured DeduplicationEngine instance
     """
     global _dedup_engine
+
+    # Determine the strategy to use
+    effective_strategy: DeduplicationStrategy
+    if strategy is not None:
+        effective_strategy = strategy
+    elif store is not None:
+        # Check if it's already a strategy
+        if isinstance(store, DeduplicationStrategy):
+            effective_strategy = store
+        else:
+            # Wrap the store in an adapter
+            effective_strategy = StoreToStrategyAdapter(store)
+    else:
+        effective_strategy = InMemoryDeduplicationStrategy()
+
     _dedup_engine = DeduplicationEngine(
-        store=store if store is not None else InMemoryDeduplicationStore()
+        strategy=effective_strategy,
+        default_window_seconds=default_window_seconds,
     )
     return _dedup_engine
 
 
-def should_deduplicate(notification: Notification) -> bool:
+def reset_deduplication_engine() -> None:
+    """Reset the global deduplication engine (for testing)."""
+    global _dedup_engine
+    _dedup_engine = None
+
+
+def should_deduplicate(
+    notification: Notification,
+    window_seconds: int | None = None,
+) -> bool:
     """Check if notification should be deduplicated.
 
     This is the primary interface as specified in the PRD.
 
     Args:
         notification: The notification to check
+        window_seconds: Optional custom deduplication window
 
     Returns:
         True if notification is a duplicate and should be skipped
     """
-    return get_deduplication_engine().should_deduplicate(notification)
+    return get_deduplication_engine().should_deduplicate(notification, window_seconds)
