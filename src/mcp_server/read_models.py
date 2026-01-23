@@ -292,10 +292,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             and record.notification_created_at < filter_criteria.start_time
         ):
             return False
-        if (
-            filter_criteria.end_time
-            and record.notification_created_at >= filter_criteria.end_time
-        ):
+        if filter_criteria.end_time and record.notification_created_at >= filter_criteria.end_time:
             return False
         if filter_criteria.status and record.status != filter_criteria.status:
             return False
@@ -319,23 +316,14 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         ):
             return False
         return not (
-            filter_criteria.channel
-            and filter_criteria.channel not in record.channels_attempted
+            filter_criteria.channel and filter_criteria.channel not in record.channels_attempted
         )
 
-    def _matches_audit_filter(
-        self, record: AuditRecord, filter_criteria: AuditEventFilter
-    ) -> bool:
+    def _matches_audit_filter(self, record: AuditRecord, filter_criteria: AuditEventFilter) -> bool:
         """Check if an audit record matches the audit event filter criteria."""
-        if (
-            filter_criteria.start_time
-            and record.audit_created_at < filter_criteria.start_time
-        ):
+        if filter_criteria.start_time and record.audit_created_at < filter_criteria.start_time:
             return False
-        if (
-            filter_criteria.end_time
-            and record.audit_created_at >= filter_criteria.end_time
-        ):
+        if filter_criteria.end_time and record.audit_created_at >= filter_criteria.end_time:
             return False
         if (
             filter_criteria.notification_id
@@ -355,9 +343,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             and record.correlation_id != filter_criteria.correlation_id
         )
 
-    def _audit_record_to_delivery_summary(
-        self, record: AuditRecord
-    ) -> DeliverySummary:
+    def _audit_record_to_delivery_summary(self, record: AuditRecord) -> DeliverySummary:
         """Convert an AuditRecord to a DeliverySummary."""
         return DeliverySummary(
             notification_id=record.notification_id,
@@ -373,9 +359,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             agent_id=record.agent_id,
         )
 
-    def _audit_record_to_delivery_timeline(
-        self, record: AuditRecord
-    ) -> DeliveryTimeline:
+    def _audit_record_to_delivery_timeline(self, record: AuditRecord) -> DeliveryTimeline:
         """Convert an AuditRecord to a DeliveryTimeline."""
         # Build attempts from channel information
         # Note: In-memory store doesn't track individual attempt timing,
@@ -492,9 +476,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         all_records = self._audit_store.delivery_audits
 
         # Filter records
-        filtered = [
-            r for r in all_records if self._matches_delivery_filter(r, filter_criteria)
-        ]
+        filtered = [r for r in all_records if self._matches_delivery_filter(r, filter_criteria)]
 
         # Sort by created_at descending (most recent first)
         filtered.sort(key=lambda r: r.notification_created_at, reverse=True)
@@ -520,9 +502,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         notification_id: UUID,
     ) -> DeliveryTimeline | None:
         """Get full delivery timeline for a specific notification."""
-        records = self._audit_store.get_delivery_audits_for_notification(
-            notification_id
-        )
+        records = self._audit_store.get_delivery_audits_for_notification(notification_id)
         if not records:
             return None
 
@@ -546,17 +526,12 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                 continue
             event = self._audit_record_to_event(record)
             # Filter by event_type if specified
-            if (
-                filter_criteria.event_type
-                and event.event_type != filter_criteria.event_type
-            ):
+            if filter_criteria.event_type and event.event_type != filter_criteria.event_type:
                 continue
             all_events.append(event)
 
         # Add ack audit events (if no event_type filter or it's an ack type)
-        if filter_criteria.event_type is None or filter_criteria.event_type.startswith(
-            "ack."
-        ):
+        if filter_criteria.event_type is None or filter_criteria.event_type.startswith("ack."):
             for record in self._audit_store.ack_audits:
                 # Filter by notification_id if specified
                 if (
@@ -570,16 +545,10 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                     and record.audit_created_at < filter_criteria.start_time
                 ):
                     continue
-                if (
-                    filter_criteria.end_time
-                    and record.audit_created_at >= filter_criteria.end_time
-                ):
+                if filter_criteria.end_time and record.audit_created_at >= filter_criteria.end_time:
                     continue
                 event = self._ack_record_to_event(record)
-                if (
-                    filter_criteria.event_type
-                    and event.event_type != filter_criteria.event_type
-                ):
+                if filter_criteria.event_type and event.event_type != filter_criteria.event_type:
                     continue
                 all_events.append(event)
 
@@ -665,40 +634,29 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             # Apply filters
             if filter_criteria.start_time:
                 stmt = stmt.where(
-                    NotificationAuditRecord.notification_created_at
-                    >= filter_criteria.start_time
+                    NotificationAuditRecord.notification_created_at >= filter_criteria.start_time
                 )
             if filter_criteria.end_time:
                 stmt = stmt.where(
-                    NotificationAuditRecord.notification_created_at
-                    < filter_criteria.end_time
+                    NotificationAuditRecord.notification_created_at < filter_criteria.end_time
                 )
             if filter_criteria.status:
-                stmt = stmt.where(
-                    NotificationAuditRecord.status == filter_criteria.status.value
-                )
+                stmt = stmt.where(NotificationAuditRecord.status == filter_criteria.status.value)
             if filter_criteria.intent:
-                stmt = stmt.where(
-                    NotificationAuditRecord.intent == filter_criteria.intent.value
-                )
+                stmt = stmt.where(NotificationAuditRecord.intent == filter_criteria.intent.value)
             if filter_criteria.delivery_mode:
                 stmt = stmt.where(
-                    NotificationAuditRecord.delivery_mode
-                    == filter_criteria.delivery_mode.value
+                    NotificationAuditRecord.delivery_mode == filter_criteria.delivery_mode.value
                 )
             if filter_criteria.agent_id:
-                stmt = stmt.where(
-                    NotificationAuditRecord.agent_id == filter_criteria.agent_id
-                )
+                stmt = stmt.where(NotificationAuditRecord.agent_id == filter_criteria.agent_id)
             if filter_criteria.autonomy_mode:
                 stmt = stmt.where(
-                    NotificationAuditRecord.autonomy_mode
-                    == filter_criteria.autonomy_mode.value
+                    NotificationAuditRecord.autonomy_mode == filter_criteria.autonomy_mode.value
                 )
             if filter_criteria.notification_type:
                 stmt = stmt.where(
-                    NotificationAuditRecord.notification_type
-                    == filter_criteria.notification_type
+                    NotificationAuditRecord.notification_type == filter_criteria.notification_type
                 )
             if filter_criteria.channel:
                 # JSON contains check - syntax depends on database
@@ -776,9 +734,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             attempts: list[DeliveryAttemptRecord] = []
             for channel_str in result.channels_attempted:
                 channel = Channel(channel_str)
-                status = (
-                    "SUCCESS" if channel_str in result.channels_succeeded else "FAILED"
-                )
+                status = "SUCCESS" if channel_str in result.channels_succeeded else "FAILED"
                 attempts.append(
                     DeliveryAttemptRecord(
                         attempt_id=uuid4(),
@@ -843,8 +799,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 )
             if filter_criteria.notification_id:
                 delivery_stmt = delivery_stmt.where(
-                    NotificationAuditRecord.notification_id
-                    == filter_criteria.notification_id
+                    NotificationAuditRecord.notification_id == filter_criteria.notification_id
                 )
             if filter_criteria.agent_id:
                 delivery_stmt = delivery_stmt.where(
@@ -852,13 +807,11 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 )
             if filter_criteria.autonomy_mode:
                 delivery_stmt = delivery_stmt.where(
-                    NotificationAuditRecord.autonomy_mode
-                    == filter_criteria.autonomy_mode.value
+                    NotificationAuditRecord.autonomy_mode == filter_criteria.autonomy_mode.value
                 )
             if filter_criteria.correlation_id:
                 delivery_stmt = delivery_stmt.where(
-                    NotificationAuditRecord.correlation_id
-                    == filter_criteria.correlation_id
+                    NotificationAuditRecord.correlation_id == filter_criteria.correlation_id
                 )
 
             delivery_results = session.execute(delivery_stmt).scalars().all()
@@ -900,9 +853,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 )
 
             # Query ack audits (if not filtering for delivery-only events)
-            if filter_criteria.event_type is None or filter_criteria.event_type.startswith(
-                "ack."
-            ):
+            if filter_criteria.event_type is None or filter_criteria.event_type.startswith("ack."):
                 ack_stmt = select(AckAuditRecordDB)
 
                 if filter_criteria.start_time:
@@ -931,10 +882,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
                 for r in ack_results:
                     event_type = ack_status_to_event.get(r.new_status, "ack.unknown")
-                    if (
-                        filter_criteria.event_type
-                        and event_type != filter_criteria.event_type
-                    ):
+                    if filter_criteria.event_type and event_type != filter_criteria.event_type:
                         continue
                     all_events.append(
                         AuditEvent(

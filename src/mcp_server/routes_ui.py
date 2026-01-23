@@ -88,9 +88,7 @@ class ErrorDetail(BaseModel):
 
     code: str = Field(description="Machine-readable error code")
     message: str = Field(description="Human-readable description")
-    details: dict[str, Any] | None = Field(
-        default=None, description="Additional context"
-    )
+    details: dict[str, Any] | None = Field(default=None, description="Additional context")
 
 
 class ErrorResponse(BaseModel):
@@ -190,9 +188,7 @@ class ResolutionStep(BaseModel):
     source: ResolutionSource
     value: Any = Field(description="The value at this resolution step")
     applied: bool = Field(description="Whether this value was used")
-    reason: str | None = Field(
-        default=None, description="Explanation if not applied"
-    )
+    reason: str | None = Field(default=None, description="Explanation if not applied")
 
 
 class EffectivePolicyValues(BaseModel):
@@ -281,9 +277,7 @@ class InvariantEntry(BaseModel):
     evidence: list[EvidenceLink] = Field(default_factory=list)
     owner: str = Field(description="Team/role responsible")
     last_reviewed: str = Field(description="ISO 8601 date")
-    mitigation: list[str] | None = Field(
-        default=None, description="For exceptions only"
-    )
+    mitigation: list[str] | None = Field(default=None, description="For exceptions only")
 
 
 class InvariantListResponse(BaseModel):
@@ -711,7 +705,8 @@ async def get_effective_policy(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=get_default_require_ack(intent, autonomy_mode),
-            applied=not policy_found or policy.get_require_ack_for_mode(autonomy_mode, intent) is None,
+            applied=not policy_found
+            or policy.get_require_ack_for_mode(autonomy_mode, intent) is None,
         )
     )
     resolution["ack_timeout_minutes"].append(
@@ -763,8 +758,12 @@ async def list_invariants(
     cursor: str | None = Query(default=None, description="Pagination cursor"),
     limit: int = Query(default=25, ge=1, le=100, description="Items per page"),
     severity: InvariantSeverity | None = Query(default=None, description="Filter by severity"),
-    enforcement_type: EnforcementType | None = Query(default=None, description="Filter by enforcement type"),
-    invariant_status: InvariantStatus | None = Query(default=None, alias="status", description="Filter by status"),
+    enforcement_type: EnforcementType | None = Query(
+        default=None, description="Filter by enforcement type"
+    ),
+    invariant_status: InvariantStatus | None = Query(
+        default=None, alias="status", description="Filter by status"
+    ),
     search: str | None = Query(default=None, description="Full-text search on statement"),
 ) -> InvariantListResponse:
     """List system invariants from the registry.
@@ -774,8 +773,12 @@ async def list_invariants(
     """
     # Handle case when called internally (params may not be resolved Query objects)
     severity_val = severity.value if severity and hasattr(severity, "value") else None
-    enforcement_val = enforcement_type.value if enforcement_type and hasattr(enforcement_type, "value") else None
-    status_val = invariant_status.value if invariant_status and hasattr(invariant_status, "value") else None
+    enforcement_val = (
+        enforcement_type.value if enforcement_type and hasattr(enforcement_type, "value") else None
+    )
+    status_val = (
+        invariant_status.value if invariant_status and hasattr(invariant_status, "value") else None
+    )
 
     log_endpoint_call(
         logger,
@@ -796,7 +799,9 @@ async def list_invariants(
 
         import yaml
 
-        invariants_path = Path(__file__).parent.parent.parent / "docs" / "verification" / "invariants.yml"
+        invariants_path = (
+            Path(__file__).parent.parent.parent / "docs" / "verification" / "invariants.yml"
+        )
         if invariants_path.exists():
             with open(invariants_path) as f:
                 data = yaml.safe_load(f)
@@ -835,11 +840,23 @@ async def list_invariants(
                 # Apply filters (check hasattr in case called internally without FastAPI resolution)
                 if severity and hasattr(severity, "value") and entry.severity != severity:
                     continue
-                if enforcement_type and hasattr(enforcement_type, "value") and entry.enforcement.type != enforcement_type:
+                if (
+                    enforcement_type
+                    and hasattr(enforcement_type, "value")
+                    and entry.enforcement.type != enforcement_type
+                ):
                     continue
-                if invariant_status and hasattr(invariant_status, "value") and entry.status != invariant_status:
+                if (
+                    invariant_status
+                    and hasattr(invariant_status, "value")
+                    and entry.status != invariant_status
+                ):
                     continue
-                if search and isinstance(search, str) and search.lower() not in entry.statement.lower():
+                if (
+                    search
+                    and isinstance(search, str)
+                    and search.lower() not in entry.statement.lower()
+                ):
                     continue
 
                 items.append(entry)
@@ -907,7 +924,9 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
 
     for item in result.items:
         by_severity[item.severity.value] = by_severity.get(item.severity.value, 0) + 1
-        by_enforcement[item.enforcement.type.value] = by_enforcement.get(item.enforcement.type.value, 0) + 1
+        by_enforcement[item.enforcement.type.value] = (
+            by_enforcement.get(item.enforcement.type.value, 0) + 1
+        )
         by_status[item.status.value] = by_status.get(item.status.value, 0) + 1
         if item.enforcement.type == EnforcementType.EXCEPTION:
             exceptions_count += 1
