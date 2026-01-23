@@ -228,7 +228,7 @@ class AckAuditRecord(Base):
     )
 
     # Metadata
-    metadata: Mapped[dict[str, Any]] = mapped_column(
+    ack_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSON, nullable=False, default=dict, comment="Additional metadata"
     )
 

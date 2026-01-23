@@ -35,8 +35,14 @@ from notification.models import (
     Channel,
     DeliveryMode,
     NotificationIntent,
+)
+from notification.models import (
     get_default_ack_timeout_minutes as _get_default_ack_timeout_minutes,
+)
+from notification.models import (
     get_default_delivery_mode as _get_default_delivery_mode_from_models,
+)
+from notification.models import (
     get_default_require_ack as _get_default_require_ack_from_models,
 )
 
@@ -379,6 +385,18 @@ def get_default_ack_timeout(intent: NotificationIntent) -> int | None:
         Timeout in minutes, or None if no timeout applies
     """
     return _get_default_ack_timeout_minutes(intent)
+
+
+def get_default_delivery_mode(intent: NotificationIntent) -> DeliveryMode:
+    """Get the default delivery mode for an intent.
+
+    Args:
+        intent: The notification intent
+
+    Returns:
+        The appropriate DeliveryMode (GUARANTEED or BEST_EFFORT)
+    """
+    return _get_default_delivery_mode_from_models(intent)
 
 
 @dataclass

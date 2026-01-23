@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
-
 from src.notification.models import (
     DEFAULT_ACK_TIMEOUTS,
     INTENT_DELIVERY_MODE_MAP,

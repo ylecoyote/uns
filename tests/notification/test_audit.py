@@ -484,6 +484,203 @@ class TestAuditRecordOutcomes:
         assert record.status == DeliveryStatus.RATE_LIMITED
 
 
+class TestFileAuditStore:
+    """Tests for FileAuditStore operations."""
+
+    def test_save_delivery_audit_writes_to_file(
+        self,
+        tmp_path,
+        sample_notification: Notification,
+        sample_result: NotificationResult,
+    ) -> None:
+        """Test that delivery audit is written to file."""
+        from notification.audit import FileAuditStore
+
+        delivery_path = tmp_path / "delivery_audits.jsonl"
+        ack_path = tmp_path / "ack_audits.jsonl"
+
+        store = FileAuditStore(
+            delivery_audit_path=str(delivery_path),
+            ack_audit_path=str(ack_path),
+        )
+        record = create_audit_record(sample_notification, sample_result)
+
+        store.save_delivery_audit(record)
+
+        assert delivery_path.exists()
+        content = delivery_path.read_text()
+        assert str(record.notification_id) in content
+
+    def test_save_ack_audit_writes_to_file(self, tmp_path) -> None:
+        """Test that ack audit is written to file."""
+        from notification.audit import FileAuditStore
+
+        delivery_path = tmp_path / "delivery_audits.jsonl"
+        ack_path = tmp_path / "ack_audits.jsonl"
+
+        store = FileAuditStore(
+            delivery_audit_path=str(delivery_path),
+            ack_audit_path=str(ack_path),
+        )
+        notification_id = uuid4()
+        record = create_ack_audit_record(
+            notification_id=notification_id,
+            old_status=AckStatus.PENDING,
+            new_status=AckStatus.ACKED,
+        )
+
+        store.save_ack_audit(record)
+
+        assert ack_path.exists()
+        content = ack_path.read_text()
+        assert str(notification_id) in content
+
+    def test_save_delivery_audit_raises_on_write_error(
+        self,
+        sample_notification: Notification,
+        sample_result: NotificationResult,
+    ) -> None:
+        """Test that OS errors raise AuditPersistenceError."""
+        from notification.audit import FileAuditStore
+
+        # Use an invalid path
+        store = FileAuditStore(
+            delivery_audit_path="/nonexistent/path/audits.jsonl",
+            ack_audit_path="/nonexistent/path/ack_audits.jsonl",
+        )
+        record = create_audit_record(sample_notification, sample_result)
+
+        with pytest.raises(AuditPersistenceError):
+            store.save_delivery_audit(record)
+
+    def test_save_ack_audit_raises_on_write_error(self) -> None:
+        """Test that OS errors raise AuditPersistenceError for ack audits."""
+        from notification.audit import FileAuditStore
+
+        store = FileAuditStore(
+            delivery_audit_path="/nonexistent/path/audits.jsonl",
+            ack_audit_path="/nonexistent/path/ack_audits.jsonl",
+        )
+        notification_id = uuid4()
+        record = create_ack_audit_record(
+            notification_id=notification_id,
+            old_status=AckStatus.PENDING,
+            new_status=AckStatus.ACKED,
+        )
+
+        with pytest.raises(AuditPersistenceError):
+            store.save_ack_audit(record)
+
+    def test_get_delivery_audits_not_implemented(self) -> None:
+        """Test that querying is not implemented for file store."""
+        from notification.audit import FileAuditStore
+
+        store = FileAuditStore()
+
+        with pytest.raises(NotImplementedError):
+            store.get_delivery_audits_for_notification(uuid4())
+
+    def test_get_ack_audits_not_implemented(self) -> None:
+        """Test that querying ack audits is not implemented for file store."""
+        from notification.audit import FileAuditStore
+
+        store = FileAuditStore()
+
+        with pytest.raises(NotImplementedError):
+            store.get_ack_audits_for_notification(uuid4())
+
+
+class TestPersistentAuditLoggerAck:
+    """Tests for PersistentAuditLogger ack logging error handling."""
+
+    def test_log_ack_fail_silently_suppresses_error(self) -> None:
+        """Test that fail_silently=True suppresses ack persistence errors."""
+        failing_store = MagicMock()
+        failing_store.save_ack_audit.side_effect = AuditPersistenceError("Test error")
+
+        logger = PersistentAuditLogger(store=failing_store, fail_silently=True)
+
+        # Should not raise
+        logger.log_ack(
+            notification_id=uuid4(),
+            old_status=AckStatus.PENDING,
+            new_status=AckStatus.ACKED,
+        )
+
+    def test_log_ack_fail_silently_false_raises_error(self) -> None:
+        """Test that fail_silently=False raises ack persistence errors."""
+        failing_store = MagicMock()
+        failing_store.save_ack_audit.side_effect = AuditPersistenceError("Test error")
+
+        logger = PersistentAuditLogger(store=failing_store, fail_silently=False)
+
+        with pytest.raises(AuditPersistenceError):
+            logger.log_ack(
+                notification_id=uuid4(),
+                old_status=AckStatus.PENDING,
+                new_status=AckStatus.ACKED,
+            )
+
+    def test_log_ack_unexpected_error_wrapped(self) -> None:
+        """Test that unexpected errors in log_ack are wrapped."""
+        failing_store = MagicMock()
+        failing_store.save_ack_audit.side_effect = RuntimeError("Unexpected")
+
+        logger = PersistentAuditLogger(store=failing_store, fail_silently=False)
+
+        with pytest.raises(AuditPersistenceError) as exc_info:
+            logger.log_ack(
+                notification_id=uuid4(),
+                old_status=AckStatus.PENDING,
+                new_status=AckStatus.ACKED,
+            )
+
+        assert exc_info.value.original_error is not None
+
+    def test_log_ack_unexpected_error_fail_silently(self) -> None:
+        """Test that unexpected errors are suppressed when fail_silently=True."""
+        failing_store = MagicMock()
+        failing_store.save_ack_audit.side_effect = RuntimeError("Unexpected")
+
+        logger = PersistentAuditLogger(store=failing_store, fail_silently=True)
+
+        # Should not raise
+        logger.log_ack(
+            notification_id=uuid4(),
+            old_status=AckStatus.PENDING,
+            new_status=AckStatus.ACKED,
+        )
+
+
+class TestGlobalAuditLogger:
+    """Tests for global audit logger functions."""
+
+    def test_get_audit_logger_returns_singleton(self) -> None:
+        """Test that get_audit_logger returns a singleton."""
+        # Reset the global logger
+        import notification.audit as audit_module
+        from notification.audit import get_audit_logger
+        audit_module._audit_logger = None
+
+        logger1 = get_audit_logger()
+        logger2 = get_audit_logger()
+
+        assert logger1 is logger2
+
+    def test_configure_audit_logger_replaces_global(self) -> None:
+        """Test that configure_audit_logger replaces the global instance."""
+        from notification.audit import configure_audit_logger, get_audit_logger
+
+        store = InMemoryAuditStore()
+        configured = configure_audit_logger(store=store, fail_silently=True)
+
+        current = get_audit_logger()
+
+        assert current is configured
+        assert current.store is store
+        assert current.fail_silently is True
+
+
 class TestAuditRecordIntegrityInvariants:
     """Tests for audit record integrity and invariants."""
 

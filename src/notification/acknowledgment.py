@@ -46,7 +46,15 @@ class NotificationNotFoundError(AckEngineError):
 class InvalidAckTransitionError(AckEngineError):
     """Raised when an invalid ack status transition is attempted."""
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        current_status: AckStatus,
+        requested_status: AckStatus,
+    ) -> None:
+        super().__init__(message)
+        self.current_status = current_status
+        self.requested_status = requested_status
 
 
 # Default timeout values per intent (in minutes)
@@ -369,6 +377,20 @@ class AcknowledgmentEngine:
                 acked_by=acked_by,
                 acked_at=now,
                 metadata={"error": "Notification already timed out"},
+            )
+
+        # Cannot transition between ACKED and DISMISSED
+        if state.status in (AckStatus.ACKED, AckStatus.DISMISSED) and state.status != ack_status:
+            logger.warning(
+                "Invalid transition attempted: notification_id=%s from %s to %s",
+                notification_id,
+                state.status.value,
+                ack_status.value,
+            )
+            raise InvalidAckTransitionError(
+                f"Cannot transition from {state.status.value} to {ack_status.value}",
+                current_status=state.status,
+                requested_status=ack_status,
             )
 
         # Update state
