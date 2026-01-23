@@ -1,0 +1,164 @@
+# Progress: Implement SDK (send(), validation guards, policy overrides)
+
+## Task: Task 8 - SDK (Producer Interface)
+
+## Completed Work
+
+### 1. Package Structure Setup
+- Created `src/notification/` package with adapters and integrations subdirectories
+- Copied prerequisite files from completed tasks:
+  - `models.py` - Core data contracts (Notification, AutonomyContext, enums)
+  - `interfaces.py` - Integration interfaces (ContextProvider, AckCallback)
+  - `rate_limiting.py` - Token bucket rate limiting
+- Created `README.md` and `pyproject.toml` for package configuration
+
+### 2. Implemented policies.py (Policy Registry)
+Location: `src/notification/policies.py`
+
+Features:
+- `NotificationPolicy` dataclass with:
+  - `notification_type` - Policy identifier
+  - `delivery_mode` - Override for GUARANTEED/BEST_EFFORT
+  - `require_ack` - Override for acknowledgment requirement
+  - `channels_by_mode` - Per-mode channel routing configuration
+  - `ack_timeout_minutes` - Custom timeout override
+  - `dedup_window_seconds` - Deduplication window override
+  - `priority_override` - Priority override
+
+- `PolicyRegistry` class with:
+  - `register(policy)` - Register a policy
+  - `unregister(notification_type)` - Remove a policy
+  - `get_sync(notification_type)` - Synchronous policy lookup
+  - `get_all()` - Get all registered policies
+  - `clear()` - Clear all policies
+  - `load_from_dict(policies_data)` - Load policies from dict/JSON
+
+- Default derivation functions:
+  - `get_default_channels(intent, autonomy_mode, irreversible)` - PRD Section 6.2 routing
+  - `get_default_delivery_mode(intent)` - SAFETY/GOVERNANCE → GUARANTEED
+  - `get_default_require_ack(intent, autonomy_mode)` - SAFETY+LIVE → True
+  - `get_default_ack_timeout(intent)` - SAFETY=15min, GOVERNANCE=30min
+
+### 3. Implemented SDK (sdk.py)
+Location: `src/notification/sdk.py`
+
+Features:
+- `NotificationSDK` class with hard validation guards:
+  - `autonomy_context` REQUIRED (hard guard)
+  - `autonomy_mode` must be set in context
+  - `agent_id` must be present in context
+
+- Primary `send()` method with:
+  - Policy lookup and override behavior
+  - Delivery mode derivation (policy → intent default)
+  - Channel derivation (override → policy → intent/mode default)
+  - Require_ack derivation (override → policy → SAFETY+LIVE rule)
+  - Priority derivation (override → policy → intent default)
+  - Ack timeout derivation (policy → intent default)
+  - Auto-generated dedup_key (SHA256 of type+agent_id)
+  - Configurable delivery_handler for RQ integration
+
+- Convenience methods:
+  - `send_safety()` - SAFETY intent with GUARANTEED delivery
+  - `send_governance()` - GOVERNANCE intent with GUARANTEED delivery
+  - `send_operational()` - OPERATIONAL intent with BEST_EFFORT delivery
+  - `send_info()` - INFORMATIONAL intent with BEST_EFFORT delivery
+
+- Dependency injection support:
+  - `policy_registry` - Custom policy registry
+  - `context_provider` - Auto-populate autonomy context
+  - `ack_callback` - Acknowledgment event handler
+  - `delivery_handler` - Custom delivery function (for RQ jobs)
+
+- Factory functions:
+  - `create_sdk()` - Create configured SDK instance
+  - `get_sdk()` - Get global singleton SDK
+  - `configure_sdk()` - Configure global SDK
+
+### 4. Updated __init__.py
+- Exported all policy and SDK types
+- Added to `__all__` list
+
+### 5. Test Coverage
+Location: `tests/notification/test_sdk.py` and `tests/notification/test_policies.py`
+
+63 tests covering:
+- Validation guards (autonomy_context required)
+- Context provider integration
+- Delivery mode derivation (GUARANTEED vs BEST_EFFORT)
+- Channel derivation by intent and mode
+- PagerDuty escalation for irreversible SAFETY notifications
+- PREVIEW mode WebSocket-only routing
+- Require_ack derivation (SAFETY+LIVE rule)
+- Ack timeout derivation
+- Policy overrides (delivery_mode, channels, require_ack)
+- Explicit override precedence over policy
+- Priority derivation by intent
+- Dedup key generation and stability
+- Factory functions (create_sdk, get_sdk)
+- Policy registry CRUD operations
+- Policy immutability
+- Default derivation functions
+
+## Validation Rules Implemented (from PRD)
+
+1. **autonomy_context required** - Hard guard enforced
+2. **Title max 200 chars** - Validated by Pydantic
+3. **Message max 4000 chars** - Validated by Pydantic
+4. **DeliveryMode derivation**:
+   - SAFETY → GUARANTEED
+   - GOVERNANCE → GUARANTEED
+   - OPERATIONAL → BEST_EFFORT
+   - INFORMATIONAL → BEST_EFFORT
+5. **Require Ack derivation**:
+   - If policy specifies → use policy
+   - Else if SAFETY AND LIVE → true
+   - Else → false
+6. **Ack Timeout defaults**:
+   - SAFETY → 15 minutes
+   - GOVERNANCE → 30 minutes
+
+## Channel Routing Rules (from PRD Section 6.2)
+
+### LIVE Mode
+- SAFETY → Slack, WebSocket (+ PagerDuty if irreversible)
+- GOVERNANCE → Slack, WebSocket
+- OPERATIONAL → Slack
+- INFORMATIONAL → WebSocket
+
+### PREVIEW Mode
+- All intents → WebSocket only
+
+### SHADOW Mode
+- OPERATIONAL → WebSocket
+- GOVERNANCE → Slack, WebSocket
+
+## Files Created/Modified
+
+Created:
+- `src/notification/policies.py`
+- `src/notification/sdk.py`
+- `tests/notification/test_sdk.py`
+- `tests/notification/test_policies.py`
+- `progress.txt`
+- `README.md`
+
+Modified:
+- `src/notification/__init__.py` - Added policy and SDK exports
+
+## Test Results
+
+All 63 tests pass:
+```
+tests/notification/test_sdk.py - 34 tests
+tests/notification/test_policies.py - 29 tests
+============================== 63 passed ==============================
+```
+
+## Linting
+
+All ruff checks pass:
+- No pycodestyle errors
+- No pyflakes errors
+- No isort issues
+- Formatting compliant
