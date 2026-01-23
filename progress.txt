@@ -25,5 +25,60 @@
 - ✅ All 6 tests pass
 - ✅ Ruff linting passes
 
-### Next task:
-Task 1 - Core Enums and Models (Notification, AutonomyContext, etc.)
+---
+
+## Task 1: Core Enums and Models - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented core data contracts for the Unified Notification Service as specified in the PRD.
+
+### Artifacts Created
+
+1. **Core Models** (`src/notification/models.py`)
+
+   **Enums:**
+   - `NotificationIntent` - SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL
+   - `DeliveryMode` - GUARANTEED, BEST_EFFORT
+   - `AutonomyMode` - PREVIEW, SHADOW, LIVE
+   - `AckStatus` - PENDING, ACKED, DISMISSED, TIMED_OUT
+   - `Channel` - SLACK, EMAIL, WEBSOCKET, PAGERDUTY
+   - `Priority` - HIGH, NORMAL, LOW
+   - `DeliveryStatus` - PENDING, DELIVERED, FAILED, DEDUPLICATED, RATE_LIMITED
+
+   **Models:**
+   - `AutonomyContext` - Captures autonomy state (mode, agent_id, optional snapshot IDs)
+   - `Notification` - Core notification with all fields as specified in PRD
+   - `NotificationResult` - Delivery outcome with channel tracking
+   - `AckEvent` - Acknowledgment action record
+
+   **Constants/Mappings:**
+   - `TITLE_MAX_LENGTH` = 200
+   - `MESSAGE_MAX_LENGTH` = 4000
+   - `DEFAULT_ACK_TIMEOUTS` - SAFETY: 15min, GOVERNANCE: 30min
+   - `INTENT_PRIORITY_MAP` - Maps intent to priority
+   - `INTENT_DELIVERY_MODE_MAP` - Maps intent to delivery mode
+
+2. **Tests** (`tests/notification/test_models.py`)
+   - 51 tests covering all enums and models
+   - Validation guards (autonomy_context required, title/message length)
+   - Derived field computation (delivery_mode, priority, ack_timeout)
+   - Serialization (model_dump / JSON)
+   - PRD invariants (SAFETY/GOVERNANCE -> GUARANTEED, etc.)
+
+### Key Implementation Details
+
+- All models use Pydantic v2 with frozen=True for immutability
+- Derived fields (delivery_mode, priority, ack_timeout_minutes) are computed automatically based on intent using a `model_validator` with `mode="before"`
+- Hard guard: `autonomy_context` is required on Notification (fails validation if missing)
+- Uses timezone-aware UTC datetimes (`datetime.now(UTC)`)
+- All enums inherit from `str, Enum` for JSON serialization compatibility
+
+### Test Results
+- 51 tests passed
+- Linting (ruff) passed
+- No deprecation warnings
+
+### Next Steps
+- Task 2: Implement integration interfaces (ContextProvider, AckCallback)

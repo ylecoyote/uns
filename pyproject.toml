@@ -1,21 +1,27 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "unified-notification-service"
 version = "0.1.0"
-description = "Control-plane notification and acknowledgment service"
+description = "Unified Notification Service (UNS) - Control-plane notification and acknowledgment service"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-dependencies = []
+authors = [
+    {name = "UNS Team"}
+]
+dependencies = [
+    "pydantic>=2.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
+    "mypy>=1.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -24,10 +30,11 @@ include = ["src*", "tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v"
+addopts = "-v --tb=short"
 
 [tool.ruff]
 target-version = "py310"
@@ -38,7 +45,7 @@ src = ["src", "tests"]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
-    "F",   # pyflakes
+    "F",   # Pyflakes
     "I",   # isort
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
@@ -50,3 +57,14 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
