@@ -11,6 +11,7 @@ import logging
 from fastapi import FastAPI
 
 from mcp_server.routes_notification import router as notification_router
+from mcp_server.routes_ui import router as ui_router
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ def create_app() -> FastAPI:
 
     # Include notification routes
     app.include_router(notification_router)
+
+    # Include UI routes (read-only endpoints)
+    app.include_router(ui_router)
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

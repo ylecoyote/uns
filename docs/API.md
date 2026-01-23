@@ -18,6 +18,7 @@ This document provides detailed API documentation for the Unified Notification S
 - [Rate Limiting](#rate-limiting)
 - [Acknowledgment](#acknowledgment)
 - [Interfaces](#interfaces)
+- [UI Endpoints](#ui-endpoints)
 
 ---
 
@@ -769,6 +770,198 @@ except DeliveryError as e:
 
 > **See Also:** [Delivery Semantics](sections/delivery-semantics.md#failure-handling) for complete failure handling documentation.
 
+---
+
+## UI Endpoints
+
+The UI module (`mcp_server.routes_ui`) provides read-only HTTP endpoints for the dashboard UI.
+
+> **See Also:** [UI Data Contracts](ui/ui-data-contracts.md) for complete response shapes and filter specifications.
+
+All UI endpoints are **read-only**. No mutating actions are permitted.
+
+### GET /ui/deliveries
+
+List delivery timelines with filtering.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cursor` | string | Pagination cursor |
+| `limit` | number | Items per page (default: 25, max: 100) |
+| `start_time` | string | ISO 8601, filter by created_at >= |
+| `end_time` | string | ISO 8601, filter by created_at < |
+| `status` | string | Filter by delivery status |
+| `intent` | string | Filter by notification intent |
+| `delivery_mode` | string | Filter by GUARANTEED or BEST_EFFORT |
+| `agent_id` | string | Filter by agent UUID |
+| `autonomy_mode` | string | Filter by PREVIEW, SHADOW, or LIVE |
+| `notification_type` | string | Filter by notification type |
+| `channel` | string | Filter by channel attempted |
+
+#### Response
+
+```python
+{
+    "items": [DeliveryTimelineSummary, ...],
+    "pagination": {
+        "next_cursor": str | None,
+        "has_more": bool,
+        "total_count": int | None
+    }
+}
+```
+
+### GET /ui/deliveries/{notification_id}
+
+Get full delivery timeline for a specific notification.
+
+#### Response
+
+Returns `DeliveryTimelineResponse` with complete attempt history, channels, and autonomy context.
+
+#### Errors
+
+| Code | Condition |
+|------|-----------|
+| `not_found` | notification_id does not exist |
+
+### GET /ui/policies/effective
+
+Get effective policy resolution for a notification type, showing the resolution chain.
+
+#### Query Parameters (Required)
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `notification_type` | string | The notification type to resolve |
+| `intent` | string | SAFETY, GOVERNANCE, OPERATIONAL, or INFORMATIONAL |
+| `autonomy_mode` | string | PREVIEW, SHADOW, or LIVE |
+| `irreversible` | bool | Whether the action is irreversible (default: false) |
+
+#### Response
+
+```python
+{
+    "notification_type": str,
+    "effective": {
+        "delivery_mode": "GUARANTEED" | "BEST_EFFORT",
+        "channels": [Channel, ...],
+        "require_ack": bool,
+        "ack_timeout_minutes": int | None,
+        "dedup_window_seconds": int
+    },
+    "resolution": {
+        "delivery_mode": [ResolutionStep, ...],
+        "channels": [ResolutionStep, ...],
+        # ... other fields
+    },
+    "resolution_context": {
+        "intent": str,
+        "autonomy_mode": str,
+        "irreversible": bool,
+        "policy_found": bool,
+        "policy_notification_type": str | None
+    }
+}
+```
+
+### GET /ui/invariants
+
+List system invariants from the registry.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cursor` | string | Pagination cursor |
+| `limit` | number | Items per page (default: 25, max: 100) |
+| `severity` | string | Filter by HIGH, MEDIUM, or LOW |
+| `enforcement_type` | string | Filter by guard, isolation, test, or exception |
+| `status` | string | Filter by active or inactive |
+| `search` | string | Full-text search on statement |
+
+#### Response
+
+```python
+{
+    "items": [InvariantEntry, ...],
+    "pagination": {
+        "next_cursor": str | None,
+        "has_more": bool,
+        "total_count": int | None
+    }
+}
+```
+
+### GET /ui/invariants/summary
+
+Get summary statistics for system invariants.
+
+#### Response
+
+```python
+{
+    "total_count": int,
+    "by_severity": {"HIGH": int, "MEDIUM": int, "LOW": int},
+    "by_enforcement_type": {"guard": int, "isolation": int, "test": int, "exception": int},
+    "by_status": {"active": int, "inactive": int},
+    "exceptions_requiring_review": int,
+    "last_updated": str  # ISO 8601
+}
+```
+
+### GET /ui/audit
+
+Query audit event stream with filtering.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cursor` | string | Pagination cursor |
+| `limit` | number | Items per page (default: 25, max: 100) |
+| `start_time` | string | ISO 8601, filter by event_time >= |
+| `end_time` | string | ISO 8601, filter by event_time < |
+| `event_type` | string | Filter by event type |
+| `notification_id` | string | Filter by notification UUID |
+| `agent_id` | string | Filter by agent UUID |
+| `autonomy_mode` | string | Filter by autonomy mode |
+| `correlation_id` | string | Filter by correlation ID |
+
+#### Event Types
+
+| Type | Description |
+|------|-------------|
+| `notification.created` | Notification submitted |
+| `delivery.started` | Delivery attempt initiated |
+| `delivery.channel_attempted` | Individual channel attempt |
+| `delivery.succeeded` | Delivery completed successfully |
+| `delivery.failed` | Delivery failed (all channels) |
+| `delivery.deduplicated` | Notification deduplicated |
+| `delivery.rate_limited` | Channel rate limited |
+| `ack.pending` | Acknowledgment tracking started |
+| `ack.received` | Notification acknowledged |
+| `ack.dismissed` | Notification dismissed |
+| `ack.timed_out` | Acknowledgment timeout |
+| `escalation.triggered` | Escalation callback invoked |
+
+#### Response
+
+```python
+{
+    "items": [AuditEvent, ...],
+    "pagination": {
+        "next_cursor": str | None,
+        "has_more": bool,
+        "total_count": int | None
+    }
+}
+```
+
+---
+
 ## Related Documentation
 
 - [Architecture](ARCHITECTURE.md) - System design and component overview
@@ -776,3 +969,4 @@ except DeliveryError as e:
 - [Integration Modes](sections/integration-modes.md) - Integration configuration options
 - [Observability](sections/observability.md) - Health states and metrics
 - [Policy Lifecycle](sections/policy-lifecycle.md) - Policy management
+- [UI Data Contracts](ui/ui-data-contracts.md) - Complete UI response shapes and specifications
