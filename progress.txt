@@ -973,3 +973,105 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 ✅ Optional improvements do not contradict core specifications
 ✅ Validation tests created and passing
 ✅ No blocking issues identified
+
+---
+
+## Task: Add UI Tests (Smoke + Critical Flows) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Created comprehensive smoke tests and critical flow tests for the UI API endpoints. These tests verify endpoint availability, response contract conformance, request ID propagation, and end-to-end user journeys through the UI.
+
+### Files Created
+- `tests/mcp_server/test_routes_ui_smoke_critical.py` - 40 tests covering smoke tests and critical flows
+
+### Test Categories
+
+#### 1. Smoke Tests - Endpoint Availability (7 tests)
+- `test_smoke_deliveries_list_endpoint` - GET /ui/deliveries returns 200
+- `test_smoke_deliveries_detail_endpoint` - GET /ui/deliveries/{id} returns 404 for non-existent
+- `test_smoke_policies_effective_endpoint` - GET /ui/policies/effective returns 200 with valid params
+- `test_smoke_invariants_list_endpoint` - GET /ui/invariants returns 200
+- `test_smoke_invariants_summary_endpoint` - GET /ui/invariants/summary returns 200
+- `test_smoke_audit_list_endpoint` - GET /ui/audit returns 200
+- `test_smoke_health_endpoint` - Health check endpoint returns 200
+
+#### 2. Smoke Tests - Response Contracts (4 tests)
+- `test_smoke_deliveries_list_response_structure` - Verifies list response structure matches contract
+- `test_smoke_delivery_detail_response_structure` - Verifies detail response includes attempts and autonomy_context
+- `test_smoke_policy_response_structure` - Verifies policy resolution response structure
+- `test_smoke_audit_event_response_structure` - Verifies audit event response structure
+
+#### 3. Smoke Tests - Request ID Propagation (4 tests)
+- `test_smoke_request_id_in_response_header` - X-Request-ID returned in response headers
+- `test_smoke_request_id_preserved_from_request` - Custom X-Request-ID preserved
+- `test_smoke_request_id_in_error_response` - X-Request-ID in 404 error responses
+- `test_smoke_request_id_different_per_request` - Different requests get different auto-generated IDs
+
+#### 4. Critical Flow Tests - Delivery Navigation (3 tests)
+- `test_flow_list_deliveries_then_view_detail` - Navigate from list to detail view
+- `test_flow_filter_deliveries_then_drill_down` - Filter then view filtered item details
+- `test_flow_paginate_through_deliveries` - Paginate through multiple pages
+
+#### 5. Critical Flow Tests - Audit Timeline (3 tests)
+- `test_flow_view_audit_timeline_for_notification` - View complete audit trail for a notification
+- `test_flow_filter_audit_by_event_type` - Filter audit events by type (failures, timeouts)
+- `test_flow_audit_combined_with_delivery_detail` - Combine audit timeline with delivery detail
+
+#### 6. Critical Flow Tests - Policy Resolution (4 tests)
+- `test_flow_inspect_policy_no_custom_policy` - SDK defaults when no policy registered
+- `test_flow_inspect_policy_with_registered_policy` - Policy values used when registered
+- `test_flow_compare_preview_vs_live_modes` - Compare policy behavior across autonomy modes
+- `test_flow_irreversible_action_adds_pagerduty` - Irreversible flag adds PagerDuty for SAFETY
+
+#### 7. Critical Flow Tests - Invariant Browsing (3 tests)
+- `test_flow_list_invariants_and_filter` - List and filter invariants
+- `test_flow_invariant_summary_statistics` - Summary statistics match list counts
+- `test_flow_search_invariants` - Search invariants by statement text
+
+#### 8. Critical Flow Tests - Error Handling (4 tests)
+- `test_flow_404_error_with_request_id` - 404 errors include request ID for debugging
+- `test_flow_422_validation_error` - Validation errors handled properly
+- `test_flow_empty_results_handling` - Empty results handled gracefully
+- `test_flow_filter_with_no_matches` - Filtering with no matches returns empty
+
+#### 9. Critical Flow Tests - Metrics Collection (3 tests)
+- `test_flow_metrics_recorded_for_successful_requests` - Metrics recorded for success
+- `test_flow_error_metrics_recorded` - Error metrics recorded for failures
+- `test_flow_latency_metrics_collected` - Latency metrics collected
+
+#### 10. Critical Flow Tests - Multiple Filters Combined (2 tests)
+- `test_flow_delivery_filters_combined` - Combining multiple delivery filters
+- `test_flow_audit_filters_combined` - Combining multiple audit filters
+
+#### 11. Critical Flow Tests - Data Integrity (3 tests)
+- `test_flow_delivery_data_consistent_across_views` - Data consistent between list and detail
+- `test_flow_uuid_serialization_consistent` - UUIDs serialized consistently as strings
+- `test_flow_datetime_serialization_iso_format` - Datetimes serialized in ISO 8601 format
+
+### Test Results
+- 40 new tests passing (test_routes_ui_smoke_critical.py)
+- 144 total UI route tests passing (all test_routes_ui*.py files)
+- All linting checks pass (ruff check and format)
+
+### Key Design Decisions
+
+1. **Smoke Tests Focus**: Verify endpoints are reachable and return valid response structures without testing specific business logic (covered by existing comprehensive tests)
+
+2. **Critical Flow Tests Focus**: Test end-to-end user journeys that mimic how a dashboard user would navigate through the UI
+
+3. **Request ID Testing**: Explicitly test X-Request-ID propagation since it's critical for debugging and correlation
+
+4. **Metrics Collection Testing**: Verify observability infrastructure is working properly
+
+5. **Data Integrity Testing**: Ensure data consistency across different API views
+
+### Acceptance Criteria Met
+✅ Smoke tests verify all endpoints are reachable
+✅ Response structure tests verify contracts match ui-data-contracts.md
+✅ Request ID propagation tests verify X-Request-ID header handling
+✅ Critical flow tests cover delivery navigation, audit timeline, policy resolution, invariant browsing
+✅ Error handling tests verify graceful degradation
+✅ All 40 tests pass
+✅ Linting passes
