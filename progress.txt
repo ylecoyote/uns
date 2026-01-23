@@ -60,8 +60,14 @@ Implemented core data contracts for the Unified Notification Service as specifie
    - `INTENT_PRIORITY_MAP` - Maps intent to priority
    - `INTENT_DELIVERY_MODE_MAP` - Maps intent to delivery mode
 
+   **Helper Functions:**
+   - `get_default_delivery_mode(intent)` - Derive delivery mode from intent
+   - `get_default_priority(intent)` - Derive priority from intent
+   - `get_default_ack_timeout_minutes(intent)` - Get default ack timeout
+   - `get_default_require_ack(intent, autonomy_mode)` - Determine ack requirement
+
 2. **Tests** (`tests/notification/test_models.py`)
-   - 51 tests covering all enums and models
+   - Tests covering all enums and models
    - Validation guards (autonomy_context required, title/message length)
    - Derived field computation (delivery_mode, priority, ack_timeout)
    - Serialization (model_dump / JSON)
@@ -70,13 +76,13 @@ Implemented core data contracts for the Unified Notification Service as specifie
 ### Key Implementation Details
 
 - All models use Pydantic v2 with frozen=True for immutability
-- Derived fields (delivery_mode, priority, ack_timeout_minutes) are computed automatically based on intent using a `model_validator` with `mode="before"`
+- Derived fields (delivery_mode, priority, ack_timeout_minutes) are computed automatically based on intent
 - Hard guard: `autonomy_context` is required on Notification (fails validation if missing)
 - Uses timezone-aware UTC datetimes (`datetime.now(UTC)`)
 - All enums inherit from `str, Enum` for JSON serialization compatibility
 
 ### Test Results
-- 51 tests passed
+- All tests passed
 - Linting (ruff) passed
 - No deprecation warnings
 
@@ -114,7 +120,7 @@ Implemented integration protocols and default implementations for ATP-agnostic o
    - `CompositeAcknowledgmentCallback` - delegates to multiple callbacks
 
 2. **Tests** (`tests/notification/test_interfaces.py`)
-   - 36 tests covering:
+   - Tests covering:
      - Protocol runtime checkability
      - Custom implementations satisfying protocols
      - DefaultContextProvider registration, lookup, default context
@@ -137,7 +143,7 @@ Implemented integration protocols and default implementations for ATP-agnostic o
 4. **Composite Pattern for Callbacks**: `CompositeAcknowledgmentCallback` allows combining multiple handlers (logging, metrics, ATP integration) into a single callback instance.
 
 ### Test Results
-- 65+ tests passed (combined with Task 1 tests)
+- All tests passed
 - 0 warnings
 - Linting: All checks passed (ruff)
 
@@ -145,5 +151,75 @@ Implemented integration protocols and default implementations for ATP-agnostic o
 - `src/notification/interfaces.py` - integration protocols and default implementations
 - `tests/notification/test_interfaces.py` - interface tests
 
+---
+
+## Task 3: Policy Schema + Registry (Mode-Aware Routing) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented policy schema and registry with mode-aware routing as specified in the PRD.
+
+### Artifacts Created
+
+1. **Policy Module** (`src/notification/policies.py`)
+
+   **ModeOverride model:**
+   - Mode-specific configuration for channels, require_ack, delivery_mode
+
+   **NotificationPolicy model:**
+   - notification_type identifier
+   - Base configuration (intent, delivery_mode, channels, require_ack, ack_timeout_minutes, dedup_window_seconds)
+   - Mode overrides (preview_override, shadow_override, live_override)
+   - Methods:
+     - `get_channels_for_mode(autonomy_mode, intent)` - deterministic channel resolution
+     - `get_require_ack_for_mode(autonomy_mode, intent)` - ack requirement resolution
+     - `get_delivery_mode_for_mode(autonomy_mode, intent)` - delivery mode resolution
+     - `get_ack_timeout_minutes_for_mode(autonomy_mode, intent)` - timeout resolution
+
+   **PolicyRegistry class:**
+   - `register(policy)` - add policy
+   - `register_many(policies)` - batch add
+   - `unregister(notification_type)` - remove policy
+   - `get_sync(notification_type)` - lookup policy (returns None for fallback)
+   - `has_policy(notification_type)` - check existence
+   - `list_notification_types()` - list all registered types
+   - `clear()` - remove all policies
+
+   **Helper functions:**
+   - `get_default_registry()` - global singleton registry
+   - `set_default_registry(registry)` - replace default
+   - `resolve_channels(...)` - top-level channel resolution with PagerDuty handling
+   - `resolve_require_ack(...)` - top-level ack resolution
+   - `resolve_delivery_mode(...)` - top-level delivery mode resolution
+
+   **SDK Default Channel Rules implemented:**
+   - PREVIEW mode: All intents -> WebSocket only
+   - SHADOW mode: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket
+   - LIVE mode: SAFETY -> Slack + WebSocket, GOVERNANCE -> Slack + WebSocket, OPERATIONAL -> Slack, INFORMATIONAL -> WebSocket
+   - Irreversible SAFETY adds PagerDuty
+
+2. **Tests** (`tests/notification/test_policies.py`)
+   - ModeOverride creation tests
+   - NotificationPolicy creation and configuration tests
+   - Channel resolution with mode overrides
+   - Ack requirement resolution with mode overrides
+   - Delivery mode resolution tests
+   - SDK default channel rules tests
+   - PolicyRegistry operations (register, unregister, lookup, clear)
+   - Default registry singleton tests
+   - Resolve helper function tests
+   - PRD invariant verification tests
+
+### Test Results
+- All tests pass
+- Linting passes (ruff check)
+
+### PRD Acceptance Criteria Met
+1. Policy lookup failure falls back to SDK defaults
+2. Mode overrides apply deterministically
+3. All routing rules from PRD section 6 implemented
+4. All acknowledgment rules from PRD section 7 implemented
+
 ### Next Steps
-- Task 3: Implement notification routing and channel selection
+- Task 4: Implement notification routing and channel selection

@@ -6,6 +6,7 @@ Tests cover:
 - Derived field computation (delivery_mode, priority, ack_timeout)
 - Serialization (model_dump / JSON)
 - Invariants from PRD
+- Helper functions for default derivations
 """
 
 from datetime import UTC, datetime
@@ -31,6 +32,10 @@ from src.notification.models import (
     NotificationIntent,
     NotificationResult,
     Priority,
+    get_default_ack_timeout_minutes,
+    get_default_delivery_mode,
+    get_default_priority,
+    get_default_require_ack,
 )
 
 
@@ -158,12 +163,12 @@ class TestAutonomyContext:
 
     def test_missing_autonomy_mode_raises(self):
         with pytest.raises(ValidationError) as exc_info:
-            AutonomyContext(agent_id=uuid4())
+            AutonomyContext(agent_id=uuid4())  # type: ignore
         assert "autonomy_mode" in str(exc_info.value)
 
     def test_missing_agent_id_raises(self):
         with pytest.raises(ValidationError) as exc_info:
-            AutonomyContext(autonomy_mode=AutonomyMode.LIVE)
+            AutonomyContext(autonomy_mode=AutonomyMode.LIVE)  # type: ignore
         assert "agent_id" in str(exc_info.value)
 
     def test_serialization(self):
@@ -190,7 +195,7 @@ class TestAutonomyContext:
             agent_id=uuid4(),
         )
         with pytest.raises(ValidationError):
-            ctx.autonomy_mode = AutonomyMode.SHADOW
+            ctx.autonomy_mode = AutonomyMode.SHADOW  # type: ignore
 
 
 class TestNotification:
@@ -479,7 +484,7 @@ class TestNotification:
             source="test",
         )
         with pytest.raises(ValidationError):
-            notif.title = "New Title"
+            notif.title = "New Title"  # type: ignore
 
 
 class TestNotificationResult:
@@ -652,3 +657,62 @@ class TestInvariants:
             )
         errors = exc_info.value.errors()
         assert any("autonomy_context" in str(e) for e in errors)
+
+
+class TestDefaultDerivationFunctions:
+    """Tests for default value derivation helper functions."""
+
+    def test_get_default_delivery_mode(self) -> None:
+        """Delivery mode derivation based on intent."""
+        safety = get_default_delivery_mode(NotificationIntent.SAFETY)
+        assert safety == DeliveryMode.GUARANTEED
+        governance = get_default_delivery_mode(NotificationIntent.GOVERNANCE)
+        assert governance == DeliveryMode.GUARANTEED
+        operational = get_default_delivery_mode(NotificationIntent.OPERATIONAL)
+        assert operational == DeliveryMode.BEST_EFFORT
+        informational = get_default_delivery_mode(NotificationIntent.INFORMATIONAL)
+        assert informational == DeliveryMode.BEST_EFFORT
+
+    def test_get_default_priority(self) -> None:
+        """Priority derivation based on intent."""
+        assert get_default_priority(NotificationIntent.SAFETY) == Priority.HIGH
+        assert get_default_priority(NotificationIntent.GOVERNANCE) == Priority.HIGH
+        assert get_default_priority(NotificationIntent.OPERATIONAL) == Priority.NORMAL
+        assert get_default_priority(NotificationIntent.INFORMATIONAL) == Priority.LOW
+
+    def test_get_default_ack_timeout_minutes(self) -> None:
+        """Ack timeout derivation based on intent."""
+        assert get_default_ack_timeout_minutes(NotificationIntent.SAFETY) == 15
+        assert get_default_ack_timeout_minutes(NotificationIntent.GOVERNANCE) == 30
+        assert get_default_ack_timeout_minutes(NotificationIntent.OPERATIONAL) is None
+        assert get_default_ack_timeout_minutes(NotificationIntent.INFORMATIONAL) is None
+
+    def test_get_default_require_ack(self) -> None:
+        """Require ack derivation based on intent + mode."""
+        # SAFETY + LIVE = True
+        result = get_default_require_ack(NotificationIntent.SAFETY, AutonomyMode.LIVE)
+        assert result is True
+
+        # SAFETY + non-LIVE = False
+        preview = get_default_require_ack(
+            NotificationIntent.SAFETY, AutonomyMode.PREVIEW
+        )
+        assert preview is False
+        shadow = get_default_require_ack(
+            NotificationIntent.SAFETY, AutonomyMode.SHADOW
+        )
+        assert shadow is False
+
+        # Non-SAFETY = always False by default
+        gov = get_default_require_ack(
+            NotificationIntent.GOVERNANCE, AutonomyMode.LIVE
+        )
+        assert gov is False
+        op = get_default_require_ack(
+            NotificationIntent.OPERATIONAL, AutonomyMode.LIVE
+        )
+        assert op is False
+        info = get_default_require_ack(
+            NotificationIntent.INFORMATIONAL, AutonomyMode.LIVE
+        )
+        assert info is False
