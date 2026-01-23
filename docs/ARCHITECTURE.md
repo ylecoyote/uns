@@ -2,6 +2,13 @@
 
 This document describes the architecture of the Unified Notification Service (UNS).
 
+> **Related Documentation:**
+> - [API Reference](API.md) - Complete API documentation
+> - [Delivery Semantics](sections/delivery-semantics.md) - GUARANTEED vs BEST_EFFORT behavior
+> - [Integration Modes](sections/integration-modes.md) - Standalone and integrated operation
+> - [Observability](sections/observability.md) - Health states, metrics, monitoring
+> - [Policy Lifecycle](sections/policy-lifecycle.md) - Policy management and resolution
+
 ## Overview
 
 UNS is a control-plane notification and acknowledgment service designed for autonomous agent systems. It provides:
@@ -86,6 +93,8 @@ The SDK (`notification.sdk`) is the primary producer interface. It handles:
   3. Intent/mode defaults
 
 ### Policy System
+
+> **See Also:** [Policy Lifecycle](sections/policy-lifecycle.md) for complete policy management documentation.
 
 The policy system (`notification.policies`) provides flexible routing rules:
 
@@ -238,6 +247,8 @@ PENDING ────────────────────────
 >
 > If your design requires blocking execution on acknowledgment, you have a fundamental architectural flaw that must be corrected.
 
+> **See Also:** [Delivery Semantics - Acknowledgment Requirements](sections/delivery-semantics.md#acknowledgment-requirements) for the complete ack truth table.
+
 ### Audit System
 
 The audit system (`notification.audit`) provides compliance logging:
@@ -317,6 +328,8 @@ The audit system (`notification.audit`) provides compliance logging:
 
 ## Routing Rules
 
+> **See Also:** [Delivery Semantics](sections/delivery-semantics.md) for complete truth tables and invariants.
+
 ### Delivery Mode Resolution
 
 ```python
@@ -363,6 +376,8 @@ else:
 ```
 
 ## Failure Handling
+
+> **See Also:** [Delivery Semantics](sections/delivery-semantics.md#guaranteed-delivery-semantics) for detailed flow diagrams and invariants.
 
 ### GUARANTEED Mode
 
@@ -478,3 +493,11 @@ This allows:
 - Testing with mocks (InMemory stores)
 - Production with real implementations (Redis, Database)
 - Gradual migration and A/B testing
+
+## Related Documentation
+
+- [API Reference](API.md) - Complete API documentation
+- [Delivery Semantics](sections/delivery-semantics.md) - Delivery behavior truth tables
+- [Integration Modes](sections/integration-modes.md) - Integration configuration options
+- [Observability](sections/observability.md) - Health, metrics, and monitoring
+- [Policy Lifecycle](sections/policy-lifecycle.md) - Policy management

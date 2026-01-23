@@ -114,6 +114,8 @@ sdk.send_info(
 
 ## Architecture
 
+> **See Also:** [Full Documentation](docs/README.md) for detailed architecture, API reference, and topic guides.
+
 ### Core Concepts
 
 #### Acknowledgment Scope
@@ -142,9 +144,11 @@ Determines urgency and delivery guarantees:
 | Intent | Delivery Mode | Default Ack (LIVE) | Priority |
 |--------|---------------|---------------------|----------|
 | SAFETY | GUARANTEED | Required (15 min) | HIGH |
-| GOVERNANCE | GUARANTEED | Optional (30 min) | HIGH |
+| GOVERNANCE | GUARANTEED | Not required* | HIGH |
 | OPERATIONAL | BEST_EFFORT | Not required | NORMAL |
 | INFORMATIONAL | BEST_EFFORT | Not required | LOW |
+
+*GOVERNANCE has a 30-minute timeout if acknowledgment is explicitly enabled via policy.
 
 #### Autonomy Mode
 

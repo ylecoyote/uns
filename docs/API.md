@@ -2,6 +2,12 @@
 
 This document provides detailed API documentation for the Unified Notification Service (UNS).
 
+> **Related Documentation:**
+> - [Architecture](ARCHITECTURE.md) - System design and component overview
+> - [Delivery Semantics](sections/delivery-semantics.md) - Delivery behavior and truth tables
+> - [Integration Modes](sections/integration-modes.md) - Integration configuration options
+> - [Policy Lifecycle](sections/policy-lifecycle.md) - Policy management and resolution
+
 ## Table of Contents
 
 - [SDK](#sdk)
@@ -393,12 +399,15 @@ def get_delivery_mode_for_mode(self, mode: AutonomyMode) -> DeliveryMode | None
 
 ### PolicyRegistry
 
+> **See Also:** [Policy Lifecycle](sections/policy-lifecycle.md) for complete policy management documentation.
+
 ```python
 class PolicyRegistry:
     def register(self, policy: NotificationPolicy) -> None
     def get_sync(self, notification_type: str) -> NotificationPolicy | None
-    async def get(self, notification_type: str) -> NotificationPolicy | None
 ```
+
+**Note:** Policy lookup is synchronous via `get_sync()`. Returns `None` if no policy is registered for the notification type, triggering SDK default behavior.
 
 ### Factory Functions
 
@@ -592,6 +601,8 @@ def configure_rate_limiter(
 
 The acknowledgment module (`notification.acknowledgment`) manages ack lifecycle.
 
+> **See Also:** [Delivery Semantics - Acknowledgment Requirements](sections/delivery-semantics.md#acknowledgment-requirements) for the ack truth table and timeout behavior.
+
 ### AckState
 
 ```python
@@ -644,6 +655,8 @@ def configure_ack_engine(
 ## Interfaces
 
 The interfaces module (`notification.interfaces`) provides protocol-based abstractions.
+
+> **See Also:** [Integration Modes](sections/integration-modes.md) for detailed integration configuration options.
 
 ### NotificationContextProvider (Protocol)
 
@@ -718,3 +731,13 @@ except DeliveryError as e:
     # Handle GUARANTEED delivery failure
     logger.critical(f"Delivery failed: {e}")
 ```
+
+> **See Also:** [Delivery Semantics](sections/delivery-semantics.md#failure-handling) for complete failure handling documentation.
+
+## Related Documentation
+
+- [Architecture](ARCHITECTURE.md) - System design and component overview
+- [Delivery Semantics](sections/delivery-semantics.md) - Delivery behavior truth tables
+- [Integration Modes](sections/integration-modes.md) - Integration configuration options
+- [Observability](sections/observability.md) - Health states and metrics
+- [Policy Lifecycle](sections/policy-lifecycle.md) - Policy management

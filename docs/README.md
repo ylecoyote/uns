@@ -1,0 +1,127 @@
+# Documentation
+
+This directory contains the technical documentation for the Unified Notification Service (UNS).
+
+## Quick Navigation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, components, and data flow |
+| [API.md](API.md) | Complete API reference for SDK, models, and interfaces |
+
+### Topic Sections
+
+Detailed documentation for specific subsystems:
+
+| Section | Description |
+|---------|-------------|
+| [Delivery Semantics](sections/delivery-semantics.md) | GUARANTEED vs BEST_EFFORT modes, truth tables, failure handling |
+| [Integration Modes](sections/integration-modes.md) | Standalone, context provider, and full integration configurations |
+| [Observability](sections/observability.md) | Health states, metrics, DLQ visibility, monitoring |
+| [Policy Lifecycle](sections/policy-lifecycle.md) | Policy states, loading, versioning, and resolution |
+
+## Document Map
+
+```
+docs/
+├── README.md           ← You are here
+├── ARCHITECTURE.md     ← System architecture overview
+├── API.md              ← API reference
+└── sections/
+    ├── delivery-semantics.md   ← Delivery behavior truth tables
+    ├── integration-modes.md    ← Integration configuration options
+    ├── observability.md        ← Health, metrics, and monitoring
+    └── policy-lifecycle.md     ← Policy management
+```
+
+## Reading Guide
+
+**New to UNS?** Start with:
+1. [Root README](../README.md) - Quick start and basic usage
+2. [ARCHITECTURE.md](ARCHITECTURE.md) - Understand the system design
+3. [API.md](API.md) - Learn the SDK interface
+
+**Implementing delivery logic?** Read:
+1. [Delivery Semantics](sections/delivery-semantics.md) - Understand GUARANTEED vs BEST_EFFORT
+2. [Policy Lifecycle](sections/policy-lifecycle.md) - Configure routing policies
+
+**Integrating with external systems?** Read:
+1. [Integration Modes](sections/integration-modes.md) - Choose your integration approach
+2. [API.md](API.md) - Implement required protocols
+
+**Setting up monitoring?** Read:
+1. [Observability](sections/observability.md) - Health states and metrics
+2. [Delivery Semantics](sections/delivery-semantics.md) - DLQ and escalation handling
+
+## Key Concepts Summary
+
+### Notification Intents
+
+| Intent | Purpose | Delivery Mode | Default Ack (LIVE) |
+|--------|---------|---------------|---------------------|
+| SAFETY | Critical safety issues | GUARANTEED | Required (15 min) |
+| GOVERNANCE | Policy/compliance notifications | GUARANTEED | Not required* |
+| OPERATIONAL | Operational alerts | BEST_EFFORT | Not required |
+| INFORMATIONAL | Informational messages | BEST_EFFORT | Not required |
+
+*GOVERNANCE acknowledgment timeout (30 min) applies only if explicitly enabled via policy.
+
+### Autonomy Modes
+
+| Mode | Channel Routing |
+|------|-----------------|
+| PREVIEW | WebSocket only (all intents) |
+| SHADOW | Limited routing (elevated intents add Slack) |
+| LIVE | Full production routing |
+
+### Delivery Modes
+
+| Mode | Behavior | On Failure |
+|------|----------|------------|
+| GUARANTEED | Sequential fallback (Slack → Email → PagerDuty) | Raises `DeliveryError` |
+| BEST_EFFORT | Concurrent delivery to all channels | Returns `FAILED` status, no exception |
+
+For complete details, see [Delivery Semantics](sections/delivery-semantics.md).
+
+## Cross-Reference Index
+
+### By Topic
+
+| Topic | Primary Document | Related Sections |
+|-------|-----------------|------------------|
+| Acknowledgments | [ARCHITECTURE.md](ARCHITECTURE.md#acknowledgment-engine) | [Delivery Semantics](sections/delivery-semantics.md#acknowledgment-requirements) |
+| Channel Adapters | [ARCHITECTURE.md](ARCHITECTURE.md#channel-adapters) | [API.md](API.md#adapters), [Observability](sections/observability.md#per-adapter-health-check-behavior) |
+| DLQ/Escalation | [Delivery Semantics](sections/delivery-semantics.md#dlq-dead-letter-queue-visibility) | [Observability](sections/observability.md#dlq-dead-letter-queue-visibility) |
+| Health Checks | [Observability](sections/observability.md#health-states) | [API.md](API.md#healthcheckresult) |
+| Policy Resolution | [Policy Lifecycle](sections/policy-lifecycle.md#policy-application) | [ARCHITECTURE.md](ARCHITECTURE.md#policy-system) |
+| Rate Limiting | [ARCHITECTURE.md](ARCHITECTURE.md#rate-limiter) | [API.md](API.md#rate-limiting), [Observability](sections/observability.md#6-rate-limiting-events) |
+| WebSocket Integration | [Integration Modes](sections/integration-modes.md#websocket-considerations) | [ARCHITECTURE.md](ARCHITECTURE.md#integration-points) |
+
+### By Component
+
+| Component | API Reference | Architecture | Configuration |
+|-----------|---------------|--------------|---------------|
+| NotificationSDK | [API.md#sdk](API.md#sdk) | [ARCHITECTURE.md#sdk-layer](ARCHITECTURE.md#sdk-layer) | [Integration Modes](sections/integration-modes.md#mode-1-standalone-no-external-integration) |
+| PolicyRegistry | [API.md#policies](API.md#policies) | [ARCHITECTURE.md#policy-system](ARCHITECTURE.md#policy-system) | [Policy Lifecycle](sections/policy-lifecycle.md) |
+| DeliveryService | [API.md#error-handling](API.md#error-handling) | [ARCHITECTURE.md#delivery-service](ARCHITECTURE.md#delivery-service) | [Delivery Semantics](sections/delivery-semantics.md) |
+| AcknowledgmentEngine | [API.md#acknowledgment](API.md#acknowledgment) | [ARCHITECTURE.md#acknowledgment-engine](ARCHITECTURE.md#acknowledgment-engine) | [Delivery Semantics](sections/delivery-semantics.md#acknowledgment-requirements) |
+
+## Contributing to Documentation
+
+When adding or updating documentation:
+
+1. **Avoid duplication** - Reference existing sections instead of repeating content
+2. **Add cross-references** - Link to related documentation sections
+3. **Update this README** - Add new sections to the navigation tables
+4. **Maintain consistency** - Use the same terminology across documents
+
+### Terminology Standards
+
+| Term | Meaning |
+|------|---------|
+| UNS | Unified Notification Service |
+| ATP | Autonomous Trading Platform (external system) |
+| Intent | Notification classification (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL) |
+| Autonomy Mode | Agent operating mode (PREVIEW, SHADOW, LIVE) |
+| Delivery Mode | Reliability semantics (GUARANTEED, BEST_EFFORT) |
+| DLQ | Dead Letter Queue (via escalation callback) |
