@@ -1,11 +1,3 @@
-# Virtual environment
-.venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -27,6 +19,14 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
 # PyInstaller
 *.manifest

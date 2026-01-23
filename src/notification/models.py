@@ -279,7 +279,7 @@ class AckEvent(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     notification_id: UUID = Field(..., description="ID of the notification being acknowledged")
-    status: AckStatus = Field(..., description="Acknowledgment status")
+    status: AckStatus = Field(default=None, description="Acknowledgment status")
     ack_status: AckStatus | None = Field(default=None, description="Alias for status (compatibility)")
     acked_by: str | None = Field(default=None, description="User/system that acknowledged")
     acked_at: datetime = Field(
