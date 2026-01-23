@@ -93,7 +93,27 @@ All UI error responses follow this structure:
 | `not_found` | 404 | Requested resource does not exist |
 | `validation_error` | 422 | Invalid request parameters |
 | `internal_error` | 500 | Unexpected server error |
-| `invariants_load_error` | 200 | Failed to load invariants YAML (returns empty) |
+
+### Degraded State Handling
+
+When the invariants YAML file cannot be loaded, the `/ui/invariants` endpoint returns an empty response with HTTP 200 rather than failing. This graceful degradation is logged and recorded as an error metric for monitoring:
+
+- An error metric is recorded with code `invariants_load_error`
+- The error is logged at ERROR level with details
+- The response returns an empty `items` array
+
+Example degraded response:
+```json
+{
+  "items": [],
+  "pagination": { "next_cursor": null, "has_more": false, "total_count": 0 }
+}
+```
+
+Monitor for these conditions via:
+```promql
+increase(ui_request_error{error_code="invariants_load_error"}[1h]) > 0
+```
 
 ### Error Metrics Recording
 
@@ -308,6 +328,62 @@ class PrometheusMetricsCollector(MetricsCollector):
 | `get_latency_stats(endpoint, method)` | Get latency statistics |
 | `get_all_metrics()` | Get all recorded metrics |
 | `clear()` | Clear all metrics (testing) |
+
+## Verifying Instrumentation
+
+### Testing Request ID Propagation
+
+```bash
+# Verify request ID is returned in response header
+curl -i http://localhost:8000/ui/deliveries | grep X-Request-ID
+
+# Verify client-provided request ID is echoed back
+curl -i -H "X-Request-ID: test-123" http://localhost:8000/ui/deliveries | grep X-Request-ID
+# Expected: X-Request-ID: test-123
+```
+
+### Testing Metrics Collection
+
+```python
+from mcp_server.observability import get_metrics_collector
+
+# After making requests, inspect collected metrics
+collector = get_metrics_collector()
+
+# Check request counts
+print(f"Deliveries requests: {collector.get_request_count('/ui/deliveries')}")
+
+# Check latency stats
+stats = collector.get_latency_stats('/ui/deliveries')
+print(f"P95 latency: {stats['p95']}ms")
+
+# Check error counts
+print(f"404 errors: {collector.get_error_count('/ui/deliveries/{id}', status_code=404)}")
+```
+
+### Testing Structured Logging
+
+```bash
+# Run with debug logging enabled
+LOG_LEVEL=DEBUG python -m uvicorn mcp_server.app:app
+
+# Make a request and observe logs
+curl http://localhost:8000/ui/deliveries
+
+# Expected log output:
+# INFO - list_deliveries called [request_id=req-abc123 cursor=None limit=25]
+# INFO - UI request completed [request_id=req-abc123 endpoint=/ui/deliveries method=GET status_code=200 latency_ms=12.5]
+```
+
+### Running Observability Tests
+
+```bash
+# Run all observability tests
+pytest tests/mcp_server/test_observability.py -v
+
+# Run specific test class
+pytest tests/mcp_server/test_observability.py::TestMetricsForAllEndpoints -v
+```
 
 ## Related Documentation
 
