@@ -12,6 +12,11 @@ All endpoints are READ-ONLY. No mutating actions are permitted.
 Authentication/Authorization:
 - All endpoints require read-only permissions (stub: no auth enforcement yet)
 - Future: integrate with auth middleware for proper RBAC
+
+Read Model Adapters:
+- Endpoints are wired to read model adapters (see read_models.py)
+- Default: InMemoryReadModelAdapter for local demo (data lost on restart)
+- Production: Configure SQLAlchemyReadModelAdapter for persistence
 """
 
 from __future__ import annotations
@@ -25,6 +30,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from mcp_server.read_models import (
+    AuditEventFilter,
+    DeliveryFilter,
+    get_read_model_adapter,
+)
 from notification.models import (
     AutonomyMode,
     Channel,
@@ -356,24 +366,59 @@ async def list_deliveries(
 ) -> DeliveryTimelineListResponse:
     """List delivery timelines with filtering.
 
-    This is a stub implementation that returns an empty list.
-    In production, this would query the delivery audit store.
+    Queries the read model adapter for delivery summaries matching the
+    provided filter criteria. Returns paginated results.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    # STUB: Return empty list
-    # Production implementation would query the audit/delivery store
-    # with the provided filters
     logger.info(
         "list_deliveries called: cursor=%s, limit=%d, filters applied",
         cursor,
         limit,
     )
 
+    # Build filter criteria
+    filter_criteria = DeliveryFilter(
+        start_time=start_time,
+        end_time=end_time,
+        status=status,
+        intent=intent,
+        delivery_mode=delivery_mode,
+        agent_id=agent_id,
+        autonomy_mode=autonomy_mode,
+        notification_type=notification_type,
+        channel=channel,
+    )
+
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    result = adapter.get_deliveries(filter_criteria, cursor, limit)
+
+    # Convert to response model
+    items = [
+        DeliveryTimelineSummary(
+            notification_id=item.notification_id,
+            notification_type=item.notification_type,
+            intent=item.intent,
+            delivery_mode=item.delivery_mode,
+            status=item.status,
+            created_at=item.created_at,
+            delivered_at=item.delivered_at,
+            channels_attempted=item.channels_attempted,
+            channels_succeeded=item.channels_succeeded,
+            autonomy_mode=item.autonomy_mode,
+            agent_id=item.agent_id,
+        )
+        for item in result.items
+    ]
+
     return DeliveryTimelineListResponse(
-        items=[],
+        items=items,
         pagination=PaginationInfo(
-            next_cursor=None,
-            has_more=False,
-            total_count=0,
+            next_cursor=result.next_cursor,
+            has_more=result.has_more,
+            total_count=result.total_count,
         ),
     )
 
@@ -393,21 +438,66 @@ async def get_delivery_timeline(
 ) -> DeliveryTimelineResponse:
     """Get delivery timeline for a specific notification.
 
-    This is a stub implementation that returns 404.
-    In production, this would query the delivery store.
+    Queries the read model adapter for the full delivery timeline
+    of a specific notification, including all channel attempts.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    # STUB: Return 404 since we have no persistent store
     logger.info("get_delivery_timeline called: notification_id=%s", notification_id)
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={
-            "error": {
-                "code": "not_found",
-                "message": f"Notification not found: {notification_id}",
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    timeline = adapter.get_delivery_timeline(notification_id)
+
+    if timeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "not_found",
+                    "message": f"Notification not found: {notification_id}",
+                },
+                "request_id": "stub-request-id",
             },
-            "request_id": "stub-request-id",
-        },
+        )
+
+    # Convert attempts to response model
+    attempts = [
+        DeliveryAttempt(
+            attempt_id=attempt.attempt_id,
+            channel=attempt.channel,
+            status=attempt.status,
+            started_at=attempt.started_at,
+            completed_at=attempt.completed_at,
+            duration_ms=attempt.duration_ms,
+            error_message=attempt.error_message,
+            error_code=attempt.error_code,
+            metadata=attempt.metadata,
+        )
+        for attempt in timeline.attempts
+    ]
+
+    return DeliveryTimelineResponse(
+        notification_id=timeline.notification_id,
+        notification_type=timeline.notification_type,
+        intent=timeline.intent,
+        delivery_mode=timeline.delivery_mode,
+        status=timeline.status,
+        created_at=timeline.created_at,
+        delivered_at=timeline.delivered_at,
+        attempts=attempts,
+        channels_attempted=timeline.channels_attempted,
+        channels_succeeded=timeline.channels_succeeded,
+        channels_failed=timeline.channels_failed,
+        autonomy_context=AutonomyContextResponse(
+            autonomy_mode=timeline.autonomy_mode,
+            agent_id=timeline.agent_id,
+            plan_id=timeline.plan_id,
+            decision_snapshot_id=timeline.decision_snapshot_id,
+            execution_snapshot_id=timeline.execution_snapshot_id,
+            skip_snapshot_id=timeline.skip_snapshot_id,
+        ),
     )
 
 
@@ -805,8 +895,11 @@ async def list_audit_events(
 ) -> AuditEventListResponse:
     """List audit events with filtering.
 
-    This is a stub implementation that returns an empty list.
-    In production, this would query the audit store.
+    Queries the read model adapter for audit events matching the
+    provided filter criteria. Returns paginated results.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
     """
     logger.info(
         "list_audit_events called: cursor=%s, limit=%d, event_type=%s",
@@ -815,14 +908,49 @@ async def list_audit_events(
         event_type,
     )
 
-    # STUB: Return empty list
-    # Production implementation would query the audit store
+    # Build filter criteria
+    filter_criteria = AuditEventFilter(
+        start_time=start_time,
+        end_time=end_time,
+        event_type=event_type.value if event_type else None,
+        notification_id=notification_id,
+        agent_id=agent_id,
+        autonomy_mode=autonomy_mode,
+        correlation_id=correlation_id,
+    )
+
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    result = adapter.get_audit_events(filter_criteria, cursor, limit)
+
+    # Convert to response model
+    items = [
+        AuditEvent(
+            audit_id=item.audit_id,
+            event_type=AuditEventType(item.event_type),
+            event_time=item.event_time,
+            notification_id=item.notification_id,
+            notification_type=item.notification_type,
+            autonomy_context=AutonomyContextResponse(
+                autonomy_mode=item.autonomy_mode,
+                agent_id=item.agent_id,
+                plan_id=item.plan_id,
+                decision_snapshot_id=item.decision_snapshot_id,
+                execution_snapshot_id=item.execution_snapshot_id,
+                skip_snapshot_id=item.skip_snapshot_id,
+            ),
+            payload=item.payload,
+            correlation_id=item.correlation_id,
+        )
+        for item in result.items
+    ]
+
     return AuditEventListResponse(
-        items=[],
+        items=items,
         pagination=PaginationInfo(
-            next_cursor=None,
-            has_more=False,
-            total_count=0,
+            next_cursor=result.next_cursor,
+            has_more=result.has_more,
+            total_count=result.total_count,
         ),
     )
 
