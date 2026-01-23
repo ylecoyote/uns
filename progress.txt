@@ -278,5 +278,81 @@ Per PRD Task 4:
 - Ruff check: All checks passed
 - Ruff format: Applied
 
-### Next Steps
-- Task 5: Implement notification routing and channel selection
+---
+
+## Task 5: Implement adapters (Slack, Email, WebSocket, PagerDuty) - COMPLETED
+
+### Date: 2026-01-22
+
+### Summary
+Implemented channel adapters for all delivery channels.
+
+### Files Created
+
+1. **src/notification/adapters/base.py**
+   - `BaseAdapter` abstract base class with `deliver()` and `health_check()` methods
+   - `DeliveryResult` and `HealthCheckResult` dataclasses
+   - `AdapterStatus` enum (HEALTHY, DEGRADED, UNHEALTHY)
+   - Exception classes: `AdapterError`, `AdapterConfigurationError`, `AdapterDeliveryError`, `AdapterTimeoutError`
+
+2. **src/notification/adapters/slack.py**
+   - `SlackConfig` with bot_token, default_channel, timeout, retry config
+   - `SlackClient` for Slack Web API calls (chat.postMessage, auth.test)
+   - `SlackAdapter` with Block Kit support, intent-based emoji/colors, ack buttons
+   - Retry logic with exponential backoff
+
+3. **src/notification/adapters/email.py**
+   - `EmailConfig` with SMTP settings (host, port, TLS/SSL, credentials)
+   - `EmailAdapter` with MIME multipart (plain text + HTML)
+   - Priority headers (X-Priority, Importance)
+   - Custom UNS headers (X-UNS-Notification-ID, X-UNS-Intent, X-UNS-Autonomy-Mode)
+   - Async delivery via executor
+
+4. **src/notification/adapters/websocket.py**
+   - `WebSocketConfig` with broadcast mode, metadata options
+   - `WebSocketConnectionManager` protocol and `InMemoryConnectionManager` implementation
+   - `WebSocketAdapter` for fire-and-forget real-time delivery
+   - Support for user-targeted, agent-subscription, and broadcast modes
+   - JSON payload with UUID/datetime serialization
+
+5. **src/notification/adapters/pagerduty.py**
+   - `PagerDutyConfig` with routing_key, severity defaults
+   - `PagerDutyClient` for Events API v2 (trigger, acknowledge, resolve)
+   - `PagerDutyAdapter` with intent-based severity mapping
+   - Rich custom_details with full notification context
+   - Support for irreversible action flagging
+
+6. **src/notification/adapters/__init__.py**
+   - `get_adapter(channel, config)` factory function
+   - `AdapterRegistry` for managing multiple adapters
+   - Health check aggregation and graceful shutdown
+   - All exports for easy importing
+
+### Tests Created
+
+1. **tests/notification/test_adapters.py** - 67 tests covering:
+   - All config validation
+   - Message formatting for each channel
+   - Delivery success/failure/timeout scenarios
+   - Health check functionality
+   - Factory and registry operations
+   - Error handling and retry logic
+
+### Key Design Decisions
+
+1. **Async-first**: All adapters use async/await for non-blocking I/O
+2. **Protocol-based**: WebSocket uses protocols for pluggable connection managers
+3. **Retry with backoff**: Configurable retry attempts with exponential backoff
+4. **Fire-and-forget WebSocket**: No clients connected is not a failure
+5. **Intent-based formatting**: Each adapter maps notification intent to channel-specific visuals
+6. **httpx dependency**: Optional - only required if using Slack/PagerDuty adapters
+
+### Test Results
+- 67 tests passing
+- Linting passes (ruff check)
+
+### Dependencies Added
+- httpx (optional, for Slack and PagerDuty API calls)
+- pydantic (for models)
+- pytest, pytest-asyncio, pytest-cov (dev)
+- ruff, mypy (dev)

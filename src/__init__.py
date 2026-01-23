@@ -1,1 +1,1 @@
-# Unified Notification Service
+"""Unified Notification Service (UNS) source package."""
