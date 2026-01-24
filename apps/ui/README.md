@@ -58,6 +58,15 @@ See [INV-UI-001](../../docs/verification/invariants.yml) for the formal invarian
 | `/invariants` | Invariants Viewer | System invariants with filters |
 | `/audit` | Audit Timeline | Audit events with filters |
 
+## Architecture
+
+This module provides a **JSON API backend** for the React frontend:
+
+- **Backend (this module)**: FastAPI endpoints returning JSON responses
+- **Frontend (React)**: TypeScript/React components in `src/*.tsx` that consume the JSON API
+
+The backend does not serve HTML directly. All HTML rendering is handled by the React frontend.
+
 ## Project Structure
 
 ```
@@ -68,19 +77,23 @@ apps/ui/
 ├── tsconfig.json           # TypeScript configuration
 ├── .eslintrc.cjs           # ESLint configuration
 ├── .env.example            # Environment variable template
+├── __init__.py             # Package init (Python backend)
+├── app.py                  # FastAPI app factory (JSON API backend)
 ├── src/
 │   ├── main.tsx            # React entry point
 │   ├── App.tsx             # Layout + routing
 │   ├── App.css             # Global styles
-│   ├── api/                # Typed API client
+│   ├── api/                # Typed API client (TypeScript)
 │   │   ├── client.ts       # UNSUIClient
 │   │   ├── types.ts        # Response type definitions
 │   │   ├── audit.ts        # Audit endpoints
 │   │   └── invariants.ts   # Invariants endpoints
-│   ├── pages/              # Page components
+│   ├── pages/              # Page components (React) + API routers (Python)
 │   │   ├── AuditTimeline.tsx
 │   │   ├── InvariantsPage.tsx
-│   │   └── index.ts
+│   │   ├── index.ts
+│   │   ├── __init__.py
+│   │   └── deliveries.py   # Deliveries Explorer JSON API
 │   ├── components/         # Reusable UI components
 │   │   ├── AuditEventCard.tsx
 │   │   ├── AuditFilters.tsx
@@ -101,9 +114,13 @@ apps/ui/
 │   └── test/               # Test utilities
 │       ├── mocks.ts        # MSW mocks
 │       └── setup.ts        # Vitest setup
-└── tests/                  # Component and integration tests
+├── static/
+│   └── css/
+│       └── main.css        # Styles
+└── tests/                  # Component, integration, and API tests
     ├── *.test.tsx          # React component tests
-    └── *.test.ts           # API client tests
+    ├── *.test.ts           # API client tests
+    └── __init__.py
 ```
 
 ## Local Development
