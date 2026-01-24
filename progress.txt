@@ -2042,3 +2042,92 @@ Produced Phase 1.1 bounded verification report for UI standardization. The repor
 ✅ UI respects degraded-state semantics - VERIFIED
 ✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
 ✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
+
+---
+
+## Add UI Boundary Guardrail (no Python in canonical apps/ui) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Implemented a UI boundary guardrail that enforces the canonical UI structure. The guardrail prevents Flask/Python HTML-serving patterns from returning to the `apps/ui` directory by detecting Python files outside the allowed `legacy_flask_reference` folder.
+
+### Artifacts Created
+
+1. **scripts/ci/check_ui_boundary.py** (NEW)
+   - Standalone Python script for UI boundary checking
+   - Detects Python files outside `apps/ui/legacy_flask_reference/`
+   - Detects `templates/` directories (Flask-style templating)
+   - Detects Flask patterns in `app.py` files
+   - Command-line arguments:
+     - `--strict` - Exit with error on violations (for CI enforcement)
+     - `--fix` - Show migration guidance
+     - `--quiet` - Minimal output
+   - Exit codes: 0 (success/warning), 1 (failure in strict mode)
+
+2. **tests/ci/__init__.py** (NEW)
+   - Package init for CI tests
+
+3. **tests/ci/test_ui_boundary.py** (NEW)
+   - 28 comprehensive tests covering:
+     - `find_repo_root()` - Repository root detection
+     - `is_in_legacy_reference()` - Legacy folder exemption
+     - `check_python_files()` - Python file detection
+     - `check_templates_directory()` - Templates detection
+     - `check_flask_app_patterns()` - Flask pattern detection
+     - Script integration tests (runs as subprocess)
+
+### Documentation Updated
+
+4. **apps/ui/README.md** (MODIFIED)
+   - Added "Boundary Rules" section with:
+     - Rule table (NO_PYTHON_IN_CANONICAL_UI, NO_TEMPLATES_DIRECTORY, NO_FLASK_APP_IN_UI)
+     - Allowed exceptions (legacy_flask_reference folder)
+     - Where backend code should live (migration guidance)
+     - How to run the guardrail script
+     - Link to scripts/ci/check_ui_boundary.py
+
+### Rules Enforced
+
+| Rule | Description |
+|------|-------------|
+| NO_PYTHON_IN_CANONICAL_UI | No `.py` files in `apps/ui/` except under `legacy_flask_reference/` |
+| NO_TEMPLATES_DIRECTORY | No `templates/` directories (Flask-style HTML templating) |
+| NO_FLASK_APP_IN_UI | No Flask imports or `render_template` patterns in app.py files |
+
+### Test Results
+- 28 tests passing in `tests/ci/test_ui_boundary.py`
+- Ruff linting passes
+- Mypy type checking passes
+
+### Current Status
+The guardrail currently detects 26 Python files in `apps/ui/` that are from the existing FastAPI backend implementation. These are flagged as violations since the PRD specifies Python should only be in `legacy_flask_reference/`. The guardrail runs in warning mode by default and strict mode for CI enforcement.
+
+### Usage
+```bash
+# Warning mode (default)
+python scripts/ci/check_ui_boundary.py
+
+# Strict mode (for CI)
+python scripts/ci/check_ui_boundary.py --strict
+
+# Show migration guidance
+python scripts/ci/check_ui_boundary.py --fix
+```
+
+### Files Created/Modified
+- `scripts/ci/check_ui_boundary.py` (NEW)
+- `tests/ci/__init__.py` (NEW)
+- `tests/ci/test_ui_boundary.py` (NEW)
+- `apps/ui/README.md` (MODIFIED - added Boundary Rules section)
+
+### Acceptance Criteria Met
+✅ Guardrail script created at `scripts/ci/check_ui_boundary.py`
+✅ Detects Python files outside `apps/ui/legacy_flask_reference/`
+✅ Detects `templates/` directories
+✅ Detects Flask patterns in app.py files
+✅ Strict mode exits with error (for CI enforcement)
+✅ Migration guidance available via `--fix`
+✅ Documentation added to `apps/ui/README.md`
+✅ 28 tests passing
+✅ Linting passes
