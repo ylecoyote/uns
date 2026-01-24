@@ -77,3 +77,44 @@ export async function apiGet<T>(
 
   return response.json() as Promise<T>;
 }
+
+/**
+ * Build a query string from a filters object.
+ *
+ * @param params - Object with filter parameters
+ * @returns Query string starting with '?' or empty string if no params
+ */
+export function buildQueryString(
+  params: object
+): string {
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null && value !== ''
+  );
+
+  if (entries.length === 0) {
+    return '';
+  }
+
+  const searchParams = new URLSearchParams();
+  entries.forEach(([key, value]) => {
+    searchParams.set(key, String(value));
+  });
+
+  return `?${searchParams.toString()}`;
+}
+
+/**
+ * Generic API request function.
+ * Wrapper around apiGet for backwards compatibility.
+ *
+ * @param path - Full API path including /ui prefix
+ * @param options - Request options
+ */
+export async function apiRequest<T>(
+  path: string,
+  options?: RequestOptions
+): Promise<T> {
+  // Remove /ui prefix if present since apiGet adds it
+  const normalizedPath = path.startsWith('/ui') ? path.slice(3) : path;
+  return apiGet<T>(normalizedPath, undefined, options);
+}
