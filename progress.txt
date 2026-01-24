@@ -976,101 +976,118 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 
 ---
 
-## UI Phase 1: Deliveries Explorer Page (list + detail) - COMPLETED
+## UI Phase 1 Task 4: Policy Inspector Page - COMPLETED
 
 ### Date: 2026-01-23
 
 ### Summary
-Implemented the Deliveries Explorer UI pages as part of Phase 1 of the UNS Dashboard.
-This provides read-only visibility into notification delivery timelines per ui-scope.md.
+Implemented the Policy Inspector page for the UNS UI app, allowing users to view effective policy resolution and detailed resolution traces. This is a read-only UI per UI Scope v1.
 
-### Artifacts Created
+### Files Created
 
-1. **UI Application Structure** (`apps/ui/`)
-   - `__init__.py` - Package initialization
-   - `app.py` - FastAPI app factory with routes and static file serving
-   - `README.md` - Documentation with local run instructions
+1. **apps/ui/README.md** - Project documentation with local setup instructions
+2. **apps/ui/src/__init__.py** - Package initialization
+3. **apps/ui/src/api/__init__.py** - API client exports
+4. **apps/ui/src/api/models.py** - Typed Pydantic models for API responses:
+   - `ResolutionSource` enum (EXPLICIT_OVERRIDE, MODE_OVERRIDE, POLICY_BASE, SDK_DEFAULT)
+   - `NotificationIntent`, `AutonomyMode`, `DeliveryMode`, `Channel` enums
+   - `ResolutionStep` - Single step in resolution chain
+   - `EffectivePolicyValues` - Effective policy values
+   - `ResolutionContext` - Resolution input context
+   - `EffectivePolicyResponse` - Full API response model
+   - `ErrorDetail`, `ErrorResponse` - Error handling models
 
-2. **Typed API Client** (`apps/ui/src/api/`)
-   - `types.py` - Response models matching ui-data-contracts.md:
-     - `DeliveryTimelineListResponse`
-     - `DeliveryTimelineResponse`
-     - `DeliveryTimelineSummary`
-     - `DeliveryAttempt`
-     - `AutonomyContextResponse`
-     - `PaginationInfo`
-     - `ErrorResponse`
-     - `DeliveryFilterParams`
-   - `client.py` - UNSUIClient with:
-     - `list_deliveries()` with all filter parameters
-     - `get_delivery_timeline()` for detail view
-     - Request ID propagation via X-Request-ID header
-     - Error handling with typed APIError
+5. **apps/ui/src/api/client.py** - Typed API client:
+   - `UNSApiClient` - HTTP client for /ui endpoints
+   - `UNSApiError` - Exception with status_code, error_response, request_id
+   - `get_effective_policy()` - Typed method for /ui/policies/effective
+   - Request ID propagation via X-Request-ID header
+   - Context manager support for resource cleanup
 
-3. **Deliveries Explorer Pages** (`apps/ui/src/pages/`)
-   - `deliveries.py` - FastAPI router with:
-     - `GET /pages/deliveries/` - List page with filters
-     - `GET /pages/deliveries/{notification_id}` - Detail page
-     - Filter support: status, intent, delivery_mode, autonomy_mode, channel, notification_type, agent_id, time range
-     - Cursor-based pagination
-     - Template rendering via Jinja2
+6. **apps/ui/src/components/__init__.py** - Component exports
+7. **apps/ui/src/components/resolution_trace.py** - Resolution trace display:
+   - `format_resolution_value()` - Format any value for display
+   - `format_resolution_step()` - Format a resolution step
+   - `ResolutionFieldDisplay` - Dataclass for field display data
+   - `ResolutionTraceDisplay` - Component for rendering resolution traces
+   - `to_text()` - Render as formatted terminal output
+   - `get_summary()` - Get structured summary data
 
-4. **HTML Templates** (`apps/ui/templates/`)
-   - `base.html` - Base layout with navbar and footer
-   - `deliveries/list.html` - List page with:
-     - Filter form (dropdowns + text inputs)
-     - Results table with links to detail pages
-     - Pagination controls
-     - Empty state handling
-   - `deliveries/detail.html` - Detail page with:
-     - Notification summary section
-     - Autonomy context section
-     - Channel results (attempted/succeeded/failed)
-     - Delivery attempts table with timing and errors
-     - Back to list link
+8. **apps/ui/src/pages/__init__.py** - Page exports
+9. **apps/ui/src/pages/policy_inspector.py** - Policy Inspector page:
+   - `PolicyInspectorFormData` - Form data with validation
+   - `PolicyInspectorResult` - Inspection result with success/error state
+   - `PolicyInspectorPage` - Main page component
+   - Form options for intent and autonomy_mode dropdowns
+   - `inspect()` - Call API and format response
+   - `render_text()` - Render result as text
+   - Context manager support
 
-5. **Static Assets** (`apps/ui/static/`)
-   - `css/main.css` - Styles including:
-     - Navbar and layout
-     - Filter panel
-     - Data tables
-     - Status badges (success/warning/danger/info)
-     - Channel tags
-     - Responsive design
+10. **apps/ui/tests/__init__.py** - Test package
+11. **apps/ui/tests/test_policy_inspector.py** - Comprehensive test suite (35 tests):
+    - Form data validation tests
+    - Resolution value formatting tests
+    - Resolution step formatting tests
+    - Resolution trace display tests
+    - Policy Inspector page tests
+    - API client integration tests (mocked)
+    - Error handling tests
+    - Request ID propagation tests
 
-6. **Tests** (`apps/ui/tests/`)
-   - `test_deliveries_pages.py` - 33 tests covering:
-     - List page rendering
-     - Filter functionality
-     - Pagination
-     - Detail page display
-     - Error handling (404, 422)
-     - Static file serving
-     - Navigation elements
-     - API client imports
+### Implementation Details
 
-### Configuration Updates
-- `pyproject.toml` updated:
-  - Added `apps` to package paths
-  - Added `apps/ui/tests` to test paths
-  - Added `apps` to Python path for imports
-  - Added `apps` to ruff src paths
-  - Added `jinja2>=3.0.0` dependency
+**API Client Features:**
+- Typed responses using Pydantic models
+- Automatic request ID generation for correlation
+- Consistent error handling with ErrorResponse parsing
+- Configurable base URL (env var: UNS_API_BASE_URL)
+- Context manager pattern for resource cleanup
 
-### Key Implementation Details
-- Read-only pages per ui-scope.md v1 constraints
-- Uses existing `/ui/deliveries` API endpoints
-- Cursor-based pagination matching ui-data-contracts.md
-- Template filters for datetime, duration, and status badges
-- Error handling with proper HTTP status codes
+**Resolution Trace Display:**
+- Formats all 5 policy fields: delivery_mode, channels, require_ack, ack_timeout_minutes, dedup_window_seconds
+- Shows human-readable display names
+- Tracks which source was applied for each field
+- Renders both APPLIED and SKIPPED steps with reasons
+
+**Form Data Validation:**
+- notification_type required and non-blank
+- All enum fields properly typed
+- from_dict() factory with sensible defaults
 
 ### Test Results
-- 33 tests passing for UI pages
-- 137 tests passing for all UI-related tests
-- All linting checks pass (ruff check/format)
+```
+apps/ui/tests/test_policy_inspector.py - 35 passed, 1 skipped (integration)
+```
+
+### Linting
+- Ruff check: All checks passed
+- Ruff format: Applied to 2 files
+
+### Directory Structure Created
+```
+apps/ui/
+├── README.md
+├── src/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── client.py
+│   │   └── models.py
+│   ├── components/
+│   │   ├── __init__.py
+│   │   └── resolution_trace.py
+│   └── pages/
+│       ├── __init__.py
+│       └── policy_inspector.py
+└── tests/
+    ├── __init__.py
+    └── test_policy_inspector.py
+```
 
 ### Acceptance Criteria Met
-✅ Deliveries list page with filters (intent, delivery_mode, status, time range, agent_id, autonomy_mode, channel)
-✅ Delivery detail view for notification_id showing attempts and timestamps
-✅ Tests written and passing
-✅ Linting passes
+✅ Form for notification_type, intent, autonomy_mode, irreversible inputs
+✅ Renders EffectivePolicyResponse including resolution steps
+✅ Typed API client with request_id propagation
+✅ Comprehensive test suite (35 tests passing)
+✅ Ruff linting and formatting pass
+✅ Read-only posture maintained (all GET endpoints)
