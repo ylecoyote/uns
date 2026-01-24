@@ -2042,3 +2042,71 @@ Produced Phase 1.1 bounded verification report for UI standardization. The repor
 ✅ UI respects degraded-state semantics - VERIFIED
 ✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
 ✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
+
+---
+
+## UI Phase 1.2: Bounded Verification Report (Guardrails + CI + Contracts) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Produced a bounded verification report for UI Phase 1.2, covering guardrails, CI integration, and contract drift checks. The report documents what exists vs. what was specified in the Phase 1.2 YAML, along with verification tests.
+
+### Artifacts Created
+
+1. **Phase 1.2 Verification Report** (`docs/reports/ui/phase-1_2-verify.md`)
+   - Executive summary with partial pass status
+   - CI integration verification (lint, typecheck, test, build)
+   - Boundary guardrail status (NOT FULLY IMPLEMENTED - Python files in canonical paths)
+   - Backend contract drift tests (77 tests passing)
+   - UI-side contract tests (217 tests passing with TypeScript types)
+   - Contract snapshot artifact status (NOT FOUND)
+   - Recommendations for addressing gaps
+
+2. **Phase 1.2 Verification Tests** (`tests/docs/test_ui_phase1_2_verification.py`)
+   - 44 tests covering:
+     - Report existence and structure
+     - CI script configuration (lint, typecheck, test, build)
+     - TypeScript type definitions matching contracts
+     - UI-side contract tests existence
+     - Backend contract tests existence
+     - Documentation contract alignment
+     - Report claims verification
+
+### Key Findings
+
+**Verified (5/8 requirements):**
+1. CI script with lint/typecheck/test/build - via `npm run ci`
+2. Backend contract drift tests - 77 comprehensive tests
+3. UI-side contract drift tests - TypeScript types + API client tests
+4. Report generation determinism
+5. Documentation updates
+
+**Not Verified (3/8 requirements):**
+1. Boundary guardrail script - Not found; Python files exist outside legacy folder
+2. Boundary guardrail CI integration - Cannot integrate non-existent script
+3. Contract snapshot artifact - `docs/ui/contracts/` directory not created
+
+### Test Results
+- All 44 Phase 1.2 verification tests pass
+- Backend contract tests: 77 passed
+- UI data contracts tests: 65 passed
+- UI Phase 1 verification tests: 25 passed
+
+### Recommendations (documented in report)
+1. Relocate Python files to `apps/ui/legacy_flask_reference/`
+2. Create `scripts/ci/check_ui_boundary.sh` for enforcement
+3. Generate `docs/ui/contracts/ui-contracts.yaml` snapshot
+4. Add "Boundary Rules" section to `apps/ui/README.md`
+
+### Files Created
+- `docs/reports/ui/phase-1_2-verify.md`
+- `tests/docs/test_ui_phase1_2_verification.py`
+
+### Acceptance Criteria Met
+✅ Phase 1.2 bounded verification report produced
+✅ Report documents CI integration status
+✅ Report documents boundary guardrail status (with gaps noted)
+✅ Report documents contract drift tests (backend + UI-side)
+✅ 44 verification tests created and passing
+✅ Linting passes (ruff)
