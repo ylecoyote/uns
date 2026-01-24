@@ -66,7 +66,7 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
     path: ROUTES.POLICY,
     title: 'Policy',
     description: 'Effective policy inspector',
-    implemented: false,
+    implemented: true,
     navOrder: 2,
   },
   {
