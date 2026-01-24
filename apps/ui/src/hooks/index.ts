@@ -1,5 +1,1 @@
-/**
- * React hooks exports
- */
-
-export * from './useInvariants';
+export * from './useAuditEvents';
