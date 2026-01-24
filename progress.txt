@@ -1050,3 +1050,112 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 ✅ No mutation routes or privileged actions introduced - VERIFIED
 ✅ Basic UI tests pass - VERIFIED (152 tests)
 ✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
+
+---
+
+## Migrate Deliveries Explorer UI to React - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Migrated the Deliveries Explorer from Flask/Jinja templates to React components, replacing the server-rendered UI with a client-side React implementation that consumes the existing `/ui/deliveries` API endpoints.
+
+### Files Created
+
+1. **TypeScript Types** (`apps/ui/src/types/api.ts`)
+   - Added `DeliveryAttempt` interface
+   - Added `AutonomyContextResponse` interface
+   - Added `DeliveryTimelineResponse` interface
+   - Added `DeliveryTimelineSummary` interface
+   - Added `DeliveryTimelineListResponse` interface
+   - Added `DeliveryFilter` interface
+
+2. **API Client** (`apps/ui/src/api/deliveries.ts`)
+   - `getDeliveries(filter?, options?)` - Fetch paginated delivery list with filtering
+   - `getDeliveryTimeline(notificationId, options?)` - Fetch single delivery timeline
+
+3. **React Hooks**
+   - `apps/ui/src/hooks/useDeliveries.ts` - Hook for fetching delivery list with filtering and pagination
+   - `apps/ui/src/hooks/useDeliveryTimeline.ts` - Hook for fetching single delivery timeline
+
+4. **React Components**
+   - `apps/ui/src/components/DeliveriesFilters.tsx` - Filter controls for deliveries (status, intent, channel, etc.)
+   - `apps/ui/src/components/DeliveriesTable.tsx` - Table display of delivery summaries with links to details
+
+5. **React Pages**
+   - `apps/ui/src/pages/DeliveriesListPage.tsx` - Main deliveries list page with filters, table, and pagination
+   - `apps/ui/src/pages/DeliveriesDetailPage.tsx` - Detail page showing full delivery timeline with attempts
+
+6. **Test Mocks** (`apps/ui/src/test/mocks.ts`)
+   - Added mock data for deliveries: `mockDeliveryAttempt`, `mockDeliverySummary`, `mockDeliveryTimeline`, etc.
+
+7. **Tests**
+   - `apps/ui/tests/DeliveriesListPage.test.tsx` - 11 tests for list page
+   - `apps/ui/tests/DeliveriesDetailPage.test.tsx` - 13 tests for detail page
+   - `apps/ui/tests/DeliveriesFilters.test.tsx` - 13 tests for filter component
+
+### Files Modified
+
+1. **apps/ui/src/App.tsx**
+   - Added imports for `DeliveriesListPage` and `DeliveriesDetailPage`
+   - Replaced placeholder `/deliveries` route with actual `DeliveriesListPage` component
+   - Added nested route `/deliveries/:notificationId` for `DeliveriesDetailPage`
+
+2. **apps/ui/src/App.css**
+   - Added CSS for data tables (.data-table, .table-container)
+   - Added CSS for channel tags (.channel-tag, .channel-success, .channel-failed)
+   - Added CSS for detail page layout (.detail-grid, .detail-section, .breadcrumb)
+   - Added CSS for attempts table and error display
+
+3. **apps/ui/src/api/index.ts**
+   - Added export for deliveries API
+
+4. **apps/ui/src/hooks/index.ts**
+   - Added exports for useDeliveries and useDeliveryTimeline hooks
+
+5. **apps/ui/src/components/index.ts**
+   - Added exports for DeliveriesFilters and DeliveriesTable components
+
+### Features Implemented
+
+1. **Deliveries List Page**
+   - Filter by status (PENDING, DELIVERED, FAILED, DEDUPLICATED, RATE_LIMITED)
+   - Filter by intent (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL)
+   - Filter by delivery mode (GUARANTEED, BEST_EFFORT)
+   - Filter by autonomy mode (PREVIEW, SHADOW, LIVE)
+   - Filter by channel (SLACK, EMAIL, WEBSOCKET, PAGERDUTY)
+   - Filter by notification type (text input)
+   - Filter by agent ID (text input)
+   - Configurable page size (10, 25, 50, 100)
+   - Cursor-based pagination with "Load More" button
+   - Table with sortable columns: Notification ID, Type, Intent, Status, Delivery Mode, Autonomy, Channels, Created, Delivered
+   - Status and intent badges with color coding
+   - Channel tags showing success/failure status
+   - Links to detail pages
+
+2. **Deliveries Detail Page**
+   - Breadcrumb navigation
+   - Summary section (notification ID, type, intent, status, delivery mode, timestamps)
+   - Autonomy context section (mode, agent ID, optional snapshot IDs)
+   - Channel results section (attempted, succeeded, failed channels)
+   - Delivery attempts table (attempt ID, channel, status, timing, duration, errors)
+   - Back to list navigation
+
+3. **Loading, Error, and Empty States**
+   - Loading spinner during data fetch
+   - Error message with retry button on fetch failure
+   - Empty state message when no results match filters
+
+### Test Results
+- 37 new tests passing (DeliveriesListPage: 11, DeliveriesDetailPage: 13, DeliveriesFilters: 13)
+- All new files pass ESLint with no errors
+- Pre-existing InvariantsPage test failures are unrelated to this change
+
+### Acceptance Criteria Met
+✅ Flask/Jinja Deliveries Explorer replaced with React components
+✅ React components consume existing /ui/deliveries API endpoints
+✅ All filtering functionality preserved (status, intent, delivery_mode, autonomy_mode, channel, notification_type, agent_id)
+✅ Pagination functionality preserved with "Load More" pattern
+✅ Detail page shows full delivery timeline with attempts
+✅ Tests written and passing (37 tests)
+✅ ESLint passes on new code

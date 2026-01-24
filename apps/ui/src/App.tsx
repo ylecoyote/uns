@@ -7,6 +7,8 @@
 
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { AuditTimeline } from './pages/AuditTimeline';
+import { DeliveriesListPage } from './pages/DeliveriesListPage';
+import { DeliveriesDetailPage } from './pages/DeliveriesDetailPage';
 import './App.css';
 
 function App() {
@@ -44,10 +46,8 @@ function App() {
           <Routes>
             <Route path="/" element={<AuditTimeline />} />
             <Route path="/audit" element={<AuditTimeline />} />
-            <Route
-              path="/deliveries"
-              element={<PlaceholderPage title="Deliveries" description="Delivery timeline explorer" />}
-            />
+            <Route path="/deliveries" element={<DeliveriesListPage />} />
+            <Route path="/deliveries/:notificationId" element={<DeliveriesDetailPage />} />
             <Route
               path="/policy"
               element={<PlaceholderPage title="Policy" description="Effective policy inspector" />}

@@ -90,3 +90,74 @@ export interface AuditEventFilter {
   autonomy_mode?: AutonomyMode;
   correlation_id?: string;
 }
+
+// Delivery Timeline Types
+
+export interface DeliveryAttempt {
+  attempt_id: string;
+  channel: Channel;
+  status: string; // SUCCESS, FAILED, RATE_LIMITED, SKIPPED
+  started_at: string;
+  completed_at: string;
+  duration_ms: number;
+  error_message?: string | null;
+  error_code?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AutonomyContextResponse {
+  autonomy_mode: AutonomyMode;
+  agent_id: string;
+  plan_id?: string | null;
+  decision_snapshot_id?: string | null;
+  execution_snapshot_id?: string | null;
+  skip_snapshot_id?: string | null;
+}
+
+export interface DeliveryTimelineResponse {
+  notification_id: string;
+  notification_type: string;
+  intent: NotificationIntent;
+  delivery_mode: DeliveryMode;
+  status: DeliveryStatus;
+  created_at: string;
+  delivered_at?: string | null;
+  attempts: DeliveryAttempt[];
+  channels_attempted: Channel[];
+  channels_succeeded: Channel[];
+  channels_failed: Channel[];
+  autonomy_context: AutonomyContextResponse;
+}
+
+export interface DeliveryTimelineSummary {
+  notification_id: string;
+  notification_type: string;
+  intent: NotificationIntent;
+  delivery_mode: DeliveryMode;
+  status: DeliveryStatus;
+  created_at: string;
+  delivered_at?: string | null;
+  channels_attempted: Channel[];
+  channels_succeeded: Channel[];
+  autonomy_mode: AutonomyMode;
+  agent_id: string;
+}
+
+export interface DeliveryTimelineListResponse {
+  items: DeliveryTimelineSummary[];
+  pagination: PaginationInfo;
+}
+
+export interface DeliveryFilter {
+  cursor?: string;
+  limit?: number;
+  start_time?: string;
+  end_time?: string;
+  status?: DeliveryStatus;
+  intent?: NotificationIntent;
+  delivery_mode?: DeliveryMode;
+  agent_id?: string;
+  autonomy_mode?: AutonomyMode;
+  notification_type?: string;
+  channel?: Channel;
+}
