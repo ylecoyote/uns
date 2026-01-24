@@ -8,3 +8,4 @@ export * from './useAuditEvents';
 export * from './useInvariants';
 export * from './useDeliveries';
 export * from './useDeliveryTimeline';
+export * from './usePolicyInspector';

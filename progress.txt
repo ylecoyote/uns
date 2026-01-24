@@ -1554,3 +1554,123 @@ Migrated the Deliveries Explorer from Flask/Jinja templates to React components,
 ✅ Detail page shows full delivery timeline with attempts
 ✅ Tests written and passing (37 tests)
 ✅ ESLint passes on new code
+
+---
+
+## Migrate Policy Inspector UI to React - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Migrated the Policy Inspector UI from Flask/Jinja to React/TypeScript. The Policy Inspector allows users to view effective policy values and resolution traces for any notification type. The implementation follows existing patterns established in the codebase for AuditTimeline and InvariantsPage.
+
+### Artifacts Created
+
+1. **Types** (`apps/ui/src/types/api.ts`)
+   - Added `ResolutionSource` type for resolution chain sources
+   - Added `ResolutionStep` interface for individual resolution steps
+   - Added `EffectivePolicy` interface for effective policy values
+   - Added `ResolutionContext` interface for resolution context
+   - Added `EffectivePolicyResponse` interface for API response
+   - Added `PolicyInspectorParams` interface for API request parameters
+
+2. **API Client** (`apps/ui/src/api/policies.ts`) - NEW
+   - `fetchEffectivePolicy()` - Fetches effective policy with resolution trace from `/ui/policies/effective`
+
+3. **API Client Utilities** (`apps/ui/src/api/client.ts`)
+   - Added `buildQueryString()` helper function
+   - Added `apiRequest()` helper function for invariants API compatibility
+
+4. **React Hook** (`apps/ui/src/hooks/usePolicyInspector.ts`) - NEW
+   - `usePolicyInspector()` - Hook for policy inspection with loading/error state management
+   - Returns: result, loading, error, inspect(), clear()
+
+5. **Components**
+
+   **PolicyInspectorForm** (`apps/ui/src/components/PolicyInspectorForm.tsx`) - NEW
+   - Form for entering policy inspection parameters
+   - Fields: notification_type (text), intent (select), autonomy_mode (select), irreversible (checkbox)
+   - Form validation with error display
+   - Inspect and Clear buttons with loading states
+
+   **ResolutionTraceDisplay** (`apps/ui/src/components/ResolutionTraceDisplay.tsx`) - NEW
+   - Displays policy resolution trace
+   - Shows resolution context (intent, autonomy_mode, irreversible, policy_found)
+   - Shows effective policy values (delivery_mode, channels, require_ack, ack_timeout, dedup_window)
+   - Shows resolution trace for each field with source chain (explicit_override → mode_override → policy_base → sdk_default)
+   - Applied/Skipped status badges for each resolution step
+
+   **PolicyInspectorPage** (`apps/ui/src/pages/PolicyInspectorPage.tsx`) - NEW
+   - Main page component integrating form and display components
+   - Handles loading, error, empty, and result states
+   - Read-only per UI scope requirements
+
+6. **Routing** (`apps/ui/src/App.tsx`)
+   - Updated `/policy` route to use `PolicyInspectorPage` instead of placeholder
+
+7. **Styles** (`apps/ui/src/App.css`)
+   - Added Policy Inspector specific styles
+   - Resolution trace display styles
+   - Resolution step visualization with applied/skipped indicators
+   - Context and effective policy grid layouts
+
+8. **Exports**
+   - Updated `apps/ui/src/api/index.ts` to export policies module
+   - Updated `apps/ui/src/hooks/index.ts` to export usePolicyInspector
+   - Updated `apps/ui/src/components/index.ts` to export new components
+   - Updated `apps/ui/src/pages/index.ts` to export PolicyInspectorPage
+
+9. **Tests** (`apps/ui/tests/PolicyInspectorPage.test.tsx`) - NEW
+   - 18 tests covering:
+     - Initial render (page title, form fields, empty state)
+     - Form validation (empty notification type, whitespace-only)
+     - API integration (correct parameters, success display, error display, loading state)
+     - Clear functionality (form reset, results cleared)
+     - Resolution trace display (header, context values, effective values, field resolution, step status, source labels)
+
+10. **API Tests** (`apps/ui/tests/api.test.ts`)
+    - Added tests for `fetchEffectivePolicy()` function
+    - Tests for parameter passing, request ID header, error handling
+
+### Implementation Details
+
+- **Pattern Consistency**: Follows existing patterns from AuditTimeline and InvariantsPage
+- **Read-Only**: All functionality is read-only per UI Scope v1
+- **Type Safety**: Full TypeScript coverage with proper interfaces
+- **Error Handling**: Proper error display with code and request ID
+- **Form Validation**: Client-side validation for required fields
+- **Accessibility**: Proper labels, aria attributes, and focus management
+
+### Test Results
+- 34 Policy Inspector related tests pass (18 component tests + 16 API tests including new policy tests)
+- Build passes successfully
+- No lint errors in new files
+
+### Files Created/Modified
+**New Files:**
+- `apps/ui/src/api/policies.ts`
+- `apps/ui/src/hooks/usePolicyInspector.ts`
+- `apps/ui/src/components/PolicyInspectorForm.tsx`
+- `apps/ui/src/components/ResolutionTraceDisplay.tsx`
+- `apps/ui/src/pages/PolicyInspectorPage.tsx`
+- `apps/ui/tests/PolicyInspectorPage.test.tsx`
+
+**Modified Files:**
+- `apps/ui/src/types/api.ts` (added policy types)
+- `apps/ui/src/api/client.ts` (added helper functions)
+- `apps/ui/src/api/index.ts` (export policies)
+- `apps/ui/src/hooks/index.ts` (export usePolicyInspector, useInvariants)
+- `apps/ui/src/components/index.ts` (export new components, invariants components)
+- `apps/ui/src/pages/index.ts` (export PolicyInspectorPage, InvariantsPage)
+- `apps/ui/src/App.tsx` (update routing)
+- `apps/ui/src/App.css` (add styles)
+- `apps/ui/tests/api.test.ts` (add policy API tests)
+
+### Acceptance Criteria Met
+✅ Policy Inspector page migrated from Flask/Jinja to React
+✅ Form for notification_type, intent, autonomy_mode, irreversible parameters
+✅ Display of effective policy values
+✅ Resolution trace showing how each value was determined
+✅ Tests written and passing
+✅ Build passes
+✅ No lint errors in new code
