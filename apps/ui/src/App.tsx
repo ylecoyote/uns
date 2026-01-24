@@ -7,6 +7,7 @@
 
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { AuditTimeline } from './pages/AuditTimeline';
+import { InvariantsPage } from './pages/InvariantsPage';
 import './App.css';
 
 function App() {
@@ -52,10 +53,7 @@ function App() {
               path="/policy"
               element={<PlaceholderPage title="Policy" description="Effective policy inspector" />}
             />
-            <Route
-              path="/invariants"
-              element={<PlaceholderPage title="Invariants" description="System invariants viewer" />}
-            />
+            <Route path="/invariants" element={<InvariantsPage />} />
           </Routes>
         </main>
       </div>

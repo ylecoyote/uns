@@ -11,7 +11,7 @@ import type {
   InvariantListResponse,
   InvariantSummaryResponse,
 } from '../types/invariants';
-import { apiRequest, buildQueryString } from './client';
+import { apiGet } from './client';
 
 /**
  * Fetch invariants list with optional filters and pagination
@@ -19,13 +19,19 @@ import { apiRequest, buildQueryString } from './client';
 export async function fetchInvariants(
   filters: InvariantFilters = {}
 ): Promise<InvariantListResponse> {
-  const queryString = buildQueryString(filters);
-  return apiRequest<InvariantListResponse>(`/ui/invariants${queryString}`);
+  return apiGet<InvariantListResponse>('/invariants', {
+    severity: filters.severity,
+    enforcement_type: filters.enforcement_type,
+    status: filters.status,
+    search: filters.search,
+    cursor: filters.cursor,
+    limit: filters.limit,
+  });
 }
 
 /**
  * Fetch invariants summary statistics
  */
 export async function fetchInvariantsSummary(): Promise<InvariantSummaryResponse> {
-  return apiRequest<InvariantSummaryResponse>('/ui/invariants/summary');
+  return apiGet<InvariantSummaryResponse>('/invariants/summary');
 }
