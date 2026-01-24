@@ -59,7 +59,7 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
     path: ROUTES.DELIVERIES,
     title: 'Deliveries',
     description: 'Delivery timeline explorer',
-    implemented: false,
+    implemented: true,
     navOrder: 1,
   },
   {

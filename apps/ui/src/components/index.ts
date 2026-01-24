@@ -13,3 +13,7 @@ export * from './Pagination';
 export * from './InvariantsFilter';
 export * from './InvariantsList';
 export * from './InvariantsSummary';
+
+// Deliveries components
+export * from './DeliveriesFilters';
+export * from './DeliveriesTable';
