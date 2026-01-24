@@ -2042,3 +2042,126 @@ Produced Phase 1.1 bounded verification report for UI standardization. The repor
 ✅ UI respects degraded-state semantics - VERIFIED
 ✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
 ✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
+
+---
+
+## Task: Implement Lightweight Contract Drift Checks for /ui Endpoints (Backend) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Implemented lightweight contract drift checks for /ui endpoints in the backend. These tests validate the response shapes of all /ui endpoints to detect breaking changes before they affect the UI. Tests are independent of the UI codebase and use only backend models/schemas.
+
+### Requirements Met (from uns-ui-phase-1_2-guardrails-ci-contracts.yaml)
+- ✅ Tests live under tests/ and use backend models/schemas only
+- ✅ Tests do NOT rely on UI codebase
+- ✅ Validate critical fields exist before rendering
+
+### Files Created
+
+1. **tests/ui_contract/__init__.py** - Package docstring
+2. **tests/ui_contract/test_ui_contracts.py** - 33 contract drift tests
+
+### Endpoint Coverage
+
+| Endpoint | Response Model | Tests |
+|----------|---------------|-------|
+| GET /ui/deliveries | DeliveryTimelineListResponse | 5 tests |
+| GET /ui/deliveries/{id} | DeliveryTimelineResponse | 3 tests |
+| GET /ui/policies/effective | EffectivePolicyResponse | 4 tests |
+| GET /ui/invariants | InvariantListResponse | 3 tests |
+| GET /ui/invariants/summary | InvariantSummaryResponse | 4 tests |
+| GET /ui/audit | AuditEventListResponse | 4 tests |
+
+### Test Categories
+
+1. **TestDeliveriesListContract** (5 tests)
+   - Response has items and pagination
+   - Empty items has correct pagination defaults
+   - Items have required fields (with data)
+   - Filter params are accepted
+   - Invalid enum returns 422
+
+2. **TestDeliveryDetailContract** (3 tests)
+   - 404 response has correct error structure
+   - Invalid UUID returns 422
+   - Found delivery has all required fields
+
+3. **TestEffectivePolicyContract** (4 tests)
+   - Response has all required fields
+   - Resolution trace has all policy fields
+   - Missing required params return 422
+   - Irreversible param is accepted
+
+4. **TestInvariantsListContract** (3 tests)
+   - Response has items and pagination
+   - Items have required fields
+   - Filter params are accepted
+
+5. **TestInvariantsSummaryContract** (4 tests)
+   - Response has all required fields
+   - by_severity has all levels (HIGH, MEDIUM, LOW)
+   - by_enforcement_type has all types
+   - by_status has all statuses
+
+6. **TestAuditEventsContract** (4 tests)
+   - Response has items and pagination
+   - Empty items has correct pagination
+   - Items have required fields
+   - Filter params are accepted
+
+7. **TestDegradedState** (3 tests) - degraded:true scenarios
+   - test_invariants_source_unavailable_graceful_degradation
+   - test_invariants_yaml_parse_error_graceful_degradation
+   - test_invariants_summary_graceful_degradation
+
+8. **TestPydanticModelConsistency** (5 tests)
+   - PaginationInfo model fields
+   - DeliveryTimelineSummary model fields
+   - EffectivePolicyResponse model fields
+   - InvariantEntry model fields
+   - AuditEvent model fields
+
+9. **TestErrorResponseContract** (2 tests)
+   - ErrorResponse model fields
+   - 404 error format
+
+### Contract Validation Helpers
+
+Created reusable validation functions:
+- `validate_pagination_info()` - Validates PaginationInfo fields
+- `validate_delivery_timeline_summary()` - Validates DeliveryTimelineSummary
+- `validate_delivery_timeline_response()` - Validates full timeline response
+- `validate_autonomy_context()` - Validates AutonomyContextResponse
+- `validate_delivery_attempt()` - Validates DeliveryAttempt
+- `validate_effective_policy_response()` - Validates policy response
+- `validate_effective_policy_values()` - Validates effective values
+- `validate_resolution_context()` - Validates resolution context
+- `validate_invariant_entry()` - Validates invariant entries
+- `validate_invariant_summary_response()` - Validates summary
+- `validate_audit_event()` - Validates audit events
+
+### Degraded State Handling
+
+Implemented tests for graceful degradation when invariants source is unavailable:
+- When invariants.yml file is missing, endpoint returns empty list (not error)
+- When YAML parsing fails, endpoint returns empty list (not error)
+- Summary endpoint returns zero counts when source unavailable
+- All degraded scenarios return 200 with proper pagination structure
+
+### Test Results
+- **33 tests passing**
+- Ruff linting: All checks passed
+- Ruff formatting: Applied
+
+### Acceptance Criteria Met
+✅ GET /ui/deliveries returns DeliveryListResponse with pagination fields - VALIDATED
+✅ GET /ui/deliveries/{id} returns DeliveryDetailResponse - VALIDATED
+✅ GET /ui/policies/effective returns EffectivePolicyResponse - VALIDATED
+✅ GET /ui/invariants returns InvariantListResponse - VALIDATED
+✅ GET /ui/invariants/summary returns InvariantSummaryResponse - VALIDATED
+✅ GET /ui/audit returns AuditEventListResponse - VALIDATED
+✅ Degraded-state test for invariants_source_unavailable (degraded:true) - INCLUDED
+✅ Output: tests/ui_contract/test_ui_contracts.py - CREATED
+
+---
