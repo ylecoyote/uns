@@ -1974,3 +1974,71 @@ npm run test:ui     # Interactive Vitest UI
 ✅ Coverage reporting configured
 ✅ Linting passes
 ✅ Type checking passes
+
+---
+
+## UI Phase 1.1 Bounded Verification Report (Standardization) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Produced Phase 1.1 bounded verification report for UI standardization. The report verifies that apps/ui uses the canonical React+TS+Vite stack, that Flask/Jinja is not in the runtime path, that UI consumes only GET /ui/* endpoints (no mutations), that degraded-state semantics are respected, and that all UI tests and build scripts run successfully.
+
+### Artifacts Created
+
+1. **docs/reports/ui/phase-1_1-standardize-ui-verify.md** (NEW)
+   - Full bounded verification report following Phase 1 template
+   - Sections include:
+     - Executive Summary with PASS status
+     - Scope Limits (what is/isn't verified)
+     - Unverifiable Claims
+     - React+TS+Vite Canonical Stack Verification
+     - Flask/Jinja Runtime Removal Verification
+     - GET-Only API Consumption Verification
+     - Degraded-State Semantics Verification
+     - Test and Build Verification
+     - Verification Checklist (all PASS)
+     - Appendices with file references and methodology
+
+### Bug Fixes During Verification
+
+1. **src/api/client.ts** - Added missing `apiRequest` and `buildQueryString` exports
+2. **src/components/index.ts** - Added exports for InvariantsFilter, InvariantsList, InvariantsSummary
+3. **src/hooks/useInvariants.ts** - Fixed ESLint warning for missing dependency
+4. **tests/InvariantsPage.test.tsx** - Fixed flaky tests using getAllByText for ambiguous text
+
+### Verification Results
+
+| Verification Claim | Status | Evidence |
+|-------------------|--------|----------|
+| React+TS+Vite canonical stack | PASS | Package.json, vite.config.ts, index.html |
+| No Flask/Jinja in runtime path | PASS | Entry point is index.html + main.tsx |
+| UI consumes only GET endpoints | PASS | All API functions use method: 'GET' |
+| UI respects degraded-state semantics | PASS | InvariantsPage and InvariantsSummary handle degraded |
+| UI tests pass | PASS | 69 tests passing |
+| Type-check passes | PASS | tsc --noEmit succeeds |
+| Lint passes | PASS | eslint succeeds with 0 warnings |
+| Build succeeds | PASS | vite build produces dist/ |
+
+### Test Results
+- 69 UI tests pass across 6 test files
+- Type-check passes (tsc --noEmit)
+- Lint passes (eslint with 0 warnings)
+- Build succeeds (tsc && vite build)
+
+### Files Created
+- `docs/reports/ui/phase-1_1-standardize-ui-verify.md`
+
+### Files Modified
+- `apps/ui/src/api/client.ts` - Added apiRequest and buildQueryString
+- `apps/ui/src/components/index.ts` - Added missing exports
+- `apps/ui/src/hooks/useInvariants.ts` - Fixed ESLint warning
+- `apps/ui/tests/InvariantsPage.test.tsx` - Fixed flaky tests
+
+### Acceptance Criteria Met
+✅ apps/ui is React+TS+Vite canonical - VERIFIED
+✅ No Flask/Jinja runtime in canonical path - VERIFIED
+✅ UI consumes only GET /ui/* endpoints - VERIFIED
+✅ UI respects degraded-state semantics - VERIFIED
+✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
+✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
