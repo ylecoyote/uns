@@ -288,9 +288,9 @@ Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md)
 
 ## Boundary Rules
 
-The canonical `apps/ui/` directory enforces strict boundaries to prevent Flask/Python HTML-serving patterns from returning. This is enforced by a CI guardrail.
+The canonical `apps/ui/` directory enforces strict boundaries to prevent Flask/Python HTML-serving patterns from returning. The canonical UI is a **React SPA** served by Vite. Python files are not permitted in the canonical UI directory structure (except for legacy reference code). This is enforced by a CI guardrail.
 
-### Rules
+### Rules Enforced by CI
 
 | Rule | Description |
 |------|-------------|
@@ -304,27 +304,38 @@ Python files are allowed **only** under `apps/ui/legacy_flask_reference/` for mi
 - Temporary preservation of old Flask code during migration
 - Reference for developers migrating functionality to the canonical React/TypeScript stack
 
-### Where Backend Code Should Live
+### Migration Guidance
 
-| Code Type | Location |
-|-----------|----------|
-| UI API Routes | `src/mcp_server/routes_ui.py` |
-| Pydantic Models | `src/notification/models.py` or `src/mcp_server/read_models.py` |
-| Backend Tests | `tests/ui_client/` or `tests/mcp_server/` |
-| Read Model Adapters | `src/mcp_server/read_models.py` |
+If you have Python files that need to be migrated:
+
+| What | Move To |
+|------|---------|
+| Backend API Routes | `src/mcp_server/routes_ui.py` |
+| Pydantic Models/Types | `src/notification/models.py` or `src/mcp_server/read_models.py` |
+| Test Files | `tests/ui_client/` or `tests/docs/` |
+| Reference Code (temporary) | `apps/ui/legacy_flask_reference/` |
 
 ### Running the Guardrail
 
 ```bash
-# Check for violations (warning mode)
+# Run checks (warning mode)
 python scripts/ci/check_ui_boundary.py
 
-# Strict mode (fails CI on violations)
+# Run checks with CI enforcement (fail on violations)
 python scripts/ci/check_ui_boundary.py --strict
 
-# Show migration guidance
+# Show migration guidance for violations
 python scripts/ci/check_ui_boundary.py --fix
 ```
+
+### CI Enforcement
+
+The UI boundary guardrail runs in CI on every PR that touches:
+- `apps/ui/**`
+- `scripts/ci/check_ui_boundary.py`
+- `.github/workflows/ui.yaml`
+
+The guardrail fails with `--strict` mode, preventing merges that violate boundary rules.
 
 ### Current Status
 

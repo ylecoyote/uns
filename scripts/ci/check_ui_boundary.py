@@ -354,7 +354,11 @@ Examples:
                 print(f"  TypeScript/TSX files: {ts_count}")
                 print(f"  Python files: {py_count}")
                 if py_count > 0:
-                    legacy_count = len(list((ui_root / "legacy_flask_reference").rglob("*.py"))) if (ui_root / "legacy_flask_reference").exists() else 0
+                    legacy_count = (
+                        len(list((ui_root / "legacy_flask_reference").rglob("*.py")))
+                        if (ui_root / "legacy_flask_reference").exists()
+                        else 0
+                    )
                     print(f"    (in legacy_flask_reference: {legacy_count})")
 
     return 1 if (args.strict and all_violations) else 0
