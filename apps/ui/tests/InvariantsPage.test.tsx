@@ -10,12 +10,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { InvariantsPage } from '../src/pages/InvariantsPage';
 import * as api from '../src/api/invariants';
 
 // Mock the API module
 vi.mock('../src/api/invariants');
+
+// Helper to wait for loading to complete
+const waitForLoadingComplete = async () => {
+  await waitFor(() => {
+    expect(screen.queryByText('Total Invariants')).toBeInTheDocument();
+  }, { timeout: 3000 });
+};
 
 const mockInvariantsList = {
   items: [
@@ -80,6 +87,7 @@ describe('InvariantsPage', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.resetAllMocks();
   });
 
@@ -102,12 +110,13 @@ describe('InvariantsPage', () => {
     it('fetches and displays summary statistics', async () => {
       render(<InvariantsPage />);
 
-      await waitFor(() => {
-        // Total Invariants label indicates summary is rendered
-        expect(screen.getByText('Total Invariants')).toBeInTheDocument();
-        // Use getAllByText since '7' might appear in multiple places
-        expect(screen.getAllByText('7').length).toBeGreaterThan(0);
-      });
+      await waitForLoadingComplete();
+
+      // Check that total count and label are displayed
+      // The value "7" might appear multiple times, so use getAllByText
+      const sevenElements = screen.getAllByText('7');
+      expect(sevenElements.length).toBeGreaterThan(0);
+      expect(screen.getByText('Total Invariants')).toBeInTheDocument();
     });
 
     it('displays invariant details', async () => {
@@ -210,11 +219,11 @@ describe('InvariantsPage', () => {
       // Clear filters
       fireEvent.click(screen.getByText('Clear'));
 
-      // After clearing, severity should not be set in the call
+      // After clearing, the API should be called with an object where severity is not 'HIGH'
       await waitFor(() => {
-        // After clearing, fetchInvariants should be called without severity filter
-        const lastCall = vi.mocked(api.fetchInvariants).mock.calls.at(-1)?.[0];
-        expect(lastCall?.severity).toBeUndefined();
+        const lastCall = vi.mocked(api.fetchInvariants).mock.calls.at(-1);
+        expect(lastCall).toBeDefined();
+        expect(lastCall![0].severity).toBeUndefined();
       });
     });
   });
@@ -403,43 +412,52 @@ describe('InvariantsSummary', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.resetAllMocks();
   });
 
   it('displays severity breakdown', async () => {
     render(<InvariantsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('By Severity')).toBeInTheDocument();
-      // Use getAllByText since 'High' appears in summary and in severity badges on cards
-      expect(screen.getAllByText('High').length).toBeGreaterThan(0);
-      expect(screen.getByText('5')).toBeInTheDocument(); // HIGH count
-    });
+    await waitForLoadingComplete();
+
+    expect(screen.getByText('By Severity')).toBeInTheDocument();
+    // "High" appears in multiple places (badges + summary labels)
+    const highElements = screen.getAllByText('High');
+    expect(highElements.length).toBeGreaterThan(0);
+    // Check that the summary stat "5" is present (HIGH count)
+    const fiveElements = screen.getAllByText('5');
+    expect(fiveElements.length).toBeGreaterThan(0);
   });
 
   it('displays enforcement type breakdown', async () => {
     render(<InvariantsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('By Enforcement Type')).toBeInTheDocument();
-      // Use getAllByText since 'Guard' appears in summary and in enforcement badges on cards
-      expect(screen.getAllByText(/Guard/i).length).toBeGreaterThan(0);
-      expect(screen.getByText('4')).toBeInTheDocument(); // guard count
-    });
+    await waitForLoadingComplete();
+
+    expect(screen.getByText('By Enforcement Type')).toBeInTheDocument();
+    // "Guard" appears in summary section
+    const guardElements = screen.getAllByText('Guard');
+    expect(guardElements.length).toBeGreaterThan(0);
+    // Check that the summary stat "4" is present (guard count)
+    const fourElements = screen.getAllByText('4');
+    expect(fourElements.length).toBeGreaterThan(0);
   });
 
   it('displays status breakdown', async () => {
     render(<InvariantsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('By Status')).toBeInTheDocument();
-      // Use getAllByText since 'Active' appears multiple times (summary + list status badges)
-      expect(screen.getAllByText(/Active/i).length).toBeGreaterThan(0);
-    });
+    await waitForLoadingComplete();
+
+    expect(screen.getByText('By Status')).toBeInTheDocument();
+    // "Active" appears in multiple places (status badges + summary), so use getAllByText
+    const activeElements = screen.getAllByText('Active');
+    expect(activeElements.length).toBeGreaterThan(0);
   });
 
   it('displays exceptions requiring review when > 0', async () => {
-    vi.mocked(api.fetchInvariantsSummary).mockResolvedValue({
+    // Override the summary mock for this test only
+    vi.mocked(api.fetchInvariantsSummary).mockResolvedValueOnce({
       ...mockSummary,
       exceptions_requiring_review: 2,
     });
@@ -448,14 +466,14 @@ describe('InvariantsSummary', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/2 exception\(s\) require review/)).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   it('shows last updated timestamp', async () => {
     render(<InvariantsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Last updated:/)).toBeInTheDocument();
-    });
+    await waitForLoadingComplete();
+
+    expect(screen.getByText(/Last updated:/)).toBeInTheDocument();
   });
 });

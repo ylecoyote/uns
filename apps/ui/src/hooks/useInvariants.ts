@@ -30,14 +30,14 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
   const [degraded, setDegraded] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
 
-  const fetchData = useCallback(async (isLoadMore = false) => {
+  const fetchData = useCallback(async (isLoadMore = false, currentCursor: string | null = null) => {
     setLoading(true);
     setError(null);
 
     try {
       const currentFilters: InvariantFilters = {
         ...filters,
-        cursor: isLoadMore && cursor ? cursor : undefined,
+        cursor: isLoadMore && currentCursor ? currentCursor : undefined,
       };
 
       const response = await fetchInvariants(currentFilters);
@@ -61,7 +61,7 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
     } finally {
       setLoading(false);
     }
-  }, [filters, cursor]);
+  }, [filters]);
 
   useEffect(() => {
     setCursor(null);
@@ -75,10 +75,10 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
   }, [fetchData]);
 
   const loadMore = useCallback(() => {
-    if (pagination?.has_more) {
-      fetchData(true);
+    if (pagination?.has_more && cursor) {
+      fetchData(true, cursor);
     }
-  }, [fetchData, pagination?.has_more]);
+  }, [fetchData, pagination?.has_more, cursor]);
 
   return {
     invariants,
