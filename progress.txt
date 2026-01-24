@@ -2068,8 +2068,8 @@ Implemented a UI boundary guardrail that enforces the canonical UI structure. Th
 2. **tests/ci/__init__.py** (NEW)
    - Package init for CI tests
 
-3. **tests/ci/test_ui_boundary.py** (NEW)
-   - 28 comprehensive tests covering:
+3. **tests/ci/test_check_ui_boundary.py** (NEW)
+   - Comprehensive tests covering:
      - `find_repo_root()` - Repository root detection
      - `is_in_legacy_reference()` - Legacy folder exemption
      - `check_python_files()` - Python file detection
@@ -2096,7 +2096,7 @@ Implemented a UI boundary guardrail that enforces the canonical UI structure. Th
 | NO_FLASK_APP_IN_UI | No Flask imports or `render_template` patterns in app.py files |
 
 ### Test Results
-- 28 tests passing in `tests/ci/test_ui_boundary.py`
+- All tests passing in `tests/ci/test_check_ui_boundary.py`
 - Ruff linting passes
 - Mypy type checking passes
 
@@ -2118,7 +2118,7 @@ python scripts/ci/check_ui_boundary.py --fix
 ### Files Created/Modified
 - `scripts/ci/check_ui_boundary.py` (NEW)
 - `tests/ci/__init__.py` (NEW)
-- `tests/ci/test_ui_boundary.py` (NEW)
+- `tests/ci/test_check_ui_boundary.py` (NEW)
 - `apps/ui/README.md` (MODIFIED - added Boundary Rules section)
 
 ### Acceptance Criteria Met
@@ -2129,7 +2129,7 @@ python scripts/ci/check_ui_boundary.py --fix
 ✅ Strict mode exits with error (for CI enforcement)
 ✅ Migration guidance available via `--fix`
 ✅ Documentation added to `apps/ui/README.md`
-✅ 28 tests passing
+✅ Tests passing
 ✅ Linting passes
 
 ---
@@ -2143,14 +2143,15 @@ Created GitHub Actions CI workflow for the apps/ui React/TypeScript application 
 
 ### Artifacts Created
 
-1. **GitHub Actions Workflow** (`.github/workflows/apps-ui.yml`)
+1. **GitHub Actions Workflow** (`.github/workflows/ui.yaml`)
+   - **boundary-check** job: Runs UI boundary guardrail with `--strict`
    - **lint** job: Runs ESLint with `--max-warnings 0` (fails on any warnings)
    - **typecheck** job: Runs TypeScript compiler in check mode (`tsc --noEmit`)
    - **test** job: Runs Vitest with coverage, uploads coverage report as artifact
-   - **build** job: Builds production assets, uploads dist/ as artifact (depends on lint, typecheck, test)
+   - **build** job: Builds production assets, uploads dist/ as artifact (depends on all other jobs)
 
    Features:
-   - Triggers on push/PR to main/develop branches when apps/ui/** changes
+   - Triggers on push/PR affecting apps/ui/**, scripts/ci/**, or workflow files
    - Uses Node.js 20 with npm cache for faster builds
    - Each job runs in parallel (except build which waits for others)
    - Artifacts retained for 7 days
@@ -2185,7 +2186,7 @@ Created GitHub Actions CI workflow for the apps/ui React/TypeScript application 
 - Build succeeds (`npm run build` produces dist/)
 
 ### Files Created
-- `.github/workflows/apps-ui.yml`
+- `.github/workflows/ui.yaml`
 
 ### Files Modified
 - `apps/ui/src/api/audit.ts` - Type fix and options support
@@ -2194,8 +2195,9 @@ Created GitHub Actions CI workflow for the apps/ui React/TypeScript application 
 - `CONTRIBUTING.md` - Added UI development and CI documentation
 
 ### Acceptance Criteria Met
-✅ GitHub Actions workflow created with lint, typecheck, test, build jobs
+✅ GitHub Actions workflow created with boundary-check, lint, typecheck, test, build jobs
 ✅ CI uses `npm ci` for reproducible installs
+✅ Boundary check runs with --strict mode
 ✅ Lint job fails on any ESLint issue
 ✅ Typecheck job runs `tsc --noEmit`
 ✅ Test job runs tests once with coverage
