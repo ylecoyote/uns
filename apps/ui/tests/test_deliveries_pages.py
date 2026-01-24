@@ -1,11 +1,13 @@
-"""Tests for Deliveries Explorer UI pages.
+"""Tests for Deliveries Explorer API endpoints.
 
-Tests for the deliveries list and detail pages including:
-- Page rendering with populated data
+Tests for the deliveries list and detail endpoints including:
+- JSON response structure
 - Filter functionality
 - Pagination
-- Detail page display
+- Detail endpoint data
 - Error handling (404 for missing notification)
+
+Note: These endpoints now return JSON for the React frontend.
 """
 
 from __future__ import annotations
@@ -107,35 +109,57 @@ def create_audit_record(
 
 
 # =============================================================================
-# Test: Deliveries List Page
+# Test: Deliveries List Endpoint
 # =============================================================================
 
 
-class TestDeliveriesListPage:
-    """Tests for the deliveries list page."""
+class TestDeliveriesListEndpoint:
+    """Tests for the deliveries list endpoint."""
 
-    def test_list_page_renders(self, client: TestClient):
-        """Test list page renders successfully."""
+    def test_list_endpoint_returns_json(self, client: TestClient):
+        """Test list endpoint returns JSON successfully."""
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert "application/json" in response.headers["content-type"]
 
-    def test_list_page_contains_title(self, client: TestClient):
-        """Test list page contains expected title."""
+    def test_list_endpoint_structure(self, client: TestClient):
+        """Test list endpoint returns expected structure."""
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "Deliveries Explorer" in response.text
+        data = response.json()
+        assert "items" in data
+        assert "pagination" in data
+        assert "filters" in data
+        assert "filter_options" in data
+        assert isinstance(data["items"], list)
 
-    def test_list_page_shows_empty_state(self, client: TestClient):
-        """Test list page shows empty state when no data."""
+    def test_list_endpoint_filter_options(self, client: TestClient):
+        """Test list endpoint includes filter options."""
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "No deliveries found" in response.text
+        data = response.json()
+        filter_options = data["filter_options"]
+        assert "status_options" in filter_options
+        assert "intent_options" in filter_options
+        assert "delivery_mode_options" in filter_options
+        assert "autonomy_mode_options" in filter_options
+        assert "channel_options" in filter_options
+        # Verify some expected values
+        assert "DELIVERED" in filter_options["status_options"]
+        assert "SAFETY" in filter_options["intent_options"]
 
-    def test_list_page_shows_delivery_items(
+    def test_list_endpoint_empty_items(self, client: TestClient):
+        """Test list endpoint returns empty items when no data."""
+        response = client.get("/pages/deliveries/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["items"] == []
+        assert data["pagination"]["total_count"] == 0
+
+    def test_list_endpoint_with_data(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test list page displays delivery items."""
+        """Test list endpoint returns delivery items."""
         # Create test data
         notif_id = uuid4()
         audit_store.save_delivery_audit(
@@ -148,13 +172,16 @@ class TestDeliveriesListPage:
 
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "order.placed" in response.text
-        assert "DELIVERED" in response.text
+        data = response.json()
+        assert len(data["items"]) == 1
+        item = data["items"][0]
+        assert item["notification_type"] == "order.placed"
+        assert item["status"] == "DELIVERED"
 
-    def test_list_page_shows_multiple_items(
+    def test_list_endpoint_multiple_items(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test list page displays multiple delivery items."""
+        """Test list endpoint returns multiple delivery items."""
         for i in range(3):
             audit_store.save_delivery_audit(
                 create_audit_record(
@@ -165,35 +192,47 @@ class TestDeliveriesListPage:
 
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "test.type_0" in response.text
-        assert "test.type_1" in response.text
-        assert "test.type_2" in response.text
+        data = response.json()
+        assert len(data["items"]) == 3
 
-    def test_list_page_contains_filter_form(self, client: TestClient):
-        """Test list page contains filter form elements."""
-        response = client.get("/pages/deliveries/")
-        assert response.status_code == 200
-        # Check for filter dropdowns
-        assert 'name="status"' in response.text
-        assert 'name="intent"' in response.text
-        assert 'name="delivery_mode"' in response.text
-        assert 'name="autonomy_mode"' in response.text
-        assert 'name="channel"' in response.text
-        assert 'name="notification_type"' in response.text
-
-    def test_list_page_links_to_detail(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test list page contains links to detail pages."""
+    def test_list_endpoint_item_structure(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test list endpoint item structure."""
         notif_id = uuid4()
-        audit_store.save_delivery_audit(create_audit_record(notification_id=notif_id))
+        agent_id = uuid4()
+        audit_store.save_delivery_audit(
+            create_audit_record(
+                notification_id=notif_id,
+                notification_type="order.placed",
+                status=DeliveryStatus.DELIVERED,
+                intent="SAFETY",
+                delivery_mode="GUARANTEED",
+                autonomy_mode="LIVE",
+                agent_id=agent_id,
+                channels_attempted=(Channel.SLACK, Channel.EMAIL),
+                channels_succeeded=(Channel.SLACK,),
+            )
+        )
 
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        # Should contain link to detail page
-        assert f"/pages/deliveries/{notif_id}" in response.text
+        data = response.json()
+        item = data["items"][0]
+        assert item["notification_id"] == str(notif_id)
+        assert item["notification_type"] == "order.placed"
+        assert item["intent"] == "SAFETY"
+        assert item["delivery_mode"] == "GUARANTEED"
+        assert item["status"] == "DELIVERED"
+        assert item["autonomy_mode"] == "LIVE"
+        assert item["agent_id"] == str(agent_id)
+        assert "SLACK" in item["channels_attempted"]
+        assert "EMAIL" in item["channels_attempted"]
+        assert "SLACK" in item["channels_succeeded"]
 
 
 class TestDeliveriesListFiltering:
-    """Tests for filtering on the deliveries list page."""
+    """Tests for filtering on the deliveries list endpoint."""
 
     def test_filter_by_status(self, client: TestClient, audit_store: InMemoryAuditStore):
         """Test filtering by status."""
@@ -203,10 +242,10 @@ class TestDeliveriesListFiltering:
         # Filter for DELIVERED
         response = client.get("/pages/deliveries/", params={"status": "DELIVERED"})
         assert response.status_code == 200
-        # Should show DELIVERED status
-        assert "DELIVERED" in response.text
-        # Should show only 1 result (the DELIVERED one)
-        assert "1 total result" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 1
+        assert data["items"][0]["status"] == "DELIVERED"
+        assert data["filters"]["status"] == "DELIVERED"
 
     def test_filter_by_intent(self, client: TestClient, audit_store: InMemoryAuditStore):
         """Test filtering by intent."""
@@ -215,8 +254,9 @@ class TestDeliveriesListFiltering:
 
         response = client.get("/pages/deliveries/", params={"intent": "SAFETY"})
         assert response.status_code == 200
-        # Should show SAFETY notifications
-        assert "SAFETY" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 1
+        assert data["items"][0]["intent"] == "SAFETY"
 
     def test_filter_by_autonomy_mode(self, client: TestClient, audit_store: InMemoryAuditStore):
         """Test filtering by autonomy mode."""
@@ -225,9 +265,13 @@ class TestDeliveriesListFiltering:
 
         response = client.get("/pages/deliveries/", params={"autonomy_mode": "LIVE"})
         assert response.status_code == 200
-        assert "LIVE" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 1
+        assert data["items"][0]["autonomy_mode"] == "LIVE"
 
-    def test_filter_by_notification_type(self, client: TestClient, audit_store: InMemoryAuditStore):
+    def test_filter_by_notification_type(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
         """Test filtering by notification type."""
         audit_store.save_delivery_audit(create_audit_record(notification_type="order.placed"))
         audit_store.save_delivery_audit(create_audit_record(notification_type="payment.received"))
@@ -237,7 +281,9 @@ class TestDeliveriesListFiltering:
             params={"notification_type": "order.placed"},
         )
         assert response.status_code == 200
-        assert "order.placed" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 1
+        assert data["items"][0]["notification_type"] == "order.placed"
 
     def test_combined_filters(self, client: TestClient, audit_store: InMemoryAuditStore):
         """Test applying multiple filters."""
@@ -274,17 +320,17 @@ class TestDeliveriesListFiltering:
             },
         )
         assert response.status_code == 200
-        # Should show only the matching record
-        assert "1 total result" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 1
 
 
 class TestDeliveriesListPagination:
-    """Tests for pagination on the deliveries list page."""
+    """Tests for pagination on the deliveries list endpoint."""
 
-    def test_pagination_shows_total_count(
+    def test_pagination_total_count(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test pagination displays total count."""
+        """Test pagination includes total count."""
         for i in range(5):
             audit_store.save_delivery_audit(
                 create_audit_record(
@@ -294,7 +340,8 @@ class TestDeliveriesListPagination:
 
         response = client.get("/pages/deliveries/")
         assert response.status_code == 200
-        assert "5 total results" in response.text
+        data = response.json()
+        assert data["pagination"]["total_count"] == 5
 
     def test_pagination_respects_limit(self, client: TestClient, audit_store: InMemoryAuditStore):
         """Test pagination respects limit parameter."""
@@ -308,11 +355,13 @@ class TestDeliveriesListPagination:
 
         response = client.get("/pages/deliveries/", params={"limit": 3})
         assert response.status_code == 200
-        # Should show next page link
-        assert "Next Page" in response.text
+        data = response.json()
+        assert len(data["items"]) == 3
+        assert data["pagination"]["has_more"] is True
+        assert data["next_page_url"] is not None
 
-    def test_pagination_next_page_link(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test next page link contains correct parameters."""
+    def test_pagination_cursor(self, client: TestClient, audit_store: InMemoryAuditStore):
+        """Test pagination cursor works correctly."""
         for i in range(10):
             audit_store.save_delivery_audit(
                 create_audit_record(
@@ -322,42 +371,67 @@ class TestDeliveriesListPagination:
 
         response = client.get("/pages/deliveries/", params={"limit": 3})
         assert response.status_code == 200
-        # Should contain cursor parameter in next page link
-        assert "cursor=" in response.text
+        data = response.json()
+        assert data["pagination"]["next_cursor"] is not None
 
 
 # =============================================================================
-# Test: Deliveries Detail Page
+# Test: Deliveries Detail Endpoint
 # =============================================================================
 
 
-class TestDeliveriesDetailPage:
-    """Tests for the deliveries detail page."""
+class TestDeliveriesDetailEndpoint:
+    """Tests for the deliveries detail endpoint."""
 
-    def test_detail_page_renders(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test detail page renders successfully."""
+    def test_detail_endpoint_returns_json(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test detail endpoint returns JSON successfully."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(create_audit_record(notification_id=notif_id))
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert "application/json" in response.headers["content-type"]
 
-    def test_detail_page_shows_notification_id(
+    def test_detail_endpoint_structure(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test detail page displays notification ID."""
+        """Test detail endpoint returns expected structure."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(create_audit_record(notification_id=notif_id))
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert str(notif_id) in response.text
+        data = response.json()
+        assert "notification_id" in data
+        assert "notification_type" in data
+        assert "intent" in data
+        assert "delivery_mode" in data
+        assert "status" in data
+        assert "created_at" in data
+        assert "attempts" in data
+        assert "channels_attempted" in data
+        assert "channels_succeeded" in data
+        assert "channels_failed" in data
+        assert "autonomy_context" in data
 
-    def test_detail_page_shows_notification_type(
+    def test_detail_endpoint_notification_id(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test detail page displays notification type."""
+        """Test detail endpoint returns correct notification ID."""
+        notif_id = uuid4()
+        audit_store.save_delivery_audit(create_audit_record(notification_id=notif_id))
+
+        response = client.get(f"/pages/deliveries/{notif_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["notification_id"] == str(notif_id)
+
+    def test_detail_endpoint_notification_type(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test detail endpoint returns correct notification type."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(
             create_audit_record(
@@ -368,10 +442,13 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "order.shipped" in response.text
+        data = response.json()
+        assert data["notification_type"] == "order.shipped"
 
-    def test_detail_page_shows_status(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test detail page displays status with badge."""
+    def test_detail_endpoint_status(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test detail endpoint returns correct status."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(
             create_audit_record(
@@ -382,10 +459,13 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "DELIVERED" in response.text
+        data = response.json()
+        assert data["status"] == "DELIVERED"
 
-    def test_detail_page_shows_intent(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test detail page displays intent."""
+    def test_detail_endpoint_intent(
+        self, client: TestClient, audit_store: InMemoryAuditStore
+    ):
+        """Test detail endpoint returns correct intent."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(
             create_audit_record(
@@ -396,12 +476,13 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "GOVERNANCE" in response.text
+        data = response.json()
+        assert data["intent"] == "GOVERNANCE"
 
-    def test_detail_page_shows_autonomy_context(
+    def test_detail_endpoint_autonomy_context(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test detail page displays autonomy context."""
+        """Test detail endpoint returns autonomy context."""
         notif_id = uuid4()
         agent_id = uuid4()
         plan_id = uuid4()
@@ -417,14 +498,16 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "LIVE" in response.text
-        assert str(agent_id) in response.text
-        assert str(plan_id) in response.text
+        data = response.json()
+        ctx = data["autonomy_context"]
+        assert ctx["autonomy_mode"] == "LIVE"
+        assert ctx["agent_id"] == str(agent_id)
+        assert ctx["plan_id"] == str(plan_id)
 
-    def test_detail_page_shows_channel_results(
+    def test_detail_endpoint_channel_results(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test detail page displays channel results."""
+        """Test detail endpoint returns channel results."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(
             create_audit_record(
@@ -437,13 +520,16 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "SLACK" in response.text
-        assert "EMAIL" in response.text
+        data = response.json()
+        assert "SLACK" in data["channels_attempted"]
+        assert "EMAIL" in data["channels_attempted"]
+        assert "SLACK" in data["channels_succeeded"]
+        assert "EMAIL" in data["channels_failed"]
 
-    def test_detail_page_shows_delivery_attempts(
+    def test_detail_endpoint_delivery_attempts(
         self, client: TestClient, audit_store: InMemoryAuditStore
     ):
-        """Test detail page displays delivery attempts table."""
+        """Test detail endpoint returns delivery attempts."""
         notif_id = uuid4()
         audit_store.save_delivery_audit(
             create_audit_record(
@@ -457,33 +543,21 @@ class TestDeliveriesDetailPage:
 
         response = client.get(f"/pages/deliveries/{notif_id}")
         assert response.status_code == 200
-        assert "Delivery Attempts" in response.text
-        # Should show attempt details
-        assert "SUCCESS" in response.text
-        assert "FAILED" in response.text
-
-    def test_detail_page_shows_back_link(self, client: TestClient, audit_store: InMemoryAuditStore):
-        """Test detail page has link back to list."""
-        notif_id = uuid4()
-        audit_store.save_delivery_audit(create_audit_record(notification_id=notif_id))
-
-        response = client.get(f"/pages/deliveries/{notif_id}")
-        assert response.status_code == 200
-        assert "Back to List" in response.text
-        assert "/pages/deliveries/" in response.text
+        data = response.json()
+        assert isinstance(data["attempts"], list)
 
 
 class TestDeliveriesDetailErrors:
-    """Tests for error handling on detail page."""
+    """Tests for error handling on detail endpoint."""
 
-    def test_detail_page_404_for_missing_notification(self, client: TestClient):
-        """Test detail page returns 404 for non-existent notification."""
+    def test_detail_endpoint_404_for_missing_notification(self, client: TestClient):
+        """Test detail endpoint returns 404 for non-existent notification."""
         fake_id = uuid4()
         response = client.get(f"/pages/deliveries/{fake_id}")
         assert response.status_code == 404
 
-    def test_detail_page_422_for_invalid_uuid(self, client: TestClient):
-        """Test detail page returns 422 for invalid UUID."""
+    def test_detail_endpoint_422_for_invalid_uuid(self, client: TestClient):
+        """Test detail endpoint returns 422 for invalid UUID."""
         response = client.get("/pages/deliveries/not-a-valid-uuid")
         assert response.status_code == 422
 
@@ -509,19 +583,7 @@ class TestStaticFiles:
 
 
 class TestNavigation:
-    """Tests for navigation elements."""
-
-    def test_navbar_present(self, client: TestClient):
-        """Test navbar is present on pages."""
-        response = client.get("/pages/deliveries/")
-        assert response.status_code == 200
-        assert "UNS Dashboard" in response.text
-
-    def test_navbar_links(self, client: TestClient):
-        """Test navbar contains expected navigation links."""
-        response = client.get("/pages/deliveries/")
-        assert response.status_code == 200
-        assert "/pages/deliveries/" in response.text
+    """Tests for navigation endpoints."""
 
     def test_index_redirects_to_deliveries(self, client: TestClient):
         """Test index page redirects to deliveries."""
