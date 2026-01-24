@@ -1,6 +1,11 @@
 /**
  * Invariants types matching docs/ui/ui-data-contracts.md
+ *
+ * These types define the response shapes for invariant-related API endpoints.
+ * Uses shared PaginationInfo from api.ts for consistency.
  */
+
+import type { PaginationInfo } from './api';
 
 export type InvariantSeverity = 'HIGH' | 'MEDIUM' | 'LOW';
 export type EnforcementType = 'guard' | 'isolation' | 'test' | 'exception';
@@ -29,12 +34,6 @@ export interface InvariantEntry {
   mitigation?: string[];
 }
 
-export interface PaginationInfo {
-  next_cursor: string | null;
-  has_more: boolean;
-  total_count?: number;
-}
-
 export interface InvariantListResponse {
   items: InvariantEntry[];
   pagination: PaginationInfo;
@@ -57,3 +56,6 @@ export interface InvariantFilters {
   cursor?: string;
   limit?: number;
 }
+
+// Re-export PaginationInfo for convenience
+export type { PaginationInfo };

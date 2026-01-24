@@ -1,7 +1,8 @@
 /**
- * Type exports for UNS UI Dashboard.
+ * Central type exports for UNS UI.
  *
- * Export all TypeScript types and interfaces from this index.
+ * Import types from this module for convenience:
+ * import type { AuditEvent, InvariantEntry, PaginationInfo } from '../types';
  */
 
 // API types (includes PaginationInfo, ErrorDetail, ErrorResponse)
