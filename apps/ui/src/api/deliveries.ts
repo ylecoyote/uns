@@ -3,6 +3,8 @@
  *
  * Provides typed access to delivery timeline endpoints.
  * All operations are READ-ONLY.
+ *
+ * Contract validation is applied via decoders to detect drift early.
  */
 
 import type {
@@ -11,6 +13,11 @@ import type {
   DeliveryFilter,
 } from '../types/api';
 import { apiGet, type RequestOptions } from './client';
+import {
+  decodeDeliveriesList,
+  decodeDeliveryTimeline,
+  decodeWithMode,
+} from './validators';
 
 /**
  * Fetch delivery timelines with optional filtering and pagination.
@@ -39,7 +46,8 @@ export async function getDeliveries(
     if (filter.channel) params.channel = filter.channel;
   }
 
-  return apiGet<DeliveryTimelineListResponse>('/deliveries', params, options);
+  const data = await apiGet<DeliveryTimelineListResponse>('/deliveries', params, options);
+  return decodeWithMode(decodeDeliveriesList, data, 'GET /ui/deliveries');
 }
 
 /**
@@ -53,5 +61,6 @@ export async function getDeliveryTimeline(
   notificationId: string,
   options?: RequestOptions
 ): Promise<DeliveryTimelineResponse> {
-  return apiGet<DeliveryTimelineResponse>(`/deliveries/${notificationId}`, undefined, options);
+  const data = await apiGet<DeliveryTimelineResponse>(`/deliveries/${notificationId}`, undefined, options);
+  return decodeWithMode(decodeDeliveryTimeline, data, `GET /ui/deliveries/${notificationId}`);
 }

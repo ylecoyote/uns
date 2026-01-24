@@ -6,6 +6,10 @@
  *
  * @example
  * import { apiGet, getAuditEvents, fetchInvariants, ApiError } from '../api';
+ *
+ * // Contract validation
+ * import { setValidationMode, decodeDeliveriesList } from '../api';
+ * setValidationMode('strict'); // For development
  */
 
 // Core client exports - base API functions and utilities
@@ -21,7 +25,7 @@ export {
 } from './client';
 
 // Audit API exports
-export { getAuditEvents } from './audit';
+export { getAuditEvents, fetchAuditEvents } from './audit';
 
 // Invariants API exports
 export { fetchInvariants, fetchInvariantsSummary } from './invariants';
@@ -31,3 +35,25 @@ export { getDeliveries, getDeliveryTimeline } from './deliveries';
 
 // Policies API exports
 export { fetchEffectivePolicy } from './policies';
+
+// Contract validators - for runtime drift detection
+export {
+  // Decode functions
+  decodeDeliveriesList,
+  decodeDeliveryTimeline,
+  decodeAuditEventsList,
+  decodeInvariantsList,
+  decodeInvariantsSummary,
+  decodeEffectivePolicy,
+  // Error handling
+  ContractDriftError,
+  assertDecode,
+  logDriftIfFailed,
+  // Configuration
+  getValidationMode,
+  setValidationMode,
+  decodeWithMode,
+  // Types
+  type DecodeResult,
+  type ValidationMode,
+} from './validators';
