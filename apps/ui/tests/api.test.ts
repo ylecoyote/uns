@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getAuditEvents, ApiError, apiGet } from '../src/api';
+import { getAuditEvents, ApiError, apiGet, fetchEffectivePolicy } from '../src/api';
 import { mockAuditEventsResponse } from '../src/test/mocks';
 
 const mockFetch = vi.fn();
@@ -213,6 +213,90 @@ describe('API Client', () => {
 
       const callUrl = mockFetch.mock.calls[0][0];
       expect(callUrl).toContain('cursor=cursor-abc123');
+    });
+  });
+
+  describe('fetchEffectivePolicy', () => {
+    const mockPolicyResponse = {
+      notification_type: 'trading.order_placed',
+      effective: {
+        delivery_mode: 'GUARANTEED',
+        channels: ['SLACK', 'EMAIL'],
+        require_ack: true,
+        ack_timeout_minutes: 60,
+        dedup_window_seconds: 300,
+      },
+      resolution: {},
+      resolution_context: {
+        intent: 'GOVERNANCE',
+        autonomy_mode: 'LIVE',
+        irreversible: false,
+        policy_found: true,
+        policy_notification_type: 'trading.order_placed',
+      },
+    };
+
+    it('fetches effective policy with correct parameters', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPolicyResponse),
+      });
+
+      const result = await fetchEffectivePolicy({
+        notification_type: 'trading.order_placed',
+        intent: 'GOVERNANCE',
+        autonomy_mode: 'LIVE',
+        irreversible: false,
+      });
+
+      expect(result.notification_type).toBe('trading.order_placed');
+      expect(result.effective.delivery_mode).toBe('GUARANTEED');
+
+      const callUrl = mockFetch.mock.calls[0][0];
+      expect(callUrl).toContain('/ui/policies/effective');
+      expect(callUrl).toContain('notification_type=trading.order_placed');
+      expect(callUrl).toContain('intent=GOVERNANCE');
+      expect(callUrl).toContain('autonomy_mode=LIVE');
+      expect(callUrl).toContain('irreversible=false');
+    });
+
+    it('passes request ID when provided', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPolicyResponse),
+      });
+
+      await fetchEffectivePolicy(
+        {
+          notification_type: 'test.type',
+          intent: 'INFORMATIONAL',
+          autonomy_mode: 'PREVIEW',
+        },
+        { requestId: 'test-req-123' }
+      );
+
+      const callHeaders = mockFetch.mock.calls[0][1].headers;
+      expect(callHeaders['X-Request-ID']).toBe('test-req-123');
+    });
+
+    it('handles API errors correctly', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () =>
+          Promise.resolve({
+            error: { code: 'not_found', message: 'Policy not found' },
+            request_id: 'req-456',
+          }),
+      });
+
+      await expect(
+        fetchEffectivePolicy({
+          notification_type: 'unknown.type',
+          intent: 'INFORMATIONAL',
+          autonomy_mode: 'PREVIEW',
+        })
+      ).rejects.toThrow(ApiError);
     });
   });
 });

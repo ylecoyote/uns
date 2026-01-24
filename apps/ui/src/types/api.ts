@@ -90,3 +90,44 @@ export interface AuditEventFilter {
   autonomy_mode?: AutonomyMode;
   correlation_id?: string;
 }
+
+// Policy Inspector Types
+
+export type ResolutionSource = 'explicit_override' | 'mode_override' | 'policy_base' | 'sdk_default';
+
+export interface ResolutionStep {
+  source: ResolutionSource;
+  value: unknown;
+  applied: boolean;
+  reason: string | null;
+}
+
+export interface EffectivePolicy {
+  delivery_mode: DeliveryMode;
+  channels: Channel[];
+  require_ack: boolean;
+  ack_timeout_minutes: number | null;
+  dedup_window_seconds: number;
+}
+
+export interface ResolutionContext {
+  intent: NotificationIntent;
+  autonomy_mode: AutonomyMode;
+  irreversible: boolean;
+  policy_found: boolean;
+  policy_notification_type: string | null;
+}
+
+export interface EffectivePolicyResponse {
+  notification_type: string;
+  effective: EffectivePolicy;
+  resolution: Record<string, ResolutionStep[]>;
+  resolution_context: ResolutionContext;
+}
+
+export interface PolicyInspectorParams {
+  notification_type: string;
+  intent: NotificationIntent;
+  autonomy_mode: AutonomyMode;
+  irreversible?: boolean;
+}

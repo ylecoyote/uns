@@ -77,3 +77,63 @@ export async function apiGet<T>(
 
   return response.json() as Promise<T>;
 }
+
+/**
+ * Build a query string from an object of parameters.
+ * Filters out undefined and null values.
+ *
+ * @param params - Object of key-value pairs
+ * @returns Query string starting with '?' or empty string if no params
+ */
+export function buildQueryString<T extends object>(params: T): string {
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null
+  );
+
+  if (entries.length === 0) {
+    return '';
+  }
+
+  const searchParams = new URLSearchParams();
+  entries.forEach(([key, value]) => {
+    searchParams.set(key, String(value));
+  });
+
+  return `?${searchParams.toString()}`;
+}
+
+/**
+ * Make a generic API request.
+ * This is an alias for apiGet that uses the path directly (including /ui prefix).
+ *
+ * @param path - Full API path (e.g., '/ui/invariants')
+ * @param options - Request options
+ */
+export async function apiRequest<T>(
+  path: string,
+  options?: RequestOptions
+): Promise<T> {
+  const url = new URL(path, window.location.origin);
+
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+  };
+
+  if (options?.requestId) {
+    headers['X-Request-ID'] = options.requestId;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers,
+    signal: options?.signal,
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
+    const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
+    throw new ApiError(errorResponse, response.status);
+  }
+
+  return response.json() as Promise<T>;
+}
