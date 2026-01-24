@@ -2540,3 +2540,97 @@ Updated the `/verify` command documentation to include references to UI boundary
 ✅ Tests created validating documentation references (13 tests)
 ✅ All tests pass
 ✅ All linting passes
+
+---
+
+## Task: Add Contract Snapshot Artifact - COMPLETED
+
+### Date: 2026-01-24
+
+### Summary
+Added a machine-readable contract snapshot artifact for /ui endpoints. The snapshot is generated deterministically from Pydantic models in routes_ui.py and captures all enum definitions, response schemas, endpoint metadata, and system constants.
+
+### Artifacts Created
+
+1. **scripts/generate_ui_contracts.py** (NEW)
+   - Contract snapshot generator script
+   - Extracts JSON schemas from Pydantic models in routes_ui.py
+   - Extracts enum definitions from notification.models and routes_ui
+   - Defines endpoint metadata (method, path, parameters, response model)
+   - Extracts system constants (TITLE_MAX_LENGTH, etc.)
+   - Generates deterministic output (sorted keys/values)
+   - Output: `docs/ui/contracts/ui-contracts.json`
+
+2. **docs/ui/contracts/ui-contracts.json** (NEW)
+   - Machine-readable JSON Schema bundle
+   - Contains:
+     - 12 enum definitions (NotificationIntent, DeliveryMode, AutonomyMode, Channel, etc.)
+     - 4 system constants (TITLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, pagination limits)
+     - 19 response schemas extracted from Pydantic models
+     - 6 endpoint definitions with full parameter and response specifications
+   - Follows JSON Schema draft 2020-12
+   - Includes version and generated_at timestamp
+
+3. **tests/scripts/test_generate_ui_contracts.py** (NEW)
+   - Comprehensive test suite with 33 tests
+   - Test classes:
+     - `TestContractSnapshotFile` - File existence and structure validation
+     - `TestEnums` - Enum definitions and sorting
+     - `TestConstants` - System constants validation
+     - `TestSchemas` - Response schema validation
+     - `TestEndpoints` - Endpoint metadata validation
+     - `TestGeneratorScript` - Script execution and idempotency
+     - `TestContractDrift` - Contract drift detection
+
+### Files Modified
+
+1. **docs/ui/ui-data-contracts.md**
+   - Added "Machine-Readable Contract Snapshot" section
+   - Links to contracts/ui-contracts.json
+   - Documents regeneration process
+
+### Contract Snapshot Contents
+
+**Enums (12):**
+- AckStatus, AuditEventType, AutonomyMode, Channel, DeliveryMode
+- DeliveryStatus, EnforcementType, InvariantSeverity, InvariantStatus
+- NotificationIntent, Priority, ResolutionSource
+
+**Constants (4):**
+- TITLE_MAX_LENGTH: 200
+- MESSAGE_MAX_LENGTH: 4000
+- PAGINATION_DEFAULT_LIMIT: 25
+- PAGINATION_MAX_LIMIT: 100
+
+**Schemas (19):**
+- PaginationInfo, ErrorDetail, ErrorResponse
+- DeliveryAttempt, AutonomyContextResponse, DeliveryTimelineResponse
+- DeliveryTimelineSummary, DeliveryTimelineListResponse
+- ResolutionStep, EffectivePolicyValues, ResolutionContext, EffectivePolicyResponse
+- EvidenceLink, InvariantEnforcement, InvariantEntry
+- InvariantListResponse, InvariantSummaryResponse
+- AuditEvent, AuditEventListResponse
+
+**Endpoints (6):**
+- GET /ui/deliveries - List delivery timelines
+- GET /ui/deliveries/{notification_id} - Get delivery timeline
+- GET /ui/policies/effective - Get effective policy
+- GET /ui/invariants - List system invariants
+- GET /ui/invariants/summary - Get invariant summary
+- GET /ui/audit - List audit events
+
+### Test Results
+- 33 tests passing in test_generate_ui_contracts.py
+- Generator script runs successfully
+- Output is deterministic (idempotent)
+- Ruff linting passes
+- Ruff formatting applied
+
+### Acceptance Criteria Met
+✅ Machine-readable contract snapshot generated
+✅ JSON Schema bundle format (draft 2020-12)
+✅ Generated deterministically from Pydantic models
+✅ Output at docs/ui/contracts/ui-contracts.json
+✅ ui-data-contracts.md links to snapshot
+✅ Tests written and passing (33 tests)
+✅ Linting passes
