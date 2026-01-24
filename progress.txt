@@ -976,145 +976,101 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 
 ---
 
-## UI Phase 1 Task: Initialize apps/ui project scaffolding (read-only) - COMPLETED
+## UI Phase 1: Deliveries Explorer Page (list + detail) - COMPLETED
 
 ### Date: 2026-01-23
 
 ### Summary
-Created the UI app skeleton under apps/ui with routing, layout shell, environment configuration, minimal auth integration placeholder, and basic navigation structure. All components follow the v1 read-only posture per the UI scope specification.
+Implemented the Deliveries Explorer UI pages as part of Phase 1 of the UNS Dashboard.
+This provides read-only visibility into notification delivery timelines per ui-scope.md.
 
-### Files Created
+### Artifacts Created
 
-#### Directory Structure
-```
-apps/
-├── __init__.py                    # Apps package init
-└── ui/
-    ├── __init__.py               # UI package (version 0.1.0)
-    ├── README.md                 # Local run instructions + non-authoritative rules
-    ├── src/
-    │   ├── __init__.py
-    │   ├── config.py             # Env config for API base URL
-    │   ├── auth.py               # Minimal auth integration placeholder
-    │   ├── router.py             # Route definitions (GET only)
-    │   ├── api/
-    │   │   └── __init__.py       # API client placeholder
-    │   ├── pages/
-    │   │   ├── __init__.py
-    │   │   ├── deliveries.py     # Deliveries explorer stub
-    │   │   ├── policy.py         # Policy inspector stub
-    │   │   ├── invariants.py     # Invariants viewer stub
-    │   │   └── audit.py          # Audit timeline stub
-    │   ├── components/
-    │   │   └── __init__.py
-    │   ├── layouts/
-    │   │   ├── __init__.py
-    │   │   └── main_layout.py    # Navigation and layout shell
-    │   ├── hooks/
-    │   │   └── __init__.py
-    │   └── utils/
-    │       └── __init__.py
-    └── tests/
-        ├── __init__.py
-        └── test_package_structure.py  # 44 tests
-```
+1. **UI Application Structure** (`apps/ui/`)
+   - `__init__.py` - Package initialization
+   - `app.py` - FastAPI app factory with routes and static file serving
+   - `README.md` - Documentation with local run instructions
 
-### Key Components
+2. **Typed API Client** (`apps/ui/src/api/`)
+   - `types.py` - Response models matching ui-data-contracts.md:
+     - `DeliveryTimelineListResponse`
+     - `DeliveryTimelineResponse`
+     - `DeliveryTimelineSummary`
+     - `DeliveryAttempt`
+     - `AutonomyContextResponse`
+     - `PaginationInfo`
+     - `ErrorResponse`
+     - `DeliveryFilterParams`
+   - `client.py` - UNSUIClient with:
+     - `list_deliveries()` with all filter parameters
+     - `get_delivery_timeline()` for detail view
+     - Request ID propagation via X-Request-ID header
+     - Error handling with typed APIError
 
-#### 1. Configuration (`config.py`)
-- `UIConfig` dataclass with frozen=True (immutable)
-- Environment variables:
-  - `UNS_API_BASE_URL` (default: http://localhost:8000)
-  - `UNS_UI_DEBUG` (default: false)
-  - `UNS_UI_REQUEST_TIMEOUT` (default: 30)
-  - `UNS_API_VERSION` (default: v1)
-- `get_config()` with caching, `reset_config()` for testing
+3. **Deliveries Explorer Pages** (`apps/ui/src/pages/`)
+   - `deliveries.py` - FastAPI router with:
+     - `GET /pages/deliveries/` - List page with filters
+     - `GET /pages/deliveries/{notification_id}` - Detail page
+     - Filter support: status, intent, delivery_mode, autonomy_mode, channel, notification_type, agent_id, time range
+     - Cursor-based pagination
+     - Template rendering via Jinja2
 
-#### 2. Authentication Placeholder (`auth.py`)
-- `AuthStatus` enum: AUTHENTICATED, ANONYMOUS, EXPIRED
-- `UserContext` dataclass with `is_authenticated` property
-- `AuthProvider` Protocol for dependency injection
-- `NoOpAuthProvider` for local development (anonymous access)
-- Global provider management: `get_auth_provider()`, `configure_auth_provider()`, `reset_auth_provider()`
+4. **HTML Templates** (`apps/ui/templates/`)
+   - `base.html` - Base layout with navbar and footer
+   - `deliveries/list.html` - List page with:
+     - Filter form (dropdowns + text inputs)
+     - Results table with links to detail pages
+     - Pagination controls
+     - Empty state handling
+   - `deliveries/detail.html` - Detail page with:
+     - Notification summary section
+     - Autonomy context section
+     - Channel results (attempted/succeeded/failed)
+     - Delivery attempts table with timing and errors
+     - Back to list link
 
-#### 3. Router (`router.py`)
-- `HTTPMethod` enum: GET only (read-only posture)
-- `Route` dataclass for route definitions
-- Routes defined:
-  - `/deliveries` - List delivery timelines
-  - `/deliveries/{notification_id}` - Delivery detail
-  - `/policy` - Policy inspector
-  - `/invariants` - Invariants list
-  - `/invariants/summary` - Invariants summary
-  - `/audit` - Audit timeline
-- Helper functions: `get_all_routes()`, `get_route_by_name()`, `build_path()`
+5. **Static Assets** (`apps/ui/static/`)
+   - `css/main.css` - Styles including:
+     - Navbar and layout
+     - Filter panel
+     - Data tables
+     - Status badges (success/warning/danger/info)
+     - Channel tags
+     - Responsive design
 
-#### 4. Layout (`main_layout.py`)
-- `NavigationRoute` enum: DELIVERIES, POLICY, INVARIANTS, AUDIT
-- `NavigationItem` dataclass with label, icon, description
-- `NAVIGATION_ITEMS` tuple with 4 nav items
-- Helper functions: `get_navigation_items()`, `get_route_for_label()`
+6. **Tests** (`apps/ui/tests/`)
+   - `test_deliveries_pages.py` - 33 tests covering:
+     - List page rendering
+     - Filter functionality
+     - Pagination
+     - Detail page display
+     - Error handling (404, 422)
+     - Static file serving
+     - Navigation elements
+     - API client imports
 
-#### 5. Page Stubs
-Each page module provides:
-- Page state dataclass (frozen)
-- Filter definitions
-- Title helpers
-- Placeholder for Phase 1 implementation
+### Configuration Updates
+- `pyproject.toml` updated:
+  - Added `apps` to package paths
+  - Added `apps/ui/tests` to test paths
+  - Added `apps` to Python path for imports
+  - Added `apps` to ruff src paths
+  - Added `jinja2>=3.0.0` dependency
 
-### Tests (44 tests)
-
-**TestPackageStructure** (8 tests)
-- Package import tests for all subpackages
-
-**TestConfigModule** (6 tests)
-- Config defaults, api_prefix, frozen, caching, reset
-
-**TestAuthModule** (7 tests)
-- Auth imports, status enum, user context, NoOpAuthProvider
-
-**TestRouterModule** (6 tests)
-- Router imports, GET-only method, routes exist, path building
-
-**TestMainLayout** (4 tests)
-- Layout imports, navigation routes, navigation items, route lookup
-
-**TestPageModules** (8 tests)
-- Page module imports, filters, options for each page
-
-**TestReadOnlyPosture** (2 tests)
-- All routes are GET only
-- HTTPMethod enum only has GET
-
-**TestFileStructure** (3 tests)
-- README exists
-- README contains required sections
-- All __init__.py files exist
-
-### pyproject.toml Updates
-- Added `apps` to `tool.setuptools.packages.find.where`
-- Added `apps/ui/tests` to `tool.pytest.ini_options.testpaths`
-- Added `apps` to `tool.pytest.ini_options.pythonpath`
-- Added `apps` to `tool.ruff.src`
-- Added `apps` to `tool.ruff.lint.isort.known-first-party`
+### Key Implementation Details
+- Read-only pages per ui-scope.md v1 constraints
+- Uses existing `/ui/deliveries` API endpoints
+- Cursor-based pagination matching ui-data-contracts.md
+- Template filters for datetime, duration, and status badges
+- Error handling with proper HTTP status codes
 
 ### Test Results
-- 44 tests passing
-- Ruff check: All checks passed
-- Ruff format: Applied
+- 33 tests passing for UI pages
+- 137 tests passing for all UI-related tests
+- All linting checks pass (ruff check/format)
 
 ### Acceptance Criteria Met
-Per uns-ui-phase-1.yaml task requirements:
-✅ Created UI app skeleton under apps/ui
-✅ Routing and layout shell implemented
-✅ Env config for API base URL (UNS_API_BASE_URL)
-✅ Minimal auth integration placeholder (read-only posture)
-✅ Basic navigation: Deliveries, Policy, Invariants, Audit
-✅ apps/ui/README.md with local run instructions and non-authoritative rules
-
-### Read-Only Posture Enforced
-- All routes use GET method only
-- HTTPMethod enum only defines GET
-- README clearly states UI is non-authoritative
-- Auth placeholder uses anonymous access by default
-- No write operations available in v1
+✅ Deliveries list page with filters (intent, delivery_mode, status, time range, agent_id, autonomy_mode, channel)
+✅ Delivery detail view for notification_id showing attempts and timestamps
+✅ Tests written and passing
+✅ Linting passes

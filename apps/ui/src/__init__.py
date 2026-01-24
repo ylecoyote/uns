@@ -1,1 +1,1 @@
-"""UNS UI source package."""
+"""UI source modules."""

@@ -1,0 +1,129 @@
+tasks:
+  - title: Initialize apps/ui project scaffolding (read-only)
+    completed: true
+    description: >
+      Create UI app skeleton under apps/ui with:
+
+      - routing and layout shell
+
+      - env config for API base URL (points at UNS backend)
+
+      - minimal auth integration placeholder (read-only posture; no privileged
+      actions)
+
+      - basic navigation: Deliveries, Policy, Invariants, Audit
+
+      Output:
+
+      - apps/ui/* initial scaffold
+
+      - apps/ui/README.md with local run instructions and non-authoritative
+      rules
+  - title: Implement typed UI API client for /ui endpoints
+    completed: true
+    parallel_group: 1
+    description: >
+      Build a typed client module in apps/ui that matches
+      docs/ui/ui-data-contracts.md:
+
+      - GET /ui/deliveries (+ filters + cursor pagination)
+
+      - GET /ui/deliveries/{notification_id}
+
+      - GET /ui/policies/effective
+
+      - GET /ui/invariants (+ filters + cursor pagination)
+
+      - GET /ui/invariants/summary
+
+      - GET /ui/audit (+ filters + cursor pagination)
+
+      Include:
+
+      - request_id propagation support via header (X-Request-ID)
+
+      - consistent error handling per ErrorResponse contract
+
+      Output:
+
+      - apps/ui/src/api/* (or equivalent)
+  - title: Build Deliveries Explorer page (list + detail)
+    completed: true
+    parallel_group: 1
+    description: >
+      Implement read-only UI pages:
+
+      - Deliveries list with filters (intent, delivery_mode, status, time range,
+      agent_id, autonomy_mode, channel)
+
+      - Delivery detail view for a notification_id showing attempts and
+      timestamps
+
+      Output:
+
+      - apps/ui/src/pages/Deliveries*
+
+      - apps/ui/src/components/* as needed
+  - title: Build Policy Inspector page (effective policy + trace)
+    completed: true
+    parallel_group: 1
+    description: |
+      Implement read-only UI page:
+      - Form for notification_type, intent, autonomy_mode, irreversible
+      - Render EffectivePolicyResponse including resolution steps
+      Output:
+      - apps/ui/src/pages/Policy*
+      - apps/ui/src/components/*
+  - title: Build Invariants viewer (list + summary)
+    completed: true
+    parallel_group: 2
+    description: >
+      Implement read-only UI pages:
+
+      - Invariants list with filters (severity, enforcement_type, status,
+      search) + pagination
+
+      - Summary panel using /ui/invariants/summary
+
+      - Clearly display degraded state if API returns degraded=true
+
+      Output:
+
+      - apps/ui/src/pages/Invariants*
+
+      - apps/ui/src/components/*
+  - title: Build Audit Timeline page (filtered event stream)
+    completed: true
+    parallel_group: 2
+    description: >
+      Implement read-only UI page:
+
+      - Audit list with filters (event_type, notification_id, agent_id,
+      autonomy_mode, correlation_id, time range)
+
+      - Render event payload details with safe formatting
+
+      Output:
+
+      - apps/ui/src/pages/Audit*
+
+      - apps/ui/src/components/*
+  - title: Add UI tests (smoke + critical flows)
+    completed: true
+    description: |
+      Add tests for:
+      - API client error handling and request_id propagation
+      - Smoke: deliveries list loads and navigates to detail
+      - Smoke: invariants list loads and handles degraded=true
+      Output:
+      - apps/ui/tests/* (or equivalent)
+  - title: Produce Phase 1 bounded verification report (UI + contracts)
+    completed: true
+    description: |
+      Produce a bounded verification report for Phase 1:
+      - UI calls only GET endpoints
+      - UI uses only /ui contracts as documented
+      - No mutation routes or privileged actions are introduced
+      - Basic UI tests pass
+      Output:
+      - docs/reports/ui/phase-1-verify.md

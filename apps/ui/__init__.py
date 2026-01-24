@@ -1,11 +1,8 @@
-"""UNS UI Dashboard - Read-only flight instruments for the Unified Notification Service.
+"""UNS UI Application.
 
-This package provides a read-only dashboard for monitoring and inspecting the UNS
-notification system. Per the v1 scope constraints, the UI is strictly read-only
-and does not provide any write operations.
-
-See: docs/ui/ui-scope.md for design philosophy and constraints.
+Read-only dashboard for the Unified Notification Service.
+Per ui-scope.md: This is a "flight instruments" dashboard providing visibility
+into the notification system's state and health without direct manipulation.
 """
 
 __version__ = "0.1.0"
-__all__ = ["__version__"]

@@ -1,8 +1,5 @@
-"""UI page components.
+"""UI Pages for the UNS Dashboard."""
 
-Pages:
-- Deliveries: Delivery timeline explorer (list + detail)
-- Policy: Policy inspector with resolution trace
-- Invariants: System invariants viewer
-- Audit: Audit event timeline
-"""
+from apps.ui.src.pages.deliveries import router as deliveries_router
+
+__all__ = ["deliveries_router"]
