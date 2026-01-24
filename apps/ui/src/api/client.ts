@@ -1,61 +1,79 @@
 /**
- * Base API client with request ID propagation and error handling
+ * Base API client for UNS UI endpoints.
+ *
+ * All endpoints are READ-ONLY per ui-scope.md.
+ * Supports request_id propagation via X-Request-ID header.
  */
 
-import type { ApiError, ErrorResponse } from '../types/common';
+import type { ErrorResponse } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+export class ApiError extends Error {
+  public readonly code: string;
+  public readonly requestId: string;
+  public readonly statusCode: number;
+  public readonly details?: Record<string, unknown>;
 
-function generateRequestId(): string {
-  return `ui-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  constructor(response: ErrorResponse, statusCode: number) {
+    super(response.error.message);
+    this.name = 'ApiError';
+    this.code = response.error.code;
+    this.requestId = response.request_id;
+    this.statusCode = statusCode;
+    this.details = response.error.details;
+  }
 }
 
-export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
+export interface RequestOptions {
+  requestId?: string;
+  signal?: AbortSignal;
+}
+
+const API_BASE = '/ui';
+
+/**
+ * Make a GET request to the API.
+ *
+ * @param path - API path (e.g., '/audit')
+ * @param params - Query parameters
+ * @param options - Request options including optional requestId for correlation
+ */
+export async function apiGet<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>,
+  options?: RequestOptions
 ): Promise<T> {
-  const requestId = generateRequestId();
+  const url = new URL(`${API_BASE}${path}`, window.location.origin);
+
+  // Add query parameters, filtering out undefined values
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'X-Request-ID': requestId,
-    ...options.headers,
+    Accept: 'application/json',
   };
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
+  // Propagate request ID for correlation if provided
+  if (options?.requestId) {
+    headers['X-Request-ID'] = options.requestId;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
     headers,
+    signal: options?.signal,
   });
 
   if (!response.ok) {
-    let errorBody: ErrorResponse | undefined;
-    try {
-      errorBody = await response.json();
-    } catch {
-      // Ignore JSON parse errors
-    }
-
-    const error: ApiError = new Error(
-      errorBody?.error?.message || `Request failed: ${response.status}`
-    ) as ApiError;
-    error.code = errorBody?.error?.code || 'unknown_error';
-    error.request_id = errorBody?.request_id || requestId;
-    error.details = errorBody?.error?.details;
-    throw error;
+    const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
+    // Handle FastAPI's error wrapping
+    const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
+    throw new ApiError(errorResponse, response.status);
   }
 
-  return response.json();
-}
-
-export function buildQueryString(params: Record<string, unknown>): string {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.append(key, String(value));
-    }
-  }
-
-  const queryString = searchParams.toString();
-  return queryString ? `?${queryString}` : '';
+  return response.json() as Promise<T>;
 }
