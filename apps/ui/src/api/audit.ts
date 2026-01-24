@@ -12,19 +12,20 @@ import type {
   AuditEventListResponse,
   AuditEventFilter,
 } from '../types/api';
-import { apiRequest, buildQueryString } from './client';
+import { apiGet, filterToParams, type RequestOptions } from './client';
 
 /**
  * Fetch audit events with optional filtering and pagination.
  *
  * @param filter - Filter and pagination parameters
+ * @param options - Request options (requestId, signal)
  * @returns Paginated list of audit events
  */
 export async function fetchAuditEvents(
-  filter: AuditEventFilter = {}
+  filter: AuditEventFilter = {},
+  options?: RequestOptions
 ): Promise<AuditEventListResponse> {
-  const queryString = buildQueryString(filter);
-  return apiRequest<AuditEventListResponse>(`/ui/audit${queryString}`);
+  return apiGet<AuditEventListResponse>('/audit', filterToParams(filter), options);
 }
 
 // Re-export with legacy name for backwards compatibility
