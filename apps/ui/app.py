@@ -1,14 +1,18 @@
 """UNS UI Application.
 
-This module provides a FastAPI application for the UNS Dashboard UI.
-It serves HTML pages for viewing notification delivery timelines, policies,
+This module provides a FastAPI application for the UNS Dashboard API.
+It provides JSON API endpoints for the React frontend to consume,
+serving data about notification delivery timelines, policies,
 invariants, and audit events.
 
 Per ui-scope.md: This is a read-only "flight instruments" dashboard.
 No mutation operations are permitted in v1.
 
+Note: This module provides JSON API responses. The React frontend
+(built separately) handles all HTML rendering.
+
 Usage:
-    # Run standalone UI server
+    # Run standalone API server
     uvicorn apps.ui.app:app --reload --port 8001
 
     # Or mount into main app
@@ -28,7 +32,6 @@ from apps.ui.src.pages import deliveries_router
 # Paths
 _app_dir = Path(__file__).parent
 _static_dir = _app_dir / "static"
-_templates_dir = _app_dir / "templates"
 
 
 def create_ui_app() -> FastAPI:
