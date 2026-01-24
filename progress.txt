@@ -2330,3 +2330,111 @@ Implemented tests for graceful degradation when invariants source is unavailable
 ✅ Output: tests/ui_contract/test_ui_contracts.py - CREATED
 
 ---
+
+## Task: Implement Lightweight Contract Drift Checks for /ui Endpoints (UI-side) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Implemented UI-side contract drift checks using Zod runtime validators. The implementation validates API responses at runtime to detect contract drift between the backend and frontend early, before data reaches components where undefined access could cause runtime errors.
+
+### Artifacts Created
+
+1. **Zod Schema Definitions** (`apps/ui/src/api/validators/schemas.ts`) - NEW
+   - Complete schema definitions for all UI API contracts:
+     - **Common Types**: PaginationInfoSchema, ErrorDetailSchema, ErrorResponseSchema
+     - **Enums**: ChannelSchema, NotificationIntentSchema, DeliveryModeSchema, DeliveryStatusSchema, AutonomyModeSchema, AuditEventTypeSchema, InvariantSeveritySchema, EnforcementTypeSchema, InvariantStatusSchema, ResolutionSourceSchema
+     - **Autonomy Context**: AutonomyContextSchema, AutonomyContextResponseSchema
+     - **Audit Events**: AuditEventSchema, AuditEventListResponseSchema
+     - **Delivery Timeline**: DeliveryAttemptSchema, DeliveryTimelineResponseSchema, DeliveryTimelineSummarySchema, DeliveryTimelineListResponseSchema
+     - **Invariants**: EvidenceLinkSchema, InvariantEnforcementSchema, InvariantEntrySchema, InvariantListResponseSchema, InvariantSummaryResponseSchema
+     - **Policy Inspector**: ResolutionStepSchema, EffectivePolicySchema, ResolutionContextSchema, EffectivePolicyResponseSchema
+   - Type inference exports for all schemas
+
+2. **Decoder Functions** (`apps/ui/src/api/validators/decoders.ts`) - NEW
+   - `DecodeResult<T>` type for success/failure result handling
+   - `ContractDriftError` class with:
+     - Detailed error message formatting
+     - `getSummary(maxIssues?)` method for concise logging
+     - Preservation of raw data for debugging
+   - Decoder functions for all endpoints:
+     - `decodeDeliveriesList()` - validates DeliveryTimelineListResponse
+     - `decodeDeliveryTimeline()` - validates DeliveryTimelineResponse
+     - `decodeAuditEventsList()` - validates AuditEventListResponse
+     - `decodeInvariantsList()` - validates InvariantListResponse
+     - `decodeInvariantsSummary()` - validates InvariantSummaryResponse
+     - `decodeEffectivePolicy()` - validates EffectivePolicyResponse
+   - Utility functions:
+     - `assertDecode()` - throws on validation failure (strict mode)
+     - `logDriftIfFailed()` - logs warning but continues (lenient mode)
+     - `decodeWithMode()` - applies current validation mode
+   - Validation mode configuration:
+     - `getValidationMode()` / `setValidationMode()` - get/set current mode
+     - Modes: 'strict' (throw), 'lenient' (log), 'off' (skip)
+
+3. **Module Exports** (`apps/ui/src/api/validators/index.ts`) - NEW
+   - Central exports for all validators, decoders, and utilities
+
+4. **Comprehensive Tests** (`apps/ui/tests/validators.test.ts`) - NEW
+   - 57 tests covering:
+     - **Contract Decoders** (36 tests):
+       - decodeDeliveriesList: valid decode, missing fields, invalid enum values
+       - decodeDeliveryTimeline: valid decode, missing autonomy_context, invalid attempts
+       - decodeAuditEventsList: valid decode, invalid event_type, missing context
+       - decodeInvariantsList: valid decode, degraded flag handling, invalid enums
+       - decodeInvariantsSummary: valid decode, degraded flag, missing fields
+       - decodeEffectivePolicy: valid decode, invalid enums in nested structures
+     - **ContractDriftError** (4 tests): error messages, getSummary, raw data preservation
+     - **assertDecode** (3 tests): success returns data, failure throws, context in message
+     - **logDriftIfFailed** (2 tests): success returns data, failure logs warning
+     - **Validation Mode** (7 tests): default mode, set/get modes, decodeWithMode behavior
+     - **Degraded State Handling** (4 tests): invariants list/summary with degraded=true/false
+     - **Edge Cases** (5 tests): empty arrays, null/optional fields, mitigation arrays
+
+### Files Modified
+
+1. **API Clients with Validation Integration**:
+   - `apps/ui/src/api/deliveries.ts` - Added validation via decodeWithMode
+   - `apps/ui/src/api/invariants.ts` - Added validation via decodeWithMode
+   - `apps/ui/src/api/policies.ts` - Added validation via decodeWithMode
+   - `apps/ui/src/api/audit.ts` - Added validation via decodeWithMode, fixed to accept RequestOptions
+
+2. **API Exports** (`apps/ui/src/api/index.ts`)
+   - Added exports for all validator functions and types
+
+3. **Route Configuration Updates** (pre-existing issue fixes):
+   - `apps/ui/src/types/routes.ts` - Marked POLICY as implemented
+   - `apps/ui/src/router.tsx` - Added PolicyInspectorPage to route switch
+   - `apps/ui/tests/router.test.tsx` - Updated tests to expect implemented pages
+
+4. **Dependencies**:
+   - Added `zod@3.23.8` to package.json
+
+### Validation Configuration
+
+The validation system supports three modes:
+- **strict** - Throws `ContractDriftError` on validation failure (recommended for development)
+- **lenient** (default) - Logs warning but returns raw data (recommended for production)
+- **off** - Skips validation entirely (use with caution)
+
+```typescript
+// Configure at app startup
+import { setValidationMode } from './api';
+setValidationMode('strict'); // For development
+setValidationMode('lenient'); // For production
+```
+
+### Test Results
+- **286 tests passing** (57 validator tests + 229 existing tests)
+- TypeScript type-check passes
+- ESLint passes with 0 warnings
+
+### Acceptance Criteria Met
+✅ Runtime validator (zod) implemented
+✅ Validates critical fields exist before rendering
+✅ Tests cover deliveries list decode
+✅ Tests cover invariants list decode + degraded flag handling
+✅ Tests cover policy effective decode
+✅ All 286 tests pass
+✅ Linting passes
+✅ Type-check passes
