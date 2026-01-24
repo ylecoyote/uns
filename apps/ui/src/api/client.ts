@@ -31,6 +31,11 @@ export class ApiError extends Error {
     this.statusCode = statusCode;
     this.details = response.error.details;
   }
+
+  // Alias for consistency with types/common.ts interface
+  get request_id(): string {
+    return this.requestId;
+  }
 }
 
 /**

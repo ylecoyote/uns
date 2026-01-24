@@ -6,13 +6,16 @@
 
 // Audit components
 export * from './AuditEventCard';
+export * from './AuditEventList';
 export * from './AuditFilters';
-export * from './Pagination';
 
 // Invariants components
 export * from './InvariantsFilter';
 export * from './InvariantsList';
 export * from './InvariantsSummary';
+
+// Shared components
+export * from './Pagination';
 
 // Deliveries components
 export * from './DeliveriesFilters';
