@@ -59,32 +59,40 @@ from apps.ui.app import create_ui_app
 main_app.mount("/dashboard", create_ui_app())
 ```
 
+## Architecture
+
+This module provides a **JSON API backend** for the React frontend:
+
+- **Backend (this module)**: FastAPI endpoints returning JSON responses
+- **Frontend (React)**: TypeScript/React components in `src/*.tsx` that consume the JSON API
+
+The backend does not serve HTML directly. All HTML rendering is handled by the React frontend.
+
 ## Project Structure
 
 ```
 apps/ui/
 ├── __init__.py           # Package init
-├── app.py                # FastAPI app factory
+├── app.py                # FastAPI app factory (JSON API)
 ├── README.md             # This file
 ├── src/
 │   ├── api/              # Typed API client
 │   │   ├── __init__.py
 │   │   ├── client.py     # UNSUIClient
 │   │   └── types.py      # Response types
-│   ├── pages/            # Page routers
+│   ├── pages/            # Page routers (JSON API endpoints)
 │   │   ├── __init__.py
-│   │   └── deliveries.py # Deliveries Explorer
-│   └── components/       # Reusable components
-│       └── __init__.py
-├── templates/            # Jinja2 templates
-│   ├── base.html         # Base layout
-│   └── deliveries/
-│       ├── list.html     # List page
-│       └── detail.html   # Detail page
+│   │   └── deliveries.py # Deliveries Explorer API
+│   ├── components/       # React components
+│   │   └── *.tsx
+│   ├── hooks/            # React hooks
+│   │   └── *.ts
+│   ├── App.tsx           # Main React app
+│   └── main.tsx          # React entry point
 ├── static/
 │   └── css/
 │       └── main.css      # Styles
-└── tests/                # UI tests
+└── tests/                # API tests
     └── __init__.py
 ```
 

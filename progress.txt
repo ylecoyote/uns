@@ -1050,3 +1050,80 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 ✅ No mutation routes or privileged actions introduced - VERIFIED
 ✅ Basic UI tests pass - VERIFIED (152 tests)
 ✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
+
+---
+
+## Task: Remove Flask/Jinja Runtime from Canonical apps/ui Path - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Removed Flask/Jinja2 runtime dependencies from the canonical `apps/ui` path. The deliveries endpoints now return JSON API responses that can be consumed by the React frontend, instead of server-side rendered HTML via Jinja2 templates.
+
+### Changes Made
+
+#### 1. Converted `apps/ui/src/pages/deliveries.py` to JSON API
+- **Removed**: `Jinja2Templates` import from FastAPI
+- **Removed**: Template directory configuration and filter registration
+- **Removed**: `HTMLResponse` response class from endpoints
+- **Changed**: Endpoints now return Pydantic models as JSON responses
+- **Added**: New response models for the JSON API:
+  - `PaginationInfo` - Pagination metadata
+  - `DeliveryAttemptResponse` - Single delivery attempt
+  - `AutonomyContextResponse` - Autonomy context data
+  - `DeliveryTimelineSummary` - List view summary
+  - `DeliveryTimelineDetailResponse` - Full detail view
+  - `FilterOptions` - Available filter dropdown values
+  - `DeliveryListFilters` - Current filter state
+  - `DeliveryListResponse` - Complete list response with items, pagination, filters
+
+#### 2. Removed Jinja2 Template Files
+- **Deleted**: `apps/ui/templates/base.html`
+- **Deleted**: `apps/ui/templates/deliveries/list.html`
+- **Deleted**: `apps/ui/templates/deliveries/detail.html`
+- **Deleted**: `apps/ui/templates/` directory
+
+#### 3. Updated `apps/ui/app.py`
+- Updated docstring to reflect JSON API architecture
+- Removed `_templates_dir` path variable (no longer needed)
+- Kept static file serving for CSS (used by React frontend)
+
+#### 4. Updated Tests (`apps/ui/tests/test_deliveries_pages.py`)
+- Converted all tests to expect JSON responses instead of HTML
+- Tests now verify JSON structure, data content, and filter options
+- All 31 tests pass
+
+#### 5. Updated Documentation (`apps/ui/README.md`)
+- Added Architecture section explaining JSON API + React frontend separation
+- Updated project structure to reflect removal of templates directory
+- Clarified that backend serves JSON, frontend renders HTML
+
+### Test Results
+- **31 tests pass** in `apps/ui/tests/test_deliveries_pages.py`
+- All ruff linting checks pass
+
+### Files Modified
+- `apps/ui/src/pages/deliveries.py` - Converted to JSON API
+- `apps/ui/app.py` - Removed template references
+- `apps/ui/tests/test_deliveries_pages.py` - Updated for JSON responses
+- `apps/ui/README.md` - Updated documentation
+
+### Files Deleted
+- `apps/ui/templates/base.html`
+- `apps/ui/templates/deliveries/list.html`
+- `apps/ui/templates/deliveries/detail.html`
+
+### Architecture Notes
+The UI now follows a clean separation:
+- **Backend (FastAPI)**: Serves JSON API responses at `/pages/deliveries/` and `/pages/deliveries/{id}`
+- **Frontend (React)**: Consumes JSON API and renders HTML (existing `App.tsx`, `*.tsx` components)
+
+This removes the Jinja2 runtime dependency from the canonical apps/ui path while maintaining the same functionality through JSON APIs.
+
+### Acceptance Criteria Met
+✅ Flask/Jinja runtime removed from apps/ui path
+✅ Endpoints return JSON for React frontend consumption
+✅ All tests pass (31 tests)
+✅ Linting passes
+
+---
