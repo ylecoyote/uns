@@ -7,6 +7,7 @@
 
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { AuditTimeline } from './pages/AuditTimeline';
+import { PolicyInspectorPage } from './pages/PolicyInspectorPage';
 import './App.css';
 
 function App() {
@@ -50,7 +51,7 @@ function App() {
             />
             <Route
               path="/policy"
-              element={<PlaceholderPage title="Policy" description="Effective policy inspector" />}
+              element={<PolicyInspectorPage />}
             />
             <Route
               path="/invariants"
