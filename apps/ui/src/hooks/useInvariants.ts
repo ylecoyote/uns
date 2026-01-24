@@ -17,6 +17,7 @@ interface UseInvariantsResult {
   pagination: PaginationInfo | null;
   loading: boolean;
   error: ApiError | null;
+  degraded: boolean;
   refetch: () => void;
   loadMore: () => void;
 }
@@ -26,6 +27,7 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const [degraded, setDegraded] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
 
   const fetchData = useCallback(async (isLoadMore = false) => {
@@ -48,8 +50,14 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
 
       setPagination(response.pagination);
       setCursor(response.pagination.next_cursor);
+      setDegraded(response.degraded ?? false);
     } catch (err) {
-      setError(err as ApiError);
+      const apiError = err as ApiError;
+      setError(apiError);
+      // Set degraded state for specific error codes indicating source unavailable
+      if (apiError.code === 'invariants_source_unavailable') {
+        setDegraded(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -77,6 +85,7 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
     pagination,
     loading,
     error,
+    degraded,
     refetch,
     loadMore,
   };
@@ -86,6 +95,7 @@ interface UseInvariantsSummaryResult {
   summary: InvariantSummaryResponse | null;
   loading: boolean;
   error: ApiError | null;
+  degraded: boolean;
   refetch: () => void;
 }
 
@@ -93,6 +103,7 @@ export function useInvariantsSummary(): UseInvariantsSummaryResult {
   const [summary, setSummary] = useState<InvariantSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const [degraded, setDegraded] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -101,8 +112,14 @@ export function useInvariantsSummary(): UseInvariantsSummaryResult {
     try {
       const response = await fetchInvariantsSummary();
       setSummary(response);
+      setDegraded(response.degraded ?? false);
     } catch (err) {
-      setError(err as ApiError);
+      const apiError = err as ApiError;
+      setError(apiError);
+      // Set degraded state for specific error codes indicating source unavailable
+      if (apiError.code === 'invariants_source_unavailable') {
+        setDegraded(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -120,6 +137,7 @@ export function useInvariantsSummary(): UseInvariantsSummaryResult {
     summary,
     loading,
     error,
+    degraded,
     refetch,
   };
 }

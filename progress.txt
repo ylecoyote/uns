@@ -1053,6 +1053,90 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 
 ---
 
+## Migrate Invariants Viewer UI to React and Integrate Degraded-State Semantics - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Migrated the Invariants Viewer page to React and integrated degraded-state semantics. The implementation includes:
+- Connected existing React InvariantsPage component to the App.tsx router
+- Enhanced degraded-state handling to support `invariants_source_unavailable` error code
+- Added `degraded` flag to API response types
+- Updated hooks to track degraded state from API responses and error codes
+- Added graceful fallback UI for degraded/unavailable states
+
+### Files Modified
+
+1. **apps/ui/src/types/invariants.ts**
+   - Added `degraded?: boolean` field to `InvariantListResponse`
+   - Added `degraded?: boolean` field to `InvariantSummaryResponse`
+
+2. **apps/ui/src/App.tsx**
+   - Connected `InvariantsPage` component to `/invariants` route
+   - Replaced placeholder with actual implementation
+
+3. **apps/ui/src/components/index.ts**
+   - Exported `InvariantsFilter`, `InvariantsList`, and `InvariantsSummary` components
+
+4. **apps/ui/src/pages/index.ts**
+   - Exported `InvariantsPage` component
+
+5. **apps/ui/src/hooks/useInvariants.ts**
+   - Added `degraded` state tracking to `useInvariants` hook
+   - Added `degraded` state tracking to `useInvariantsSummary` hook
+   - Handle `invariants_source_unavailable` error code to set degraded state
+   - Return `degraded` boolean from both hooks
+
+6. **apps/ui/src/pages/InvariantsPage.tsx**
+   - Added top-level degraded state banner with warning message
+   - Combined degraded state from hook and error codes
+   - For `invariants_source_unavailable` errors, show degraded banner without red error panel
+
+7. **apps/ui/src/components/InvariantsSummary.tsx**
+   - Added graceful fallback UI for `invariants_source_unavailable` error
+   - Shows "Summary Unavailable" message instead of error
+   - Added "Data may be incomplete" indicator when in degraded state
+
+8. **apps/ui/src/api/invariants.ts**
+   - Fixed import to use `apiGet` instead of `apiRequest`
+   - Updated to pass filter parameters correctly
+
+9. **apps/ui/tests/InvariantsPage.test.tsx**
+   - Added tests for `invariants_source_unavailable` error handling
+   - Added tests for `degraded=true` API response handling
+   - Added tests for degraded indicator in summary
+   - Fixed existing tests to handle multiple matching elements
+
+### Degraded State Semantics
+
+The degraded state is triggered by:
+1. API response containing `degraded: true`
+2. Error with code `invariants_source_unavailable`
+3. Any non-`not_found` error (fallback for backwards compatibility)
+
+When in degraded state:
+- Yellow warning banner displayed at top: "Degraded State - The invariant registry may be incomplete or outdated"
+- Summary shows "Data may be incomplete" indicator
+- For `invariants_source_unavailable`, shows graceful "Summary Unavailable" fallback instead of error
+- Partial data still displayed when available
+
+### Test Results
+- 24 tests in InvariantsPage.test.tsx - all passing
+- 73 total UI tests - all passing
+- ESLint linting - passes
+- TypeScript type-check - passes
+
+### Acceptance Criteria Met
+✅ Invariants Viewer migrated to React
+✅ Degraded-state semantics integrated
+✅ `invariants_source_unavailable` error code handled gracefully
+✅ Degraded banner displayed when appropriate
+✅ Partial/empty fallback UI for unavailable states
+✅ Tests written and passing
+✅ Linting passes
+
+---
+
 ## Phase 1.1 Task: Codify UI Stack Decision and Boundary Rules - COMPLETED
 
 ### Date: 2026-01-23

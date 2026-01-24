@@ -36,12 +36,36 @@ interface InvariantsSummaryProps {
 }
 
 export function InvariantsSummary({ degraded = false }: InvariantsSummaryProps) {
-  const { summary, loading, error } = useInvariantsSummary();
+  const { summary, loading, error, degraded: summaryDegraded } = useInvariantsSummary();
+
+  // Combine degraded state from prop and hook
+  const isDegraded = degraded || summaryDegraded;
+
+  // Show fallback UI for invariants_source_unavailable - don't show error, just degraded state
+  const isSourceUnavailable = error?.code === 'invariants_source_unavailable';
 
   if (loading) {
     return (
       <div className="animate-pulse">
         <div className="h-24 bg-gray-200 rounded-lg"></div>
+      </div>
+    );
+  }
+
+  // For source unavailable, show a graceful fallback instead of error
+  if (isSourceUnavailable) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Invariants Summary</h2>
+          <div className="text-gray-500 text-center py-8">
+            <div className="text-4xl mb-2" aria-hidden="true">&#128203;</div>
+            <div className="font-medium">Summary Unavailable</div>
+            <div className="text-sm mt-1">
+              The invariant registry is temporarily unavailable.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -64,19 +88,14 @@ export function InvariantsSummary({ degraded = false }: InvariantsSummaryProps) 
 
   return (
     <div className="space-y-4">
-      {degraded && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-          <span className="text-yellow-600 text-xl">&#9888;</span>
-          <div>
-            <div className="text-yellow-800 font-medium">Degraded State</div>
-            <div className="text-yellow-700 text-sm">
-              The invariant registry may be incomplete or outdated. Some data may be unavailable.
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white rounded-lg shadow p-6">
+        {/* Show degraded indicator within summary card */}
+        {isDegraded && (
+          <div className="mb-4 text-yellow-700 text-sm flex items-center gap-2">
+            <span aria-hidden="true">&#9888;</span>
+            <span>Data may be incomplete</span>
+          </div>
+        )}
         <h2 className="text-lg font-semibold mb-4">Invariants Summary</h2>
 
         {/* Total Count */}
