@@ -1050,3 +1050,101 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 ✅ No mutation routes or privileged actions introduced - VERIFIED
 ✅ Basic UI tests pass - VERIFIED (152 tests)
 ✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
+
+---
+
+## Phase 1.1 Task: Codify UI Stack Decision and Boundary Rules - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Codified the UI stack decision and boundary rules for the React/Vite/TypeScript SPA in `apps/ui/README.md`. Created `.env.example` for environment configuration and comprehensive tests to validate documentation.
+
+### Files Created
+- `apps/ui/.env.example` - Environment variable template with VITE_UNS_API_BASE_URL
+- `tests/docs/test_ui_stack_decision.py` - 58 tests validating documentation completeness
+
+### Files Modified
+- `apps/ui/README.md` - Complete rewrite to document React/Vite/TS stack
+
+### Documentation Updates
+
+**apps/ui/README.md now documents:**
+
+1. **Canonical UI Stack**: React + TypeScript + Vite (SPA)
+   - Technology versions and purposes
+   - ## Stack section with version table
+
+2. **Non-Authoritative UI Principle**:
+   - Read-first "flight instruments" dashboard
+   - UI must only call HTTP endpoints under `/ui/*`
+   - No direct imports from backend `src/`
+   - Backend is authoritative for all business rules
+
+3. **Phase 1 Posture**:
+   - GET-only from UI; no mutation actions
+   - Read-only dashboards included
+   - Notification authoring and policy editing not included
+
+4. **Degraded-State Handling**:
+   - UI renders degraded banner when backend returns `degraded: true`
+   - API client exposes degraded state to components
+
+5. **Development Instructions**:
+   - How to run dev server (`npm run dev`)
+   - How to run tests (`npm test`, `npm run test:run`)
+   - How to run linting (`npm run lint`)
+   - How to build for production (`npm run build`)
+
+6. **Environment Variables**:
+   - `VITE_UNS_API_BASE_URL` documented
+   - VITE_ prefix requirement explained
+   - `.env.example` template provided
+
+7. **Project Structure**:
+   - Complete directory tree with descriptions
+   - Entry points (index.html, main.tsx, App.tsx)
+   - Organized by: api/, pages/, components/, hooks/, types/, test/
+
+8. **API Endpoints Consumed**:
+   - All `/ui/*` endpoints listed
+   - GET-only constraint emphasized
+   - Links to ui-data-contracts.md
+
+9. **Related Documentation**:
+   - Links to ui-scope.md, ui-data-contracts.md
+   - Links to invariants.yml (INV-UI-001)
+   - Links to phase-1-verify.md
+
+### Test Results
+- 58 new tests in test_ui_stack_decision.py - All passing
+- Tests cover:
+  - File existence (README.md, .env.example)
+  - Canonical stack documentation (React, TypeScript, Vite, SPA)
+  - Non-authoritative UI principle
+  - UI endpoint boundaries (/ui/* only)
+  - Phase 1 GET-only posture
+  - Degraded state handling
+  - Dev server instructions
+  - Test instructions
+  - Environment variables
+  - Project structure
+  - API endpoints consumed
+  - Scripts reference
+  - Related documentation links
+
+### Linting Results
+- ruff check: All checks passed
+- ruff format: Already formatted
+
+### Acceptance Criteria Met
+✅ `apps/ui/README.md` updated with:
+   - Canonical UI: React + TypeScript + Vite
+   - UI is non-authoritative and read-first
+   - UI must only call HTTP endpoints under `/ui/*`
+   - Phase 1 posture: GET-only; no mutation actions
+   - Degraded-state handling documented
+   - How to run dev server
+   - How to run tests
+   - Environment variables (VITE_UNS_API_BASE_URL)
+✅ `apps/ui/.env.example` added
