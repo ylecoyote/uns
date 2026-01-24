@@ -1758,3 +1758,123 @@ Migrated the Policy Inspector UI from Flask/Jinja to React/TypeScript. The Polic
 ✅ Tests written and passing
 ✅ Build passes
 ✅ No lint errors in new code
+
+---
+
+## Task: Normalize Audit Timeline into React SPA Patterns - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Normalized the AuditTimeline page and related components to follow the established React SPA patterns used by InvariantsPage. This ensures consistent architecture, styling, and API patterns across all UI pages.
+
+### Changes Made
+
+#### 1. API Layer Normalization (`apps/ui/src/api/`)
+- **client.ts** - Added shared utility functions:
+  - `buildQueryString()` - Build query strings from filter objects
+  - `apiRequest()` - Generic API request function with full path support
+  - Added `request_id` getter alias to `ApiError` class for snake_case consistency
+- **audit.ts** - Refactored to use shared patterns:
+  - Renamed `getAuditEvents` to `fetchAuditEvents` (matching `fetchInvariants` pattern)
+  - Uses `buildQueryString()` and `apiRequest()` instead of manual param building
+  - Maintains backwards compatibility via re-export
+- **index.ts** - Added `invariants` export
+
+#### 2. Hooks Normalization (`apps/ui/src/hooks/`)
+- **useAuditEvents.ts** - Updated to match useInvariants pattern:
+  - Changed `isLoading` to `loading` for consistency
+  - Uses `ApiError` class from API layer instead of interface
+  - Added eslint-disable comment for intentional exhaustive-deps omission
+  - Same callback and state management patterns as useInvariants
+- **useInvariants.ts** - Added eslint-disable comment for consistency
+- **index.ts** - Added `useInvariants` export
+
+#### 3. Component Styling Normalization (`apps/ui/src/components/`)
+- **AuditEventList.tsx** (NEW) - Follows InvariantsList pattern:
+  - Empty state, loading state, pagination
+  - Tailwind CSS styling
+  - Test IDs for testing
+- **AuditFilters.tsx** - Updated with Tailwind CSS:
+  - Consistent with InvariantsFilter styling patterns
+  - Proper form handling with local state
+  - Clear filters functionality
+- **AuditEventCard.tsx** - Updated with Tailwind CSS:
+  - Follows InvariantCard styling pattern
+  - Badge styling for event types and autonomy modes
+  - Collapsible payload section
+- **index.ts** - Added exports for all Invariants components
+
+#### 4. Page Normalization (`apps/ui/src/pages/`)
+- **AuditTimeline.tsx** - Restructured to match InvariantsPage:
+  - Tailwind CSS layout (min-h-screen, bg-gray-50, etc.)
+  - Header with shadow styling
+  - Main content with max-w-7xl container
+  - Error display following InvariantsPage pattern
+  - Uses AuditEventList instead of inline rendering
+- **index.ts** - Added InvariantsPage export
+
+#### 5. Tests Added/Updated (`apps/ui/tests/`)
+- **AuditTimeline.test.tsx** - Updated for new patterns:
+  - Tests for Tailwind CSS styling compliance
+  - Tests for SPA pattern compliance
+  - All 19 tests pass
+- **AuditEventList.test.tsx** (NEW) - 12 tests:
+  - Empty state, loading state, event display, pagination
+- **AuditFilters.test.tsx** (NEW) - 17 tests:
+  - Rendering, filter selection, apply/clear actions
+- **AuditEventCard.test.tsx** - 19 tests:
+  - Badge styling, payload display, metadata rendering
+
+### Files Created
+- `apps/ui/src/components/AuditEventList.tsx`
+- `apps/ui/tests/AuditEventList.test.tsx`
+- `apps/ui/tests/AuditFilters.test.tsx`
+- `apps/ui/tests/AuditEventCard.test.tsx`
+
+### Files Modified
+- `apps/ui/src/api/client.ts` - Added buildQueryString, apiRequest, request_id getter
+- `apps/ui/src/api/audit.ts` - Refactored to use shared patterns
+- `apps/ui/src/api/index.ts` - Added invariants export
+- `apps/ui/src/hooks/useAuditEvents.ts` - Normalized to match useInvariants
+- `apps/ui/src/hooks/useInvariants.ts` - Added eslint-disable comment
+- `apps/ui/src/hooks/index.ts` - Added useInvariants export
+- `apps/ui/src/components/AuditFilters.tsx` - Tailwind CSS styling
+- `apps/ui/src/components/AuditEventCard.tsx` - Tailwind CSS styling
+- `apps/ui/src/components/index.ts` - Added all component exports
+- `apps/ui/src/pages/AuditTimeline.tsx` - SPA pattern normalization
+- `apps/ui/src/pages/index.ts` - Added InvariantsPage export
+- `apps/ui/tests/AuditTimeline.test.tsx` - Updated for new patterns
+
+### Pattern Alignment Summary
+
+| Pattern | Before | After |
+|---------|--------|-------|
+| API function naming | `getAuditEvents` | `fetchAuditEvents` |
+| Query string building | Manual param building | `buildQueryString()` |
+| Loading prop naming | `isLoading` | `loading` |
+| Component styling | Custom CSS classes | Tailwind CSS |
+| Error display | Inline rendering | Consistent error panel |
+| Event list | Inline in page | Dedicated AuditEventList component |
+| Page layout | Custom structure | min-h-screen, bg-gray-50, max-w-7xl |
+
+### Test Results
+- **78 audit-related tests pass** (100% of audit tests)
+  - AuditTimeline.test.tsx: 19 tests
+  - AuditEventList.test.tsx: 12 tests
+  - AuditFilters.test.tsx: 17 tests
+  - AuditEventCard.test.tsx: 19 tests
+  - api.test.ts: 13 tests
+  - Pagination.test.tsx: 8 tests (shared component)
+- Linting passes (0 errors, 0 warnings)
+
+### Acceptance Criteria Met
+✅ AuditTimeline page follows InvariantsPage SPA patterns
+✅ API layer uses shared buildQueryString and apiRequest functions
+✅ Hooks follow useInvariants pattern (loading state, error handling)
+✅ Components use Tailwind CSS styling
+✅ All exports properly organized in index files
+✅ All 78 audit-related tests pass
+✅ Linting passes
+
+---

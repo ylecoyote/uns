@@ -1,83 +1,90 @@
 /**
- * React hook for fetching audit events with filtering and pagination.
+ * React hooks for audit events data fetching
+ *
+ * Follows the same patterns as useInvariants hook for consistency.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import type { AuditEvent, AuditEventFilter, PaginationInfo } from '../types/api';
-import { getAuditEvents, ApiError } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { fetchAuditEvents, ApiError } from '../api';
+import type {
+  AuditEvent,
+  AuditEventFilter,
+  PaginationInfo,
+} from '../types/api';
 
-export interface UseAuditEventsResult {
+interface UseAuditEventsResult {
   events: AuditEvent[];
   pagination: PaginationInfo | null;
-  isLoading: boolean;
-  error: ApiError | Error | null;
+  loading: boolean;
+  error: ApiError | null;
   refetch: () => void;
   loadMore: () => void;
 }
 
-export function useAuditEvents(filter: AuditEventFilter): UseAuditEventsResult {
+export function useAuditEvents(filters: AuditEventFilter): UseAuditEventsResult {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<ApiError | Error | null>(null);
-  const [cursor, setCursor] = useState<string | undefined>(filter.cursor);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(
-    async (loadingMore = false) => {
-      setIsLoading(true);
-      setError(null);
+  const fetchData = useCallback(async (isLoadMore = false) => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const filterWithCursor = loadingMore ? { ...filter, cursor } : filter;
-        const response = await getAuditEvents(filterWithCursor);
+    try {
+      const currentFilters: AuditEventFilter = {
+        ...filters,
+        cursor: isLoadMore && cursor ? cursor : undefined,
+      };
 
-        if (loadingMore) {
-          setEvents((prev) => [...prev, ...response.items]);
-        } else {
-          setEvents(response.items);
-        }
-        setPagination(response.pagination);
-        setCursor(response.pagination.next_cursor ?? undefined);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setIsLoading(false);
+      const response = await fetchAuditEvents(currentFilters);
+
+      if (isLoadMore) {
+        setEvents(prev => [...prev, ...response.items]);
+      } else {
+        setEvents(response.items);
       }
-    },
-    [filter, cursor]
-  );
 
-  // Refetch when filter changes (excluding cursor changes)
+      setPagination(response.pagination);
+      setCursor(response.pagination.next_cursor);
+    } catch (err) {
+      setError(err as ApiError);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, cursor]);
+
   useEffect(() => {
-    setCursor(undefined);
-    fetchEvents(false);
+    setCursor(null);
+    fetchData(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    filter.start_time,
-    filter.end_time,
-    filter.event_type,
-    filter.notification_id,
-    filter.agent_id,
-    filter.autonomy_mode,
-    filter.correlation_id,
-    filter.limit,
+    filters.start_time,
+    filters.end_time,
+    filters.event_type,
+    filters.notification_id,
+    filters.agent_id,
+    filters.autonomy_mode,
+    filters.correlation_id,
+    filters.limit,
   ]);
 
   const refetch = useCallback(() => {
-    setCursor(undefined);
-    fetchEvents(false);
-  }, [fetchEvents]);
+    setCursor(null);
+    fetchData(false);
+  }, [fetchData]);
 
   const loadMore = useCallback(() => {
-    if (pagination?.has_more && cursor) {
-      fetchEvents(true);
+    if (pagination?.has_more) {
+      fetchData(true);
     }
-  }, [pagination, cursor, fetchEvents]);
+  }, [fetchData, pagination?.has_more]);
 
   return {
     events,
     pagination,
-    isLoading,
+    loading,
     error,
     refetch,
     loadMore,
