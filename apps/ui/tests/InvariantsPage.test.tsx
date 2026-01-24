@@ -103,8 +103,10 @@ describe('InvariantsPage', () => {
       render(<InvariantsPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('7')).toBeInTheDocument(); // total_count
+        expect(screen.getByText('Invariants Summary')).toBeInTheDocument();
         expect(screen.getByText('Total Invariants')).toBeInTheDocument();
+        // Check that total count is displayed (7)
+        expect(screen.getAllByText('7').length).toBeGreaterThan(0);
       });
     });
 
@@ -208,10 +210,10 @@ describe('InvariantsPage', () => {
       // Clear filters
       fireEvent.click(screen.getByText('Clear'));
 
+      // After clearing, severity should not be set in the call
       await waitFor(() => {
-        expect(api.fetchInvariants).toHaveBeenLastCalledWith(
-          expect.objectContaining({ severity: undefined })
-        );
+        const lastCall = vi.mocked(api.fetchInvariants).mock.calls.at(-1)?.[0];
+        expect(lastCall?.severity).toBeUndefined();
       });
     });
   });
@@ -295,6 +297,80 @@ describe('InvariantsPage', () => {
         expect(screen.getByText('Degraded State')).toBeInTheDocument();
       });
     });
+
+    it('handles invariants_source_unavailable error gracefully', async () => {
+      const mockError = new Error('Invariants source unavailable') as any;
+      mockError.code = 'invariants_source_unavailable';
+      mockError.request_id = 'req-456';
+      vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
+      vi.mocked(api.fetchInvariantsSummary).mockRejectedValue(mockError);
+
+      render(<InvariantsPage />);
+
+      // Should show degraded state banner
+      await waitFor(() => {
+        expect(screen.getByText('Degraded State')).toBeInTheDocument();
+      });
+
+      // Should show fallback for summary
+      await waitFor(() => {
+        expect(screen.getByText('Summary Unavailable')).toBeInTheDocument();
+        expect(screen.getByText('The invariant registry is temporarily unavailable.')).toBeInTheDocument();
+      });
+
+      // Should NOT show the red error banner for this specific error
+      expect(screen.queryByText('Error loading invariants')).not.toBeInTheDocument();
+    });
+
+    it('does not show degraded state for not_found errors', async () => {
+      const mockError = new Error('Not found') as any;
+      mockError.code = 'not_found';
+      vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
+
+      render(<InvariantsPage />);
+
+      // Wait for error to be displayed
+      await waitFor(() => {
+        expect(screen.getByText('Error loading invariants')).toBeInTheDocument();
+      });
+
+      // Should NOT show degraded state banner for not_found
+      expect(screen.queryByText('Degraded State')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Degraded state from API response', () => {
+    it('displays degraded banner when API returns degraded=true', async () => {
+      vi.mocked(api.fetchInvariants).mockResolvedValue({
+        ...mockInvariantsList,
+        degraded: true,
+      });
+
+      render(<InvariantsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Degraded State')).toBeInTheDocument();
+        expect(screen.getByText(/The invariant registry may be incomplete/)).toBeInTheDocument();
+      });
+
+      // Should still show invariants data
+      await waitFor(() => {
+        expect(screen.getByText('INV-ACK-001')).toBeInTheDocument();
+      });
+    });
+
+    it('shows degraded indicator in summary when summary returns degraded=true', async () => {
+      vi.mocked(api.fetchInvariantsSummary).mockResolvedValue({
+        ...mockSummary,
+        degraded: true,
+      });
+
+      render(<InvariantsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Data may be incomplete')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Empty state', () => {
@@ -334,7 +410,8 @@ describe('InvariantsSummary', () => {
 
     await waitFor(() => {
       expect(screen.getByText('By Severity')).toBeInTheDocument();
-      expect(screen.getByText('High')).toBeInTheDocument();
+      // Use getAllByText since "High" appears in both summary and badges
+      expect(screen.getAllByText('High').length).toBeGreaterThan(0);
       expect(screen.getByText('5')).toBeInTheDocument(); // HIGH count
     });
   });
@@ -344,7 +421,8 @@ describe('InvariantsSummary', () => {
 
     await waitFor(() => {
       expect(screen.getByText('By Enforcement Type')).toBeInTheDocument();
-      expect(screen.getByText('Guard')).toBeInTheDocument();
+      // Use getAllByText since "Guard" appears in both summary and badges
+      expect(screen.getAllByText('Guard').length).toBeGreaterThan(0);
       expect(screen.getByText('4')).toBeInTheDocument(); // guard count
     });
   });
@@ -354,7 +432,8 @@ describe('InvariantsSummary', () => {
 
     await waitFor(() => {
       expect(screen.getByText('By Status')).toBeInTheDocument();
-      expect(screen.getByText('Active')).toBeInTheDocument();
+      // Use getAllByText since "Active" appears in both summary and badges
+      expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
     });
   });
 
