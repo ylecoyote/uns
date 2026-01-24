@@ -4,6 +4,8 @@
  * Provides typed access to the invariants endpoints.
  * All operations are READ-ONLY.
  *
+ * Contract validation is applied via decoders to detect drift early.
+ *
  * Endpoints:
  * - GET /ui/invariants - List invariants with filtering
  * - GET /ui/invariants/summary - Get summary statistics
@@ -15,6 +17,11 @@ import type {
   InvariantSummaryResponse,
 } from '../types/invariants';
 import { apiGet, filterToParams, type RequestOptions } from './client';
+import {
+  decodeInvariantsList,
+  decodeInvariantsSummary,
+  decodeWithMode,
+} from './validators';
 
 /**
  * Fetch invariants list with optional filters and pagination.
@@ -31,7 +38,8 @@ export async function fetchInvariants(
   options?: RequestOptions
 ): Promise<InvariantListResponse> {
   const params = filterToParams(filters);
-  return apiGet<InvariantListResponse>('/invariants', params, options);
+  const data = await apiGet<InvariantListResponse>('/invariants', params, options);
+  return decodeWithMode(decodeInvariantsList, data, 'GET /ui/invariants');
 }
 
 /**
@@ -46,5 +54,6 @@ export async function fetchInvariants(
 export async function fetchInvariantsSummary(
   options?: RequestOptions
 ): Promise<InvariantSummaryResponse> {
-  return apiGet<InvariantSummaryResponse>('/invariants/summary', undefined, options);
+  const data = await apiGet<InvariantSummaryResponse>('/invariants/summary', undefined, options);
+  return decodeWithMode(decodeInvariantsSummary, data, 'GET /ui/invariants/summary');
 }

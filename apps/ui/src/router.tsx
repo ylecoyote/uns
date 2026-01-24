@@ -10,7 +10,7 @@
  */
 
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuditTimeline, InvariantsPage, PlaceholderPage } from './pages';
+import { AuditTimeline, InvariantsPage, PlaceholderPage, PolicyInspectorPage } from './pages';
 import { DeliveriesListPage } from './pages/DeliveriesListPage';
 import { DeliveriesDetailPage } from './pages/DeliveriesDetailPage';
 import { ROUTES, ROUTE_CONFIGS, type RouteConfig } from './types/routes';
@@ -30,6 +30,8 @@ function getRouteElement(config: RouteConfig): React.ReactElement {
       return <InvariantsPage />;
     case ROUTES.DELIVERIES:
       return <DeliveriesListPage />;
+    case ROUTES.POLICY:
+      return <PolicyInspectorPage />;
     default:
       return <PlaceholderPage title={config.title} description={config.description} />;
   }
