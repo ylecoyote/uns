@@ -286,6 +286,52 @@ Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md)
 - `InvariantsSummaryResponse` - Summary statistics
 - `AuditEventsListResponse` - Paginated audit events
 
+## Boundary Rules
+
+The canonical `apps/ui/` directory enforces strict boundaries to prevent Flask/Python HTML-serving patterns from returning. This is enforced by a CI guardrail.
+
+### Rules
+
+| Rule | Description |
+|------|-------------|
+| **NO_PYTHON_IN_CANONICAL_UI** | No `.py` files allowed in `apps/ui/` except under `legacy_flask_reference/` |
+| **NO_TEMPLATES_DIRECTORY** | No `templates/` directories (Flask-style HTML templating) |
+| **NO_FLASK_APP_IN_UI** | No Flask imports or `render_template` patterns in app.py files |
+
+### Allowed Exceptions
+
+Python files are allowed **only** under `apps/ui/legacy_flask_reference/` for migration reference purposes. This folder is intended for:
+- Temporary preservation of old Flask code during migration
+- Reference for developers migrating functionality to the canonical React/TypeScript stack
+
+### Where Backend Code Should Live
+
+| Code Type | Location |
+|-----------|----------|
+| UI API Routes | `src/mcp_server/routes_ui.py` |
+| Pydantic Models | `src/notification/models.py` or `src/mcp_server/read_models.py` |
+| Backend Tests | `tests/ui_client/` or `tests/mcp_server/` |
+| Read Model Adapters | `src/mcp_server/read_models.py` |
+
+### Running the Guardrail
+
+```bash
+# Check for violations (warning mode)
+python scripts/ci/check_ui_boundary.py
+
+# Strict mode (fails CI on violations)
+python scripts/ci/check_ui_boundary.py --strict
+
+# Show migration guidance
+python scripts/ci/check_ui_boundary.py --fix
+```
+
+### Current Status
+
+The guardrail currently detects Python files in `apps/ui/` that need to be migrated. These files are legacy artifacts from the initial FastAPI-based UI implementation and should be moved to the appropriate backend locations.
+
+See [scripts/ci/check_ui_boundary.py](../../scripts/ci/check_ui_boundary.py) for the full guardrail implementation.
+
 ## Related Documentation
 
 - [UI Scope v1](../../docs/ui/ui-scope.md) - v1 constraints and design philosophy
