@@ -2042,3 +2042,74 @@ Produced Phase 1.1 bounded verification report for UI standardization. The repor
 ✅ UI respects degraded-state semantics - VERIFIED
 ✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
 ✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
+
+---
+
+## Phase 1.2: Add CI Job for UI Boundary Guardrail
+
+### Task: Add CI job for UI boundary guardrail
+**Date**: 2026-01-23
+
+### Summary
+Integrated the UI boundary guardrail script into CI to enforce that Python files do not appear in the canonical apps/ui directory structure.
+
+### What Was Done
+
+1. **Created UI Boundary Check Script** (`scripts/ci/check_ui_boundary.py`)
+   - Detects Python files outside `apps/ui/legacy_flask_reference/`
+   - Detects Flask-style `templates/` directories
+   - Detects Flask patterns in `app.py` files
+   - Supports `--strict` mode for CI enforcement
+   - Supports `--fix` mode for migration guidance
+
+2. **Created GitHub Actions Workflow** (`.github/workflows/ui.yaml`)
+   - `boundary-check` job: Runs UI boundary guardrail with `--strict`
+   - `lint` job: Runs ESLint on apps/ui
+   - `typecheck` job: Runs TypeScript type checking
+   - `test` job: Runs Vitest tests
+   - `build` job: Builds production assets (depends on all other jobs)
+   - Triggers on PRs and pushes affecting apps/ui, scripts/ci, or workflow files
+   - Caches node_modules for faster CI runs
+   - Uploads build artifact on success
+
+3. **Created Tests** (`tests/ci/test_check_ui_boundary.py`)
+   - 25 unit and integration tests covering:
+     - `is_in_legacy_reference()` helper function
+     - `check_python_files()` detection
+     - `check_templates_directory()` detection
+     - `check_flask_app_patterns()` detection
+     - Integration tests for clean, Flask-style, and mixed directory structures
+   - All tests pass
+
+4. **Updated Documentation** (`apps/ui/README.md`)
+   - Added "Boundary Rules" section documenting:
+     - Rules enforced by CI
+     - How to run the boundary check locally
+     - Migration guidance table
+     - CI enforcement details
+
+### Files Created
+- `scripts/ci/check_ui_boundary.py` - Boundary check script
+- `.github/workflows/ui.yaml` - GitHub Actions CI workflow
+- `tests/ci/__init__.py` - Test package init
+- `tests/ci/test_check_ui_boundary.py` - Tests for boundary check script
+
+### Files Modified
+- `apps/ui/README.md` - Added Boundary Rules section
+
+### Test Results
+- 25 tests pass for the boundary check script
+- Linting passes (ruff check)
+- Formatting passes (ruff format)
+
+### Boundary Check Output (Current State)
+The boundary check script correctly detects 26 Python file violations in apps/ui/
+This is expected as the Python files haven't been fully migrated yet.
+In CI with `--strict` mode, this will fail until migration is complete.
+
+### Acceptance Criteria Met
+✅ CI config updated to run boundary check - `.github/workflows/ui.yaml` created
+✅ CI runs with --strict mode to fail on violations
+✅ CI output clearly reports what violated boundary rules (summary with counts)
+✅ Tests written and passing (25 tests)
+✅ Documentation updated in apps/ui/README.md

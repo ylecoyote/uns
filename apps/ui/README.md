@@ -286,6 +286,51 @@ Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md)
 - `InvariantsSummaryResponse` - Summary statistics
 - `AuditEventsListResponse` - Paginated audit events
 
+## Boundary Rules
+
+The canonical UI is a **React SPA** served by Vite. Python files are not permitted in the canonical UI directory structure (except for legacy reference code).
+
+### Rules Enforced by CI
+
+1. **No Python files** in `apps/ui/**` except `apps/ui/legacy_flask_reference/**`
+2. **No `templates/` directories** in `apps/ui/**` (Flask-style HTML templating)
+3. **No Flask patterns** in `apps/ui/app.py` (e.g., `from flask import`, `render_template()`)
+
+### Boundary Check Script
+
+Run the boundary check locally:
+
+```bash
+# Run checks (warning mode)
+python scripts/ci/check_ui_boundary.py
+
+# Run checks with CI enforcement (fail on violations)
+python scripts/ci/check_ui_boundary.py --strict
+
+# Show migration guidance for violations
+python scripts/ci/check_ui_boundary.py --fix
+```
+
+### Migration Guidance
+
+If you have Python files that need to be migrated:
+
+| What | Move To |
+|------|---------|
+| Backend API Routes | `src/mcp_server/routes_ui.py` |
+| Pydantic Models/Types | `src/notification/models.py` or `src/mcp_server/read_models.py` |
+| Test Files | `tests/ui_client/` or `tests/docs/` |
+| Reference Code (temporary) | `apps/ui/legacy_flask_reference/` |
+
+### CI Enforcement
+
+The UI boundary guardrail runs in CI on every PR that touches:
+- `apps/ui/**`
+- `scripts/ci/check_ui_boundary.py`
+- `.github/workflows/ui.yaml`
+
+The guardrail fails with `--strict` mode, preventing merges that violate boundary rules.
+
 ## Related Documentation
 
 - [UI Scope v1](../../docs/ui/ui-scope.md) - v1 constraints and design philosophy
