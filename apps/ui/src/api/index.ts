@@ -25,3 +25,6 @@ export { getAuditEvents } from './audit';
 
 // Invariants API exports
 export { fetchInvariants, fetchInvariantsSummary } from './invariants';
+
+// Deliveries API exports
+export { getDeliveries, getDeliveryTimeline } from './deliveries';

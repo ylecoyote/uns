@@ -11,6 +11,8 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuditTimeline, InvariantsPage, PlaceholderPage } from './pages';
+import { DeliveriesListPage } from './pages/DeliveriesListPage';
+import { DeliveriesDetailPage } from './pages/DeliveriesDetailPage';
 import { ROUTES, ROUTE_CONFIGS, type RouteConfig } from './types/routes';
 
 /**
@@ -26,6 +28,8 @@ function getRouteElement(config: RouteConfig): React.ReactElement {
       return <AuditTimeline />;
     case ROUTES.INVARIANTS:
       return <InvariantsPage />;
+    case ROUTES.DELIVERIES:
+      return <DeliveriesListPage />;
     default:
       return <PlaceholderPage title={config.title} description={config.description} />;
   }
@@ -38,7 +42,8 @@ function getRouteElement(config: RouteConfig): React.ReactElement {
  * - / redirects to /audit (default page)
  * - /audit - Audit event timeline
  * - /invariants - System invariants viewer
- * - /deliveries - Delivery explorer (placeholder)
+ * - /deliveries - Delivery explorer list
+ * - /deliveries/:notificationId - Delivery detail page
  * - /policy - Policy inspector (placeholder)
  */
 export function AppRoutes() {
@@ -51,6 +56,9 @@ export function AppRoutes() {
       {ROUTE_CONFIGS.map((config) => (
         <Route key={config.path} path={config.path} element={getRouteElement(config)} />
       ))}
+
+      {/* Deliveries detail route (nested under /deliveries) */}
+      <Route path="/deliveries/:notificationId" element={<DeliveriesDetailPage />} />
 
       {/* Catch-all for unknown routes - redirect to home */}
       <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
