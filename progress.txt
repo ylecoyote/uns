@@ -2131,3 +2131,77 @@ python scripts/ci/check_ui_boundary.py --fix
 ✅ Documentation added to `apps/ui/README.md`
 ✅ 28 tests passing
 ✅ Linting passes
+
+---
+
+## Task: Add CI Jobs for apps/ui (lint, typecheck, test, build) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Created GitHub Actions CI workflow for the apps/ui React/TypeScript application with separate jobs for linting, type checking, testing, and building.
+
+### Artifacts Created
+
+1. **GitHub Actions Workflow** (`.github/workflows/apps-ui.yml`)
+   - **lint** job: Runs ESLint with `--max-warnings 0` (fails on any warnings)
+   - **typecheck** job: Runs TypeScript compiler in check mode (`tsc --noEmit`)
+   - **test** job: Runs Vitest with coverage, uploads coverage report as artifact
+   - **build** job: Builds production assets, uploads dist/ as artifact (depends on lint, typecheck, test)
+
+   Features:
+   - Triggers on push/PR to main/develop branches when apps/ui/** changes
+   - Uses Node.js 20 with npm cache for faster builds
+   - Each job runs in parallel (except build which waits for others)
+   - Artifacts retained for 7 days
+
+### Bug Fixes Made During Implementation
+
+1. **apps/ui/src/api/audit.ts**
+   - Fixed type error: Changed `buildQueryString(filter)` to `buildQueryString(filterToParams(filter))`
+   - Added `RequestOptions` parameter support for request ID propagation
+   - Switched from `apiRequest` to `apiGet` for proper parameter handling
+
+2. **apps/ui/src/hooks/useAuditEvents.ts**
+   - Fixed import: Changed `fetchAuditEvents` to `getAuditEvents` to match exports
+
+3. **apps/ui/tests/router.test.tsx**
+   - Updated test for DELIVERIES route: Changed from `implemented: false` to `implemented: true`
+   - Updated test for /deliveries route: Now expects DeliveriesListPage content instead of placeholder
+   - Updated PlaceholderPage test: Changed to use /policy route instead of /deliveries
+
+### Documentation Updated
+
+1. **CONTRIBUTING.md**
+   - Added Node.js 20 to prerequisites for UI development
+   - Added UI Development section with all npm commands
+   - Added UI CI requirements (ESLint, TypeScript, tests, build)
+   - Updated project structure to include apps/ui
+
+### Test Results
+- 229 UI tests pass across 13 test files
+- Type-check passes (`npm run type-check`)
+- Lint passes (`npm run lint` with 0 warnings)
+- Build succeeds (`npm run build` produces dist/)
+
+### Files Created
+- `.github/workflows/apps-ui.yml`
+
+### Files Modified
+- `apps/ui/src/api/audit.ts` - Type fix and options support
+- `apps/ui/src/hooks/useAuditEvents.ts` - Import fix
+- `apps/ui/tests/router.test.tsx` - Updated tests for implemented DeliveriesListPage
+- `CONTRIBUTING.md` - Added UI development and CI documentation
+
+### Acceptance Criteria Met
+✅ GitHub Actions workflow created with lint, typecheck, test, build jobs
+✅ CI uses `npm ci` for reproducible installs
+✅ Lint job fails on any ESLint issue
+✅ Typecheck job runs `tsc --noEmit`
+✅ Test job runs tests once with coverage
+✅ Build job runs full production build
+✅ Dependencies cached via npm cache
+✅ Build artifact uploaded
+✅ CONTRIBUTING.md updated with UI CI expectations
+✅ All 229 tests pass
+✅ All CI steps verified locally

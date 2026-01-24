@@ -6,9 +6,14 @@ Thank you for your interest in contributing to the Unified Notification Service 
 
 ### Prerequisites
 
+**Backend:**
 - Python 3.10 or higher
 - pip or uv package manager
 - Redis (for integration tests)
+
+**UI (apps/ui):**
+- Node.js 20 or higher
+- npm (included with Node.js)
 
 ### Installation
 
@@ -60,6 +65,48 @@ ruff format src tests
 mypy src
 ```
 
+### UI Development (apps/ui)
+
+The UI is a React/TypeScript application built with Vite. All UI code is in `apps/ui/`.
+
+```bash
+# Navigate to UI directory
+cd apps/ui
+
+# Install dependencies
+npm ci
+
+# Start development server (proxies to backend on port 8000)
+npm run dev
+
+# Run linting
+npm run lint
+
+# Run type checking
+npm run type-check
+
+# Run tests (interactive)
+npm run test
+
+# Run tests once (for CI)
+npm run test:run
+
+# Run tests with coverage
+npm run test:coverage
+
+# Build for production
+npm run build
+
+# Run full CI pipeline locally
+npm run ci
+```
+
+**UI CI Requirements:**
+- ESLint must pass with zero warnings (`--max-warnings 0`)
+- TypeScript must have no type errors
+- All tests must pass (minimum 50% coverage threshold)
+- Production build must succeed
+
 ## Project Structure
 
 ```
@@ -80,6 +127,17 @@ src/
 
 tests/
 └── notification/          # Test files mirror src structure
+
+apps/
+└── ui/                    # React UI application
+    ├── src/
+    │   ├── api/           # Typed API client
+    │   ├── components/    # React components
+    │   ├── hooks/         # Custom React hooks
+    │   ├── pages/         # Page components
+    │   ├── types/         # TypeScript types
+    │   └── utils/         # Utilities
+    └── tests/             # Component and integration tests
 ```
 
 ## Coding Standards

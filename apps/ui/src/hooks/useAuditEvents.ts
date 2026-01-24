@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { fetchAuditEvents, ApiError } from '../api';
+import { getAuditEvents, ApiError } from '../api';
 import type {
   AuditEvent,
   AuditEventFilter,
@@ -38,7 +38,7 @@ export function useAuditEvents(filters: AuditEventFilter): UseAuditEventsResult 
         cursor: isLoadMore && cursor ? cursor : undefined,
       };
 
-      const response = await fetchAuditEvents(currentFilters);
+      const response = await getAuditEvents(currentFilters);
 
       if (isLoadMore) {
         setEvents(prev => [...prev, ...response.items]);
