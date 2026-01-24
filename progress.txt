@@ -1050,3 +1050,78 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 ✅ No mutation routes or privileged actions introduced - VERIFIED
 ✅ Basic UI tests pass - VERIFIED (152 tests)
 ✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
+
+---
+
+## UI Scripts Validation (Industry Standard) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Validated and fixed UI scripts, build, and linting to conform to industry standards.
+
+### Issues Fixed
+
+1. **src/api/invariants.ts**
+   - Fixed import: Changed from non-existent `apiRequest` and `buildQueryString` to existing `apiGet` function
+   - Fixed type compatibility: Converted `InvariantFilters` to plain `Record<string, string | number | boolean | undefined>` for `apiGet` params
+
+2. **src/components/index.ts**
+   - Added missing exports for invariants components:
+     - `InvariantsFilter`
+     - `InvariantsList`
+     - `InvariantsSummary`
+
+3. **src/hooks/useInvariants.ts**
+   - Fixed React Hook exhaustive-deps warning in `useEffect`
+   - Refactored `fetchData` to accept cursor as parameter instead of using stale closure
+   - Added cursor to `loadMore` dependencies
+
+4. **tests/InvariantsPage.test.tsx**
+   - Fixed timing issues with async tests using `waitForLoadingComplete` helper
+   - Added explicit `cleanup()` in `afterEach` for proper test isolation
+   - Fixed element queries that returned multiple elements:
+     - Changed `getByText('Active')` to `getAllByText('Active')` where multiple elements exist
+     - Changed `getByText('High')` to `getAllByText('High')` where multiple elements exist
+     - Changed `getByText('7')` to `getAllByText('7')` where multiple elements exist
+   - Fixed filter clear test to check mock call structure correctly
+
+5. **package.json - Added Industry Standard Scripts**
+   - `test:coverage` - Run tests with coverage reporting
+   - `lint:fix` - Auto-fix linting issues
+   - `ci` - Combined CI check script (type-check + lint + test + build)
+
+### Scripts Available
+| Script | Command | Description |
+|--------|---------|-------------|
+| dev | `npm run dev` | Start Vite dev server |
+| build | `npm run build` | TypeScript check + Vite production build |
+| preview | `npm run preview` | Preview production build |
+| test | `npm run test` | Run Vitest in watch mode |
+| test:run | `npm run test:run` | Run tests once |
+| test:coverage | `npm run test:coverage` | Run tests with coverage |
+| lint | `npm run lint` | ESLint check with --max-warnings 0 |
+| lint:fix | `npm run lint:fix` | ESLint with auto-fix |
+| type-check | `npm run type-check` | TypeScript type check only |
+| ci | `npm run ci` | Full CI validation pipeline |
+
+### Test Results
+- **69 tests pass** across 6 test files
+- Type-check passes
+- Lint passes (0 warnings, 0 errors)
+- Build passes
+
+### Files Modified
+- `apps/ui/src/api/invariants.ts`
+- `apps/ui/src/components/index.ts`
+- `apps/ui/src/hooks/useInvariants.ts`
+- `apps/ui/tests/InvariantsPage.test.tsx`
+- `apps/ui/package.json`
+
+### Acceptance Criteria Met
+✅ UI scripts validated (dev, build, preview, test, lint, type-check)
+✅ Build passes without errors
+✅ Linting passes with 0 warnings
+✅ All 69 tests pass
+✅ Industry standard scripts added (ci, lint:fix, test:coverage)
+✅ CI script validates full pipeline
