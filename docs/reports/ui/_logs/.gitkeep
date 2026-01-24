@@ -1,0 +1,3 @@
+# This directory captures logs from failed verification runs.
+# Log files are named: phase-{version}-verify.log
+# Example: phase-1.2-verify.log
