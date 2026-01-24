@@ -78,9 +78,9 @@ describe('Route Configs', () => {
     expect(config?.implemented).toBe(true);
   });
 
-  it('marks DELIVERIES as not implemented', () => {
+  it('marks DELIVERIES as implemented', () => {
     const config = getRouteConfig(ROUTES.DELIVERIES);
-    expect(config?.implemented).toBe(false);
+    expect(config?.implemented).toBe(true);
   });
 
   it('marks POLICY as not implemented', () => {
@@ -176,7 +176,7 @@ describe('AppRoutes', () => {
     expect(screen.getByText('System Invariants')).toBeInTheDocument();
   });
 
-  it('renders placeholder for /deliveries route', () => {
+  it('renders DeliveriesListPage for /deliveries route', () => {
     render(
       <MemoryRouter initialEntries={['/deliveries']}>
         <AppRoutes />
@@ -184,7 +184,10 @@ describe('AppRoutes', () => {
     );
 
     expect(screen.getByText('Deliveries')).toBeInTheDocument();
-    expect(screen.getByText('Page not yet implemented.')).toBeInTheDocument();
+    // DeliveriesListPage shows the description instead of placeholder message
+    expect(
+      screen.getByText('View delivery timelines and filter by status, intent, channel, and more.')
+    ).toBeInTheDocument();
   });
 
   it('renders placeholder for /policy route', () => {
@@ -224,15 +227,15 @@ describe('AppRoutes', () => {
 });
 
 describe('PlaceholderPage', () => {
-  it('displays correct title and description', () => {
+  it('displays correct title and description for policy route', () => {
     render(
-      <MemoryRouter initialEntries={['/deliveries']}>
+      <MemoryRouter initialEntries={['/policy']}>
         <AppRoutes />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Deliveries')).toBeInTheDocument();
-    expect(screen.getByText('Delivery timeline explorer')).toBeInTheDocument();
+    expect(screen.getByText('Policy')).toBeInTheDocument();
+    expect(screen.getByText('Effective policy inspector')).toBeInTheDocument();
   });
 
   it('shows not implemented message', () => {
