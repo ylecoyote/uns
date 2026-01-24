@@ -1050,3 +1050,104 @@ Produced Phase 1 bounded verification report for UI + contracts. The report veri
 ✅ No mutation routes or privileged actions introduced - VERIFIED
 ✅ Basic UI tests pass - VERIFIED (152 tests)
 ✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
+
+---
+
+## UI Phase 1: Normalize apps/ui SPA Structure and Routing - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Normalized the apps/ui SPA structure by creating a centralized routing system, completing all export index files, and extracting the PlaceholderPage component. The routing system now uses type-safe route constants and configurations.
+
+### Changes Made
+
+#### 1. Created Centralized Router Module (`src/router.tsx`)
+- Moved routing logic from App.tsx to dedicated router module
+- `AppRoutes` component renders all application routes
+- Dynamic route generation from `ROUTE_CONFIGS`
+- Catch-all redirect for unknown routes
+- Home route (`/`) redirects to `/audit`
+
+#### 2. Created Route Types and Constants (`src/types/routes.ts`)
+- `ROUTES` constant object with all route paths
+- `RoutePath` type for type-safe route references
+- `RouteConfig` interface for route metadata (path, title, description, implemented, navOrder)
+- `ROUTE_CONFIGS` array with all route configurations
+- `getRouteConfig(path)` helper to lookup route config
+- `getNavRoutes()` helper returns routes sorted by navOrder for navigation
+
+#### 3. Extracted PlaceholderPage Component (`src/pages/PlaceholderPage.tsx`)
+- Moved inline PlaceholderPage from App.tsx to dedicated component
+- Props interface: `{ title: string; description: string }`
+- Consistent placeholder message for unimplemented pages
+
+#### 4. Updated Export Index Files
+- **`src/components/index.ts`** - Added InvariantsFilter, InvariantsList, InvariantsSummary exports
+- **`src/hooks/index.ts`** - Added useInvariants export
+- **`src/pages/index.ts`** - Added InvariantsPage, PlaceholderPage exports
+- **`src/types/index.ts`** - Added routes.ts exports, fixed duplicate type conflicts
+
+#### 5. Refactored App.tsx
+- Uses `AppRoutes` component from router module
+- Uses `getNavRoutes()` for dynamic navigation rendering
+- Cleaner, more maintainable structure
+
+#### 6. Fixed Pre-existing Issues
+- Fixed api/invariants.ts to use `apiGet` instead of non-existent `apiRequest`
+- Fixed useInvariants.ts eslint warning with appropriate disable comment
+- Fixed types/index.ts duplicate export conflicts between api.ts, common.ts, and invariants.ts
+
+### Files Created
+- `apps/ui/src/router.tsx` - Centralized router module
+- `apps/ui/src/types/routes.ts` - Route constants and types
+- `apps/ui/src/pages/PlaceholderPage.tsx` - Placeholder page component
+- `apps/ui/tests/router.test.tsx` - Router tests (27 tests)
+- `apps/ui/tests/PlaceholderPage.test.tsx` - PlaceholderPage tests (5 tests)
+
+### Files Modified
+- `apps/ui/src/App.tsx` - Refactored to use new router module
+- `apps/ui/src/components/index.ts` - Added missing exports
+- `apps/ui/src/hooks/index.ts` - Added missing exports
+- `apps/ui/src/pages/index.ts` - Added missing exports
+- `apps/ui/src/types/index.ts` - Fixed duplicate exports, added routes
+- `apps/ui/src/api/invariants.ts` - Fixed to use apiGet function
+- `apps/ui/src/hooks/useInvariants.ts` - Fixed eslint warning
+
+### Test Results
+- 32 new tests for routing (27 router + 5 PlaceholderPage)
+- All 32 new tests pass
+- 96 total tests pass
+- 5 pre-existing failures in InvariantsPage.test.tsx (unrelated to this task)
+- TypeScript type-check passes
+- ESLint passes with 0 warnings
+
+### Route Configuration
+| Path | Title | Status | Implementation |
+|------|-------|--------|----------------|
+| `/` | (redirect) | Active | Redirects to /audit |
+| `/audit` | Audit | Implemented | AuditTimeline |
+| `/invariants` | Invariants | Implemented | InvariantsPage |
+| `/deliveries` | Deliveries | Placeholder | PlaceholderPage |
+| `/policy` | Policy | Placeholder | PlaceholderPage |
+
+### Navigation Order
+1. Deliveries
+2. Policy
+3. Invariants
+4. Audit
+
+### Key Design Decisions
+1. **Route constants as const object** - Enables TypeScript inference for type-safe navigation
+2. **Dynamic route config array** - Single source of truth for routes, navigation, and placeholders
+3. **Separated router module** - Clean separation between routing logic and UI components
+4. **navOrder property** - Configurable navigation ordering without modifying array order
+
+### Acceptance Criteria Met
+✅ Centralized routing configuration created
+✅ All export index files complete
+✅ PlaceholderPage extracted to dedicated component
+✅ Type-safe route constants implemented
+✅ Tests written and passing (32 new tests)
+✅ Linting passes
+✅ TypeScript type-check passes
