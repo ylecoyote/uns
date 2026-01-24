@@ -1878,3 +1878,99 @@ Normalized the AuditTimeline page and related components to follow the establish
 ✅ Linting passes
 
 ---
+
+## Task: Standardize UI Testing Stack (Vitest + React Testing Library) - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Standardized the UI testing stack using Vitest and React Testing Library. Fixed existing test issues, enhanced test setup, and created proper configuration for coverage reporting.
+
+### Changes Made
+
+#### 1. Created Dedicated Vitest Configuration (`apps/ui/vitest.config.ts`)
+- Separated test configuration from `vite.config.ts` into dedicated `vitest.config.ts`
+- Configured V8 coverage provider with multiple reporters (text, json, html, lcov)
+- Set coverage thresholds (50% for statements, branches, functions, lines)
+- Configured proper test file patterns and exclusions
+- Added HTML test report generation
+
+#### 2. Enhanced Test Setup File (`apps/ui/src/test/setup.ts`)
+- Added automatic cleanup after each test
+- Added mock reset between tests
+- Added browser API mocks for jsdom:
+  - `window.matchMedia` (for responsive queries)
+  - `window.ResizeObserver` (for layout observers)
+  - `window.IntersectionObserver` (for visibility detection)
+  - `window.scrollTo` (for scroll operations)
+
+#### 3. Fixed Component Exports (`apps/ui/src/components/index.ts`)
+- Added missing exports for InvariantsFilter, InvariantsList, InvariantsSummary
+- These components were not exported, causing InvariantsPage tests to fail
+
+#### 4. Fixed Test Assertions (`apps/ui/tests/InvariantsPage.test.tsx`)
+- Fixed multiple elements matching same text (using `getAllByText` instead of `getByText`)
+- Fixed filter clearing assertions to properly check mock call arguments
+- Fixed summary statistics assertions for elements appearing in multiple places
+
+#### 5. Fixed API Client (`apps/ui/src/api/client.ts`)
+- Added missing `buildQueryString()` function for query parameter construction
+- Added missing `apiRequest()` function for backwards compatibility
+- Fixed TypeScript errors for InvariantFilters type compatibility
+
+#### 6. Fixed ESLint Warning (`apps/ui/src/hooks/useInvariants.ts`)
+- Added eslint-disable comment for intentional dependency omission in useEffect
+
+#### 7. Updated Package.json Scripts
+- Added `test:coverage` - Run tests with coverage report
+- Added `test:watch` - Run tests in watch mode
+- Added `test:ui` - Run Vitest UI for interactive testing
+
+#### 8. Updated Dependencies
+- Added `@vitest/coverage-v8@^1.6.1` for V8 coverage support
+- Added `@vitest/ui@^1.6.1` for interactive test UI
+
+### Files Created
+- `apps/ui/vitest.config.ts` - Dedicated Vitest configuration
+
+### Files Modified
+- `apps/ui/vite.config.ts` - Removed test config (now in vitest.config.ts)
+- `apps/ui/src/test/setup.ts` - Enhanced with browser API mocks and cleanup
+- `apps/ui/src/components/index.ts` - Added missing component exports
+- `apps/ui/tests/InvariantsPage.test.tsx` - Fixed flaky test assertions
+- `apps/ui/src/api/client.ts` - Added missing helper functions
+- `apps/ui/src/hooks/useInvariants.ts` - Fixed ESLint warning
+- `apps/ui/package.json` - Added new test scripts and dependencies
+
+### Test Results
+- **69 tests passing** across 6 test files
+- All ESLint checks passing
+- All TypeScript type checks passing
+
+### Test Stack Summary
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| Vitest | ^1.1.0 | Test runner with Vite integration |
+| @testing-library/react | ^14.1.2 | React component testing utilities |
+| @testing-library/jest-dom | ^6.1.5 | DOM assertion matchers |
+| jsdom | ^23.0.1 | DOM environment for tests |
+| @vitest/coverage-v8 | ^1.6.1 | V8 coverage provider |
+| @vitest/ui | ^1.6.1 | Interactive test UI |
+| msw | ^2.0.11 | API mocking (pre-configured) |
+
+### Available Test Scripts
+```bash
+npm run test        # Run tests in watch mode
+npm run test:run    # Run tests once
+npm run test:coverage  # Run tests with coverage report
+npm run test:watch  # Run tests in watch mode
+npm run test:ui     # Interactive Vitest UI
+```
+
+### Acceptance Criteria Met
+✅ Vitest properly configured for React/TypeScript
+✅ React Testing Library integrated with proper matchers
+✅ All 69 existing tests pass
+✅ Coverage reporting configured
+✅ Linting passes
+✅ Type checking passes
