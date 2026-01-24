@@ -2042,3 +2042,105 @@ Produced Phase 1.1 bounded verification report for UI standardization. The repor
 ✅ UI respects degraded-state semantics - VERIFIED
 ✅ UI tests + build scripts run - VERIFIED (69 tests, build passes)
 ✅ Output: docs/reports/ui/phase-1_1-standardize-ui-verify.md - CREATED
+
+---
+
+## Task: Update /verify Command Docs to Reference UI Boundary and Contract Checks - COMPLETED
+
+### Date: 2026-01-23
+
+### Summary
+Updated the `/verify` command documentation to include references to UI boundary constraints and contract checks. This ensures the verification command properly guides users in verifying UI scope compliance and contract alignment.
+
+### Files Modified (in ~/.claude/commands/)
+
+1. **verify.md** - Enhanced with UI boundary and contract check sections:
+   - Added `--ui-boundary` focus mode for UI architecture boundary constraints
+   - Added `--contracts` focus mode for data contract alignment (updated existing entry)
+   - Added UI-related examples to Examples section
+   - Added new "## UI Boundary Checks" section with:
+     - Architectural Constraints (5 key constraints)
+     - UI Invariants section referencing INV-UI-001
+     - Verification approach for read-only enforcement
+     - Related Documentation links
+   - Added new "## Contract Checks" section with:
+     - Contract Alignment checklist (5 verification points)
+     - Contract Drift Indicators (4 warning signs)
+     - Evidence Sources for contract verification
+     - Verification Guidance with example commands
+
+2. **verify_invariants.md** - Enhanced with UI-specific invariant documentation:
+   - Added new "## UI-Specific Invariants" section
+   - Documented INV-UI-001: Read-Only UI invariant with enforcement evidence
+   - Added UI Boundary Constraints subsection
+   - Added Contract Invariants subsection with reference to --contracts flag
+
+### Tests Created
+
+**tests/docs/test_verify_command_references.py** - 13 validation tests:
+- `TestUIBoundaryDocReferencesExist` (4 tests):
+  - Verifies docs/ui/ui-scope.md exists
+  - Verifies apps/ui/README.md exists
+  - Verifies docs/reports/ui/ directory has verification reports
+  - Verifies docs/verification/invariants.yml exists
+- `TestContractDocReferencesExist` (3 tests):
+  - Verifies docs/ui/ui-data-contracts.md exists
+  - Verifies apps/ui/src/types/ directory exists
+  - Verifies apps/ui/src/api/ directory exists
+- `TestInvariantRegistryContainsUIInvariants` (2 tests):
+  - Verifies INV-UI-001 is defined in registry
+  - Verifies read-only constraint is described
+- `TestUIReadmeContainsDesignPrinciples` (4 tests):
+  - Verifies read-only endpoints documented
+  - Verifies no direct backend imports documented
+  - Verifies invariant integrity documented
+  - Verifies INV-UI-001 reference exists
+
+### Test Results
+- All 13 new tests pass
+- All ruff linting checks pass
+- All mypy type checks pass
+
+### Documentation References Added
+
+**UI Boundary Checks reference:**
+- docs/ui/ui-scope.md - Authoritative scope definition
+- apps/ui/README.md - Design principles and constraints
+- docs/reports/ui/ - Phase verification reports
+- docs/verification/invariants.yml - INV-UI-001 definition
+
+**Contract Checks reference:**
+- docs/ui/ui-data-contracts.md - Response shapes and contracts
+- apps/ui/src/types/ - TypeScript type definitions
+- apps/ui/src/api/ - API client implementations
+
+### Key Documentation Additions
+
+**New Examples in verify.md:**
+```
+/verify docs/ui/ui-data-contracts.md apps/ui/src/types/ --contracts
+/verify apps/ui/ --ui-boundary --bounded
+/verify docs/ui/ui-scope.md apps/ui/ --docs-code --ui-boundary
+```
+
+**UI Boundary Constraints documented:**
+1. No Python in canonical UI paths (excluding legacy_flask_reference/)
+2. No templates or Flask runtime (React SPA only)
+3. No direct backend imports
+4. Read-only endpoints only (/ui/* or /api/v1/* GET)
+5. No mutation actions (Phase 1)
+
+**Contract Drift Indicators documented:**
+- Missing fields between backend and TypeScript types
+- Type mismatches (number vs string, optional vs required)
+- Enum drift (status/intent values)
+- Pagination inconsistency
+
+### Acceptance Criteria Met
+✅ verify.md updated with --ui-boundary and --contracts focus modes
+✅ verify.md includes UI Boundary Checks section with architectural constraints
+✅ verify.md includes Contract Checks section with alignment verification
+✅ verify_invariants.md updated with INV-UI-001 and UI boundary constraints
+✅ Tests created validating documentation references (13 tests)
+✅ All tests pass
+✅ All linting passes
