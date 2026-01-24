@@ -17,3 +17,7 @@ export * from './InvariantsSummary';
 // Deliveries components
 export * from './DeliveriesFilters';
 export * from './DeliveriesTable';
+
+// Policy Inspector components
+export * from './PolicyInspectorForm';
+export * from './ResolutionTraceDisplay';
