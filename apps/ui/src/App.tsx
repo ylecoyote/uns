@@ -5,71 +5,36 @@
  * All pages are READ-ONLY per ui-scope.md.
  */
 
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { AuditTimeline } from './pages/AuditTimeline';
+import { BrowserRouter, NavLink } from 'react-router-dom';
+import { AppRoutes } from './router';
+import { getNavRoutes } from './types/routes';
 import './App.css';
 
 function App() {
+  const navRoutes = getNavRoutes();
+
   return (
     <BrowserRouter>
       <div className="app">
         <nav className="app-nav">
           <div className="nav-brand">UNS Dashboard</div>
           <ul className="nav-links">
-            <li>
-              <NavLink to="/deliveries" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Deliveries
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/policy" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Policy
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/invariants" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Invariants
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/audit" className={({ isActive }) => (isActive ? 'active' : '')}>
-                Audit
-              </NavLink>
-            </li>
+            {navRoutes.map((route) => (
+              <li key={route.path}>
+                <NavLink to={route.path} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  {route.title}
+                </NavLink>
+              </li>
+            ))}
           </ul>
           <div className="nav-badge">READ-ONLY</div>
         </nav>
 
         <main className="app-main">
-          <Routes>
-            <Route path="/" element={<AuditTimeline />} />
-            <Route path="/audit" element={<AuditTimeline />} />
-            <Route
-              path="/deliveries"
-              element={<PlaceholderPage title="Deliveries" description="Delivery timeline explorer" />}
-            />
-            <Route
-              path="/policy"
-              element={<PlaceholderPage title="Policy" description="Effective policy inspector" />}
-            />
-            <Route
-              path="/invariants"
-              element={<PlaceholderPage title="Invariants" description="System invariants viewer" />}
-            />
-          </Routes>
+          <AppRoutes />
         </main>
       </div>
     </BrowserRouter>
-  );
-}
-
-function PlaceholderPage({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="placeholder-page">
-      <h1>{title}</h1>
-      <p>{description}</p>
-      <p className="placeholder-note">Page not yet implemented.</p>
-    </div>
   );
 }
 
