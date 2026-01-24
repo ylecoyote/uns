@@ -21,6 +21,11 @@ export class ApiError extends Error {
     this.statusCode = statusCode;
     this.details = response.error.details;
   }
+
+  // Alias for consistency with types/common.ts interface
+  get request_id(): string {
+    return this.requestId;
+  }
 }
 
 export interface RequestOptions {
@@ -71,6 +76,63 @@ export async function apiGet<T>(
   if (!response.ok) {
     const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
     // Handle FastAPI's error wrapping
+    const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
+    throw new ApiError(errorResponse, response.status);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+/**
+ * Build a query string from an object of parameters.
+ * Filters out undefined/null values.
+ *
+ * @param params - Object with query parameters
+ * @returns Query string including leading '?' if params exist, empty string otherwise
+ */
+export function buildQueryString(
+  params: Record<string, string | number | boolean | undefined | null>
+): string {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  });
+
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
+/**
+ * Make a GET request to the API using a full path (including /ui prefix if needed).
+ *
+ * @param path - Full API path (e.g., '/ui/audit')
+ * @param options - Request options including optional requestId for correlation
+ */
+export async function apiRequest<T>(
+  path: string,
+  options?: RequestOptions
+): Promise<T> {
+  const url = new URL(path, window.location.origin);
+
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+  };
+
+  if (options?.requestId) {
+    headers['X-Request-ID'] = options.requestId;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers,
+    signal: options?.signal,
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
     const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
     throw new ApiError(errorResponse, response.status);
   }
