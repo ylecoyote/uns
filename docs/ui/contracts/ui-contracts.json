@@ -1,0 +1,2480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UNS UI Contracts",
+  "description": "Machine-readable contract snapshot for /ui endpoints in the Unified Notification Service",
+  "version": "1.0.0",
+  "generated_at": "2026-01-24T06:09:10.223266+00:00",
+  "source": "scripts/generate_ui_contracts.py",
+  "enums": {
+    "AckStatus": [
+      "ACKED",
+      "DISMISSED",
+      "PENDING",
+      "TIMED_OUT"
+    ],
+    "AuditEventType": [
+      "ack.dismissed",
+      "ack.pending",
+      "ack.received",
+      "ack.timed_out",
+      "delivery.channel_attempted",
+      "delivery.deduplicated",
+      "delivery.failed",
+      "delivery.rate_limited",
+      "delivery.started",
+      "delivery.succeeded",
+      "escalation.triggered",
+      "notification.created"
+    ],
+    "AutonomyMode": [
+      "LIVE",
+      "PREVIEW",
+      "SHADOW"
+    ],
+    "Channel": [
+      "EMAIL",
+      "PAGERDUTY",
+      "SLACK",
+      "WEBSOCKET"
+    ],
+    "DeliveryMode": [
+      "BEST_EFFORT",
+      "GUARANTEED"
+    ],
+    "DeliveryStatus": [
+      "DEDUPLICATED",
+      "DELIVERED",
+      "FAILED",
+      "PENDING",
+      "RATE_LIMITED",
+      "SUCCESS"
+    ],
+    "EnforcementType": [
+      "exception",
+      "guard",
+      "isolation",
+      "test"
+    ],
+    "InvariantSeverity": [
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ],
+    "InvariantStatus": [
+      "active",
+      "inactive"
+    ],
+    "NotificationIntent": [
+      "GOVERNANCE",
+      "INFORMATIONAL",
+      "OPERATIONAL",
+      "SAFETY"
+    ],
+    "Priority": [
+      "HIGH",
+      "LOW",
+      "NORMAL"
+    ],
+    "ResolutionSource": [
+      "explicit_override",
+      "mode_override",
+      "policy_base",
+      "sdk_default"
+    ]
+  },
+  "constants": {
+    "TITLE_MAX_LENGTH": 200,
+    "MESSAGE_MAX_LENGTH": 4000,
+    "PAGINATION_DEFAULT_LIMIT": 25,
+    "PAGINATION_MAX_LIMIT": 100
+  },
+  "schemas": {
+    "AuditEvent": {
+      "$defs": {
+        "AuditEventType": {
+          "description": "Types of audit events.",
+          "enum": [
+            "notification.created",
+            "delivery.started",
+            "delivery.channel_attempted",
+            "delivery.succeeded",
+            "delivery.failed",
+            "delivery.deduplicated",
+            "delivery.rate_limited",
+            "ack.pending",
+            "ack.received",
+            "ack.dismissed",
+            "ack.timed_out",
+            "escalation.triggered"
+          ],
+          "title": "AuditEventType",
+          "type": "string"
+        },
+        "AutonomyContextResponse": {
+          "description": "Autonomy context in responses.",
+          "properties": {
+            "autonomy_mode": {
+              "$ref": "#/$defs/AutonomyMode"
+            },
+            "agent_id": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            },
+            "plan_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Plan Id"
+            },
+            "decision_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Decision Snapshot Id"
+            },
+            "execution_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Execution Snapshot Id"
+            },
+            "skip_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Snapshot Id"
+            }
+          },
+          "required": [
+            "autonomy_mode",
+            "agent_id"
+          ],
+          "title": "AutonomyContextResponse",
+          "type": "object"
+        },
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        }
+      },
+      "description": "Single audit event.",
+      "properties": {
+        "audit_id": {
+          "format": "uuid",
+          "title": "Audit Id",
+          "type": "string"
+        },
+        "event_type": {
+          "$ref": "#/$defs/AuditEventType"
+        },
+        "event_time": {
+          "format": "date-time",
+          "title": "Event Time",
+          "type": "string"
+        },
+        "notification_id": {
+          "format": "uuid",
+          "title": "Notification Id",
+          "type": "string"
+        },
+        "notification_type": {
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "autonomy_context": {
+          "$ref": "#/$defs/AutonomyContextResponse"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "correlation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correlation Id"
+        }
+      },
+      "required": [
+        "audit_id",
+        "event_type",
+        "event_time",
+        "notification_id",
+        "notification_type",
+        "autonomy_context"
+      ],
+      "title": "AuditEvent",
+      "type": "object"
+    },
+    "AuditEventListResponse": {
+      "$defs": {
+        "AuditEvent": {
+          "description": "Single audit event.",
+          "properties": {
+            "audit_id": {
+              "format": "uuid",
+              "title": "Audit Id",
+              "type": "string"
+            },
+            "event_type": {
+              "$ref": "#/$defs/AuditEventType"
+            },
+            "event_time": {
+              "format": "date-time",
+              "title": "Event Time",
+              "type": "string"
+            },
+            "notification_id": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            },
+            "notification_type": {
+              "title": "Notification Type",
+              "type": "string"
+            },
+            "autonomy_context": {
+              "$ref": "#/$defs/AutonomyContextResponse"
+            },
+            "payload": {
+              "additionalProperties": true,
+              "title": "Payload",
+              "type": "object"
+            },
+            "correlation_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Correlation Id"
+            }
+          },
+          "required": [
+            "audit_id",
+            "event_type",
+            "event_time",
+            "notification_id",
+            "notification_type",
+            "autonomy_context"
+          ],
+          "title": "AuditEvent",
+          "type": "object"
+        },
+        "AuditEventType": {
+          "description": "Types of audit events.",
+          "enum": [
+            "notification.created",
+            "delivery.started",
+            "delivery.channel_attempted",
+            "delivery.succeeded",
+            "delivery.failed",
+            "delivery.deduplicated",
+            "delivery.rate_limited",
+            "ack.pending",
+            "ack.received",
+            "ack.dismissed",
+            "ack.timed_out",
+            "escalation.triggered"
+          ],
+          "title": "AuditEventType",
+          "type": "string"
+        },
+        "AutonomyContextResponse": {
+          "description": "Autonomy context in responses.",
+          "properties": {
+            "autonomy_mode": {
+              "$ref": "#/$defs/AutonomyMode"
+            },
+            "agent_id": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            },
+            "plan_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Plan Id"
+            },
+            "decision_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Decision Snapshot Id"
+            },
+            "execution_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Execution Snapshot Id"
+            },
+            "skip_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Snapshot Id"
+            }
+          },
+          "required": [
+            "autonomy_mode",
+            "agent_id"
+          ],
+          "title": "AutonomyContextResponse",
+          "type": "object"
+        },
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "PaginationInfo": {
+          "description": "Pagination metadata for list responses.",
+          "properties": {
+            "next_cursor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Opaque cursor for next page, null if no more pages",
+              "title": "Next Cursor"
+            },
+            "has_more": {
+              "default": false,
+              "description": "Whether more pages exist",
+              "title": "Has More",
+              "type": "boolean"
+            },
+            "total_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total count (included when efficient to compute)",
+              "title": "Total Count"
+            }
+          },
+          "title": "PaginationInfo",
+          "type": "object"
+        }
+      },
+      "description": "Paginated list of audit events.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AuditEvent"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "pagination": {
+          "$ref": "#/$defs/PaginationInfo"
+        }
+      },
+      "required": [
+        "pagination"
+      ],
+      "title": "AuditEventListResponse",
+      "type": "object"
+    },
+    "AutonomyContextResponse": {
+      "$defs": {
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        }
+      },
+      "description": "Autonomy context in responses.",
+      "properties": {
+        "autonomy_mode": {
+          "$ref": "#/$defs/AutonomyMode"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Id"
+        },
+        "decision_snapshot_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision Snapshot Id"
+        },
+        "execution_snapshot_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Snapshot Id"
+        },
+        "skip_snapshot_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skip Snapshot Id"
+        }
+      },
+      "required": [
+        "autonomy_mode",
+        "agent_id"
+      ],
+      "title": "AutonomyContextResponse",
+      "type": "object"
+    },
+    "DeliveryAttempt": {
+      "$defs": {
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        }
+      },
+      "description": "Single channel delivery attempt.",
+      "properties": {
+        "attempt_id": {
+          "format": "uuid",
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "channel": {
+          "$ref": "#/$defs/Channel"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "completed_at": {
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "channel",
+        "status",
+        "started_at",
+        "completed_at",
+        "duration_ms"
+      ],
+      "title": "DeliveryAttempt",
+      "type": "object"
+    },
+    "DeliveryTimelineListResponse": {
+      "$defs": {
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "DeliveryStatus": {
+          "description": "Outcome of a delivery attempt.",
+          "enum": [
+            "PENDING",
+            "DELIVERED",
+            "SUCCESS",
+            "FAILED",
+            "DEDUPLICATED",
+            "RATE_LIMITED"
+          ],
+          "title": "DeliveryStatus",
+          "type": "string"
+        },
+        "DeliveryTimelineSummary": {
+          "description": "Summary view of delivery timeline for list responses.",
+          "properties": {
+            "notification_id": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            },
+            "notification_type": {
+              "title": "Notification Type",
+              "type": "string"
+            },
+            "intent": {
+              "$ref": "#/$defs/NotificationIntent"
+            },
+            "delivery_mode": {
+              "$ref": "#/$defs/DeliveryMode"
+            },
+            "status": {
+              "$ref": "#/$defs/DeliveryStatus"
+            },
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "delivered_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Delivered At"
+            },
+            "channels_attempted": {
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "title": "Channels Attempted",
+              "type": "array"
+            },
+            "channels_succeeded": {
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "title": "Channels Succeeded",
+              "type": "array"
+            },
+            "autonomy_mode": {
+              "$ref": "#/$defs/AutonomyMode"
+            },
+            "agent_id": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "notification_id",
+            "notification_type",
+            "intent",
+            "delivery_mode",
+            "status",
+            "created_at",
+            "autonomy_mode",
+            "agent_id"
+          ],
+          "title": "DeliveryTimelineSummary",
+          "type": "object"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        },
+        "PaginationInfo": {
+          "description": "Pagination metadata for list responses.",
+          "properties": {
+            "next_cursor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Opaque cursor for next page, null if no more pages",
+              "title": "Next Cursor"
+            },
+            "has_more": {
+              "default": false,
+              "description": "Whether more pages exist",
+              "title": "Has More",
+              "type": "boolean"
+            },
+            "total_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total count (included when efficient to compute)",
+              "title": "Total Count"
+            }
+          },
+          "title": "PaginationInfo",
+          "type": "object"
+        }
+      },
+      "description": "Paginated list of delivery timelines.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DeliveryTimelineSummary"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "pagination": {
+          "$ref": "#/$defs/PaginationInfo"
+        }
+      },
+      "required": [
+        "pagination"
+      ],
+      "title": "DeliveryTimelineListResponse",
+      "type": "object"
+    },
+    "DeliveryTimelineResponse": {
+      "$defs": {
+        "AutonomyContextResponse": {
+          "description": "Autonomy context in responses.",
+          "properties": {
+            "autonomy_mode": {
+              "$ref": "#/$defs/AutonomyMode"
+            },
+            "agent_id": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            },
+            "plan_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Plan Id"
+            },
+            "decision_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Decision Snapshot Id"
+            },
+            "execution_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Execution Snapshot Id"
+            },
+            "skip_snapshot_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Snapshot Id"
+            }
+          },
+          "required": [
+            "autonomy_mode",
+            "agent_id"
+          ],
+          "title": "AutonomyContextResponse",
+          "type": "object"
+        },
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryAttempt": {
+          "description": "Single channel delivery attempt.",
+          "properties": {
+            "attempt_id": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            },
+            "channel": {
+              "$ref": "#/$defs/Channel"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "started_at": {
+              "format": "date-time",
+              "title": "Started At",
+              "type": "string"
+            },
+            "completed_at": {
+              "format": "date-time",
+              "title": "Completed At",
+              "type": "string"
+            },
+            "duration_ms": {
+              "title": "Duration Ms",
+              "type": "integer"
+            },
+            "error_message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Error Message"
+            },
+            "error_code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Error Code"
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            }
+          },
+          "required": [
+            "attempt_id",
+            "channel",
+            "status",
+            "started_at",
+            "completed_at",
+            "duration_ms"
+          ],
+          "title": "DeliveryAttempt",
+          "type": "object"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "DeliveryStatus": {
+          "description": "Outcome of a delivery attempt.",
+          "enum": [
+            "PENDING",
+            "DELIVERED",
+            "SUCCESS",
+            "FAILED",
+            "DEDUPLICATED",
+            "RATE_LIMITED"
+          ],
+          "title": "DeliveryStatus",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Full delivery timeline for a notification.",
+      "properties": {
+        "notification_id": {
+          "format": "uuid",
+          "title": "Notification Id",
+          "type": "string"
+        },
+        "notification_type": {
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "intent": {
+          "$ref": "#/$defs/NotificationIntent"
+        },
+        "delivery_mode": {
+          "$ref": "#/$defs/DeliveryMode"
+        },
+        "status": {
+          "$ref": "#/$defs/DeliveryStatus"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "delivered_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivered At"
+        },
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/DeliveryAttempt"
+          },
+          "title": "Attempts",
+          "type": "array"
+        },
+        "channels_attempted": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels Attempted",
+          "type": "array"
+        },
+        "channels_succeeded": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels Succeeded",
+          "type": "array"
+        },
+        "channels_failed": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels Failed",
+          "type": "array"
+        },
+        "autonomy_context": {
+          "$ref": "#/$defs/AutonomyContextResponse"
+        }
+      },
+      "required": [
+        "notification_id",
+        "notification_type",
+        "intent",
+        "delivery_mode",
+        "status",
+        "created_at",
+        "autonomy_context"
+      ],
+      "title": "DeliveryTimelineResponse",
+      "type": "object"
+    },
+    "DeliveryTimelineSummary": {
+      "$defs": {
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "DeliveryStatus": {
+          "description": "Outcome of a delivery attempt.",
+          "enum": [
+            "PENDING",
+            "DELIVERED",
+            "SUCCESS",
+            "FAILED",
+            "DEDUPLICATED",
+            "RATE_LIMITED"
+          ],
+          "title": "DeliveryStatus",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Summary view of delivery timeline for list responses.",
+      "properties": {
+        "notification_id": {
+          "format": "uuid",
+          "title": "Notification Id",
+          "type": "string"
+        },
+        "notification_type": {
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "intent": {
+          "$ref": "#/$defs/NotificationIntent"
+        },
+        "delivery_mode": {
+          "$ref": "#/$defs/DeliveryMode"
+        },
+        "status": {
+          "$ref": "#/$defs/DeliveryStatus"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "delivered_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivered At"
+        },
+        "channels_attempted": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels Attempted",
+          "type": "array"
+        },
+        "channels_succeeded": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels Succeeded",
+          "type": "array"
+        },
+        "autonomy_mode": {
+          "$ref": "#/$defs/AutonomyMode"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "notification_id",
+        "notification_type",
+        "intent",
+        "delivery_mode",
+        "status",
+        "created_at",
+        "autonomy_mode",
+        "agent_id"
+      ],
+      "title": "DeliveryTimelineSummary",
+      "type": "object"
+    },
+    "EffectivePolicyResponse": {
+      "$defs": {
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "EffectivePolicyValues": {
+          "description": "Effective policy values that were actually used.",
+          "properties": {
+            "delivery_mode": {
+              "$ref": "#/$defs/DeliveryMode"
+            },
+            "channels": {
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "title": "Channels",
+              "type": "array"
+            },
+            "require_ack": {
+              "title": "Require Ack",
+              "type": "boolean"
+            },
+            "ack_timeout_minutes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ack Timeout Minutes"
+            },
+            "dedup_window_seconds": {
+              "title": "Dedup Window Seconds",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "delivery_mode",
+            "channels",
+            "require_ack",
+            "dedup_window_seconds"
+          ],
+          "title": "EffectivePolicyValues",
+          "type": "object"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        },
+        "ResolutionContext": {
+          "description": "Context used for policy resolution.",
+          "properties": {
+            "intent": {
+              "$ref": "#/$defs/NotificationIntent"
+            },
+            "autonomy_mode": {
+              "$ref": "#/$defs/AutonomyMode"
+            },
+            "irreversible": {
+              "title": "Irreversible",
+              "type": "boolean"
+            },
+            "policy_found": {
+              "title": "Policy Found",
+              "type": "boolean"
+            },
+            "policy_notification_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Policy Notification Type"
+            }
+          },
+          "required": [
+            "intent",
+            "autonomy_mode",
+            "irreversible",
+            "policy_found"
+          ],
+          "title": "ResolutionContext",
+          "type": "object"
+        },
+        "ResolutionSource": {
+          "description": "Source of a policy resolution value.",
+          "enum": [
+            "explicit_override",
+            "mode_override",
+            "policy_base",
+            "sdk_default"
+          ],
+          "title": "ResolutionSource",
+          "type": "string"
+        },
+        "ResolutionStep": {
+          "description": "Single step in policy resolution chain.",
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/ResolutionSource"
+            },
+            "value": {
+              "description": "The value at this resolution step",
+              "title": "Value"
+            },
+            "applied": {
+              "description": "Whether this value was used",
+              "title": "Applied",
+              "type": "boolean"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Explanation if not applied",
+              "title": "Reason"
+            }
+          },
+          "required": [
+            "source",
+            "value",
+            "applied"
+          ],
+          "title": "ResolutionStep",
+          "type": "object"
+        }
+      },
+      "description": "Response for effective policy resolution.",
+      "properties": {
+        "notification_type": {
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "effective": {
+          "$ref": "#/$defs/EffectivePolicyValues"
+        },
+        "resolution": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/ResolutionStep"
+            },
+            "type": "array"
+          },
+          "description": "Resolution trace for each field",
+          "title": "Resolution",
+          "type": "object"
+        },
+        "resolution_context": {
+          "$ref": "#/$defs/ResolutionContext"
+        }
+      },
+      "required": [
+        "notification_type",
+        "effective",
+        "resolution",
+        "resolution_context"
+      ],
+      "title": "EffectivePolicyResponse",
+      "type": "object"
+    },
+    "EffectivePolicyValues": {
+      "$defs": {
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        }
+      },
+      "description": "Effective policy values that were actually used.",
+      "properties": {
+        "delivery_mode": {
+          "$ref": "#/$defs/DeliveryMode"
+        },
+        "channels": {
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels",
+          "type": "array"
+        },
+        "require_ack": {
+          "title": "Require Ack",
+          "type": "boolean"
+        },
+        "ack_timeout_minutes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ack Timeout Minutes"
+        },
+        "dedup_window_seconds": {
+          "title": "Dedup Window Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "delivery_mode",
+        "channels",
+        "require_ack",
+        "dedup_window_seconds"
+      ],
+      "title": "EffectivePolicyValues",
+      "type": "object"
+    },
+    "ErrorDetail": {
+      "description": "Error detail structure.",
+      "properties": {
+        "code": {
+          "description": "Machine-readable error code",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "description": "Human-readable description",
+          "title": "Message",
+          "type": "string"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional context",
+          "title": "Details"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorDetail",
+      "type": "object"
+    },
+    "ErrorResponse": {
+      "$defs": {
+        "ErrorDetail": {
+          "description": "Error detail structure.",
+          "properties": {
+            "code": {
+              "description": "Machine-readable error code",
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "description": "Human-readable description",
+              "title": "Message",
+              "type": "string"
+            },
+            "details": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional context",
+              "title": "Details"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ErrorDetail",
+          "type": "object"
+        }
+      },
+      "description": "Standard error response.",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        },
+        "request_id": {
+          "description": "Request ID for correlation/support",
+          "title": "Request Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error",
+        "request_id"
+      ],
+      "title": "ErrorResponse",
+      "type": "object"
+    },
+    "EvidenceLink": {
+      "description": "Link to evidence for an invariant.",
+      "properties": {
+        "path": {
+          "description": "Repo-relative path",
+          "title": "Path",
+          "type": "string"
+        },
+        "note": {
+          "description": "Description of what this evidences",
+          "title": "Note",
+          "type": "string"
+        },
+        "line_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional line reference",
+          "title": "Line Ref"
+        }
+      },
+      "required": [
+        "path",
+        "note"
+      ],
+      "title": "EvidenceLink",
+      "type": "object"
+    },
+    "InvariantEnforcement": {
+      "$defs": {
+        "EnforcementType": {
+          "description": "Invariant enforcement mechanism.",
+          "enum": [
+            "guard",
+            "isolation",
+            "test",
+            "exception"
+          ],
+          "title": "EnforcementType",
+          "type": "string"
+        }
+      },
+      "description": "Enforcement details for an invariant.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/EnforcementType"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "description"
+      ],
+      "title": "InvariantEnforcement",
+      "type": "object"
+    },
+    "InvariantEntry": {
+      "$defs": {
+        "EnforcementType": {
+          "description": "Invariant enforcement mechanism.",
+          "enum": [
+            "guard",
+            "isolation",
+            "test",
+            "exception"
+          ],
+          "title": "EnforcementType",
+          "type": "string"
+        },
+        "EvidenceLink": {
+          "description": "Link to evidence for an invariant.",
+          "properties": {
+            "path": {
+              "description": "Repo-relative path",
+              "title": "Path",
+              "type": "string"
+            },
+            "note": {
+              "description": "Description of what this evidences",
+              "title": "Note",
+              "type": "string"
+            },
+            "line_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional line reference",
+              "title": "Line Ref"
+            }
+          },
+          "required": [
+            "path",
+            "note"
+          ],
+          "title": "EvidenceLink",
+          "type": "object"
+        },
+        "InvariantEnforcement": {
+          "description": "Enforcement details for an invariant.",
+          "properties": {
+            "type": {
+              "$ref": "#/$defs/EnforcementType"
+            },
+            "description": {
+              "title": "Description",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "description"
+          ],
+          "title": "InvariantEnforcement",
+          "type": "object"
+        },
+        "InvariantSeverity": {
+          "description": "Invariant severity level.",
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ],
+          "title": "InvariantSeverity",
+          "type": "string"
+        },
+        "InvariantStatus": {
+          "description": "Invariant status.",
+          "enum": [
+            "active",
+            "inactive"
+          ],
+          "title": "InvariantStatus",
+          "type": "string"
+        }
+      },
+      "description": "Single invariant entry.",
+      "properties": {
+        "id": {
+          "description": "e.g., INV-ACK-001",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement": {
+          "description": "The invariant claim",
+          "title": "Statement",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/InvariantSeverity"
+        },
+        "status": {
+          "$ref": "#/$defs/InvariantStatus"
+        },
+        "enforcement": {
+          "$ref": "#/$defs/InvariantEnforcement"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceLink"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "owner": {
+          "description": "Team/role responsible",
+          "title": "Owner",
+          "type": "string"
+        },
+        "last_reviewed": {
+          "description": "ISO 8601 date",
+          "title": "Last Reviewed",
+          "type": "string"
+        },
+        "mitigation": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For exceptions only",
+          "title": "Mitigation"
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "severity",
+        "status",
+        "enforcement",
+        "owner",
+        "last_reviewed"
+      ],
+      "title": "InvariantEntry",
+      "type": "object"
+    },
+    "InvariantListResponse": {
+      "$defs": {
+        "EnforcementType": {
+          "description": "Invariant enforcement mechanism.",
+          "enum": [
+            "guard",
+            "isolation",
+            "test",
+            "exception"
+          ],
+          "title": "EnforcementType",
+          "type": "string"
+        },
+        "EvidenceLink": {
+          "description": "Link to evidence for an invariant.",
+          "properties": {
+            "path": {
+              "description": "Repo-relative path",
+              "title": "Path",
+              "type": "string"
+            },
+            "note": {
+              "description": "Description of what this evidences",
+              "title": "Note",
+              "type": "string"
+            },
+            "line_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Optional line reference",
+              "title": "Line Ref"
+            }
+          },
+          "required": [
+            "path",
+            "note"
+          ],
+          "title": "EvidenceLink",
+          "type": "object"
+        },
+        "InvariantEnforcement": {
+          "description": "Enforcement details for an invariant.",
+          "properties": {
+            "type": {
+              "$ref": "#/$defs/EnforcementType"
+            },
+            "description": {
+              "title": "Description",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "description"
+          ],
+          "title": "InvariantEnforcement",
+          "type": "object"
+        },
+        "InvariantEntry": {
+          "description": "Single invariant entry.",
+          "properties": {
+            "id": {
+              "description": "e.g., INV-ACK-001",
+              "title": "Id",
+              "type": "string"
+            },
+            "statement": {
+              "description": "The invariant claim",
+              "title": "Statement",
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "#/$defs/InvariantSeverity"
+            },
+            "status": {
+              "$ref": "#/$defs/InvariantStatus"
+            },
+            "enforcement": {
+              "$ref": "#/$defs/InvariantEnforcement"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/EvidenceLink"
+              },
+              "title": "Evidence",
+              "type": "array"
+            },
+            "owner": {
+              "description": "Team/role responsible",
+              "title": "Owner",
+              "type": "string"
+            },
+            "last_reviewed": {
+              "description": "ISO 8601 date",
+              "title": "Last Reviewed",
+              "type": "string"
+            },
+            "mitigation": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "For exceptions only",
+              "title": "Mitigation"
+            }
+          },
+          "required": [
+            "id",
+            "statement",
+            "severity",
+            "status",
+            "enforcement",
+            "owner",
+            "last_reviewed"
+          ],
+          "title": "InvariantEntry",
+          "type": "object"
+        },
+        "InvariantSeverity": {
+          "description": "Invariant severity level.",
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ],
+          "title": "InvariantSeverity",
+          "type": "string"
+        },
+        "InvariantStatus": {
+          "description": "Invariant status.",
+          "enum": [
+            "active",
+            "inactive"
+          ],
+          "title": "InvariantStatus",
+          "type": "string"
+        },
+        "PaginationInfo": {
+          "description": "Pagination metadata for list responses.",
+          "properties": {
+            "next_cursor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Opaque cursor for next page, null if no more pages",
+              "title": "Next Cursor"
+            },
+            "has_more": {
+              "default": false,
+              "description": "Whether more pages exist",
+              "title": "Has More",
+              "type": "boolean"
+            },
+            "total_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Total count (included when efficient to compute)",
+              "title": "Total Count"
+            }
+          },
+          "title": "PaginationInfo",
+          "type": "object"
+        }
+      },
+      "description": "Paginated list of invariants.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/InvariantEntry"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "pagination": {
+          "$ref": "#/$defs/PaginationInfo"
+        }
+      },
+      "required": [
+        "pagination"
+      ],
+      "title": "InvariantListResponse",
+      "type": "object"
+    },
+    "InvariantSummaryResponse": {
+      "description": "Summary statistics for invariants.",
+      "properties": {
+        "total_count": {
+          "title": "Total Count",
+          "type": "integer"
+        },
+        "by_severity": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Severity",
+          "type": "object"
+        },
+        "by_enforcement_type": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Enforcement Type",
+          "type": "object"
+        },
+        "by_status": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Status",
+          "type": "object"
+        },
+        "exceptions_requiring_review": {
+          "title": "Exceptions Requiring Review",
+          "type": "integer"
+        },
+        "last_updated": {
+          "title": "Last Updated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "total_count",
+        "by_severity",
+        "by_enforcement_type",
+        "by_status",
+        "exceptions_requiring_review",
+        "last_updated"
+      ],
+      "title": "InvariantSummaryResponse",
+      "type": "object"
+    },
+    "PaginationInfo": {
+      "description": "Pagination metadata for list responses.",
+      "properties": {
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opaque cursor for next page, null if no more pages",
+          "title": "Next Cursor"
+        },
+        "has_more": {
+          "default": false,
+          "description": "Whether more pages exist",
+          "title": "Has More",
+          "type": "boolean"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Total count (included when efficient to compute)",
+          "title": "Total Count"
+        }
+      },
+      "title": "PaginationInfo",
+      "type": "object"
+    },
+    "ResolutionContext": {
+      "$defs": {
+        "AutonomyMode": {
+          "description": "Operating mode of the autonomous agent.\n\nAffects channel routing and acknowledgment requirements.\n\nChannel routing varies by mode:\n- PREVIEW: All intents -> WebSocket only\n- SHADOW: OPERATIONAL -> WebSocket, GOVERNANCE -> Slack + WebSocket\n- LIVE: Full channel routing based on intent",
+          "enum": [
+            "PREVIEW",
+            "SHADOW",
+            "LIVE"
+          ],
+          "title": "AutonomyMode",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Context used for policy resolution.",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/NotificationIntent"
+        },
+        "autonomy_mode": {
+          "$ref": "#/$defs/AutonomyMode"
+        },
+        "irreversible": {
+          "title": "Irreversible",
+          "type": "boolean"
+        },
+        "policy_found": {
+          "title": "Policy Found",
+          "type": "boolean"
+        },
+        "policy_notification_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policy Notification Type"
+        }
+      },
+      "required": [
+        "intent",
+        "autonomy_mode",
+        "irreversible",
+        "policy_found"
+      ],
+      "title": "ResolutionContext",
+      "type": "object"
+    },
+    "ResolutionStep": {
+      "$defs": {
+        "ResolutionSource": {
+          "description": "Source of a policy resolution value.",
+          "enum": [
+            "explicit_override",
+            "mode_override",
+            "policy_base",
+            "sdk_default"
+          ],
+          "title": "ResolutionSource",
+          "type": "string"
+        }
+      },
+      "description": "Single step in policy resolution chain.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/ResolutionSource"
+        },
+        "value": {
+          "description": "The value at this resolution step",
+          "title": "Value"
+        },
+        "applied": {
+          "description": "Whether this value was used",
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Explanation if not applied",
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "source",
+        "value",
+        "applied"
+      ],
+      "title": "ResolutionStep",
+      "type": "object"
+    }
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/ui/audit",
+      "summary": "List audit events",
+      "description": "Query audit event stream with filtering. Read-only endpoint.",
+      "response_model": "AuditEventListResponse",
+      "query_params": [
+        {
+          "name": "cursor",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 25,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "start_time",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "end_time",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "event_type",
+          "type": "AuditEventType",
+          "required": false
+        },
+        {
+          "name": "notification_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "agent_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "autonomy_mode",
+          "type": "AutonomyMode",
+          "required": false
+        },
+        {
+          "name": "correlation_id",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter",
+        "invalid_cursor"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/deliveries",
+      "summary": "List delivery timelines",
+      "description": "Query delivery timelines with optional filtering. Read-only endpoint.",
+      "response_model": "DeliveryTimelineListResponse",
+      "query_params": [
+        {
+          "name": "cursor",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 25,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "start_time",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "end_time",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "DeliveryStatus",
+          "required": false
+        },
+        {
+          "name": "intent",
+          "type": "NotificationIntent",
+          "required": false
+        },
+        {
+          "name": "delivery_mode",
+          "type": "DeliveryMode",
+          "required": false
+        },
+        {
+          "name": "agent_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "autonomy_mode",
+          "type": "AutonomyMode",
+          "required": false
+        },
+        {
+          "name": "notification_type",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "channel",
+          "type": "Channel",
+          "required": false
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/deliveries/{notification_id}",
+      "summary": "Get delivery timeline",
+      "description": "Get full delivery timeline for a specific notification. Read-only endpoint.",
+      "response_model": "DeliveryTimelineResponse",
+      "path_params": [
+        {
+          "name": "notification_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "error_codes": [
+        "not_found"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/invariants",
+      "summary": "List system invariants",
+      "description": "Get the system invariant registry. Read-only endpoint.",
+      "response_model": "InvariantListResponse",
+      "query_params": [
+        {
+          "name": "cursor",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 25,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "severity",
+          "type": "InvariantSeverity",
+          "required": false
+        },
+        {
+          "name": "enforcement_type",
+          "type": "EnforcementType",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "InvariantStatus",
+          "required": false
+        },
+        {
+          "name": "search",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/invariants/summary",
+      "summary": "Get invariant summary",
+      "description": "Get summary statistics for system invariants. Read-only endpoint.",
+      "response_model": "InvariantSummaryResponse",
+      "query_params": [],
+      "error_codes": []
+    },
+    {
+      "method": "GET",
+      "path": "/ui/policies/effective",
+      "summary": "Get effective policy",
+      "description": "Get effective policy resolution for a notification type. Read-only endpoint.",
+      "response_model": "EffectivePolicyResponse",
+      "query_params": [
+        {
+          "name": "notification_type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "intent",
+          "type": "NotificationIntent",
+          "required": true
+        },
+        {
+          "name": "autonomy_mode",
+          "type": "AutonomyMode",
+          "required": true
+        },
+        {
+          "name": "irreversible",
+          "type": "boolean",
+          "required": false,
+          "default": false
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter"
+      ]
+    }
+  ]
+}

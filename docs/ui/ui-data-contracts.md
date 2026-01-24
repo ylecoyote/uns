@@ -13,6 +13,14 @@ All UI endpoints use the `/api/v1/` prefix for versioning (e.g., `/api/v1/notifi
 | **Phase 0/1** | Implemented | Delivery timelines, effective policy, invariants, audit events |
 | **Phase 2** | Planned | Escalations, audit statistics, policy simulation |
 
+## Machine-Readable Contract Snapshot
+
+A machine-readable JSON schema snapshot of these contracts is available at:
+
+- **[contracts/ui-contracts.json](contracts/ui-contracts.json)** - JSON Schema bundle with all endpoint schemas, enum definitions, and endpoint metadata
+
+This snapshot is generated deterministically from the Pydantic models in `src/mcp_server/routes_ui.py` via `scripts/generate_ui_contracts.py`. Regenerate it when contracts change.
+
 ## Design Principles
 
 1. **Read-only** - All endpoints are read-only per [UI Scope v1](ui-scope.md)
