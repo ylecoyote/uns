@@ -1,0 +1,101 @@
+# UNS UI - Phase 2 (Constrained Controls - Optional)
+# Usage:
+#   ralphy --yaml uns-ui-phase-2.yaml
+#   ralphy --yaml uns-ui-phase-2.yaml --parallel
+
+tasks:
+  - title: Define Phase 2 control surface and safety constraints
+    completed: false
+    description: |
+      Define exactly what UI may mutate (minimal, constrained), e.g.:
+      - acknowledge alerts (if applicable)
+      - enable/disable adapters (if supported)
+      - no policy editing (unless explicitly approved)
+      Include:
+      - permission model
+      - audit requirements
+      - rollback/guardrails
+      Output:
+      - docs/ui/ui-controls-scope.md
+
+  - title: Implement server-side authorization for UI controls
+    completed: false
+    parallel_group: 1
+    description: |
+      Add strict authz gates:
+      - role-based access
+      - least privilege
+      - explicit audit logging for every action
+      Output:
+      - src/... authz middleware/guards
+      - tests for unauthorized access
+
+  - title: Add acknowledge action (if supported) with audit trail
+    completed: false
+    parallel_group: 1
+    description: |
+      Implement minimal control:
+      - POST /ui/acknowledge (or similar)
+      Requirements:
+      - write audit event
+      - idempotent behavior
+      - no coupling to execution loops
+      Output:
+      - API endpoint + tests
+      - docs/API.md update
+      - docs/ui/ui-controls.md update
+
+  - title: Add adapter enable/disable toggle (if supported) with guardrails
+    completed: false
+    parallel_group: 2
+    description: |
+      Implement optional control:
+      - PATCH /ui/adapters/{name} (enabled true/false)
+      Requirements:
+      - audit logging
+      - safeguards (cannot disable last GUARANTEED channel unless override approved)
+      - rollback instructions
+      Output:
+      - API endpoint + tests
+      - docs updates
+
+  - title: Implement UI controls pages/components (constrained)
+    completed: false
+    description: |
+      Add UI surfaces for approved controls only:
+      - confirmation flows
+      - visible audit entries after action
+      - clear permission errors
+      Output:
+      - UI components/pages
+      - docs/ui/ui-controls.md
+
+  - title: Add e2e tests for control flows
+    completed: false
+    description: |
+      Add e2e tests verifying:
+      - unauthorized users cannot perform actions
+      - actions create audit events
+      - guardrails prevent unsafe toggles
+      Output:
+      - apps/ui/tests/e2e/*
+
+  - title: Update invariants registry for new control endpoints
+    completed: false
+    description: |
+      If any new invariants are introduced/modified by Phase 2 controls:
+      - update docs/verification/invariants.yml
+      - run /verify_invariants on affected areas
+      Output:
+      - invariants registry updates
+      - docs/reports/ui/phase-2-invariants-verify.md
+
+  - title: Produce Phase 2 verification report (bounded)
+    completed: false
+    description: |
+      Verify:
+      - controls are strictly scoped
+      - audit trail is complete
+      - invariants not violated (especially ack vs execution)
+      Output:
+      - docs/reports/ui/phase-2-verify.md

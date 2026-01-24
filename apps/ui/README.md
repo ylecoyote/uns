@@ -1,153 +1,124 @@
-# UNS UI Dashboard
+# UNS Dashboard UI
 
-Read-only "flight instruments" dashboard for the Unified Notification Service (UNS).
+Read-only dashboard for the Unified Notification Service.
 
 ## Overview
 
-The UNS UI is a **read-first dashboard** that provides visibility into the notification system's state and health. Per the v1 scope, the UI is strictly **read-only** and does not provide any write operations.
+This is a **read-only "flight instruments" dashboard** per [ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the notification system's state and health without offering direct manipulation capabilities.
 
-See [UI Scope v1](../../docs/ui/ui-scope.md) for design philosophy and constraints.
-
-## ⚠️ Non-Authoritative Rules
-
-**The UI is NOT authoritative for business logic.**
-
-All business rules, validation logic, and safety constraints are enforced by the UNS backend. The UI layer is strictly a presentation concern and does not:
-
-- Bypass system invariants
-- Introduce alternative paths for policy enforcement
-- Perform any write operations to system state
-- Cache or persist authoritative data
-
-The backend API responses are the source of truth for all displayed data.
+**v1 Constraints:**
+- No notification authoring
+- No policy editing
+- Read-only dashboards only
+- Metrics & health monitoring included
 
 ## Pages
 
-| Page | Route | Description |
-|------|-------|-------------|
-| **Deliveries** | `/deliveries` | View notification delivery timelines and channel attempts |
-| **Policy** | `/policy` | Inspect effective policy resolution and traces |
-| **Invariants** | `/invariants` | View system invariants and compliance status |
-| **Audit** | `/audit` | Browse the audit event timeline |
+### Deliveries Explorer
+- **List view** (`/pages/deliveries/`): Paginated list of delivery timelines with filters
+  - Filter by: status, intent, delivery_mode, autonomy_mode, channel, notification_type, agent_id, time range
+  - Cursor-based pagination
+- **Detail view** (`/pages/deliveries/{notification_id}`): Full delivery timeline
+  - Notification summary
+  - Autonomy context
+  - Channel results
+  - Delivery attempts with timing and errors
+
+### Other Pages (Planned)
+- Policy Inspector (`/pages/policies/`)
+- Invariants Viewer (`/pages/invariants/`)
+- Audit Timeline (`/pages/audit/`)
 
 ## Local Development
 
 ### Prerequisites
-
 - Python 3.10+
-- UNS backend running (default: `http://localhost:8000`)
+- Dependencies from main project
 
-### Installation
-
-From the repository root:
+### Run Standalone
 
 ```bash
-# Install dependencies (includes UI package)
-pip install -e ".[dev]"
+# From project root
+cd apps/ui
+uvicorn app:app --reload --port 8001
+
+# Or from project root
+uvicorn apps.ui.app:app --reload --port 8001
 ```
 
-### Configuration
+Then visit http://localhost:8001/pages/deliveries/
 
-Environment variables:
+### Run with Main Server
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `UNS_API_BASE_URL` | Base URL for the UNS backend API | `http://localhost:8000` |
-| `UNS_UI_DEBUG` | Enable debug mode | `false` |
-| `UNS_UI_REQUEST_TIMEOUT` | Request timeout in seconds | `30` |
-| `UNS_API_VERSION` | API version prefix | `v1` |
+The UI can be mounted into the main UNS server:
 
-### Running Locally
+```python
+from apps.ui.app import create_ui_app
 
-1. **Start the UNS backend** (in a separate terminal):
-   ```bash
-   uvicorn mcp_server.app:app --reload
-   ```
-
-2. **Configure the API URL** (if not using default):
-   ```bash
-   export UNS_API_BASE_URL="http://localhost:8000"
-   ```
-
-3. **Run the UI** (development mode):
-   ```bash
-   # From repository root
-   python -m apps.ui
-   ```
-
-### Running Tests
-
-```bash
-# Run UI tests only
-pytest apps/ui/tests -v
-
-# Run with coverage
-pytest apps/ui/tests -v --cov=apps.ui
+# In your main app setup
+main_app.mount("/dashboard", create_ui_app())
 ```
 
 ## Project Structure
 
 ```
 apps/ui/
-├── __init__.py           # Package initialization
+├── __init__.py           # Package init
+├── app.py                # FastAPI app factory
 ├── README.md             # This file
 ├── src/
-│   ├── __init__.py
-│   ├── config.py         # Configuration management
-│   ├── auth.py           # Authentication placeholder
-│   ├── router.py         # Route definitions
-│   ├── api/              # API client modules
-│   │   └── __init__.py
-│   ├── pages/            # Page components
+│   ├── api/              # Typed API client
 │   │   ├── __init__.py
-│   │   ├── deliveries.py # Deliveries explorer
-│   │   ├── policy.py     # Policy inspector
-│   │   ├── invariants.py # Invariants viewer
-│   │   └── audit.py      # Audit timeline
-│   ├── components/       # Reusable UI components
-│   │   └── __init__.py
-│   ├── layouts/          # Layout components
+│   │   ├── client.py     # UNSUIClient
+│   │   └── types.py      # Response types
+│   ├── pages/            # Page routers
 │   │   ├── __init__.py
-│   │   └── main_layout.py
-│   ├── hooks/            # Custom hooks
-│   │   └── __init__.py
-│   └── utils/            # Utility functions
+│   │   └── deliveries.py # Deliveries Explorer
+│   └── components/       # Reusable components
 │       └── __init__.py
-└── tests/
+├── templates/            # Jinja2 templates
+│   ├── base.html         # Base layout
+│   └── deliveries/
+│       ├── list.html     # List page
+│       └── detail.html   # Detail page
+├── static/
+│   └── css/
+│       └── main.css      # Styles
+└── tests/                # UI tests
     └── __init__.py
 ```
 
-## API Endpoints
+## API Client Usage
 
-The UI consumes read-only endpoints from the UNS backend:
+The typed API client can be used programmatically:
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/v1/delivery-timelines` | List delivery timelines with filtering |
-| `GET /api/v1/notifications/{id}/delivery-timeline` | Single delivery timeline |
-| `GET /api/v1/policy-trace` | Effective policy resolution trace |
-| `GET /api/v1/invariants` | List system invariants |
-| `GET /api/v1/invariants/summary` | Invariant summary statistics |
-| `GET /api/v1/audit-events` | List audit events |
+```python
+from apps.ui.src.api import UNSUIClient
+from notification.models import DeliveryStatus
 
-See [UI Data Contracts](../../docs/ui/ui-data-contracts.md) for full API documentation.
+client = UNSUIClient(base_url="http://localhost:8000")
 
-## Security Model
+# List deliveries with filters
+deliveries = client.list_deliveries(
+    status=DeliveryStatus.DELIVERED,
+    limit=10,
+)
 
-### v1 Read-Only Posture
+# Get single delivery timeline
+timeline = client.get_delivery_timeline(notification_id)
+```
 
-- **No write operations**: All endpoints are GET requests only
-- **No privileged actions**: UI cannot modify system state
-- **Backend authoritative**: All access control enforced by UNS backend
-- **Minimal auth**: Placeholder authentication for v1 (configurable)
+## Non-Authoritative Rules
 
-### Request ID Propagation
+Per the project's invariant integrity principles:
+- The UI layer is strictly a presentation concern
+- All business rules and validation logic are enforced by the backend
+- The UI does not introduce alternative paths that could circumvent policy enforcement
 
-All API requests include an `X-Request-ID` header for correlation and debugging. This enables tracing requests through the system for support and troubleshooting.
+## Data Contracts
 
-## Related Documentation
-
-- [UI Scope v1](../../docs/ui/ui-scope.md) - Design philosophy and constraints
-- [UI Data Contracts](../../docs/ui/ui-data-contracts.md) - API response shapes and pagination
-- [UI Read Models](../../docs/ui/ui-read-models.md) - Backend adapter architecture
-- [UI Observability](../../docs/ui/ui-observability.md) - Health monitoring and metrics
+Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md):
+- `DeliveryTimelineListResponse` - Paginated list with filtering
+- `DeliveryTimelineResponse` - Full timeline with attempts
+- `DeliveryTimelineSummary` - Summary for list items
+- `DeliveryAttempt` - Single channel attempt

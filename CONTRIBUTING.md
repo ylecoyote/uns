@@ -236,15 +236,50 @@ docs(readme): add policy configuration examples
 test(adapters): add integration tests for Slack adapter
 ```
 
+## Invariants (Must/Never/Always Statements)
+
+For full definitions and enforcement options, see `docs/verification/invariants.md`.
+
+### When this applies
+If your PR introduces, changes, or removes any statement that asserts a strong property using words like:
+- must / must not
+- never / always
+- guaranteed
+- required / forbidden
+- invariant / cannot happen
+
+…then this section applies.
+
+### Requirements for invariant changes
+1. **Update the invariant registry**
+   - Add/update an entry in `docs/verification/invariants.yml`
+   - Include severity, enforcement type (guard/isolation/test/exception), and evidence links.
+
+2. **Run invariant verification**
+   - Run `/verify_invariants <affected paths>` and attach the output to the PR
+   - Or provide an equivalent bounded-verification artifact generated via Ralphy tasks.
+
+3. **Provide enforcement evidence**
+   - For `guard`: link to the guard code and rationale
+   - For `test`: link to the test(s) that fail on violation
+   - For `isolation`: document the structural constraint that prevents violations
+   - For `exception`: include rationale, owner, and mitigation plan
+
+### Reviewer checklist (invariant PRs)
+- Registry updated (`docs/verification/invariants.yml`)
+- Verification output attached (`/verify_invariants` or equivalent)
+- Enforcement evidence is clear and appropriately scoped
+- Any exception is explicitly owned and risk-accepted
+
 ## Architecture Decisions
 
 ### Key Invariants
 
-1. `autonomy_context` is REQUIRED for all notifications
-2. `autonomy_mode` and `agent_id` must be set in context
-3. SAFETY and GOVERNANCE use GUARANTEED delivery
-4. SAFETY in LIVE mode requires acknowledgment
-5. Title max 200 chars, message max 4000 chars
+1. **INV-CTX-001** — `autonomy_context` is REQUIRED for all notifications
+2. **INV-CTX-002** — `autonomy_mode` and `agent_id` must be set in context
+3. **INV-DEL-001** — SAFETY and GOVERNANCE use GUARANTEED delivery
+4. **INV-ACK-001** — SAFETY in LIVE mode requires acknowledgment
+5. **INV-MSG-001** — Title max 200 chars, message max 4000 chars
 
 ### Adding New Features
 

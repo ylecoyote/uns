@@ -126,9 +126,9 @@ BEST_EFFORT mode attempts delivery without strict guarantees.
 │                                                                 │
 │  All channels attempted concurrently:                           │
 │                                                                 │
-│  ┌─────────┐  ┌─────────┐  ┌───────────┐                       │
-│  │  Slack  │  │ Email   │  │ WebSocket │   (parallel)          │
-│  └────┬────┘  └────┬────┘  └─────┬─────┘                       │
+│  ┌─────────┐  ┌─────────┐  ┌───────────┐                        │
+│  │  Slack  │  │ Email   │  │ WebSocket │   (parallel)           │
+│  └────┬────┘  └────┬────┘  └─────┬─────┘                        │
 │       │            │             │                              │
 │       ▼            ▼             ▼                              │
 │    Result       Result        Result                            │

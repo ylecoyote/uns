@@ -1,1 +1,1 @@
-"""Tests for UNS UI dashboard."""
+"""Tests for UNS UI application."""
