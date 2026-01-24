@@ -976,261 +976,145 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 
 ---
 
-## Task: Implement Typed UI API Client for /ui Endpoints - COMPLETED
+## UI Phase 1 Task: Initialize apps/ui project scaffolding (read-only) - COMPLETED
 
 ### Date: 2026-01-23
 
 ### Summary
-Implemented a strongly-typed Python client for interacting with the UNS UI API endpoints (`/ui/*`). The client provides type-safe access to all UI endpoints with full error handling, pagination support, and request ID propagation.
+Created the UI app skeleton under apps/ui with routing, layout shell, environment configuration, minimal auth integration placeholder, and basic navigation structure. All components follow the v1 read-only posture per the UI scope specification.
 
 ### Files Created
 
-#### Core Client Package (`src/ui_client/`)
-
-1. **`src/ui_client/__init__.py`**
-   - Package exports for all public types, client, and errors
-   - Comprehensive docstring with usage examples
-
-2. **`src/ui_client/types.py`** - Type definitions mirroring `routes_ui.py`:
-   - **Common Types:** `PaginationInfo`, `ErrorDetail`, `ErrorResponse`
-   - **Delivery Types:** `DeliveryAttempt`, `AutonomyContextResponse`, `DeliveryTimelineResponse`, `DeliveryTimelineSummary`, `DeliveryTimelineListResponse`
-   - **Policy Types:** `ResolutionSource`, `ResolutionStep`, `EffectivePolicyValues`, `ResolutionContext`, `EffectivePolicyResponse`
-   - **Invariant Types:** `EnforcementType`, `InvariantSeverity`, `InvariantStatus`, `EvidenceLink`, `InvariantEnforcement`, `InvariantEntry`, `InvariantListResponse`, `InvariantSummaryResponse`
-   - **Audit Types:** `AuditEventType`, `AuditEvent`, `AuditEventListResponse`
-
-3. **`src/ui_client/filters.py`** - Filter dataclasses for queries:
-   - `DeliveryFilters` - Filter by time range, status, intent, mode, agent, channel
-   - `AuditFilters` - Filter by time range, event type, notification, agent, correlation
-   - `InvariantFilters` - Filter by severity, enforcement type, status, search
-   - `PaginationParams` - Cursor and limit handling with validation
-
-4. **`src/ui_client/errors.py`** - Typed exceptions:
-   - `UIApiError` - Base exception with error_code, message, request_id, status_code
-   - `NotFoundError` - 404 errors (resource doesn't exist)
-   - `InvalidParameterError` - 400 errors (malformed filter value)
-   - `InvalidCursorError` - 400 errors (pagination cursor invalid/expired)
-   - `RateLimitedError` - 429 errors (with optional retry_after)
-   - `UIApiServerError` - 500 errors (internal server error)
-   - `ConnectionError` - Network-level failures
-   - `error_from_response()` - Factory function for creating appropriate error types
-
-5. **`src/ui_client/client.py`** - Main client implementation:
-   - `UIApiClient` class with all endpoint methods:
-     - `list_deliveries()` - List delivery timelines with filtering
-     - `get_delivery_timeline()` - Get single delivery timeline
-     - `get_effective_policy()` - Get policy resolution trace
-     - `list_invariants()` - List system invariants
-     - `get_invariants_summary()` - Get invariant statistics
-     - `list_audit_events()` - List audit events
-   - Iterator methods for automatic pagination:
-     - `iter_deliveries()` - Iterate through all deliveries
-     - `iter_invariants()` - Iterate through all invariants
-     - `iter_audit_events()` - Iterate through all audit events
-   - Features:
-     - Context manager support (`with UIApiClient(...) as client:`)
-     - Configurable timeouts
-     - Request ID propagation (`X-Request-ID` header)
-     - Full error handling with typed exceptions
-   - `create_ui_client()` - Factory function
-
-#### Tests (`tests/ui_client/`)
-
-1. **`tests/ui_client/__init__.py`** - Test package marker
-
-2. **`tests/ui_client/test_types.py`** - 26 tests covering:
-   - `TestPaginationInfo` - Pagination metadata
-   - `TestErrorTypes` - Error detail/response models
-   - `TestDeliveryTypes` - Delivery attempt, timeline, summary models
-   - `TestPolicyTypes` - Resolution source/step, effective policy models
-   - `TestInvariantTypes` - Enforcement, severity, evidence, entry models
-   - `TestAuditTypes` - Audit event type and event models
-
-3. **`tests/ui_client/test_filters.py`** - 16 tests covering:
-   - `TestDeliveryFilters` - All filter combinations and serialization
-   - `TestAuditFilters` - Event type and correlation filters
-   - `TestInvariantFilters` - Severity, enforcement, search filters
-   - `TestPaginationParams` - Limit validation (1-100), cursor handling
-
-4. **`tests/ui_client/test_errors.py`** - 22 tests covering:
-   - `TestUIApiError` - Base error attributes and representation
-   - `TestNotFoundError` - 404 error handling
-   - `TestInvalidParameterError` - 400 invalid parameter handling
-   - `TestInvalidCursorError` - 400 cursor error handling
-   - `TestRateLimitedError` - 429 with retry_after support
-   - `TestUIApiServerError` - 500 error handling
-   - `TestConnectionError` - Network failure handling
-   - `TestErrorFromResponse` - Factory function error mapping
-   - `TestExceptionHandling` - Catch patterns and inheritance
-
-5. **`tests/ui_client/test_client.py`** - 27 tests covering:
-   - `TestUIApiClientInit` - Initialization, timeouts, headers, context manager
-   - `TestCreateUiClient` - Factory function
-   - `TestListDeliveries` - Basic, filtered, paginated queries
-   - `TestGetDeliveryTimeline` - Success and not found cases
-   - `TestGetEffectivePolicy` - Policy resolution
-   - `TestListInvariants` - Basic and filtered queries
-   - `TestGetInvariantsSummary` - Summary statistics
-   - `TestListAuditEvents` - Basic and filtered queries
-   - `TestIterators` - Automatic pagination handling
-   - `TestErrorHandling` - All error types, connection errors, timeouts
-   - `TestRequestIdPropagation` - X-Request-ID header handling
-
-### Key Features
-
-1. **Type Safety**: All requests and responses use Pydantic models matching the server-side definitions in `routes_ui.py`
-
-2. **Error Handling**: Comprehensive error handling with typed exceptions that map to API error codes per `ui-data-contracts.md`
-
-3. **Pagination**: Both cursor-based pagination in list methods and convenience iterators that handle pagination automatically
-
-4. **Request Correlation**: Support for `X-Request-ID` header propagation for debugging and support
-
-5. **Testability**: Mocked HTTP client in tests allows testing without a running server
-
-### Test Results
-- **91 tests passing**
-- All ruff linting checks pass
-- Code formatted with ruff
-
-### Usage Example
-```python
-from ui_client import UIApiClient, DeliveryFilters
-from notification.models import DeliveryStatus
-
-# Create client
-client = UIApiClient(base_url="http://localhost:8000")
-
-# List deliveries with filters
-deliveries = client.list_deliveries(
-    filters=DeliveryFilters(status=DeliveryStatus.DELIVERED),
-    limit=10
-)
-
-# Iterate through all deliveries (handles pagination)
-for delivery in client.iter_deliveries():
-    print(f"{delivery.notification_id}: {delivery.status}")
-
-# Get single delivery timeline
-timeline = client.get_delivery_timeline(notification_id)
-
-# Get effective policy resolution
-policy = client.get_effective_policy(
-    notification_type="trading.risk_breach",
-    intent=NotificationIntent.SAFETY,
-    autonomy_mode=AutonomyMode.LIVE
-)
-
-# Close client
-client.close()
+#### Directory Structure
+```
+apps/
+├── __init__.py                    # Apps package init
+└── ui/
+    ├── __init__.py               # UI package (version 0.1.0)
+    ├── README.md                 # Local run instructions + non-authoritative rules
+    ├── src/
+    │   ├── __init__.py
+    │   ├── config.py             # Env config for API base URL
+    │   ├── auth.py               # Minimal auth integration placeholder
+    │   ├── router.py             # Route definitions (GET only)
+    │   ├── api/
+    │   │   └── __init__.py       # API client placeholder
+    │   ├── pages/
+    │   │   ├── __init__.py
+    │   │   ├── deliveries.py     # Deliveries explorer stub
+    │   │   ├── policy.py         # Policy inspector stub
+    │   │   ├── invariants.py     # Invariants viewer stub
+    │   │   └── audit.py          # Audit timeline stub
+    │   ├── components/
+    │   │   └── __init__.py
+    │   ├── layouts/
+    │   │   ├── __init__.py
+    │   │   └── main_layout.py    # Navigation and layout shell
+    │   ├── hooks/
+    │   │   └── __init__.py
+    │   └── utils/
+    │       └── __init__.py
+    └── tests/
+        ├── __init__.py
+        └── test_package_structure.py  # 44 tests
 ```
 
-### Acceptance Criteria Met
-✅ Typed client for all UI endpoints (`/ui/deliveries`, `/ui/policies/effective`, `/ui/invariants`, `/ui/audit`)
-✅ Full type safety with Pydantic models
-✅ Error handling with typed exceptions
-✅ Pagination support (cursor-based and iterators)
-✅ Request ID propagation
-✅ Comprehensive tests (91 tests passing)
-✅ Linting passes (ruff)
+### Key Components
 
----
+#### 1. Configuration (`config.py`)
+- `UIConfig` dataclass with frozen=True (immutable)
+- Environment variables:
+  - `UNS_API_BASE_URL` (default: http://localhost:8000)
+  - `UNS_UI_DEBUG` (default: false)
+  - `UNS_UI_REQUEST_TIMEOUT` (default: 30)
+  - `UNS_API_VERSION` (default: v1)
+- `get_config()` with caching, `reset_config()` for testing
 
-## Task: Add UI Tests (Smoke + Critical Flows) - COMPLETED
+#### 2. Authentication Placeholder (`auth.py`)
+- `AuthStatus` enum: AUTHENTICATED, ANONYMOUS, EXPIRED
+- `UserContext` dataclass with `is_authenticated` property
+- `AuthProvider` Protocol for dependency injection
+- `NoOpAuthProvider` for local development (anonymous access)
+- Global provider management: `get_auth_provider()`, `configure_auth_provider()`, `reset_auth_provider()`
 
-### Date: 2026-01-23
+#### 3. Router (`router.py`)
+- `HTTPMethod` enum: GET only (read-only posture)
+- `Route` dataclass for route definitions
+- Routes defined:
+  - `/deliveries` - List delivery timelines
+  - `/deliveries/{notification_id}` - Delivery detail
+  - `/policy` - Policy inspector
+  - `/invariants` - Invariants list
+  - `/invariants/summary` - Invariants summary
+  - `/audit` - Audit timeline
+- Helper functions: `get_all_routes()`, `get_route_by_name()`, `build_path()`
 
-### Summary
-Created comprehensive smoke tests and critical flow tests for the UI API endpoints. These tests verify endpoint availability, response contract conformance, request ID propagation, and end-to-end user journeys through the UI.
+#### 4. Layout (`main_layout.py`)
+- `NavigationRoute` enum: DELIVERIES, POLICY, INVARIANTS, AUDIT
+- `NavigationItem` dataclass with label, icon, description
+- `NAVIGATION_ITEMS` tuple with 4 nav items
+- Helper functions: `get_navigation_items()`, `get_route_for_label()`
 
-### Files Created
-- `tests/mcp_server/test_routes_ui_smoke_critical.py` - 40 tests covering smoke tests and critical flows
+#### 5. Page Stubs
+Each page module provides:
+- Page state dataclass (frozen)
+- Filter definitions
+- Title helpers
+- Placeholder for Phase 1 implementation
 
-### Test Categories
+### Tests (44 tests)
 
-#### 1. Smoke Tests - Endpoint Availability (7 tests)
-- `test_smoke_deliveries_list_endpoint` - GET /ui/deliveries returns 200
-- `test_smoke_deliveries_detail_endpoint` - GET /ui/deliveries/{id} returns 404 for non-existent
-- `test_smoke_policies_effective_endpoint` - GET /ui/policies/effective returns 200 with valid params
-- `test_smoke_invariants_list_endpoint` - GET /ui/invariants returns 200
-- `test_smoke_invariants_summary_endpoint` - GET /ui/invariants/summary returns 200
-- `test_smoke_audit_list_endpoint` - GET /ui/audit returns 200
-- `test_smoke_health_endpoint` - Health check endpoint returns 200
+**TestPackageStructure** (8 tests)
+- Package import tests for all subpackages
 
-#### 2. Smoke Tests - Response Contracts (4 tests)
-- `test_smoke_deliveries_list_response_structure` - Verifies list response structure matches contract
-- `test_smoke_delivery_detail_response_structure` - Verifies detail response includes attempts and autonomy_context
-- `test_smoke_policy_response_structure` - Verifies policy resolution response structure
-- `test_smoke_audit_event_response_structure` - Verifies audit event response structure
+**TestConfigModule** (6 tests)
+- Config defaults, api_prefix, frozen, caching, reset
 
-#### 3. Smoke Tests - Request ID Propagation (4 tests)
-- `test_smoke_request_id_in_response_header` - X-Request-ID returned in response headers
-- `test_smoke_request_id_preserved_from_request` - Custom X-Request-ID preserved
-- `test_smoke_request_id_in_error_response` - X-Request-ID in 404 error responses
-- `test_smoke_request_id_different_per_request` - Different requests get different auto-generated IDs
+**TestAuthModule** (7 tests)
+- Auth imports, status enum, user context, NoOpAuthProvider
 
-#### 4. Critical Flow Tests - Delivery Navigation (3 tests)
-- `test_flow_list_deliveries_then_view_detail` - Navigate from list to detail view
-- `test_flow_filter_deliveries_then_drill_down` - Filter then view filtered item details
-- `test_flow_paginate_through_deliveries` - Paginate through multiple pages
+**TestRouterModule** (6 tests)
+- Router imports, GET-only method, routes exist, path building
 
-#### 5. Critical Flow Tests - Audit Timeline (3 tests)
-- `test_flow_view_audit_timeline_for_notification` - View complete audit trail for a notification
-- `test_flow_filter_audit_by_event_type` - Filter audit events by type (failures, timeouts)
-- `test_flow_audit_combined_with_delivery_detail` - Combine audit timeline with delivery detail
+**TestMainLayout** (4 tests)
+- Layout imports, navigation routes, navigation items, route lookup
 
-#### 6. Critical Flow Tests - Policy Resolution (4 tests)
-- `test_flow_inspect_policy_no_custom_policy` - SDK defaults when no policy registered
-- `test_flow_inspect_policy_with_registered_policy` - Policy values used when registered
-- `test_flow_compare_preview_vs_live_modes` - Compare policy behavior across autonomy modes
-- `test_flow_irreversible_action_adds_pagerduty` - Irreversible flag adds PagerDuty for SAFETY
+**TestPageModules** (8 tests)
+- Page module imports, filters, options for each page
 
-#### 7. Critical Flow Tests - Invariant Browsing (3 tests)
-- `test_flow_list_invariants_and_filter` - List and filter invariants
-- `test_flow_invariant_summary_statistics` - Summary statistics match list counts
-- `test_flow_search_invariants` - Search invariants by statement text
+**TestReadOnlyPosture** (2 tests)
+- All routes are GET only
+- HTTPMethod enum only has GET
 
-#### 8. Critical Flow Tests - Error Handling (4 tests)
-- `test_flow_404_error_with_request_id` - 404 errors include request ID for debugging
-- `test_flow_422_validation_error` - Validation errors handled properly
-- `test_flow_empty_results_handling` - Empty results handled gracefully
-- `test_flow_filter_with_no_matches` - Filtering with no matches returns empty
+**TestFileStructure** (3 tests)
+- README exists
+- README contains required sections
+- All __init__.py files exist
 
-#### 9. Critical Flow Tests - Metrics Collection (3 tests)
-- `test_flow_metrics_recorded_for_successful_requests` - Metrics recorded for success
-- `test_flow_error_metrics_recorded` - Error metrics recorded for failures
-- `test_flow_latency_metrics_collected` - Latency metrics collected
-
-#### 10. Critical Flow Tests - Multiple Filters Combined (2 tests)
-- `test_flow_delivery_filters_combined` - Combining multiple delivery filters
-- `test_flow_audit_filters_combined` - Combining multiple audit filters
-
-#### 11. Critical Flow Tests - Data Integrity (3 tests)
-- `test_flow_delivery_data_consistent_across_views` - Data consistent between list and detail
-- `test_flow_uuid_serialization_consistent` - UUIDs serialized consistently as strings
-- `test_flow_datetime_serialization_iso_format` - Datetimes serialized in ISO 8601 format
+### pyproject.toml Updates
+- Added `apps` to `tool.setuptools.packages.find.where`
+- Added `apps/ui/tests` to `tool.pytest.ini_options.testpaths`
+- Added `apps` to `tool.pytest.ini_options.pythonpath`
+- Added `apps` to `tool.ruff.src`
+- Added `apps` to `tool.ruff.lint.isort.known-first-party`
 
 ### Test Results
-- 40 new tests passing (test_routes_ui_smoke_critical.py)
-- 144 total UI route tests passing (all test_routes_ui*.py files)
-- All linting checks pass (ruff check and format)
-
-### Key Design Decisions
-
-1. **Smoke Tests Focus**: Verify endpoints are reachable and return valid response structures without testing specific business logic (covered by existing comprehensive tests)
-
-2. **Critical Flow Tests Focus**: Test end-to-end user journeys that mimic how a dashboard user would navigate through the UI
-
-3. **Request ID Testing**: Explicitly test X-Request-ID propagation since it's critical for debugging and correlation
-
-4. **Metrics Collection Testing**: Verify observability infrastructure is working properly
-
-5. **Data Integrity Testing**: Ensure data consistency across different API views
+- 44 tests passing
+- Ruff check: All checks passed
+- Ruff format: Applied
 
 ### Acceptance Criteria Met
-✅ Smoke tests verify all endpoints are reachable
-✅ Response structure tests verify contracts match ui-data-contracts.md
-✅ Request ID propagation tests verify X-Request-ID header handling
-✅ Critical flow tests cover delivery navigation, audit timeline, policy resolution, invariant browsing
-✅ Error handling tests verify graceful degradation
-✅ All 40 tests pass
-✅ Linting passes
+Per uns-ui-phase-1.yaml task requirements:
+✅ Created UI app skeleton under apps/ui
+✅ Routing and layout shell implemented
+✅ Env config for API base URL (UNS_API_BASE_URL)
+✅ Minimal auth integration placeholder (read-only posture)
+✅ Basic navigation: Deliveries, Policy, Invariants, Audit
+✅ apps/ui/README.md with local run instructions and non-authoritative rules
+
+### Read-Only Posture Enforced
+- All routes use GET method only
+- HTTPMethod enum only defines GET
+- README clearly states UI is non-authoritative
+- Auth placeholder uses anonymous access by default
+- No write operations available in v1
