@@ -14,7 +14,9 @@
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit"
+    "lint:fix": "eslint src --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit",
+    "ci": "npm run type-check && npm run lint && npm run test:run && npm run build"
   },
   "dependencies": {
     "react": "^18.2.0",
