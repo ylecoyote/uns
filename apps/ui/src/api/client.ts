@@ -77,3 +77,56 @@ export async function apiGet<T>(
 
   return response.json() as Promise<T>;
 }
+
+/**
+ * Build a query string from filter parameters.
+ *
+ * @param params - Record of filter parameters
+ * @returns Query string starting with '?' or empty string if no params
+ */
+export function buildQueryString<T extends object>(params: T): string {
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null && value !== ''
+  );
+  if (entries.length === 0) {
+    return '';
+  }
+  const searchParams = new URLSearchParams();
+  entries.forEach(([key, value]) => {
+    searchParams.set(key, String(value));
+  });
+  return `?${searchParams.toString()}`;
+}
+
+/**
+ * Make a GET request to the API. Alias for apiGet without query param handling.
+ *
+ * @param path - Full API path including query string (e.g., '/ui/audit?limit=10')
+ * @param options - Request options including optional requestId for correlation
+ */
+export async function apiRequest<T>(
+  path: string,
+  options?: RequestOptions
+): Promise<T> {
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+  };
+
+  if (options?.requestId) {
+    headers['X-Request-ID'] = options.requestId;
+  }
+
+  const response = await fetch(path, {
+    method: 'GET',
+    headers,
+    signal: options?.signal,
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
+    const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
+    throw new ApiError(errorResponse, response.status);
+  }
+
+  return response.json() as Promise<T>;
+}

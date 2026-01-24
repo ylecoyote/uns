@@ -58,6 +58,7 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
   useEffect(() => {
     setCursor(null);
     fetchData(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.severity, filters.enforcement_type, filters.status, filters.search, filters.limit]);
 
   const refetch = useCallback(() => {
