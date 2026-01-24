@@ -976,139 +976,77 @@ Performed final pass to ensure optional improvements documented in UNS documenta
 
 ---
 
-## UI Phase 1: Build Audit Timeline Page (Filtered Event Stream) - COMPLETED
+## UI Phase 1 Bounded Verification Report - COMPLETED
 
 ### Date: 2026-01-23
 
 ### Summary
-Implemented the Audit Timeline page for the UNS UI Dashboard with comprehensive filtering support for the audit event stream. This task creates a read-only UI page that displays audit events with filtering by event type, notification ID, agent ID, autonomy mode, correlation ID, and time range.
+Produced Phase 1 bounded verification report for UI + contracts. The report verifies that UI calls only GET endpoints, uses only /ui contracts as documented, introduces no mutation routes or privileged actions, and that all basic UI tests pass.
 
-### Files Created
+### Artifacts Created
 
-#### UI Application Structure (`apps/ui/`)
-1. **apps/ui/package.json** - npm package configuration with React 18, Vite, TypeScript, Vitest
-2. **apps/ui/tsconfig.json** - TypeScript configuration
-3. **apps/ui/tsconfig.node.json** - TypeScript node configuration
-4. **apps/ui/vite.config.ts** - Vite build configuration with API proxy
-5. **apps/ui/index.html** - Application entry point
-6. **apps/ui/README.md** - Development and usage documentation
-7. **apps/ui/.eslintrc.cjs** - ESLint configuration
+1. **docs/verification/invariants.yml** (NEW)
+   - Created system invariants registry as YAML file
+   - Includes 8 invariants:
+     - INV-ACK-001: Acks don't gate execution
+     - INV-POL-001: Policy absence doesn't block delivery
+     - INV-DEL-001: GUARANTEED attempts all fallbacks
+     - INV-WS-001: WebSocket non-authoritative
+     - INV-CTX-001: autonomy_context required
+     - INV-CTX-002: autonomy_mode + agent_id required
+     - INV-MSG-001: Title/message length limits
+     - INV-UI-001: UI endpoints read-only (NEW)
 
-#### Types (`apps/ui/src/types/`)
-1. **api.ts** - TypeScript types matching ui-data-contracts.md:
-   - Common types: `PaginationInfo`, `ErrorDetail`, `ErrorResponse`
-   - Enums: `Channel`, `NotificationIntent`, `DeliveryMode`, `DeliveryStatus`, `AutonomyMode`, `AuditEventType`
-   - Audit types: `AutonomyContext`, `AuditEvent`, `AuditEventListResponse`, `AuditEventFilter`
+2. **docs/reports/ui/phase-1-verify.md** (NEW)
+   - Full bounded verification report following Phase 0 template
+   - Sections include:
+     - Executive Summary with PASS status
+     - Scope Limits (what is/isn't verified)
+     - Unverifiable Claims
+     - Endpoint Verification (6 endpoints verified)
+     - Query Parameter Alignment (all parameters match docs)
+     - Response Shape Alignment (all match TypeScript interfaces)
+     - Read-Only Verification (GET only, no mutations)
+     - Contract Compliance Verification
+     - Invariant Integrity
+     - Test Evidence (152 tests passing)
+     - Verification Checklist (all PASS)
 
-#### API Client (`apps/ui/src/api/`)
-1. **client.ts** - Base API client with:
-   - `ApiError` class for typed error handling with request_id propagation
-   - `apiGet<T>()` function for typed GET requests
-   - X-Request-ID header support for correlation
-2. **audit.ts** - Audit API functions:
-   - `getAuditEvents(filter?, options?)` - Fetch audit events with filtering
+3. **tests/docs/test_ui_phase1_verification.py** (NEW)
+   - 25 tests validating Phase 1 verification claims
+   - Test classes:
+     - TestPhase1ReportExists (3 tests)
+     - TestGetOnlyEnforcement (5 tests)
+     - TestContractCompliance (6 tests)
+     - TestInvariantRegistryCompliance (4 tests)
+     - TestReadModelAdapterCompliance (2 tests)
+     - TestRouteCodeInspection (2 tests)
+     - TestTestCoverage (3 tests)
 
-#### Hooks (`apps/ui/src/hooks/`)
-1. **useAuditEvents.ts** - React hook for audit data fetching with:
-   - Filter parameter handling
-   - Cursor-based pagination with "Load More"
-   - Loading, error, and empty states
-   - Refetch and loadMore callbacks
+### Verification Results
 
-#### Components (`apps/ui/src/components/`)
-1. **AuditEventCard.tsx** - Displays single audit event:
-   - Event type badge with color coding (success, error, warning, info)
-   - Formatted timestamp display
-   - Notification ID, type, agent ID, autonomy mode display
-   - Optional correlation ID
-   - Collapsible JSON payload viewer with safe formatting
-2. **AuditFilters.tsx** - Filter controls:
-   - Event type dropdown (12 event types)
-   - Autonomy mode dropdown (PREVIEW, SHADOW, LIVE)
-   - Notification ID text input
-   - Agent ID text input
-   - Correlation ID text input
-   - Start time datetime picker
-   - End time datetime picker
-   - Apply and Clear buttons
-3. **Pagination.tsx** - Pagination UI:
-   - Item count display with optional total
-   - "Load More" button for cursor-based pagination
-   - Loading state handling
-
-#### Pages (`apps/ui/src/pages/`)
-1. **AuditTimeline.tsx** - Main audit timeline page:
-   - Page header with description
-   - Filter panel
-   - Event list with loading, error, and empty states
-   - Pagination controls
-
-#### Application Files (`apps/ui/src/`)
-1. **App.tsx** - Main app with routing (Deliveries, Policy, Invariants, Audit)
-2. **App.css** - Comprehensive styling for all components
-3. **main.tsx** - React entry point
-
-#### Test Files (`apps/ui/tests/`)
-1. **AuditEventCard.test.tsx** - 11 tests for event card rendering
-2. **AuditFilters.test.tsx** - 9 tests for filter controls
-3. **AuditTimeline.test.tsx** - 8 tests for page component
-4. **Pagination.test.tsx** - 8 tests for pagination component
-5. **api.test.ts** - 13 tests for API client
-
-#### Test Utilities (`apps/ui/src/test/`)
-1. **setup.ts** - Test setup with jest-dom
-2. **mocks.ts** - Mock data for testing
+| Verification Claim | Status | Evidence |
+|-------------------|--------|----------|
+| UI calls only GET endpoints | PASS | All 6 endpoints use @router.get() |
+| UI uses only /ui contracts | PASS | All parameters/responses match docs |
+| No mutation routes | PASS | POST/PUT/PATCH/DELETE return 405 |
+| Basic UI tests pass | PASS | 152 tests passing |
 
 ### Test Results
-- **Frontend tests**: 49 tests passing across 5 test files
-- **Backend tests**: 27 tests passing (test_routes_ui.py)
-- **ESLint**: All checks passed
-- **TypeScript**: No type errors
-- **Ruff (Python)**: All checks passed
+- 104 UI tests pass (test_routes_ui.py + test_routes_ui_comprehensive.py)
+- 23 Phase 0 verification tests pass
+- 25 Phase 1 verification tests pass
+- **152 total tests pass**
+- Ruff linting passes
 
-### Key Features Implemented
+### Files Created
+- `docs/verification/invariants.yml`
+- `docs/reports/ui/phase-1-verify.md`
+- `tests/docs/test_ui_phase1_verification.py`
 
-#### Filtering Support
-- **Event Type**: Filter by any of 12 audit event types (notification.created, delivery.succeeded, delivery.failed, ack.received, etc.)
-- **Autonomy Mode**: Filter by PREVIEW, SHADOW, or LIVE
-- **Notification ID**: Filter by specific notification UUID
-- **Agent ID**: Filter by specific agent UUID
-- **Correlation ID**: Filter by correlation ID for request tracing
-- **Time Range**: Filter by start_time and end_time
-
-#### UI Components
-- Event cards with:
-  - Color-coded badges for event types
-  - Formatted timestamps
-  - Autonomy mode badges (PREVIEW=purple, SHADOW=yellow, LIVE=green)
-  - Monospace code formatting for IDs
-  - Collapsible JSON payload viewer
-- Filter panel with intuitive controls
-- Pagination with "Load More" button
-
-#### Architecture
-- Read-only posture enforced (all GET requests)
-- Typed API client with request_id propagation
-- React hooks for data fetching
-- Cursor-based pagination matching backend
-
-### Acceptance Criteria Met (per uns-ui-phase-1.yaml)
-✅ Audit list with filters (event_type, notification_id, agent_id, autonomy_mode, correlation_id, time range)
-✅ Render event payload details with safe formatting
-✅ Output: apps/ui/src/pages/Audit* created
-✅ Output: apps/ui/src/components/* created
-✅ Tests written and passing
-✅ Linting passes
-
-### Running the UI
-
-```bash
-cd apps/ui
-npm install
-npm run dev
-# UI available at http://localhost:5173
-# Backend must be running at http://localhost:8000
-```
-
-### API Endpoint Used
-- `GET /ui/audit` - List audit events with filtering (cursor-based pagination)
+### Acceptance Criteria Met
+✅ UI calls only GET endpoints - VERIFIED
+✅ UI uses only /ui contracts as documented - VERIFIED
+✅ No mutation routes or privileged actions introduced - VERIFIED
+✅ Basic UI tests pass - VERIFIED (152 tests)
+✅ Output: docs/reports/ui/phase-1-verify.md - CREATED
