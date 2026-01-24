@@ -58,6 +58,7 @@ export function useInvariants(filters: InvariantFilters): UseInvariantsResult {
   useEffect(() => {
     setCursor(null);
     fetchData(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally only re-fetch on filter value changes, not on fetchData reference changes
   }, [filters.severity, filters.enforcement_type, filters.status, filters.search, filters.limit]);
 
   const refetch = useCallback(() => {
