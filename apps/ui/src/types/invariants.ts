@@ -38,6 +38,7 @@ export interface PaginationInfo {
 export interface InvariantListResponse {
   items: InvariantEntry[];
   pagination: PaginationInfo;
+  degraded?: boolean;
 }
 
 export interface InvariantSummaryResponse {
@@ -47,6 +48,7 @@ export interface InvariantSummaryResponse {
   by_status: Record<string, number>;
   exceptions_requiring_review: number;
   last_updated: string;
+  degraded?: boolean;
 }
 
 export interface InvariantFilters {
