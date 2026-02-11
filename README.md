@@ -4,9 +4,35 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](tests/)
 
-A control-plane notification and acknowledgment service designed for autonomous agent systems. UNS provides policy-driven, multi-channel notification delivery with intent-based routing and robust delivery guarantees.
+A standalone control-plane service for autonomous agent systems, providing policy-driven notification delivery, governance decision-making, and policy management. UNS is being extracted from the [Market Insights Platform (MIP)](https://github.com/your-org/market-insights-platform) into an independent, reusable service.
+
+## Roadmap: MIP Extraction
+
+This repository is the target for extracting three tightly coupled subsystems from MIP into a single standalone product:
+
+| Subsystem | Status | Description |
+|-----------|--------|-------------|
+| **Unified Notification Service** | Extracted | Multi-channel, policy-driven notification delivery with intent-based routing and delivery guarantees |
+| **Policy Engine** | Planned | Notification policy lifecycle (DRAFT → PREVIEW → ACTIVE → RETIRED), YAML-based policy definitions, versioning, persistence, and hot-reload |
+| **Agent Governance** | Planned | Autonomy-level management, decision policies, governor hooks, and circuit-breaker integration |
+
+### Why Extract?
+
+- **Reusability** — Governance + notifications are general-purpose capabilities, not trading-specific
+- **Independent Deployment** — Decouple release cycles from the trading platform
+- **Clear Domain Boundaries** — Notification delivery, policy management, and governance form a cohesive control-plane domain
+- **Simplified Testing** — Standalone test suite without trading-platform dependencies
+
+### Extraction Phases
+
+1. **Phase 1 (Complete):** Core UNS — SDK, delivery pipeline, adapters, deduplication, rate limiting, acknowledgment tracking, audit trail
+2. **Phase 2 (In Progress):** Policy Engine Stabilization — Lifecycle transitions, YAML loader, versioning, DB persistence, hot-reload, MIP-225 compliance (completed in MIP, pending port to this repo)
+3. **Phase 3 (Planned):** Governance Extraction — Agent Governor, decision policies, autonomy-level state machine, governor hooks, circuit-breaker hooks
+4. **Phase 4 (Planned):** Integration Consolidation — Unified API surface, shared DB schema, cross-subsystem contract tests
 
 ## Features
+
+### Notification Service (Extracted)
 
 - **Multi-Channel Delivery**: Slack, Email, WebSocket, PagerDuty
 - **Intent-Based Routing**: SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL
@@ -17,6 +43,22 @@ A control-plane notification and acknowledgment service designed for autonomous 
 - **Rate Limiting**: Per-channel token bucket rate limiting
 - **Policy Registry**: Flexible per-notification-type overrides
 - **Audit Trail**: Comprehensive logging for compliance
+
+### Policy Engine (Pending Port from MIP)
+
+- **Policy Lifecycle**: DRAFT → PREVIEW → ACTIVE → RETIRED state machine
+- **YAML Policy Definitions**: File-based policy configuration with directory loading
+- **Policy Versioning**: `previous_version_id` chain for version history tracking
+- **Database Persistence**: `notification_policy` table with JSONB columns and content-hash dedup
+- **Hot-Reload**: `POST /api/v1/policies/reload` for runtime policy refresh without restart
+- **MIP-225 Compliance**: Producers cannot specify channels — policy engine owns routing decisions
+
+### Agent Governance (Planned)
+
+- **Autonomy-Level Management**: PREVIEW → SHADOW → LIVE state transitions
+- **Decision Policies**: Configurable rules for agent autonomy boundaries
+- **Governor Hooks**: Integration points for autonomy-level change notifications
+- **Circuit-Breaker Hooks**: Safety circuit-breaker engage/recover notification integration
 
 ## Quick Start
 
@@ -417,34 +459,49 @@ pytest -k "test_safety"
 
 ```
 src/
-├── notification/
+├── notification/              # ── Notification Service (Extracted) ──
 │   ├── __init__.py
-│   ├── models.py           # Core data contracts
-│   ├── interfaces.py       # Integration protocols
-│   ├── policies.py         # Policy schema & registry
-│   ├── sdk.py              # Producer interface
-│   ├── service.py          # Delivery orchestration
-│   ├── deduplication.py    # Deduplication engine
-│   ├── rate_limiting.py    # Rate limiting
-│   ├── acknowledgment.py   # Ack lifecycle management
-│   ├── audit.py            # Audit logging
-│   └── adapters/
-│       ├── __init__.py
-│       ├── base.py         # Base adapter protocol
-│       ├── slack.py        # Slack adapter
-│       ├── email.py        # Email adapter
-│       ├── websocket.py    # WebSocket adapter
-│       └── pagerduty.py    # PagerDuty adapter
+│   ├── models.py              # Core data contracts
+│   ├── interfaces.py          # Integration protocols
+│   ├── policies.py            # Policy schema & registry
+│   ├── policy_loader.py       # YAML policy loader (pending port)
+│   ├── sdk.py                 # Producer interface
+│   ├── service.py             # Delivery orchestration
+│   ├── deduplication.py       # Deduplication engine
+│   ├── rate_limiting.py       # Rate limiting
+│   ├── acknowledgment.py      # Ack lifecycle management
+│   ├── audit.py               # Audit logging
+│   ├── adapters/
+│   │   ├── __init__.py
+│   │   ├── base.py            # Base adapter protocol
+│   │   ├── slack.py           # Slack adapter
+│   │   ├── email.py           # Email adapter
+│   │   ├── websocket.py       # WebSocket adapter
+│   │   └── pagerduty.py       # PagerDuty adapter
+│   └── integrations/          # ── Hook Integrations (pending port) ──
+│       ├── governor_hooks.py  # Autonomy-level change notifications
+│       └── circuit_breaker_hooks.py  # Circuit-breaker notifications
+├── governance/                # ── Agent Governance (planned) ──
+│   ├── governor.py            # Agent Governor state machine
+│   ├── decision_policies.py   # Decision policy models
+│   └── autonomy.py            # Autonomy-level management
 ├── db/
-│   ├── models.py           # Database models
-│   └── audit_store.py      # Audit persistence
-└── mcp_server/
-    └── routes_notification.py  # HTTP API routes
+│   ├── models.py              # Database models
+│   ├── audit_store.py         # Audit persistence
+│   └── migrations/            # SQL migrations (pending port)
+├── mcp_server/
+│   └── routes_notification.py # HTTP API routes
+└── config/
+    └── notification_policies/ # YAML policy definitions (pending port)
 tests/
 └── notification/
     ├── test_models.py
     ├── test_interfaces.py
     ├── test_policies.py
+    ├── test_policy_lifecycle.py   # (pending port)
+    ├── test_policy_loader.py      # (pending port)
+    ├── test_policy_persistence.py # (pending port)
+    ├── test_policy_hot_reload.py  # (pending port)
     ├── test_sdk.py
     ├── test_service.py
     ├── test_deduplication.py
