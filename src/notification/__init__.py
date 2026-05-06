@@ -81,9 +81,13 @@ from .policies import (
 from .policy_learning import (
     DeltaRejectionReason,
     DeltaState,
+    FieldBound,
+    GuardResult,
     GuardStage,
     PolicyDelta,
     PolicyDeltaTransition,
+    ShadowEvaluationAggregate,
+    ShadowEvaluationResult,
     ShadowStatus,
 )
 from .sdk import (
@@ -144,9 +148,13 @@ __all__ = [
     # Policy learning
     "DeltaRejectionReason",
     "DeltaState",
+    "FieldBound",
     "GuardStage",
+    "GuardResult",
     "PolicyDelta",
     "PolicyDeltaTransition",
+    "ShadowEvaluationAggregate",
+    "ShadowEvaluationResult",
     "ShadowStatus",
     # SDK
     "NotificationSDK",
