@@ -162,7 +162,7 @@ evidence: code, tests, smoke docs, examples, or explicit known limitations.
 
 | Issue | Purpose | Publish impact |
 |---|---|---|
-| [MIP-250](https://linear.app/awiley-personal/issue/MIP-250/publish-mip-uns-policies-as-agsignal-sample-policy-set) | Publish MIP UNS policies as AGSignal sample policies | Gives users a realistic example without making MIP semantics core |
+| [MIP-250](https://linear.app/awiley-personal/issue/MIP-250/publish-mip-uns-policies-as-agsignal-sample-policy-set) | Publish MIP UNS policies as AGSignal sample policies | Creates `examples/policies/mip-uns/` as the canonical sample policy pack path |
 | [MIP-251](https://linear.app/awiley-personal/issue/MIP-251/add-mip-embedding-adapter-package-for-uns-parity) | Add MIP embedding adapter package | Restores MIP integration behavior outside AGSignal Core |
 | [MIP-252](https://linear.app/awiley-personal/issue/MIP-252/close-agsignal-httpadmin-api-parity-gaps-with-mip-uns) | Close HTTP/admin API parity gaps | Makes the public runtime/API story complete |
 | [MIP-253](https://linear.app/awiley-personal/issue/MIP-253/decide-and-implement-workeradapterauditdlq-operational-parity) | Decide and implement worker, adapter, audit, and DLQ parity | Defines production operational guarantees |
@@ -199,4 +199,3 @@ AGSignal is ready to publish when:
   explicitly scoped into a later release.
 - Release checklist includes package metadata, smoke commands, known
   limitations, and verification evidence.
-

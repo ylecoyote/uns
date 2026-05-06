@@ -1,0 +1,17 @@
+notification_type: "execution.slippage"
+version: "1.0.0"
+status: "ACTIVE"
+delivery_mode: "BEST_EFFORT"
+channels:
+  PREVIEW:
+    - "WEBSOCKET"
+  SHADOW:
+    - "WEBSOCKET"
+  LIVE:
+    - "SLACK"
+require_ack:
+  PREVIEW: false
+  SHADOW: false
+  LIVE: false
+dedup_window_seconds: 300
+description: "Slippage alerts - dedup for 5 minutes"
