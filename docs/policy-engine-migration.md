@@ -180,6 +180,20 @@ hardcoded in the loader.
 
 ## Recommended Migration Order
 
+### Current MIP-254 implementation notes
+
+MIP-254 is being implemented in narrow parity slices rather than one large port.
+The first AGSignal-native slice preserves the MIP enforcement boundary:
+
+- ACTIVE policies are the only policies eligible for runtime enforcement.
+- PREVIEW policies are loaded through an explicit shadow/simulation path.
+- DRAFT UI edits and RETIRED policies do not silently affect enforcement.
+- The existing mixed `load_registry()` behavior remains for backward
+  compatibility while new callers can choose `load_runtime_registry()` or
+  `load_shadow_registry()`.
+
+See [MIP-254A Policy Lifecycle Runtime Boundary Design](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md).
+
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 
 1. Copy `learning_schemas.py` verbatim — it has no MIP-specific types
