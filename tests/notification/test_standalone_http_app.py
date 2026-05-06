@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import yaml
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 from db.policy_store import SQLAlchemyPolicyStore
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
@@ -19,6 +20,7 @@ from notification.models import (
     Notification,
     NotificationIntent,
 )
+from notification.websocket_runtime import WebSocketFanoutEnvelope
 
 
 class FakeRedisList:
@@ -46,6 +48,10 @@ class FakeRedisList:
 
     def llen(self, key: str) -> int:
         return len(self.values)
+
+    def publish(self, channel: str, payload: str) -> int:
+        self.values.append(payload)
+        return 1
 
 
 def _payload() -> dict[str, object]:
@@ -81,8 +87,17 @@ def _client(
 
 
 class ExplodingRedisFactory:
-    def __call__(self, url: str):
+    def __call__(self, url: str) -> FakeRedisList:
         raise AssertionError("Redis should not be created unless fanout is enabled")
+
+
+class CapturingFanout:
+    def __init__(self) -> None:
+        self.envelopes: list[WebSocketFanoutEnvelope] = []
+
+    def publish(self, envelope: WebSocketFanoutEnvelope) -> bool:
+        self.envelopes.append(envelope)
+        return True
 
 
 def _notification() -> Notification:
@@ -112,7 +127,9 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
     assert "/ready" in openapi["paths"]
     assert "/api/v1/notifications" in openapi["paths"]
     assert "/api/v1/notifications/{notification_id}/ack-status" in openapi["paths"]
-    assert "/ws/agents/{agent_id}" in [route.path for route in create_app().routes]
+    assert "/ws/agents/{agent_id}" in [
+        getattr(route, "path", None) for route in create_app().routes
+    ]
 
 
 def test_ready_does_not_require_market_insights_dependencies() -> None:
@@ -143,7 +160,7 @@ def test_channel_health_summary_is_separate_from_ready_status() -> None:
     assert ready_response.json()["status"] == "ready"
 
 
-def test_app_does_not_create_redis_fanout_by_default(monkeypatch) -> None:
+def test_app_does_not_create_redis_fanout_by_default(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv("UNS_WEBSOCKET_REDIS_ENABLED", raising=False)
 
     from notification.main import create_app
@@ -153,12 +170,12 @@ def test_app_does_not_create_redis_fanout_by_default(monkeypatch) -> None:
     assert app.state.websocket_fanout is None
 
 
-def test_app_creates_redis_fanout_when_enabled(monkeypatch) -> None:
+def test_app_creates_redis_fanout_when_enabled(monkeypatch: MonkeyPatch) -> None:
     class RedisFactory:
         def __init__(self) -> None:
             self.urls: list[str] = []
 
-        def __call__(self, url: str):
+        def __call__(self, url: str) -> FakeRedisList:
             self.urls.append(url)
             return FakeRedisList()
 
@@ -193,6 +210,52 @@ def test_send_signal_registers_live_safety_ack_state() -> None:
 
     assert status_response.status_code == 200
     assert status_response.json()["ack_status"] == "PENDING"
+
+
+def test_send_signal_delivers_to_connected_websocket_agent() -> None:
+    client = _client()
+    payload = _payload()
+    agent_id = uuid4()
+    autonomy_context = payload["autonomy_context"]
+    assert isinstance(autonomy_context, dict)
+    autonomy_context["agent_id"] = str(agent_id)
+
+    with client.websocket_connect(f"/ws/agents/{agent_id}") as websocket:
+        websocket.receive_json()
+
+        response = client.post("/api/v1/notifications", json=payload)
+        event = websocket.receive_json()
+
+    assert response.status_code == 202
+    assert event["type"] == "notification"
+    assert event["notification"]["notification_id"] == response.json()["notification_id"]
+    assert event["notification"]["ack_status"] == "PENDING"
+    assert event["notification"]["require_ack"] is True
+
+
+def test_send_signal_publishes_optional_websocket_fanout() -> None:
+    configure_ack_engine(storage=InMemoryAckStorage())
+
+    from notification.main import create_app
+
+    app = create_app()
+    fanout = CapturingFanout()
+    app.state.websocket_fanout = fanout
+    client = TestClient(app)
+    payload = _payload()
+    agent_id = uuid4()
+    autonomy_context = payload["autonomy_context"]
+    assert isinstance(autonomy_context, dict)
+    autonomy_context["agent_id"] = str(agent_id)
+
+    response = client.post("/api/v1/notifications", json=payload)
+
+    assert response.status_code == 202
+    assert len(fanout.envelopes) == 1
+    envelope = fanout.envelopes[0]
+    assert envelope.type == "notification"
+    assert envelope.agent_id == agent_id
+    assert envelope.notification["notification_id"] == response.json()["notification_id"]
 
 
 def test_send_signal_rejects_producer_selected_channels() -> None:

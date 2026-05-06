@@ -29,6 +29,10 @@ from notification.models import (
 from notification.policies import PolicyRegistry, configure_policy_registry
 from notification.policy_loader import load_policies_from_directory
 from notification.sdk import NotificationSDK, ValidationError
+from notification.websocket_runtime import (
+    WebSocketConnectionManager,
+    WebSocketFanoutEnvelope,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +212,10 @@ def _resolve_notification(
     response_model=SendNotificationResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def send_notification(request: SendNotificationRequest) -> SendNotificationResponse:
+async def send_notification(
+    http_request: Request,
+    request: SendNotificationRequest,
+) -> SendNotificationResponse:
     """Accept an AGSignal notification from an autonomous producer."""
     result, notification = _resolve_notification(request)
     ack_status: AckStatus | None = None
@@ -229,6 +236,32 @@ async def send_notification(request: SendNotificationRequest) -> SendNotificatio
         notification.notification_type,
         notification.intent.value,
     )
+
+    websocket_payload: dict[str, object] = {
+        "notification_id": str(notification.notification_id),
+        "notification_type": notification.notification_type,
+        "intent": notification.intent.value,
+        "title": notification.title,
+        "message": notification.message,
+        "source": notification.source,
+        "require_ack": bool(notification.require_ack),
+        "ack_status": ack_status.value if ack_status is not None else None,
+    }
+    manager = getattr(http_request.app.state, "websocket_manager", None)
+    if isinstance(manager, WebSocketConnectionManager):
+        await manager.send_to_agent(
+            notification.autonomy_context.agent_id,
+            {"type": "notification", "notification": websocket_payload},
+        )
+    fanout = getattr(http_request.app.state, "websocket_fanout", None)
+    if fanout is not None:
+        fanout.publish(
+            WebSocketFanoutEnvelope(
+                type="notification",
+                agent_id=notification.autonomy_context.agent_id,
+                notification=websocket_payload,
+            )
+        )
 
     return SendNotificationResponse(
         notification_id=result.notification_id,
