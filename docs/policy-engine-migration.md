@@ -206,6 +206,17 @@ learning primitives:
 
 See [MIP-254B Policy Delta Core Design](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md).
 
+The third slice ports the reusable shadow and guard primitives:
+
+- `ShadowEvaluationResult` records original and candidate outcomes for a host
+  decision.
+- `ShadowEvaluationAggregate` captures sample size, win rate, threshold flags,
+  and whether approval preconditions are met.
+- `GuardResult` and `FieldBound` make guard checks explicit and auditable
+  without importing trading snapshots or ticker-specific metrics.
+
+See [MIP-254C Shadow And Guard Core Design](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md).
+
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 
 1. Copy `learning_schemas.py` verbatim — it has no MIP-specific types

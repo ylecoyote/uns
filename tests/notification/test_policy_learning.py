@@ -10,8 +10,13 @@ from pydantic import ValidationError
 from notification.policy_learning import (
     DeltaRejectionReason,
     DeltaState,
+    FieldBound,
+    GuardResult,
     GuardStage,
     PolicyDelta,
+    ShadowEvaluationAggregate,
+    ShadowEvaluationResult,
+    ShadowStatus,
 )
 
 
@@ -135,3 +140,70 @@ def test_delta_validates_confidence_and_evidence_count() -> None:
             confidence=0.5,
             evidence_count=0,
         )
+
+
+def test_shadow_aggregate_requires_sample_and_passed_status_for_approval() -> None:
+    delta_id = uuid4()
+    aggregate = ShadowEvaluationAggregate(
+        delta_id=delta_id,
+        total_decisions=12,
+        improved_decisions=8,
+        degraded_decisions=2,
+        neutral_decisions=2,
+        win_rate=0.67,
+        min_sample_met=True,
+        accuracy_threshold_met=True,
+        status=ShadowStatus.PASSED,
+    )
+
+    assert aggregate.can_promote_to_approval is True
+
+    failed = aggregate.model_copy(update={"status": ShadowStatus.FAILED})
+    assert failed.can_promote_to_approval is False
+
+
+def test_shadow_result_preserves_original_and_candidate_outcomes() -> None:
+    result = ShadowEvaluationResult(
+        delta_id=uuid4(),
+        decision_id="signal-123",
+        original_outcome={"channels": ["SLACK"], "require_ack": False},
+        shadow_outcome={"channels": ["SLACK", "PAGERDUTY"], "require_ack": True},
+        changed=True,
+        improvement_score=0.4,
+    )
+
+    assert result.changed is True
+    assert result.original_outcome["require_ack"] is False
+    assert result.shadow_outcome["require_ack"] is True
+
+
+def test_guard_result_allows_only_when_all_checks_pass() -> None:
+    passed = GuardResult(
+        stage=GuardStage.APPROVE,
+        allowed=True,
+        checks={"shadow_passed": True, "operator_present": True},
+    )
+    blocked = GuardResult(
+        stage=GuardStage.APPROVE,
+        allowed=False,
+        reason=DeltaRejectionReason.SHADOW_NOT_PASSED,
+        reason_detail="Shadow aggregate did not pass.",
+        checks={"shadow_passed": False, "operator_present": True},
+    )
+
+    assert passed.is_blocking is False
+    assert blocked.is_blocking is True
+    assert blocked.reason == DeltaRejectionReason.SHADOW_NOT_PASSED
+
+
+def test_field_bound_validates_numeric_bounds_and_step_sizes() -> None:
+    bound = FieldBound(
+        field_path="ack_timeout_minutes",
+        min_value=1,
+        max_value=60,
+        max_abs_change_per_delta=10,
+    )
+
+    assert bound.allows(current_value=15, proposed_value=20) is True
+    assert bound.allows(current_value=15, proposed_value=90) is False
+    assert bound.allows(current_value=15, proposed_value=30) is False

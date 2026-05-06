@@ -36,6 +36,7 @@ while the public product API stabilizes.
 | [Operational Parity Contract](superpowers/specs/2026-05-06-mip-253-operational-parity-contract.md) | MIP-253 Core-versus-host runtime ownership decision |
 | [Policy Lifecycle Runtime Boundary](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md) | MIP-254 policy engine slice for ACTIVE-only runtime loads and PREVIEW-only shadow loads |
 | [Policy Delta Core](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md) | MIP-254 policy engine slice for immutable delta transitions and auditable history |
+| [Shadow And Guard Core](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md) | MIP-254 policy engine slice for shadow evaluation and guard result primitives |
 
 ### Topic Sections
 

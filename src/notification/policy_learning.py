@@ -58,6 +58,162 @@ class ShadowStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class FieldBound(BaseModel):
+    """Numeric bounds for a policy field guard."""
+
+    field_path: str = Field(description="Dotted path to the bounded policy field")
+    min_value: float | None = Field(
+        default=None,
+        description="Minimum allowed value",
+    )
+    max_value: float | None = Field(
+        default=None,
+        description="Maximum allowed value",
+    )
+    max_abs_change_per_delta: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Maximum absolute change allowed in one delta",
+    )
+    max_rel_change_per_delta: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Maximum relative change allowed in one delta",
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+    def allows(self, *, current_value: float, proposed_value: float) -> bool:
+        """Return whether proposed_value satisfies configured bounds."""
+        if self.min_value is not None and proposed_value < self.min_value:
+            return False
+        if self.max_value is not None and proposed_value > self.max_value:
+            return False
+
+        abs_change = abs(proposed_value - current_value)
+        if (
+            self.max_abs_change_per_delta is not None
+            and abs_change > self.max_abs_change_per_delta
+        ):
+            return False
+
+        if self.max_rel_change_per_delta is not None:
+            if current_value == 0:
+                return abs_change == 0
+            rel_change = abs_change / abs(current_value)
+            if rel_change > self.max_rel_change_per_delta:
+                return False
+
+        return True
+
+
+class GuardResult(BaseModel):
+    """Auditable result from guard checks for a delta transition."""
+
+    stage: GuardStage = Field(description="Stage this guard result applies to")
+    allowed: bool = Field(description="Whether the guarded transition may proceed")
+    reason: DeltaRejectionReason | None = Field(
+        default=None,
+        description="Structured rejection reason when blocked",
+    )
+    reason_detail: str | None = Field(
+        default=None,
+        description="Human-readable rejection detail",
+    )
+    checks: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Named guard checks and their observed values",
+    )
+    checked_at: datetime = Field(
+        default_factory=_utc_now,
+        description="When the guard result was produced",
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+    @property
+    def is_blocking(self) -> bool:
+        """Whether this guard result blocks a transition."""
+        return not self.allowed
+
+
+class ShadowEvaluationResult(BaseModel):
+    """Per-decision shadow evaluation result for a candidate delta."""
+
+    result_id: UUID = Field(
+        default_factory=uuid4,
+        description="Stable result identifier",
+    )
+    delta_id: UUID = Field(description="Delta being shadow evaluated")
+    decision_id: str = Field(description="Host decision/signal identifier")
+    original_outcome: dict[str, Any] = Field(
+        description="Outcome from the current policy",
+    )
+    shadow_outcome: dict[str, Any] = Field(
+        description="Outcome from the candidate policy",
+    )
+    changed: bool = Field(
+        default=False,
+        description="Whether the candidate policy changed the decision",
+    )
+    improvement_score: float | None = Field(
+        default=None,
+        description="Domain-neutral improvement score, if available",
+    )
+    evaluated_at: datetime = Field(
+        default_factory=_utc_now,
+        description="When the shadow decision was evaluated",
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ShadowEvaluationAggregate(BaseModel):
+    """Aggregate shadow evaluation result for one policy delta."""
+
+    aggregate_id: UUID = Field(
+        default_factory=uuid4,
+        description="Stable aggregate identifier",
+    )
+    delta_id: UUID = Field(description="Delta summarized by this aggregate")
+    total_decisions: int = Field(ge=0, description="Total decisions evaluated")
+    improved_decisions: int = Field(ge=0, description="Decisions that improved")
+    degraded_decisions: int = Field(ge=0, description="Decisions that degraded")
+    neutral_decisions: int = Field(ge=0, description="Decisions with no material change")
+    win_rate: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Improved decisions divided by total decisions",
+    )
+    min_sample_met: bool = Field(
+        default=False,
+        description="Whether enough samples were evaluated",
+    )
+    accuracy_threshold_met: bool = Field(
+        default=False,
+        description="Whether the shadow evaluation passed its quality threshold",
+    )
+    status: ShadowStatus = Field(
+        default=ShadowStatus.PENDING,
+        description="Overall shadow evaluation status",
+    )
+    computed_at: datetime = Field(
+        default_factory=_utc_now,
+        description="When this aggregate was computed",
+    )
+
+    model_config = ConfigDict(frozen=True)
+
+    @property
+    def can_promote_to_approval(self) -> bool:
+        """Whether this aggregate satisfies approval preconditions."""
+        return (
+            self.status == ShadowStatus.PASSED
+            and self.min_sample_met
+            and self.accuracy_threshold_met
+        )
+
+
 class PolicyDeltaTransition(BaseModel):
     """Auditable state transition for a policy delta."""
 
