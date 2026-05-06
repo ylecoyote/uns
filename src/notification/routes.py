@@ -150,6 +150,7 @@ class PolicyReloadResponse(BaseModel):
     """HTTP response for policy reload operations."""
 
     loaded_count: int = Field(description="Number of policy files loaded")
+    persisted_count: int = Field(description="Number of policies newly persisted")
     policy_count: int = Field(description="Number of policies active after reload")
     notification_types: list[str] = Field(description="Registered notification types")
 
@@ -267,9 +268,12 @@ async def list_dlq(request: Request) -> DLQListResponse:
 
 
 @ops_router.post("/policies/reload", response_model=PolicyReloadResponse)
-async def reload_policies(request: PolicyReloadRequest) -> PolicyReloadResponse:
+async def reload_policies(
+    reload_request: PolicyReloadRequest,
+    http_request: Request,
+) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
-    policy_dir = Path(request.policy_dir)
+    policy_dir = Path(reload_request.policy_dir)
     registry = PolicyRegistry()
     try:
         loaded_count = load_policies_from_directory(policy_dir, registry=registry)
@@ -289,10 +293,19 @@ async def reload_policies(request: PolicyReloadRequest) -> PolicyReloadResponse:
             detail={"error": "invalid_policy", "message": str(exc)},
         ) from exc
 
+    persisted_count = 0
+    policy_store = getattr(http_request.app.state, "policy_store", None)
+    if policy_store is not None:
+        for policy in registry.get_all().values():
+            result = policy_store.save_policy(policy)
+            if result.created:
+                persisted_count += 1
+
     configure_policy_registry(registry=registry)
     notification_types = sorted(registry.list_notification_types())
     return PolicyReloadResponse(
         loaded_count=loaded_count,
+        persisted_count=persisted_count,
         policy_count=len(registry),
         notification_types=notification_types,
     )

@@ -21,6 +21,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    ForeignKey,
     Index,
     String,
     Text,
@@ -256,9 +257,27 @@ class PersistedNotificationPolicy(Base):
 
     __tablename__ = "notification_policies"
 
-    # Primary key (notification_type is the natural key)
+    policy_id: Mapped[UUID] = mapped_column(
+        Uuid, primary_key=True, default=uuid4, comment="Unique persisted policy row ID"
+    )
+
     notification_type: Mapped[str] = mapped_column(
-        String(255), primary_key=True, comment="Namespaced notification type"
+        String(255), nullable=False, index=True, comment="Namespaced notification type"
+    )
+    version: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="1.0.0", comment="Policy version"
+    )
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="ACTIVE", index=True, comment="Policy lifecycle status"
+    )
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True, comment="Semantic policy content hash"
+    )
+    previous_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("notification_policies.policy_id"),
+        nullable=True,
+        comment="Previous policy version in the lifecycle chain",
     )
 
     # Policy configuration
@@ -268,8 +287,14 @@ class PersistedNotificationPolicy(Base):
     channels: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True, comment="Override channels"
     )
-    require_ack: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True, comment="Override ack requirement"
+    delivery_mode_by_autonomy: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True, comment="Per-autonomy delivery mode overrides"
+    )
+    require_ack: Mapped[Any | None] = mapped_column(
+        JSON, nullable=True, comment="Override ack requirement or per-mode ack map"
+    )
+    channels_escalation: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True, comment="Escalation channel routing by autonomy mode"
     )
     ack_timeout_minutes: Mapped[int | None] = mapped_column(
         nullable=True, comment="Override ack timeout"
@@ -305,6 +330,20 @@ class PersistedNotificationPolicy(Base):
         onupdate=lambda: datetime.now(UTC),
         comment="When policy was last updated",
     )
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="When policy became ACTIVE"
+    )
+    retired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="When policy was retired"
+    )
+
+    __table_args__ = (
+        Index("ix_notification_policy_type_status", "notification_type", "status"),
+    )
 
     def __repr__(self) -> str:
-        return f"PersistedNotificationPolicy(notification_type={self.notification_type})"
+        return (
+            "PersistedNotificationPolicy("
+            f"notification_type={self.notification_type}, "
+            f"version={self.version}, status={self.status})"
+        )

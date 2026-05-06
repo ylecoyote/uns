@@ -10,10 +10,13 @@ from db.models import (
     NotificationAuditRecord,
     PersistedNotificationPolicy,
 )
+from db.policy_store import SQLAlchemyPolicyStore, create_sqlalchemy_policy_store
 
 __all__ = [
     "AckAuditRecord",
     "Base",
     "NotificationAuditRecord",
     "PersistedNotificationPolicy",
+    "SQLAlchemyPolicyStore",
+    "create_sqlalchemy_policy_store",
 ]

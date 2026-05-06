@@ -7,6 +7,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from db.policy_store import SQLAlchemyPolicyStore
 from mcp_server.routes_notification import router as acknowledgment_router
 from notification import __version__
 from notification.config import get_notification_config
@@ -54,7 +55,10 @@ def _channel_readiness() -> dict[str, bool]:
     }
 
 
-def create_app(dlq_service: DLQService | None = None) -> FastAPI:
+def create_app(
+    dlq_service: DLQService | None = None,
+    policy_store: SQLAlchemyPolicyStore | None = None,
+) -> FastAPI:
     """Create the standalone AGSignal Core HTTP application."""
     app = FastAPI(
         title="AGSignal Core",
@@ -65,6 +69,7 @@ def create_app(dlq_service: DLQService | None = None) -> FastAPI:
         openapi_url="/openapi.json",
     )
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
+    app.state.policy_store = policy_store
 
     app.include_router(notification_router)
     app.include_router(ops_router)
