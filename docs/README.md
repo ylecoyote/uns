@@ -21,6 +21,7 @@ while the public product API stabilizes.
 
 | Decision | Description |
 |----------|-------------|
+| [Generic App Adapter Boundary](decisions/2026-05-06-app-adapter-boundary.md) | Host-application integration facade without MIP coupling |
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
 | [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
 
