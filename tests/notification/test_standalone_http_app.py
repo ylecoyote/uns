@@ -53,6 +53,24 @@ class FakeRedisList:
         self.values.append(payload)
         return 1
 
+    def pubsub(self) -> FakePubSub:
+        return FakePubSub()
+
+
+class FakePubSub:
+    def subscribe(self, *channels: str) -> int:
+        return len(channels)
+
+    def get_message(
+        self,
+        ignore_subscribe_messages: bool = True,
+        timeout: float = 0.5,
+    ) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
 
 def _payload() -> dict[str, object]:
     return {
@@ -189,6 +207,7 @@ def test_app_creates_redis_fanout_when_enabled(monkeypatch: MonkeyPatch) -> None
 
     assert factory.urls == ["redis://example/0"]
     assert app.state.websocket_fanout is not None
+    assert app.state.websocket_subscriber is not None
 
 
 def test_send_signal_registers_live_safety_ack_state() -> None:

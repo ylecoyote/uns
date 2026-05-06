@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from contextlib import suppress
 from typing import Protocol
 from uuid import UUID, uuid4
 
@@ -16,11 +18,23 @@ from notification.models import AckStatus, Channel
 logger = logging.getLogger(__name__)
 
 
+class WebSocketSubscriber(Protocol):
+    """Optional cross-process subscription lifecycle for WebSocket fanout."""
+
+    async def ensure_agent_subscription(self, agent_id: UUID) -> None: ...
+
+    async def stop_agent_subscription(self, agent_id: UUID) -> None: ...
+
+
 class WebSocketConnectionManager:
     """In-memory connection tracker for standalone WebSocket sessions."""
 
-    def __init__(self) -> None:
+    def __init__(self, subscriber: WebSocketSubscriber | None = None) -> None:
         self._connections_by_agent: dict[UUID, dict[str, WebSocket | None]] = {}
+        self._subscriber = subscriber
+
+    def set_subscriber(self, subscriber: WebSocketSubscriber | None) -> None:
+        self._subscriber = subscriber
 
     @property
     def connection_count(self) -> int:
@@ -61,6 +75,14 @@ class WebSocketConnectionManager:
             delivered += 1
         return delivered
 
+    async def ensure_agent_subscription(self, agent_id: UUID) -> None:
+        if self._subscriber is not None:
+            await self._subscriber.ensure_agent_subscription(agent_id)
+
+    async def stop_agent_subscription_if_idle(self, agent_id: UUID) -> None:
+        if self._subscriber is not None and self.agent_connection_count(agent_id) == 0:
+            await self._subscriber.stop_agent_subscription(agent_id)
+
 
 class WebSocketFanoutEnvelope(BaseModel):
     """Stable envelope for optional cross-process WebSocket fanout."""
@@ -68,6 +90,10 @@ class WebSocketFanoutEnvelope(BaseModel):
     type: str = Field(description="Fanout message type")
     agent_id: UUID = Field(description="Target agent identifier")
     notification: dict[str, object] = Field(default_factory=dict)
+    origin_id: str | None = Field(
+        default=None,
+        description="AGSignal process identifier that created the fanout event",
+    )
 
 
 class RedisPublisher(Protocol):
@@ -76,22 +102,51 @@ class RedisPublisher(Protocol):
     def publish(self, channel: str, message: str) -> object: ...
 
 
+class RedisPubSub(Protocol):
+    """Redis-compatible pub/sub surface used by WebSocket fanout."""
+
+    def subscribe(self, *channels: str) -> object: ...
+
+    def get_message(
+        self,
+        ignore_subscribe_messages: bool = True,
+        timeout: float = 0.5,
+    ) -> object: ...
+
+    def close(self) -> object: ...
+
+
+class RedisWebSocketClient(RedisPublisher, Protocol):
+    """Redis surface required for AGSignal WebSocket fanout."""
+
+    def pubsub(self) -> RedisPubSub: ...
+
+
 class RedisWebSocketFanout:
     """Optional Redis-backed WebSocket fanout publisher."""
 
     def __init__(
         self,
         redis_client: RedisPublisher,
-        channel: str,
+        channel_prefix: str,
+        instance_id: str | None = None,
         channel_health_tracker: ChannelHealthTracker | None = None,
     ) -> None:
         self._redis = redis_client
-        self._channel = channel
+        self._channel_prefix = channel_prefix
+        self._instance_id = instance_id or str(uuid4())
         self._channel_health_tracker = channel_health_tracker
 
     @property
-    def channel(self) -> str:
-        return self._channel
+    def channel_prefix(self) -> str:
+        return self._channel_prefix
+
+    @property
+    def instance_id(self) -> str:
+        return self._instance_id
+
+    def channel_for_agent(self, agent_id: UUID) -> str:
+        return f"{self._channel_prefix}:agent:{agent_id}"
 
     def publish(self, envelope: WebSocketFanoutEnvelope) -> bool:
         """Publish a fanout envelope.
@@ -99,10 +154,13 @@ class RedisWebSocketFanout:
         Redis failures are observable via channel health but are not raised to
         callers. Live fanout should not block the notification execution path.
         """
-        payload = envelope.model_dump_json()
+        outbound = envelope
+        if outbound.origin_id is None:
+            outbound = outbound.model_copy(update={"origin_id": self._instance_id})
+        payload = outbound.model_dump_json()
         try:
             publish = self._redis.publish
-            publish(self._channel, payload)
+            publish(self.channel_for_agent(outbound.agent_id), payload)
         except Exception as exc:
             logger.warning("Redis WebSocket fanout failed: %s", exc)
             if self._channel_health_tracker is not None:
@@ -112,6 +170,94 @@ class RedisWebSocketFanout:
         if self._channel_health_tracker is not None:
             self._channel_health_tracker.record_success(Channel.WEBSOCKET)
         return True
+
+
+class RedisWebSocketSubscriber:
+    """Optional Redis-backed subscriber for cross-process WebSocket fanout."""
+
+    def __init__(
+        self,
+        redis_client: RedisWebSocketClient,
+        channel_prefix: str,
+        manager: WebSocketConnectionManager,
+        origin_id: str,
+        channel_health_tracker: ChannelHealthTracker | None = None,
+    ) -> None:
+        self._redis = redis_client
+        self._channel_prefix = channel_prefix
+        self._manager = manager
+        self._origin_id = origin_id
+        self._channel_health_tracker = channel_health_tracker
+        self._tasks_by_agent: dict[UUID, asyncio.Task[None]] = {}
+
+    @property
+    def active_subscription_count(self) -> int:
+        return len(self._tasks_by_agent)
+
+    def channel_for_agent(self, agent_id: UUID) -> str:
+        return f"{self._channel_prefix}:agent:{agent_id}"
+
+    async def ensure_agent_subscription(self, agent_id: UUID) -> None:
+        existing = self._tasks_by_agent.get(agent_id)
+        if existing is not None and not existing.done():
+            return
+        self._tasks_by_agent[agent_id] = asyncio.create_task(self._run_agent_subscription(agent_id))
+
+    async def stop_agent_subscription(self, agent_id: UUID) -> None:
+        task = self._tasks_by_agent.pop(agent_id, None)
+        if task is None:
+            return
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+    async def handle_message(self, message: object) -> bool:
+        """Validate and forward one Redis pub/sub message."""
+        if not isinstance(message, dict) or message.get("type") != "message":
+            return False
+
+        raw_data = message.get("data")
+        if isinstance(raw_data, bytes):
+            raw_data = raw_data.decode("utf-8")
+        if not isinstance(raw_data, str):
+            logger.warning("Redis WebSocket fanout message had non-string payload")
+            return False
+
+        try:
+            envelope = WebSocketFanoutEnvelope.model_validate_json(raw_data)
+        except ValueError:
+            logger.warning("Redis WebSocket fanout message had invalid JSON")
+            return False
+
+        if envelope.origin_id == self._origin_id:
+            return False
+
+        await self._manager.send_to_agent(
+            envelope.agent_id,
+            {"type": envelope.type, "notification": envelope.notification},
+        )
+        if self._channel_health_tracker is not None:
+            self._channel_health_tracker.record_success(Channel.WEBSOCKET)
+        return True
+
+    async def _run_agent_subscription(self, agent_id: UUID) -> None:
+        pubsub: RedisPubSub | None = None
+        try:
+            pubsub = self._redis.pubsub()
+            await asyncio.to_thread(pubsub.subscribe, self.channel_for_agent(agent_id))
+            while True:
+                message = await asyncio.to_thread(pubsub.get_message, True, 0.5)
+                await self.handle_message(message)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("Redis WebSocket subscription failed: %s", exc)
+            if self._channel_health_tracker is not None:
+                self._channel_health_tracker.record_failure(Channel.WEBSOCKET, reason=str(exc))
+        finally:
+            if pubsub is not None:
+                await asyncio.to_thread(pubsub.close)
+            self._tasks_by_agent.pop(agent_id, None)
 
 
 def get_missed_notifications(agent_id: UUID, last_seen: str | None = None) -> list[dict[str, str]]:
@@ -130,6 +276,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
     connection_id = str(uuid4())
     await websocket.accept()
     manager.register(agent_id, connection_id, websocket)
+    await manager.ensure_agent_subscription(agent_id)
     await websocket.send_json(
         {
             "type": "connected",
@@ -164,7 +311,10 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
                     }
                 )
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.unregister(agent_id, connection_id)
+        await manager.stop_agent_subscription_if_idle(agent_id)
 
 
 async def _handle_ack_message(websocket: WebSocket, message: dict[str, object]) -> None:

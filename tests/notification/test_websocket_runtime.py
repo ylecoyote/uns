@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from notification.channel_health import ChannelHealthStatus, ChannelHealthTracke
 from notification.models import AckStatus, AutonomyContext, AutonomyMode, NotificationIntent
 from notification.websocket_runtime import (
     RedisWebSocketFanout,
+    RedisWebSocketSubscriber,
     WebSocketConnectionManager,
     WebSocketFanoutEnvelope,
     get_missed_notifications,
@@ -118,9 +120,21 @@ class FakeRedis:
         return 1
 
 
+class CapturingWebSocket:
+    def __init__(self) -> None:
+        self.sent: list[dict[str, object]] = []
+
+    async def send_json(self, payload: dict[str, object]) -> None:
+        self.sent.append(payload)
+
+
 def test_redis_fanout_publishes_stable_envelope() -> None:
     redis = FakeRedis()
-    fanout = RedisWebSocketFanout(redis_client=redis, channel="agsignal:test")
+    fanout = RedisWebSocketFanout(
+        redis_client=redis,
+        channel_prefix="agsignal:test",
+        instance_id="instance-a",
+    )
     agent_id = uuid4()
 
     delivered = fanout.publish(
@@ -133,16 +147,17 @@ def test_redis_fanout_publishes_stable_envelope() -> None:
 
     assert delivered is True
     channel, payload = redis.published[0]
-    assert channel == "agsignal:test"
+    assert channel == f"agsignal:test:agent:{agent_id}"
     assert '"type":"notification"' in payload
     assert str(agent_id) in payload
+    assert '"origin_id":"instance-a"' in payload
 
 
 def test_redis_fanout_failure_degrades_websocket_health_without_raising() -> None:
     tracker = ChannelHealthTracker(failure_threshold=1)
     fanout = RedisWebSocketFanout(
         redis_client=FakeRedis(fail=True),
-        channel="agsignal:test",
+        channel_prefix="agsignal:test",
         channel_health_tracker=tracker,
     )
 
@@ -156,3 +171,63 @@ def test_redis_fanout_failure_degrades_websocket_health_without_raising() -> Non
 
     assert delivered is False
     assert tracker.get_summary().status == ChannelHealthStatus.DEGRADED
+
+
+def test_redis_subscriber_forwards_other_instance_message_to_local_agent() -> None:
+    async def run() -> None:
+        manager = WebSocketConnectionManager()
+        agent_id = uuid4()
+        websocket = CapturingWebSocket()
+        manager.register(agent_id, "conn-1", websocket)  # type: ignore[arg-type]
+        subscriber = RedisWebSocketSubscriber(
+            redis_client=FakeRedis(),  # type: ignore[arg-type]
+            channel_prefix="agsignal:test",
+            manager=manager,
+            origin_id="instance-a",
+        )
+        envelope = WebSocketFanoutEnvelope(
+            type="notification",
+            agent_id=agent_id,
+            notification={"notification_id": str(uuid4())},
+            origin_id="instance-b",
+        )
+
+        handled = await subscriber.handle_message(
+            {"type": "message", "data": envelope.model_dump_json()}
+        )
+
+        assert handled is True
+        assert websocket.sent == [
+            {"type": "notification", "notification": envelope.notification}
+        ]
+
+    asyncio.run(run())
+
+
+def test_redis_subscriber_ignores_same_origin_message() -> None:
+    async def run() -> None:
+        manager = WebSocketConnectionManager()
+        agent_id = uuid4()
+        websocket = CapturingWebSocket()
+        manager.register(agent_id, "conn-1", websocket)  # type: ignore[arg-type]
+        subscriber = RedisWebSocketSubscriber(
+            redis_client=FakeRedis(),  # type: ignore[arg-type]
+            channel_prefix="agsignal:test",
+            manager=manager,
+            origin_id="instance-a",
+        )
+        envelope = WebSocketFanoutEnvelope(
+            type="notification",
+            agent_id=agent_id,
+            notification={"notification_id": str(uuid4())},
+            origin_id="instance-a",
+        )
+
+        handled = await subscriber.handle_message(
+            {"type": "message", "data": envelope.model_dump_json()}
+        )
+
+        assert handled is False
+        assert websocket.sent == []
+
+    asyncio.run(run())
