@@ -217,6 +217,19 @@ The third slice ports the reusable shadow and guard primitives:
 
 See [MIP-254C Shadow And Guard Core Design](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md).
 
+The fourth slice ports the donor repository behavior into AGSignal's sync
+SQLAlchemy style:
+
+- `SQLAlchemyPolicyLearningStore` creates, fetches, lists, and transitions
+  policy deltas.
+- Transition history is persisted with each delta and invalid transitions fail
+  without mutating the row.
+- Shadow results and per-delta aggregates are persisted in standalone tables.
+- Approval is blocked until the shadow aggregate passes its sample and threshold
+  gates.
+
+See [MIP-254D Policy Learning Store Design](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md).
+
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 
 1. Copy `learning_schemas.py` verbatim — it has no MIP-specific types
