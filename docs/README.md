@@ -15,7 +15,7 @@ while the public product API stabilizes.
 | [../README.md](../README.md) | AGSignal product overview, boundary, terminology, and quick start |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Core runtime architecture, components, and data flow |
 | [API.md](API.md) | API reference for the current SDK, models, and interfaces |
-| [uns/executive-summary.md](uns/executive-summary.md) | Historical product framing from the UNS extraction |
+| [uns/README.md](uns/README.md) | Historical UNS extraction materials and AGSignal terminology mapping |
 
 ### Topic Sections
 

@@ -1,3 +1,5 @@
+> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+
 # Unified Notification Service (UNS) Technical Specification v2.0
 
 **Spec Type:** Technical / Engineering Specification
