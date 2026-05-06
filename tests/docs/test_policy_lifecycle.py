@@ -113,12 +113,11 @@ class TestPolicyLifecycleDocStructure:
         assert "## API Reference" in policy_lifecycle_doc
 
 
-class TestPolicyStateDisclaimerRationale:
-    """Test the policy state disclaimer and planned vs implemented rationale.
+class TestPolicyStateRuntimeBoundary:
+    """Test policy state documentation for implemented runtime boundaries.
 
     These tests verify that the documentation clearly distinguishes between
-    current implementation behavior and planned features, with explicit
-    rationale for documenting planned features upfront.
+    direct registry compatibility and database-backed lifecycle loading.
     """
 
     def test_has_current_implementation_note(self, policy_lifecycle_doc: str) -> None:
@@ -128,24 +127,24 @@ class TestPolicyStateDisclaimerRationale:
     def test_current_implementation_describes_active_behavior(
         self, policy_lifecycle_doc: str
     ) -> None:
-        """Verify current implementation note explains ACTIVE-only behavior."""
-        assert "treats all registered policies as **ACTIVE**" in policy_lifecycle_doc
-        assert "registered (active) or not present" in policy_lifecycle_doc
+        """Verify current implementation note explains runtime loading behavior."""
+        assert "load_runtime_registry()" in policy_lifecycle_doc
+        assert "loads only **ACTIVE** policies" in policy_lifecycle_doc
+        assert "load_shadow_registry()" in policy_lifecycle_doc
+        assert "loads only **PREVIEW** policies" in policy_lifecycle_doc
 
-    def test_has_planned_state_lifecycle_section(self, policy_lifecycle_doc: str) -> None:
-        """Verify document has planned state lifecycle management section."""
-        assert "### Planned: State Lifecycle Management" in policy_lifecycle_doc
+    def test_has_state_lifecycle_section(self, policy_lifecycle_doc: str) -> None:
+        """Verify document has implemented state lifecycle management section."""
+        assert "### State Lifecycle Management" in policy_lifecycle_doc
 
-    def test_planned_section_explains_rationale(self, policy_lifecycle_doc: str) -> None:
-        """Verify planned section explains why planned features are documented."""
-        assert "intended lifecycle contract" in policy_lifecycle_doc
-        assert "Prevent documentation churn" in policy_lifecycle_doc
-        assert "Guide implementation" in policy_lifecycle_doc
-        assert "Communicate design intent" in policy_lifecycle_doc
-
-    def test_planned_section_references_future_removal(self, policy_lifecycle_doc: str) -> None:
-        """Verify planned section mentions when note will be removed."""
-        assert 'Current Implementation Note" above will be removed' in policy_lifecycle_doc
+    def test_state_lifecycle_section_describes_status_meanings(
+        self, policy_lifecycle_doc: str
+    ) -> None:
+        """Verify state lifecycle section explains the persisted status meanings."""
+        assert "ACTIVE policies are runtime-enforced" in policy_lifecycle_doc
+        assert "PREVIEW policies are shadow-evaluated" in policy_lifecycle_doc
+        assert "DRAFT policies are editable" in policy_lifecycle_doc
+        assert "RETIRED policies are terminal audit history" in policy_lifecycle_doc
 
     def test_has_planned_version_management_section(self, policy_lifecycle_doc: str) -> None:
         """Verify document has planned version management section."""

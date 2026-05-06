@@ -25,17 +25,25 @@ Policies transition through defined lifecycle states:
 
 ### Current Implementation Note
 
-The current implementation treats all registered policies as **ACTIVE**. Policies are either registered (active) or not present (falling back to SDK defaults).
+The in-memory `PolicyRegistry` remains status-agnostic for backward
+compatibility: callers may register any `NotificationPolicy` object directly.
+Database-backed loading now exposes explicit lifecycle boundaries:
 
-### Planned: State Lifecycle Management
+- `SQLAlchemyPolicyStore.load_runtime_registry()` loads only **ACTIVE** policies.
+- `SQLAlchemyPolicyStore.load_shadow_registry()` loads only **PREVIEW** policies.
+- `SQLAlchemyPolicyStore.load_registry()` remains backward compatible and loads
+  **PREVIEW** plus **ACTIVE** by default, with ACTIVE winning when both exist for
+  the same notification type.
 
-The DRAFT, PREVIEW, ACTIVE, and RETIRED states documented above represent the **intended lifecycle contract** for future implementation. This section is documented now to:
+### State Lifecycle Management
 
-1. **Prevent documentation churn** — Defining the contract upfront avoids rework when states are implemented
-2. **Guide implementation** — Developers implementing state management have a clear target specification
-3. **Communicate design intent** — Operators understand the planned evolution without inferring from code
+The DRAFT, PREVIEW, ACTIVE, and RETIRED states are the AGSignal lifecycle
+contract for persisted policies.
 
-When state management is implemented, the "Current Implementation Note" above will be removed and this section will be updated to document the actual behavior.
+- ACTIVE policies are runtime-enforced.
+- PREVIEW policies are shadow-evaluated.
+- DRAFT policies are editable.
+- RETIRED policies are terminal audit history.
 
 ## Policy Loading
 
