@@ -2,11 +2,42 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import uuid4
 
+import yaml
 from fastapi.testclient import TestClient
 
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+from notification.dlq import DLQService
+from notification.models import AutonomyContext, AutonomyMode, Notification, NotificationIntent
+
+
+class FakeRedisList:
+    def __init__(self) -> None:
+        self.values: list[str] = []
+
+    def lpush(self, key: str, value: str) -> int:
+        self.values.insert(0, value)
+        return len(self.values)
+
+    def lrange(self, key: str, start: int, end: int) -> list[str]:
+        stop = None if end == -1 else end + 1
+        return self.values[start:stop]
+
+    def lrem(self, key: str, count: int, value: str) -> int:
+        removed = 0
+        next_values = []
+        for item in self.values:
+            if item == value and (count == 0 or removed < count):
+                removed += 1
+                continue
+            next_values.append(item)
+        self.values = next_values
+        return removed
+
+    def llen(self, key: str) -> int:
+        return len(self.values)
 
 
 def _payload() -> dict[str, object]:
@@ -23,12 +54,26 @@ def _payload() -> dict[str, object]:
     }
 
 
-def _client() -> TestClient:
+def _client(dlq_service: DLQService | None = None) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
     from notification.main import create_app
 
-    return TestClient(create_app())
+    return TestClient(create_app(dlq_service=dlq_service))
+
+
+def _notification() -> Notification:
+    return Notification(
+        notification_type="safety.kill_switch",
+        intent=NotificationIntent.SAFETY,
+        autonomy_context=AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        ),
+        title="Kill switch",
+        message="Kill switch engaged",
+        source="agent_governor",
+    )
 
 
 def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
@@ -87,3 +132,79 @@ def test_send_signal_rejects_producer_selected_channels() -> None:
     response = client.post("/api/v1/notifications", json=payload)
 
     assert response.status_code == 422
+
+
+def test_simulate_signal_returns_routing_preview_without_registering_ack() -> None:
+    client = _client()
+
+    response = client.post("/api/v1/notifications/simulate", json=_payload())
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["simulated"] is True
+    assert data["notification_id"]
+    assert data["require_ack"] is True
+    assert data["ack_status"] is None
+    assert data["channels_attempted"]
+
+    status_response = client.get(
+        f"/api/v1/notifications/{data['notification_id']}/ack-status"
+    )
+
+    assert status_response.status_code == 200
+    assert status_response.json()["ack_status"] is None
+
+
+def test_dlq_list_returns_seeded_entries() -> None:
+    redis = FakeRedisList()
+    dlq_service = DLQService(redis_client=redis, key="uns:test:dlq")
+    entry = dlq_service.enqueue(_notification(), reason="all persistent channels failed")
+    client = _client(dlq_service=dlq_service)
+
+    response = client.get("/api/v1/dlq")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["depth"] == 1
+    assert data["items"][0]["entry_id"] == str(entry.entry_id)
+    assert data["items"][0]["reason"] == "all persistent channels failed"
+
+
+def test_policy_reload_loads_yaml_directory(tmp_path: Path) -> None:
+    policy_file = tmp_path / "safety.yaml"
+    policy_file.write_text(
+        yaml.safe_dump(
+            {
+                "notification_type": "safety.kill_switch",
+                "version": "1.0.0",
+                "status": "ACTIVE",
+                "delivery_mode": "GUARANTEED",
+                "channels": {
+                    "LIVE": ["SLACK", "WEBSOCKET"],
+                },
+                "require_ack": {
+                    "LIVE": True,
+                },
+            }
+        )
+    )
+    client = _client()
+
+    response = client.post("/api/v1/policies/reload", json={"policy_dir": str(tmp_path)})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["loaded_count"] == 1
+    assert data["policy_count"] == 1
+    assert data["notification_types"] == ["safety.kill_switch"]
+
+
+def test_policy_reload_rejects_missing_directory(tmp_path: Path) -> None:
+    client = _client()
+
+    response = client.post(
+        "/api/v1/policies/reload",
+        json={"policy_dir": str(tmp_path / "missing")},
+    )
+
+    assert response.status_code == 404
