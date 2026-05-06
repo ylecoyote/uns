@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from notification.acknowledgment import get_ack_engine
+from notification.dlq import DLQEntry, DLQService
 from notification.models import (
     AckStatus,
     AutonomyContext,
@@ -23,11 +25,14 @@ from notification.models import (
     NotificationResult,
     Priority,
 )
+from notification.policies import PolicyRegistry, configure_policy_registry
+from notification.policy_loader import load_policies_from_directory
 from notification.sdk import NotificationSDK, ValidationError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["signals"])
+ops_router = APIRouter(prefix="/api/v1", tags=["operations"])
 
 
 class AutonomyContextRequest(BaseModel):
@@ -108,6 +113,47 @@ class SendNotificationResponse(BaseModel):
     message: str = Field(description="Acceptance summary")
 
 
+class SimulateNotificationResponse(BaseModel):
+    """HTTP response for a simulated AGSignal notification."""
+
+    notification_id: UUID = Field(description="Preview notification identifier")
+    simulated: bool = Field(description="Whether delivery was simulated")
+    status: DeliveryStatus = Field(description="Simulated delivery outcome")
+    channels_attempted: list[Channel] = Field(description="Router-derived channels")
+    require_ack: bool = Field(description="Whether the signal would require acknowledgment")
+    ack_status: AckStatus | None = Field(
+        default=None,
+        description="Always null because simulation has no ack side effect",
+    )
+    message: str = Field(description="Simulation summary")
+
+
+class DLQListResponse(BaseModel):
+    """HTTP response for DLQ inspection."""
+
+    depth: int = Field(description="Current DLQ depth")
+    items: list[DLQEntry] = Field(description="DLQ entries, newest first")
+
+
+class PolicyReloadRequest(BaseModel):
+    """Request body for reloading YAML notification policies."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    policy_dir: str = Field(
+        default="config/notification_policies",
+        description="Directory containing YAML policy files",
+    )
+
+
+class PolicyReloadResponse(BaseModel):
+    """HTTP response for policy reload operations."""
+
+    loaded_count: int = Field(description="Number of policy files loaded")
+    policy_count: int = Field(description="Number of policies active after reload")
+    notification_types: list[str] = Field(description="Registered notification types")
+
+
 def _capture_delivery(
     captured: dict[str, Notification],
 ) -> Callable[[Notification], NotificationResult]:
@@ -124,13 +170,9 @@ def _capture_delivery(
     return deliver
 
 
-@router.post(
-    "",
-    response_model=SendNotificationResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def send_notification(request: SendNotificationRequest) -> SendNotificationResponse:
-    """Accept an AGSignal notification from an autonomous producer."""
+def _resolve_notification(
+    request: SendNotificationRequest,
+) -> tuple[NotificationResult, Notification]:
     captured: dict[str, Notification] = {}
     sdk = NotificationSDK(delivery_handler=_capture_delivery(captured))
 
@@ -156,7 +198,17 @@ async def send_notification(request: SendNotificationRequest) -> SendNotificatio
             detail={"error": "validation_error", "message": str(exc)},
         ) from exc
 
-    notification = captured["notification"]
+    return result, captured["notification"]
+
+
+@router.post(
+    "",
+    response_model=SendNotificationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def send_notification(request: SendNotificationRequest) -> SendNotificationResponse:
+    """Accept an AGSignal notification from an autonomous producer."""
+    result, notification = _resolve_notification(request)
     ack_status: AckStatus | None = None
     if notification.require_ack:
         engine = get_ack_engine()
@@ -185,4 +237,62 @@ async def send_notification(request: SendNotificationRequest) -> SendNotificatio
         require_ack=bool(notification.require_ack),
         ack_status=ack_status,
         message="notification accepted",
+    )
+
+
+@router.post("/simulate", response_model=SimulateNotificationResponse)
+async def simulate_notification(request: SendNotificationRequest) -> SimulateNotificationResponse:
+    """Preview routing and acknowledgment behavior without delivery side effects."""
+    result, notification = _resolve_notification(request)
+
+    return SimulateNotificationResponse(
+        notification_id=result.notification_id,
+        simulated=True,
+        status=result.status,
+        channels_attempted=result.channels_attempted,
+        require_ack=bool(notification.require_ack),
+        ack_status=None,
+        message="notification simulated",
+    )
+
+
+@ops_router.get("/dlq", response_model=DLQListResponse)
+async def list_dlq(request: Request) -> DLQListResponse:
+    """List visible dead-lettered delivery failures."""
+    dlq_service: DLQService = request.app.state.dlq_service
+    return DLQListResponse(
+        depth=dlq_service.depth(),
+        items=dlq_service.list_entries(),
+    )
+
+
+@ops_router.post("/policies/reload", response_model=PolicyReloadResponse)
+async def reload_policies(request: PolicyReloadRequest) -> PolicyReloadResponse:
+    """Reload notification policies from YAML files."""
+    policy_dir = Path(request.policy_dir)
+    registry = PolicyRegistry()
+    try:
+        loaded_count = load_policies_from_directory(policy_dir, registry=registry)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "not_found", "message": str(exc)},
+        ) from exc
+    except NotADirectoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "not_a_directory", "message": str(exc)},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "invalid_policy", "message": str(exc)},
+        ) from exc
+
+    configure_policy_registry(registry=registry)
+    notification_types = sorted(registry.list_notification_types())
+    return PolicyReloadResponse(
+        loaded_count=loaded_count,
+        policy_count=len(registry),
+        notification_types=notification_types,
     )
