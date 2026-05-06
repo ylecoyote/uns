@@ -38,6 +38,7 @@ while the public product API stabilizes.
 | [Policy Delta Core](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md) | MIP-254 policy engine slice for immutable delta transitions and auditable history |
 | [Shadow And Guard Core](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md) | MIP-254 policy engine slice for shadow evaluation and guard result primitives |
 | [Policy Learning Store](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md) | MIP-254 policy engine slice for persisted deltas, shadow results, aggregates, and approval gates |
+| [Policy Config Envelope](superpowers/specs/2026-05-06-mip-254e-policy-config-envelope-design.md) | MIP-254 policy engine slice for config hashes, evaluation records, and applying approved deltas |
 
 ### Topic Sections
 

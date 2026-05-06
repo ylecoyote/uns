@@ -78,6 +78,13 @@ from .policies import (
     resolve_require_ack,
     set_default_registry,
 )
+from .policy_config import (
+    PolicyConfigEnvelope,
+    PolicyEvaluationRecord,
+    apply_policy_delta,
+    canonical_config_json,
+    compute_config_hash,
+)
 from .policy_learning import (
     DeltaRejectionReason,
     DeltaState,
@@ -156,6 +163,11 @@ __all__ = [
     "ShadowEvaluationAggregate",
     "ShadowEvaluationResult",
     "ShadowStatus",
+    "PolicyConfigEnvelope",
+    "PolicyEvaluationRecord",
+    "apply_policy_delta",
+    "canonical_config_json",
+    "compute_config_hash",
     # SDK
     "NotificationSDK",
     "ValidationError",
