@@ -194,6 +194,18 @@ The first AGSignal-native slice preserves the MIP enforcement boundary:
 
 See [MIP-254A Policy Lifecycle Runtime Boundary Design](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md).
 
+The second slice ports the MIP delta state machine into AGSignal-neutral
+learning primitives:
+
+- `PolicyDelta` models proposed field-level policy changes without trading
+  policy names or ATP table coupling.
+- `DeltaState` preserves `PROPOSED -> SHADOW -> APPROVED -> APPLIED`, with
+  `REJECTED` and `APPLIED` as terminal states.
+- `transition_to()` validates moves, returns immutable copies, and appends
+  auditable transition history.
+
+See [MIP-254B Policy Delta Core Design](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md).
+
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 
 1. Copy `learning_schemas.py` verbatim — it has no MIP-specific types
