@@ -22,6 +22,7 @@ while the public product API stabilizes.
 | Decision | Description |
 |----------|-------------|
 | [Generic App Adapter Boundary](decisions/2026-05-06-app-adapter-boundary.md) | Host-application integration facade without MIP coupling |
+| [UNS Taxonomy](decisions/2026-05-06-uns-taxonomy.md) | Keeps `docs/uns/` as provenance while AGSignal remains the public product identity |
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
 | [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
 
@@ -53,12 +54,12 @@ docs/
 ├── API.md              ← API reference
 ├── decisions/          ← Accepted architecture decisions
 ├── sections/
-    ├── delivery-semantics.md   ← Delivery behavior truth tables
-    ├── integration-modes.md    ← Integration configuration options
-    ├── observability.md        ← Health, metrics, and monitoring
-    └── policy-lifecycle.md     ← Policy management
-└── testing/
-    └── websocket-redis-fanout-smoke.md
+│   ├── delivery-semantics.md   ← Delivery behavior truth tables
+│   ├── integration-modes.md    ← Integration configuration options
+│   ├── observability.md        ← Health, metrics, and monitoring
+│   └── policy-lifecycle.md     ← Policy management
+├── testing/           ← Reusable smoke-test guides
+└── uns/               ← Historical UNS extraction materials, not public product docs
 ```
 
 ## Reading Guide

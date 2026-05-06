@@ -16,8 +16,10 @@ boundaries.
 
 ## Taxonomy Decision
 
-Decision for MIP-242: keep `docs/uns/` as historical extraction material instead
-of moving it to `docs/ags/`.
+Decision for MIP-242: keep `docs/uns/` as historical extraction material instead of moving it to `docs/ags/`.
+
+See [UNS Taxonomy](../decisions/2026-05-06-uns-taxonomy.md) for the durable
+decision record.
 
 Rationale:
 

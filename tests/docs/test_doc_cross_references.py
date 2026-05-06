@@ -12,6 +12,8 @@ ARCHITECTURE_MD = DOCS_DIR / "ARCHITECTURE.md"
 API_MD = DOCS_DIR / "API.md"
 DOCS_README = DOCS_DIR / "README.md"
 SECTIONS_DIR = DOCS_DIR / "sections"
+DECISIONS_DIR = DOCS_DIR / "decisions"
+UNS_README = DOCS_DIR / "uns" / "README.md"
 
 
 @pytest.fixture
@@ -42,6 +44,13 @@ def docs_readme() -> str:
     return DOCS_README.read_text()
 
 
+@pytest.fixture
+def uns_readme() -> str:
+    """Load docs/uns/README.md."""
+    assert UNS_README.exists(), f"docs/uns/README.md not found at {UNS_README}"
+    return UNS_README.read_text()
+
+
 class TestDocsReadmeExists:
     """Test that docs/README.md exists with proper structure."""
 
@@ -56,6 +65,8 @@ class TestDocsReadmeExists:
     def test_has_document_map(self, docs_readme: str) -> None:
         """Verify docs/README.md has document map."""
         assert "## Document Map" in docs_readme
+        assert "uns/" in docs_readme
+        assert "Historical UNS extraction materials" in docs_readme
 
     def test_has_reading_guide(self, docs_readme: str) -> None:
         """Verify docs/README.md has reading guide."""
@@ -266,3 +277,24 @@ class TestTerminologyConsistency:
         assert "GOVERNANCE" in docs_readme
         assert "OPERATIONAL" in docs_readme
         assert "INFORMATIONAL" in docs_readme
+
+
+class TestUnsTaxonomyDecision:
+    """Test that the UNS taxonomy decision is captured as provenance."""
+
+    def test_decision_record_exists(self) -> None:
+        """Verify the MIP-242 taxonomy decision has a durable decision record."""
+        assert (DECISIONS_DIR / "2026-05-06-uns-taxonomy.md").exists()
+
+    def test_docs_readme_links_taxonomy_decision(self, docs_readme: str) -> None:
+        """Verify the docs index links the taxonomy decision."""
+        assert "UNS Taxonomy" in docs_readme
+        assert "decisions/2026-05-06-uns-taxonomy.md" in docs_readme
+
+    def test_uns_folder_is_provenance_not_public_entrypoint(
+        self, uns_readme: str
+    ) -> None:
+        """Verify docs/uns is explicitly historical rather than public product docs."""
+        assert "historical extraction material" in uns_readme
+        assert "should not be treated as the public product entrypoint" in uns_readme
+        assert "instead of moving it to `docs/ags/`" in uns_readme
