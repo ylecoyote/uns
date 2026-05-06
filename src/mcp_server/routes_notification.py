@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from notification.acknowledgment import (
@@ -27,6 +27,7 @@ from notification.acknowledgment import (
     configure_ack_engine,
     get_ack_engine,
 )
+from notification.audit import AuditPersistenceError, AuditStore, create_ack_audit_record
 from notification.models import AckStatus
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ def get_engine() -> AcknowledgmentEngine:
 )
 async def acknowledge_notification(
     notification_id: UUID,
+    http_request: Request,
     request: AckRequest | None = None,
 ) -> AckResponse:
     """Acknowledge a notification.
@@ -143,6 +145,7 @@ async def acknowledge_notification(
     """
     engine = get_engine()
     request = request or AckRequest()
+    old_status = engine.get_status(notification_id)
 
     try:
         event = engine.ack(
@@ -156,6 +159,15 @@ async def acknowledge_notification(
             "Notification acknowledged via API: notification_id=%s acked_by=%s",
             notification_id,
             request.acked_by,
+        )
+        _persist_ack_audit(
+            http_request=http_request,
+            notification_id=notification_id,
+            old_status=old_status,
+            new_status=AckStatus.ACKED,
+            acked_by=event.acked_by,
+            acked_at=event.acked_at,
+            metadata=event.metadata,
         )
 
         return AckResponse(
@@ -207,6 +219,7 @@ async def acknowledge_notification(
 )
 async def dismiss_notification(
     notification_id: UUID,
+    http_request: Request,
     request: DismissRequest | None = None,
 ) -> AckResponse:
     """Dismiss a notification.
@@ -227,6 +240,7 @@ async def dismiss_notification(
     """
     engine = get_engine()
     request = request or DismissRequest()
+    old_status = engine.get_status(notification_id)
 
     try:
         event = engine.ack(
@@ -240,6 +254,15 @@ async def dismiss_notification(
             "Notification dismissed via API: notification_id=%s dismissed_by=%s",
             notification_id,
             request.dismissed_by,
+        )
+        _persist_ack_audit(
+            http_request=http_request,
+            notification_id=notification_id,
+            old_status=old_status,
+            new_status=AckStatus.DISMISSED,
+            acked_by=event.acked_by,
+            acked_at=event.acked_at,
+            metadata=event.metadata,
         )
 
         return AckResponse(
@@ -352,6 +375,48 @@ async def get_ack_status(
         notification_id=notification_id,
         ack_status=ack_status,
     )
+
+
+def _persist_ack_audit(
+    *,
+    http_request: Request,
+    notification_id: UUID,
+    old_status: AckStatus | None,
+    new_status: AckStatus,
+    acked_by: str | None,
+    acked_at: datetime,
+    metadata: dict[str, Any],
+) -> None:
+    if old_status == new_status:
+        return
+    audit_store = getattr(http_request.app.state, "audit_store", None)
+    if not isinstance(audit_store, AuditStore):
+        return
+    try:
+        audit_store.save_ack_audit(
+            create_ack_audit_record(
+                notification_id=notification_id,
+                old_status=old_status,
+                new_status=new_status,
+                acked_by=acked_by,
+                acked_at=acked_at,
+                metadata=metadata,
+            )
+        )
+    except AuditPersistenceError as exc:
+        logger.error(
+            "Failed to persist ack audit: notification_id=%s error=%s",
+            notification_id,
+            str(exc),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "ack_audit_persistence_failed",
+                "message": "ack state changed but audit record could not be persisted",
+                "notification_id": str(notification_id),
+            },
+        ) from exc
 
 
 def create_notification_router() -> APIRouter:
