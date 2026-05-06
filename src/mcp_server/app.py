@@ -69,12 +69,20 @@ def configure_persistence() -> None:
 
         # Configure audit logger with SQLAlchemy store
         from db.audit_store import create_sqlalchemy_audit_store
+        from db.policy_store import create_sqlalchemy_policy_store
+        from notification.policies import configure_policy_registry
 
         audit_store = create_sqlalchemy_audit_store(
             database_url=database_url,
             create_tables=create_tables,
         )
         configure_audit_logger(store=audit_store)
+
+        policy_store = create_sqlalchemy_policy_store(
+            database_url=database_url,
+            create_tables=create_tables,
+        )
+        configure_policy_registry(registry=policy_store.load_registry())
 
         logger.info("SQLAlchemy persistence configured successfully")
     else:

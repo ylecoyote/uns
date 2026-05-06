@@ -153,6 +153,40 @@ class TestConfigurePersistence:
         audit_logger = get_audit_logger()
         assert isinstance(audit_logger.store, SQLAlchemyAuditStore)
 
+    def test_sqlalchemy_mode_hydrates_policy_registry(self, tmp_path):
+        """Test SQLAlchemy mode loads persisted runtime policies."""
+        from db.policy_store import create_sqlalchemy_policy_store
+        from notification.policies import (
+            NotificationPolicy,
+            PolicyStatus,
+            configure_policy_registry,
+            get_policy_registry,
+        )
+
+        db_path = tmp_path / "policy.db"
+        database_url = f"sqlite:///{db_path}"
+        store = create_sqlalchemy_policy_store(database_url, create_tables=True)
+        store.save_policy(
+            NotificationPolicy.from_dict(
+                {
+                    "notification_type": "safety.kill_switch",
+                    "version": "1.0.0",
+                    "status": PolicyStatus.ACTIVE.value,
+                    "channels": {"LIVE": ["SLACK", "WEBSOCKET"]},
+                    "require_ack": {"LIVE": True},
+                }
+            )
+        )
+        configure_policy_registry()
+
+        with patch.dict(os.environ, {"DATABASE_URL": database_url, "UNS_CREATE_TABLES": "true"}):
+            configure_persistence()
+
+        policy = get_policy_registry().get_sync("safety.kill_switch")
+        assert policy is not None
+        assert policy.version == "1.0.0"
+        assert policy.status == PolicyStatus.ACTIVE
+
 
 class TestCreateApp:
     """Tests for create_app function."""

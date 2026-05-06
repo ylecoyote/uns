@@ -8,6 +8,7 @@ from uuid import uuid4
 import yaml
 from fastapi.testclient import TestClient
 
+from db.policy_store import SQLAlchemyPolicyStore
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
 from notification.dlq import DLQService
 from notification.models import AutonomyContext, AutonomyMode, Notification, NotificationIntent
@@ -54,12 +55,15 @@ def _payload() -> dict[str, object]:
     }
 
 
-def _client(dlq_service: DLQService | None = None) -> TestClient:
+def _client(
+    dlq_service: DLQService | None = None,
+    policy_store: SQLAlchemyPolicyStore | None = None,
+) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
     from notification.main import create_app
 
-    return TestClient(create_app(dlq_service=dlq_service))
+    return TestClient(create_app(dlq_service=dlq_service, policy_store=policy_store))
 
 
 def _notification() -> Notification:
@@ -197,6 +201,39 @@ def test_policy_reload_loads_yaml_directory(tmp_path: Path) -> None:
     assert data["loaded_count"] == 1
     assert data["policy_count"] == 1
     assert data["notification_types"] == ["safety.kill_switch"]
+
+
+def test_policy_reload_persists_loaded_yaml_when_policy_store_is_configured(
+    tmp_path: Path,
+) -> None:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from db.models import Base
+
+    policy_file = tmp_path / "safety.yaml"
+    policy_file.write_text(
+        yaml.safe_dump(
+            {
+                "notification_type": "safety.kill_switch",
+                "version": "1.0.0",
+                "status": "ACTIVE",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK", "WEBSOCKET"]},
+                "require_ack": {"LIVE": True},
+            }
+        )
+    )
+    engine = create_engine(f"sqlite:///{tmp_path / 'policies.db'}")
+    Base.metadata.create_all(engine)
+    policy_store = SQLAlchemyPolicyStore(sessionmaker(bind=engine))
+    client = _client(policy_store=policy_store)
+
+    response = client.post("/api/v1/policies/reload", json={"policy_dir": str(tmp_path)})
+
+    assert response.status_code == 200
+    assert response.json()["persisted_count"] == 1
+    assert policy_store.count_rows() == 1
 
 
 def test_policy_reload_rejects_missing_directory(tmp_path: Path) -> None:
