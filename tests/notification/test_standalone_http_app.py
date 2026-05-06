@@ -11,14 +11,17 @@ from pytest import MonkeyPatch
 
 from db.policy_store import SQLAlchemyPolicyStore
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+from notification.audit import AuditStore, InMemoryAuditStore, create_audit_record
 from notification.channel_health import ChannelHealthTracker
 from notification.dlq import DLQService
 from notification.models import (
     AutonomyContext,
     AutonomyMode,
     Channel,
+    DeliveryStatus,
     Notification,
     NotificationIntent,
+    NotificationResult,
 )
 from notification.websocket_runtime import WebSocketFanoutEnvelope
 
@@ -90,6 +93,7 @@ def _client(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
     channel_health_tracker: ChannelHealthTracker | None = None,
+    audit_store: AuditStore | None = None,
 ) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
@@ -100,6 +104,7 @@ def _client(
             dlq_service=dlq_service,
             policy_store=policy_store,
             channel_health_tracker=channel_health_tracker,
+            audit_store=audit_store,
         )
     )
 
@@ -383,6 +388,44 @@ def test_simulate_signal_returns_routing_preview_without_registering_ack() -> No
 
     assert status_response.status_code == 200
     assert status_response.json()["ack_status"] is None
+
+
+def test_delivery_status_returns_latest_seeded_audit_record() -> None:
+    notification = _notification()
+    result = NotificationResult(
+        notification_id=notification.notification_id,
+        status=DeliveryStatus.SUCCESS,
+        channels_attempted=[Channel.SLACK, Channel.WEBSOCKET],
+        channels_succeeded=[Channel.SLACK],
+        channels_failed=[Channel.WEBSOCKET],
+        error_message="websocket disconnected",
+    )
+    audit_store = InMemoryAuditStore()
+    audit_store.save_delivery_audit(create_audit_record(notification, result))
+    client = _client(audit_store=audit_store)
+
+    response = client.get(f"/api/v1/notifications/{notification.notification_id}/delivery")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["notification_id"] == str(notification.notification_id)
+    assert data["notification_type"] == "safety.kill_switch"
+    assert data["delivery_status"] == "SUCCESS"
+    assert data["channels_attempted"] == ["SLACK", "WEBSOCKET"]
+    assert data["channels_succeeded"] == ["SLACK"]
+    assert data["channels_failed"] == ["WEBSOCKET"]
+    assert data["error_message"] == "websocket disconnected"
+    assert data["audit_count"] == 1
+    assert data["audits"][0]["audit_id"]
+
+
+def test_delivery_status_returns_404_when_no_delivery_audit_exists() -> None:
+    client = _client(audit_store=InMemoryAuditStore())
+
+    response = client.get(f"/api/v1/notifications/{uuid4()}/delivery")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "delivery_audit_not_found"
 
 
 def test_dlq_list_returns_seeded_entries() -> None:
