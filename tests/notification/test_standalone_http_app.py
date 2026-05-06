@@ -236,6 +236,26 @@ def test_send_signal_registers_live_safety_ack_state() -> None:
     assert status_response.json()["ack_status"] == "PENDING"
 
 
+def test_send_signal_persists_delivery_audit_for_status_readback() -> None:
+    audit_store = InMemoryAuditStore()
+    client = _client(audit_store=audit_store)
+
+    response = client.post("/api/v1/notifications", json=_payload())
+
+    assert response.status_code == 202
+    notification_id = response.json()["notification_id"]
+
+    delivery_response = client.get(f"/api/v1/notifications/{notification_id}/delivery")
+
+    assert delivery_response.status_code == 200
+    data = delivery_response.json()
+    assert data["notification_id"] == notification_id
+    assert data["delivery_status"] == "SUCCESS"
+    assert data["audit_count"] == 1
+    assert data["audits"][0]["status"] == "SUCCESS"
+    assert data["audits"][0]["channels_attempted"] == response.json()["channels_attempted"]
+
+
 def test_send_signal_idempotency_key_replays_original_response() -> None:
     client = _client()
     payload = _payload()
