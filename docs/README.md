@@ -35,6 +35,7 @@ while the public product API stabilizes.
 | [Timeout Audit Callback Design](superpowers/specs/2026-05-06-mip-253c-timeout-audit-callback-design.md) | MIP-253 operational parity slice for host-scheduled ACK timeout audits |
 | [Operational Parity Contract](superpowers/specs/2026-05-06-mip-253-operational-parity-contract.md) | MIP-253 Core-versus-host runtime ownership decision |
 | [Policy Lifecycle Runtime Boundary](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md) | MIP-254 policy engine slice for ACTIVE-only runtime loads and PREVIEW-only shadow loads |
+| [Policy Delta Core](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md) | MIP-254 policy engine slice for immutable delta transitions and auditable history |
 
 ### Topic Sections
 
