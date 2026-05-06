@@ -78,6 +78,14 @@ from .policies import (
     resolve_require_ack,
     set_default_registry,
 )
+from .policy_learning import (
+    DeltaRejectionReason,
+    DeltaState,
+    GuardStage,
+    PolicyDelta,
+    PolicyDeltaTransition,
+    ShadowStatus,
+)
 from .sdk import (
     NotificationSDK,
     ValidationError,
@@ -133,6 +141,13 @@ __all__ = [
     "resolve_channels",
     "resolve_require_ack",
     "resolve_delivery_mode",
+    # Policy learning
+    "DeltaRejectionReason",
+    "DeltaState",
+    "GuardStage",
+    "PolicyDelta",
+    "PolicyDeltaTransition",
+    "ShadowStatus",
     # SDK
     "NotificationSDK",
     "ValidationError",
