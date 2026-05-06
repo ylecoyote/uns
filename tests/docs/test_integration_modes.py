@@ -152,6 +152,13 @@ class TestIntegrationModesContent:
         """Verify document includes code examples."""
         assert "```python" in integration_modes_doc
 
+    def test_generic_app_boundary_documented(self, integration_modes_doc: str) -> None:
+        """Verify generic app adapter boundary is documented without MIP coupling."""
+        assert "AppSignalAdapter" in integration_modes_doc
+        assert "AppEvidenceContext" in integration_modes_doc
+        assert "notification.integrations" in integration_modes_doc
+        assert "MIP-specific" in integration_modes_doc
+
 
 class TestWebSocketClarification:
     """Test that WebSocket ownership is clarified."""

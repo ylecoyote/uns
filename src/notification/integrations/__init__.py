@@ -7,3 +7,19 @@ Contains integration points for external systems and contexts.
 This package enables UNS core to remain ATP-agnostic through
 dependency injection interfaces.
 """
+
+from notification.integrations.app_boundary import (
+    AppEvidenceContext,
+    AppSignalAdapter,
+    AppSignalContextProvider,
+    AppSignalRequest,
+    DefaultAppSignalContextProvider,
+)
+
+__all__ = [
+    "AppEvidenceContext",
+    "AppSignalAdapter",
+    "AppSignalContextProvider",
+    "AppSignalRequest",
+    "DefaultAppSignalContextProvider",
+]

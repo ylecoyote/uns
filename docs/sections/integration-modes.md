@@ -148,6 +148,53 @@ result = sdk.send_safety(
 )
 ```
 
+### Mode 4: Generic App Adapter Boundary
+
+AGSignal also ships a small host-application boundary under
+`notification.integrations` for applications that want a cleaner facade than
+calling `NotificationSDK.send(...)` directly from every governor, circuit
+breaker, or evidence-producing component.
+
+This boundary is generic by design. It is **not MIP-specific** and does not
+import host application domain models.
+
+```python
+from uuid import uuid4
+
+from notification.integrations import (
+    AppEvidenceContext,
+    AppSignalAdapter,
+    AppSignalRequest,
+    DefaultAppSignalContextProvider,
+)
+from notification.models import AutonomyMode, NotificationIntent
+
+adapter = AppSignalAdapter(
+    context_provider=DefaultAppSignalContextProvider(
+        autonomy_mode=AutonomyMode.LIVE,
+        agent_id=uuid4(),
+    )
+)
+
+result = adapter.send(
+    AppSignalRequest(
+        notification_type="app.governor.circuit_breaker_engaged",
+        intent=NotificationIntent.SAFETY,
+        title="Circuit breaker engaged",
+        message="Host application halted execution.",
+        source="host-app",
+        evidence=AppEvidenceContext(
+            decision_snapshot_id=uuid4(),
+            metadata={"reason": "risk_limit"},
+        ),
+    )
+)
+```
+
+Use this mode when the host application owns governor hooks, circuit-breaker
+state, execution/slippage evidence, or audit identifiers and needs to carry
+those references into AGSignal without making AGSignal own the host domain.
+
 ## Component Ownership
 
 ### AGSignal Core Components
@@ -182,6 +229,7 @@ These components are owned by the integrating system (e.g., ATP):
 | ATP Context Provider | ATP | `NotificationContextProvider` |
 | ATP Ack Handler | ATP | `AcknowledgmentCallback` |
 | ATP WebSocket Manager | ATP | WebSocket connection management |
+| Host App Signal Adapter | Integrator | `notification.integrations.AppSignalAdapter` boundary |
 
 **Important:** AGSignal Core does NOT own or maintain WebSocket connection management. The `WebSocketAdapter` in AGSignal Core accepts a connection/manager injected at configuration time. How connections are established, authenticated, and maintained is the responsibility of the integrating system.
 
@@ -308,6 +356,7 @@ This pattern ensures:
 | **Acknowledgment Tracking** | AGSignal Core owned | - |
 | **Context Provider** | Protocol defined | Implementation owned by integrator |
 | **Ack Callbacks** | Protocol defined | Implementation owned by integrator |
+| **App Adapter Boundary** | Generic facade defined | Host wiring owned by integrator |
 | **WebSocket Connections** | - | Owned by integrator |
 | **Agent State** | - | Owned by integrator |
 
