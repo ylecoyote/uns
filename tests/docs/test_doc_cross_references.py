@@ -242,10 +242,12 @@ class TestNoAsyncPolicyRegistryGet:
 class TestTerminologyConsistency:
     """Test terminology is consistent across documents."""
 
-    def test_uns_terminology(self, docs_readme: str) -> None:
-        """Verify UNS acronym is defined."""
+    def test_agsignal_terminology(self, docs_readme: str) -> None:
+        """Verify AGSignal is the public product term."""
+        assert "AGSignal" in docs_readme
+        assert "AGSignal Core" in docs_readme
         assert "UNS" in docs_readme
-        assert "Unified Notification Service" in docs_readme
+        assert "Historical extraction/runtime name" in docs_readme
 
     def test_delivery_mode_terminology(self, docs_readme: str) -> None:
         """Verify delivery mode terminology is consistent."""

@@ -183,9 +183,12 @@ class TestComponentOwnership:
         """Verify component ownership section exists."""
         assert "Ownership" in integration_modes_doc or "ownership" in integration_modes_doc.lower()
 
-    def test_uns_owned_components_listed(self, integration_modes_doc: str) -> None:
-        """Verify UNS-owned components are listed."""
-        assert "UNS Core" in integration_modes_doc or "UNS owned" in integration_modes_doc
+    def test_agsignal_owned_components_listed(self, integration_modes_doc: str) -> None:
+        """Verify AGSignal Core-owned components are listed."""
+        assert (
+            "AGSignal Core" in integration_modes_doc
+            or "AGSignal Core owned" in integration_modes_doc
+        )
 
     def test_external_owned_components_listed(self, integration_modes_doc: str) -> None:
         """Verify externally-owned components are listed."""
@@ -237,12 +240,14 @@ class TestSummaryTable:
         summary = summary_match.group(0)
         assert "|" in summary
 
-    def test_summary_distinguishes_uns_and_external(self, integration_modes_doc: str) -> None:
-        """Verify summary table distinguishes UNS core from external."""
+    def test_summary_distinguishes_agsignal_and_external(
+        self, integration_modes_doc: str
+    ) -> None:
+        """Verify summary table distinguishes AGSignal Core from external."""
         summary_match = re.search(r"## Summary.*", integration_modes_doc, re.DOTALL)
         assert summary_match is not None
         summary = summary_match.group(0)
-        assert "UNS" in summary
+        assert "AGSignal Core" in summary
         assert "External" in summary or "integrator" in summary.lower()
 
 

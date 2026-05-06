@@ -1,6 +1,6 @@
 # Policy Lifecycle
 
-This document describes the lifecycle, loading, versioning, and application of notification policies in the Unified Notification Service (UNS).
+This document describes the lifecycle, loading, versioning, and application of notification policies in the AGSignal Core.
 
 ## Overview
 
@@ -99,7 +99,7 @@ registry.load_from_dict(policies_data)
 
 ### Singleton Pattern
 
-UNS uses a global singleton registry:
+AGSignal Core uses a global singleton registry:
 
 ```python
 from notification.policies import get_policy_registry, set_policy_registry
@@ -294,7 +294,7 @@ When no policy exists, these defaults apply:
 
 ### Deduplication Keys
 
-UNS uses SHA256 hashing for deduplication keys (not policy identification):
+AGSignal Core uses SHA256 hashing for deduplication keys (not policy identification):
 
 ```python
 import hashlib

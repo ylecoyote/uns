@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides detailed API documentation for the Unified Notification Service (UNS).
+This document provides detailed API documentation for the AGSignal Core.
 
 > **Related Documentation:**
 > - [Architecture](ARCHITECTURE.md) - System design and component overview
@@ -39,7 +39,7 @@ class NotificationSDK:
     ) -> None
 ```
 
-Main SDK class for sending notifications through UNS.
+Main SDK class for sending notifications through AGSignal Core.
 
 #### Constructor Parameters
 

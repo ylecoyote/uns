@@ -1,16 +1,16 @@
 # Integration Modes
 
-This document describes how the Unified Notification Service (UNS) operates in different integration modes, clarifying the separation between UNS core functionality and optional integrations.
+This document describes how the AGSignal Core operates in different integration modes, clarifying the separation between AGSignal Core functionality and optional integrations.
 
 ## Overview
 
-UNS is designed as an **ATP-agnostic** (Autonomous Trading Platform agnostic) notification service. The core SDK and delivery pipeline function independently of any specific trading platform or external system.
+AGSignal Core is designed as an **ATP-agnostic** (Autonomous Trading Platform agnostic) notification service. The core SDK and delivery pipeline function independently of any specific trading platform or external system.
 
-**Key Principle:** UNS does NOT require ATP to function. ATP integration is one of several optional integration modes.
+**Key Principle:** AGSignal Core does NOT require ATP to function. ATP integration is one of several optional integration modes.
 
 ## Architecture Separation
 
-### UNS Core (ATP-Agnostic)
+### AGSignal Core (ATP-Agnostic)
 
 The following components are fully self-contained and require no external platform dependencies:
 
@@ -25,24 +25,24 @@ The following components are fully self-contained and require no external platfo
 | **AcknowledgmentEngine** | `notification.acknowledgment` | Ack lifecycle management |
 | **AuditLogger** | `notification.audit` | Compliance logging |
 
-These components use **protocol-based interfaces** (`notification.interfaces`) that allow external systems to inject implementations without coupling UNS to specific platforms.
+These components use **protocol-based interfaces** (`notification.interfaces`) that allow external systems to inject implementations without coupling AGSignal Core to specific platforms.
 
 ### Integration Points (Optional)
 
-UNS defines protocols for optional integration with external systems:
+AGSignal Core defines protocols for optional integration with external systems:
 
 | Protocol | Purpose | Default Implementation |
 |----------|---------|------------------------|
 | `NotificationContextProvider` | Provides autonomy context | `DefaultContextProvider` |
 | `AcknowledgmentCallback` | Receives ack events | `NoOpAcknowledgmentCallback` |
 
-External systems (including ATP) implement these protocols to integrate with UNS.
+External systems (including ATP) implement these protocols to integrate with AGSignal Core.
 
 ## Integration Modes
 
 ### Mode 1: Standalone (No External Integration)
 
-UNS operates fully independently using default implementations and explicit context.
+AGSignal Core operates fully independently using default implementations and explicit context.
 
 **Use Cases:**
 - Testing and development
@@ -83,7 +83,7 @@ result = sdk.send_safety(
 
 ### Mode 2: Context Provider Integration
 
-UNS receives autonomy context from an external provider, but acknowledgment handling remains internal.
+AGSignal Core receives autonomy context from an external provider, but acknowledgment handling remains internal.
 
 **Use Cases:**
 - Systems with centralized agent state management
@@ -116,7 +116,7 @@ result = sdk.send_operational(
 
 ### Mode 3: Full External Integration (e.g., ATP)
 
-UNS integrates with an external platform that provides both context and acknowledgment handling.
+AGSignal Core integrates with an external platform that provides both context and acknowledgment handling.
 
 **Use Cases:**
 - Autonomous trading platforms (ATP)
@@ -150,9 +150,9 @@ result = sdk.send_safety(
 
 ## Component Ownership
 
-### UNS Core Components
+### AGSignal Core Components
 
-These components are maintained as part of UNS and have no external dependencies:
+These components are maintained as part of AGSignal Core and have no external dependencies:
 
 ```
 notification/
@@ -183,13 +183,13 @@ These components are owned by the integrating system (e.g., ATP):
 | ATP Ack Handler | ATP | `AcknowledgmentCallback` |
 | ATP WebSocket Manager | ATP | WebSocket connection management |
 
-**Important:** UNS does NOT own or maintain WebSocket connection management. The `WebSocketAdapter` in UNS accepts a connection/manager injected at configuration time. How connections are established, authenticated, and maintained is the responsibility of the integrating system.
+**Important:** AGSignal Core does NOT own or maintain WebSocket connection management. The `WebSocketAdapter` in AGSignal Core accepts a connection/manager injected at configuration time. How connections are established, authenticated, and maintained is the responsibility of the integrating system.
 
 ## WebSocket Considerations
 
-### UNS WebSocket Adapter
+### AGSignal Core WebSocket Adapter
 
-The UNS `WebSocketAdapter` is responsible for:
+The AGSignal Core `WebSocketAdapter` is responsible for:
 - Formatting notifications for WebSocket delivery
 - Sending messages through an injected connection
 - Fire-and-forget delivery semantics (non-blocking)
@@ -202,7 +202,7 @@ The adapter does NOT:
 
 ### External WebSocket Management
 
-Systems integrating with UNS provide their own WebSocket manager:
+Systems integrating with AGSignal Core provide their own WebSocket manager:
 
 ```python
 from notification.adapters import WebSocketAdapter
@@ -213,24 +213,24 @@ class MyWebSocketManager:
         # Implementation owned by external system
         ...
 
-# Inject into UNS adapter
+# Inject into AGSignal Core adapter
 adapter = WebSocketAdapter(connection_manager=MyWebSocketManager())
 ```
 
 ### ATP WebSocket Assumptions
 
-When UNS is integrated with ATP:
+When AGSignal Core is integrated with ATP:
 
 1. **Connection Management**: ATP's WebSocket manager handles connections
 2. **Authentication**: ATP handles WebSocket authentication
 3. **Reconnection**: ATP implements reconnection strategies
 4. **Message Routing**: ATP routes messages to appropriate clients
 
-UNS assumes only that the injected connection manager implements a `send()` method.
+AGSignal Core assumes only that the injected connection manager implements a `send()` method.
 
 ## Default Implementations
 
-UNS provides default implementations for standalone operation:
+AGSignal Core provides default implementations for standalone operation:
 
 ### DefaultContextProvider
 
@@ -279,7 +279,7 @@ composite = CompositeAcknowledgmentCallback([
 
 ## Dependency Injection Pattern
 
-UNS uses dependency injection to remain platform-agnostic:
+AGSignal Core uses dependency injection to remain platform-agnostic:
 
 ```python
 # SDK accepts optional dependencies
@@ -299,19 +299,19 @@ This pattern ensures:
 
 ## Summary
 
-| Aspect | UNS Core | External Integration |
+| Aspect | AGSignal Core | External Integration |
 |--------|----------|---------------------|
-| **Notification Delivery** | UNS owned | - |
-| **Policy Resolution** | UNS owned | - |
-| **Deduplication** | UNS owned | - |
-| **Rate Limiting** | UNS owned | - |
-| **Acknowledgment Tracking** | UNS owned | - |
+| **Notification Delivery** | AGSignal Core owned | - |
+| **Policy Resolution** | AGSignal Core owned | - |
+| **Deduplication** | AGSignal Core owned | - |
+| **Rate Limiting** | AGSignal Core owned | - |
+| **Acknowledgment Tracking** | AGSignal Core owned | - |
 | **Context Provider** | Protocol defined | Implementation owned by integrator |
 | **Ack Callbacks** | Protocol defined | Implementation owned by integrator |
 | **WebSocket Connections** | - | Owned by integrator |
 | **Agent State** | - | Owned by integrator |
 
-**UNS is a self-contained notification service.** Integration with ATP or other platforms is achieved through protocol-based dependency injection, not hard dependencies.
+**AGSignal Core is a self-contained notification service.** Integration with ATP or other platforms is achieved through protocol-based dependency injection, not hard dependencies.
 
 ## Related Documentation
 

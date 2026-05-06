@@ -1,9 +1,16 @@
-# Policy Engine Migration: MIP → UNS
+# Policy Engine Migration: MIP → AGSignal Core
 
 **Date:** 2026-04-22
 **Status:** Planning
 **Source:** `~/trading-assistant/market-insights-platform/src/policy/`
 **Target:** `src/policy/` (this repo)
+
+---
+
+> Historical note: this document was written during the UNS extraction phase.
+> In current product terminology, UNS maps to AGSignal Core. Remaining UNS
+> references below are provenance references to the source PRD and migration
+> language, not the public product name.
 
 ---
 
@@ -62,7 +69,7 @@ DRAFT → PREVIEW → ACTIVE → RETIRED
 ```
 
 Clean one-way transitions. DRAFT is editable, PREVIEW is shadow-only, ACTIVE is
-enforced, RETIRED is archived. This maps directly to the UNS PRD's policy lifecycle
+enforced, RETIRED is archived. This maps directly to the historical UNS PRD's policy lifecycle
 requirements.
 
 ### Policy learning layer (the crown jewel)
@@ -109,7 +116,7 @@ collapse these into the main repository.
 
 ---
 
-## What Needs to Change for UNS
+## What Needs to Change for AGSignal Core
 
 ### 1. Decouple from trading-specific policy types
 
@@ -123,7 +130,7 @@ class PolicyName(str, Enum):
 ```
 
 **Fix:** Replace with a registry/plugin pattern. Policy types should be registered
-at startup, not baked into the enum. The UNS PRD's notification-centric policy
+at startup, not baked into the enum. The historical UNS PRD's notification-centric policy
 types (routing overrides, delivery guarantees, rate limits per intent) are different
 from trading policy types.
 
@@ -138,7 +145,7 @@ async migration debt:
 # Migration requires converting %s params to :named params and RealDictCursor to mappings()
 ```
 
-**Fix:** UNS already uses async SQLAlchemy. Port repository.py to use the existing
+**Fix:** AGSignal Core already uses async SQLAlchemy. Port repository.py to use the existing
 `src/db/` stack. `async_repository.py` in MIP is already partway there — use it
 as the starting point, not `repository.py`.
 
@@ -150,7 +157,7 @@ as the starting point, not `repository.py`.
 - `RiskPolicyParamsV1` (position sizing, volatility limits)
 - `ExecutionPolicyParamsV1` (gating thresholds)
 
-**Fix:** Replace with UNS notification policy schemas. The `PolicyConfigEnvelope`
+**Fix:** Replace with AGSignal Core notification policy schemas. The `PolicyConfigEnvelope`
 wrapper pattern (generic envelope + typed payload) is correct — just swap the
 payload types. New policy types needed:
 
@@ -183,14 +190,14 @@ hardcoded in the loader.
 ### Phase 2 — Port the core policy engine with generalized types
 
 1. Create generic `PolicyConfigEnvelope` and `PolicyName` registry
-2. Define UNS-specific policy payload schemas (routing, delivery, rate limits, ack)
-3. Adapt `async_repository.py` to UNS db stack (preferred over `repository.py`)
+2. Define AGSignal Core-specific policy payload schemas (routing, delivery, rate limits, ack)
+3. Adapt `async_repository.py` to AGSignal Core db stack (preferred over `repository.py`)
 4. Adapt `async_loader.py` with generic typed loader
 
-### Phase 3 — Wire into UNS service layer
+### Phase 3 — Wire into AGSignal Core service layer
 
 1. Hook policy loading into `NotificationService` / `DeliveryEngine`
-2. Add hot-reload support (already planned in UNS PRD Phase 2)
+2. Add hot-reload support (already planned in historical UNS PRD Phase 2)
 3. Expose policy CRUD via MCP server routes
 4. Add admin UI for policy lifecycle management
 
@@ -218,4 +225,4 @@ hardcoded in the loader.
 - `learning_schemas.py` is labeled Phase 17.3 in MIP — it was built late in the
   project lifecycle and is the most mature piece
 - The `web/components/policy-learning/` directory in MIP has the UI for the
-  learning approval workflow — worth reviewing when building the UNS admin UI
+  learning approval workflow — worth reviewing when building the AGSignal Core admin UI

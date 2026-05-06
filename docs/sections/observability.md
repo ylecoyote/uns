@@ -1,10 +1,10 @@
 # Observability
 
-This document describes the observability model for the Unified Notification Service (UNS), including health states, metrics, DLQ visibility, and monitoring semantics.
+This document describes the observability model for the AGSignal Core, including health states, metrics, DLQ visibility, and monitoring semantics.
 
 ## Overview
 
-UNS provides observability through:
+AGSignal Core provides observability through:
 - **Adapter health status**: Per-channel health reporting (HEALTHY, DEGRADED, UNHEALTHY)
 - **Delivery metrics**: Latency, success/failure rates, retry counts
 - **DLQ visibility**: Escalation callbacks for GUARANTEED delivery failures
@@ -32,7 +32,7 @@ class AdapterStatus(str, Enum):
     UNHEALTHY = "UNHEALTHY"
 ```
 
-### What "DEGRADED" Means for UNS
+### What "DEGRADED" Means for AGSignal Core
 
 A DEGRADED adapter indicates:
 
@@ -45,13 +45,13 @@ A DEGRADED adapter indicates:
 
 | Scenario | Behavior | Operator Action |
 |----------|----------|-----------------|
-| Primary channel DEGRADED | UNS attempts delivery, may fallback faster | Monitor for transition to UNHEALTHY |
+| Primary channel DEGRADED | AGSignal Core attempts delivery, may fallback faster | Monitor for transition to UNHEALTHY |
 | All channels DEGRADED | Delivery continues with elevated failure risk | Investigate root cause, prepare for outage |
 | Single adapter DEGRADED | Other channels unaffected | Review adapter-specific diagnostics |
 
 **DEGRADED vs UNHEALTHY:**
-- DEGRADED: "Try delivery but expect some failures" - UNS will attempt the channel
-- UNHEALTHY: "Do not attempt delivery" - UNS will skip to fallback immediately
+- DEGRADED: "Try delivery but expect some failures" - AGSignal Core will attempt the channel
+- UNHEALTHY: "Do not attempt delivery" - AGSignal Core will skip to fallback immediately
 
 ### HealthCheckResult
 
@@ -192,7 +192,7 @@ The escalation callback receives:
 
 ### Operator Impact of DLQ
 
-**Visibility Responsibility**: UNS does not persist DLQ entries internally. Operators must implement DLQ visibility in their escalation callback:
+**Visibility Responsibility**: AGSignal Core does not persist DLQ entries internally. Operators must implement DLQ visibility in their escalation callback:
 
 ```python
 # Example: DLQ callback with external persistence
@@ -224,7 +224,7 @@ def dlq_handler(notification: Notification, channel_errors: dict[Channel, str]) 
 
 ### Metric Categories
 
-UNS exposes the following metric categories through logging and callback hooks:
+AGSignal Core exposes the following metric categories through logging and callback hooks:
 
 #### 1. Delivery Latency
 
@@ -256,7 +256,7 @@ UNS exposes the following metric categories through logging and callback hooks:
 
 **Intent**: Monitor GUARANTEED delivery health; frequent fallbacks indicate channel instability.
 
-**Note**: UNS does not implement automatic retries within a single channel. Fallback is sequential across channels (Slack → Email → PagerDuty).
+**Note**: AGSignal Core does not implement automatic retries within a single channel. Fallback is sequential across channels (Slack → Email → PagerDuty).
 
 #### 4. DLQ Depth
 
@@ -266,7 +266,7 @@ UNS exposes the following metric categories through logging and callback hooks:
 
 **Intent**: Monitor undelivered critical notifications requiring manual intervention.
 
-**Implementation**: DLQ depth is tracked by the operator's escalation callback implementation, not UNS core.
+**Implementation**: DLQ depth is tracked by the operator's escalation callback implementation, not AGSignal Core.
 
 #### 5. Acknowledgment Timeout Counts
 
@@ -322,7 +322,7 @@ Key events logged at various levels:
 
 ### Metric Collection Patterns
 
-UNS uses standard Python logging. Operators can collect metrics by:
+AGSignal Core uses standard Python logging. Operators can collect metrics by:
 
 1. **Log aggregation**: Parse structured logs (JSON logging recommended)
 2. **Callback hooks**: Implement `AuditLogger` and `AcknowledgmentCallback` protocols
