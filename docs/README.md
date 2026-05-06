@@ -1,13 +1,21 @@
-# Documentation
+# AGSignal Documentation
 
-This directory contains the technical documentation for the Unified Notification Service (UNS).
+This directory contains the technical documentation for AGSignal, the governance
+signaling control plane for autonomous agents.
+
+AGSignal turns notifications, acknowledgments, timeouts, and delivery failures
+into durable governance signals. The current Python runtime is still exposed
+through the historical `notification.*` package and UNS-compatible terminology
+while the public product API stabilizes.
 
 ## Quick Navigation
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, components, and data flow |
-| [API.md](API.md) | Complete API reference for SDK, models, and interfaces |
+| [../README.md](../README.md) | AGSignal product overview, boundary, terminology, and quick start |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Core runtime architecture, components, and data flow |
+| [API.md](API.md) | API reference for the current SDK, models, and interfaces |
+| [uns/executive-summary.md](uns/executive-summary.md) | Historical product framing from the UNS extraction |
 
 ### Topic Sections
 
@@ -36,12 +44,12 @@ docs/
 
 ## Reading Guide
 
-**New to UNS?** Start with:
-1. [Root README](../README.md) - Quick start and basic usage
-2. [ARCHITECTURE.md](ARCHITECTURE.md) - Understand the system design
-3. [API.md](API.md) - Learn the SDK interface
+**New to AGSignal?** Start with:
+1. [Root README](../README.md) - product framing, boundaries, terminology, and quick start
+2. [ARCHITECTURE.md](ARCHITECTURE.md) - understand the core runtime design
+3. [API.md](API.md) - learn the current SDK interface
 
-**Implementing delivery logic?** Read:
+**Implementing signal delivery logic?** Read:
 1. [Delivery Semantics](sections/delivery-semantics.md) - Understand GUARANTEED vs BEST_EFFORT
 2. [Policy Lifecycle](sections/policy-lifecycle.md) - Configure routing policies
 
@@ -54,6 +62,16 @@ docs/
 2. [Delivery Semantics](sections/delivery-semantics.md) - DLQ and escalation handling
 
 ## Key Concepts Summary
+
+### Product Terms
+
+| Term | Meaning |
+|------|---------|
+| AGSignal | The product and repository identity. |
+| AGS | Agent Governance Signaling, the product category. |
+| Governance signal | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
+| AGSignal Core | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
+| UNS Core | Historical extraction name for the notification runtime from MIP; use for provenance or compatibility only. |
 
 ### Notification Intents
 
@@ -119,7 +137,8 @@ When adding or updating documentation:
 
 | Term | Meaning |
 |------|---------|
-| UNS | Unified Notification Service |
+| AGSignal | Top-level product and repository identity |
+| UNS | Historical extraction/runtime name; avoid as the public product lead |
 | ATP | Autonomous Trading Platform (external system) |
 | Intent | Notification classification (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL) |
 | Autonomy Mode | Agent operating mode (PREVIEW, SHADOW, LIVE) |
