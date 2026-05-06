@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from db.policy_store import SQLAlchemyPolicyStore
 from mcp_server.routes_notification import router as acknowledgment_router
 from notification import __version__
+from notification.channel_health import ChannelHealthTracker
 from notification.config import get_notification_config
 from notification.dlq import DLQService
 from notification.policies import get_policy_registry
@@ -58,6 +59,7 @@ def _channel_readiness() -> dict[str, bool]:
 def create_app(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
+    channel_health_tracker: ChannelHealthTracker | None = None,
 ) -> FastAPI:
     """Create the standalone AGSignal Core HTTP application."""
     app = FastAPI(
@@ -70,6 +72,7 @@ def create_app(
     )
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
+    app.state.channel_health_tracker = channel_health_tracker or ChannelHealthTracker()
 
     app.include_router(notification_router)
     app.include_router(ops_router)
