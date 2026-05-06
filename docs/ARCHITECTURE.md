@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the architecture of the Unified Notification Service (UNS).
+This document describes the architecture of the AGSignal Core.
 
 > **Related Documentation:**
 > - [API Reference](API.md) - Complete API documentation
@@ -11,9 +11,9 @@ This document describes the architecture of the Unified Notification Service (UN
 
 ## Overview
 
-UNS is a control-plane notification and acknowledgment service designed for autonomous agent systems. It provides:
+AGSignal Core is a control-plane notification and acknowledgment service designed for autonomous agent systems. It provides:
 
-> **Note:** UNS is ATP-agnostic (Autonomous Trading Platform agnostic). The core SDK and delivery pipeline function independently of any specific trading platform. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation.
+> **Note:** AGSignal Core is ATP-agnostic (Autonomous Trading Platform agnostic). The core SDK and delivery pipeline function independently of any specific trading platform. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation.
 
 - Policy-driven, multi-channel notification delivery
 - Intent-based routing with delivery guarantees
@@ -428,9 +428,9 @@ else:
 
 ## Integration Points
 
-UNS uses protocol-based interfaces for external integration. These protocols allow UNS to remain ATP-agnostic while supporting rich integration with external systems.
+AGSignal Core uses protocol-based interfaces for external integration. These protocols allow AGSignal Core to remain ATP-agnostic while supporting rich integration with external systems.
 
-> **Note:** All integration points are optional. UNS functions in standalone mode with default implementations. See [Integration Modes](sections/integration-modes.md) for detailed integration options.
+> **Note:** All integration points are optional. AGSignal Core functions in standalone mode with default implementations. See [Integration Modes](sections/integration-modes.md) for detailed integration options.
 
 ### Context Provider Protocol
 
@@ -465,11 +465,11 @@ Can be synchronous (testing) or queue-based (RQ, Celery) for production.
 
 ### WebSocket Connections
 
-UNS does NOT manage WebSocket connections. The `WebSocketAdapter` accepts an injected connection manager. Connection lifecycle (establishment, authentication, reconnection) is the responsibility of the integrating system.
+AGSignal Core does NOT manage WebSocket connections. The `WebSocketAdapter` accepts an injected connection manager. Connection lifecycle (establishment, authentication, reconnection) is the responsibility of the integrating system.
 
 ## Configuration Architecture
 
-UNS uses singleton pattern with configure functions:
+AGSignal Core uses singleton pattern with configure functions:
 
 ```python
 # Policy Registry
