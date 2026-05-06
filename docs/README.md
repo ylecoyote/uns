@@ -26,6 +26,7 @@ while the public product API stabilizes.
 | [UNS Taxonomy](decisions/2026-05-06-uns-taxonomy.md) | Keeps `docs/uns/` as provenance while AGSignal remains the public product identity |
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
 | [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
+| [MIP Adapter Design](superpowers/specs/2026-05-06-mip-251-mip-adapter-design.md) | Optional MIP-shaped adapter templates built on the generic app boundary |
 
 ### Topic Sections
 
