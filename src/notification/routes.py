@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from notification.acknowledgment import get_ack_engine
+from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
 from notification.dlq import DLQEntry, DLQService
 from notification.models import (
     AckStatus,
@@ -265,6 +266,13 @@ async def list_dlq(request: Request) -> DLQListResponse:
         depth=dlq_service.depth(),
         items=dlq_service.list_entries(),
     )
+
+
+@ops_router.get("/channels/health", response_model=ChannelHealthSummary)
+async def get_channel_health(request: Request) -> ChannelHealthSummary:
+    """Return runtime channel health without changing process readiness."""
+    tracker: ChannelHealthTracker = request.app.state.channel_health_tracker
+    return tracker.get_summary()
 
 
 @ops_router.post("/policies/reload", response_model=PolicyReloadResponse)

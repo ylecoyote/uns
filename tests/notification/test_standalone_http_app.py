@@ -10,8 +10,15 @@ from fastapi.testclient import TestClient
 
 from db.policy_store import SQLAlchemyPolicyStore
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+from notification.channel_health import ChannelHealthTracker
 from notification.dlq import DLQService
-from notification.models import AutonomyContext, AutonomyMode, Notification, NotificationIntent
+from notification.models import (
+    AutonomyContext,
+    AutonomyMode,
+    Channel,
+    Notification,
+    NotificationIntent,
+)
 
 
 class FakeRedisList:
@@ -58,12 +65,19 @@ def _payload() -> dict[str, object]:
 def _client(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
+    channel_health_tracker: ChannelHealthTracker | None = None,
 ) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
     from notification.main import create_app
 
-    return TestClient(create_app(dlq_service=dlq_service, policy_store=policy_store))
+    return TestClient(
+        create_app(
+            dlq_service=dlq_service,
+            policy_store=policy_store,
+            channel_health_tracker=channel_health_tracker,
+        )
+    )
 
 
 def _notification() -> Notification:
@@ -105,6 +119,21 @@ def test_ready_does_not_require_market_insights_dependencies() -> None:
     assert data["service"] == "agsignal-core"
     assert "market" not in str(data).lower()
     assert "atp" not in str(data).lower()
+
+
+def test_channel_health_summary_is_separate_from_ready_status() -> None:
+    tracker = ChannelHealthTracker(failure_threshold=1)
+    tracker.record_failure(Channel.SLACK, reason="timeout")
+    client = _client(channel_health_tracker=tracker)
+
+    health_response = client.get("/api/v1/channels/health")
+    ready_response = client.get("/ready")
+
+    assert health_response.status_code == 200
+    assert health_response.json()["status"] == "DEGRADED"
+    assert health_response.json()["degraded_channels"] == ["SLACK"]
+    assert ready_response.status_code == 200
+    assert ready_response.json()["status"] == "ready"
 
 
 def test_send_signal_registers_live_safety_ack_state() -> None:
