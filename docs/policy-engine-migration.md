@@ -230,6 +230,18 @@ SQLAlchemy style:
 
 See [MIP-254D Policy Learning Store Design](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md).
 
+The fifth slice ports the config envelope and evaluation hash guarantees:
+
+- `PolicyConfigEnvelope` wraps generic `config_json` with lifecycle, version,
+  config hash, actor, and source-delta metadata.
+- `compute_config_hash()` preserves the donor canonical JSON SHA-256 behavior.
+- `apply_policy_delta()` turns an approved delta into the next DRAFT config
+  version without mutating the source config.
+- `PolicyEvaluationRecord` captures the exact config hash used for an
+  evaluation.
+
+See [MIP-254E Policy Config Envelope Design](superpowers/specs/2026-05-06-mip-254e-policy-config-envelope-design.md).
+
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 
 1. Copy `learning_schemas.py` verbatim — it has no MIP-specific types
