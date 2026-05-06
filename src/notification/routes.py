@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from notification.acknowledgment import get_ack_engine
-from notification.audit import AuditRecord, AuditStore
+from notification.audit import AuditPersistenceError, AuditRecord, AuditStore, create_audit_record
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
 from notification.dlq import DLQEntry, DLQService
 from notification.models import (
@@ -309,6 +309,30 @@ async def send_notification(
         notification.notification_type,
         notification.intent.value,
     )
+    audit_store = getattr(http_request.app.state, "audit_store", None)
+    if isinstance(audit_store, AuditStore):
+        try:
+            audit_store.save_delivery_audit(
+                create_audit_record(
+                    notification,
+                    result,
+                    metadata={"runtime": "standalone_http"},
+                )
+            )
+        except AuditPersistenceError as exc:
+            logger.error(
+                "Failed to persist delivery audit: notification_id=%s error=%s",
+                notification.notification_id,
+                str(exc),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "audit_persistence_failed",
+                    "message": "notification accepted but delivery audit could not be persisted",
+                    "notification_id": str(notification.notification_id),
+                },
+            ) from exc
 
     websocket_payload: dict[str, object] = {
         "notification_id": str(notification.notification_id),
