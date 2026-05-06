@@ -24,6 +24,7 @@ from notification.policies import (
     ModeOverride,
     NotificationPolicy,
     PolicyRegistry,
+    PolicyStatus,
     _get_default_channels,
     configure_policy_registry,
     get_default_ack_timeout,
@@ -74,6 +75,34 @@ class TestNotificationPolicy:
         assert policy.notification_type == "test.event"
         assert policy.channels == []
         assert policy.require_ack is None
+
+    def test_lifecycle_helpers_identify_runtime_boundary(self) -> None:
+        """Only ACTIVE policies are runtime-enforced."""
+        active = NotificationPolicy(
+            notification_type="test.active",
+            status=PolicyStatus.ACTIVE,
+        )
+        preview = NotificationPolicy(
+            notification_type="test.preview",
+            status=PolicyStatus.PREVIEW,
+        )
+        draft = NotificationPolicy(
+            notification_type="test.draft",
+            status=PolicyStatus.DRAFT,
+        )
+        retired = NotificationPolicy(
+            notification_type="test.retired",
+            status=PolicyStatus.RETIRED,
+        )
+
+        assert active.is_runtime_enforced is True
+        assert preview.is_runtime_enforced is False
+        assert draft.is_runtime_enforced is False
+        assert retired.is_runtime_enforced is False
+
+        assert preview.is_shadow_evaluated is True
+        assert draft.is_editable is True
+        assert retired.is_terminal is True
 
     def test_create_full_policy(self) -> None:
         """Policy with all fields specified."""

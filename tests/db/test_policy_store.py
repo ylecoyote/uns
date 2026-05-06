@@ -121,3 +121,38 @@ def test_load_registry_includes_active_and_preview_policies_only() -> None:
         Channel.WEBSOCKET,
     ]
     assert policy.get_require_ack_for_mode(AutonomyMode.LIVE) is True
+
+
+def test_load_runtime_registry_excludes_preview_draft_and_retired_edits() -> None:
+    store = SQLAlchemyPolicyStore(_session_factory())
+    store.save_policy(_policy(status=PolicyStatus.DRAFT, version="0.1.0"))
+    store.save_policy(_policy(status=PolicyStatus.PREVIEW, version="0.9.0"))
+    store.save_policy(_policy(status=PolicyStatus.ACTIVE, version="1.0.0"))
+    store.save_policy(
+        _policy(
+            status=PolicyStatus.RETIRED,
+            version="2.0.0",
+            live_channels=["PAGERDUTY"],
+        )
+    )
+
+    registry = store.load_runtime_registry()
+    policy = registry.get_sync("safety.kill_switch")
+
+    assert policy is not None
+    assert policy.status == PolicyStatus.ACTIVE
+    assert policy.version == "1.0.0"
+
+
+def test_load_shadow_registry_loads_preview_without_runtime_enforcement() -> None:
+    store = SQLAlchemyPolicyStore(_session_factory())
+    store.save_policy(_policy(status=PolicyStatus.PREVIEW, version="0.9.0"))
+    store.save_policy(_policy(status=PolicyStatus.ACTIVE, version="1.0.0"))
+
+    registry = store.load_shadow_registry()
+    policy = registry.get_sync("safety.kill_switch")
+
+    assert policy is not None
+    assert policy.status == PolicyStatus.PREVIEW
+    assert policy.is_shadow_evaluated is True
+    assert policy.is_runtime_enforced is False

@@ -149,6 +149,26 @@ class NotificationPolicy(BaseModel):
 
     model_config = {"frozen": True}
 
+    @property
+    def is_runtime_enforced(self) -> bool:
+        """Whether this policy is eligible for live runtime enforcement."""
+        return self.status == PolicyStatus.ACTIVE
+
+    @property
+    def is_shadow_evaluated(self) -> bool:
+        """Whether this policy is eligible for shadow/simulation evaluation."""
+        return self.status == PolicyStatus.PREVIEW
+
+    @property
+    def is_editable(self) -> bool:
+        """Whether this policy may represent an editable draft."""
+        return self.status == PolicyStatus.DRAFT
+
+    @property
+    def is_terminal(self) -> bool:
+        """Whether this policy has left the active lifecycle."""
+        return self.status == PolicyStatus.RETIRED
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> NotificationPolicy:
         """Build a policy from the YAML/dict extraction contract.

@@ -117,6 +117,14 @@ class SQLAlchemyPolicyStore:
         finally:
             session.close()
 
+    def load_runtime_registry(self) -> PolicyRegistry:
+        """Load only ACTIVE policies eligible for runtime enforcement."""
+        return self.load_registry(statuses=(PolicyStatus.ACTIVE,))
+
+    def load_shadow_registry(self) -> PolicyRegistry:
+        """Load only PREVIEW policies eligible for shadow evaluation."""
+        return self.load_registry(statuses=(PolicyStatus.PREVIEW,))
+
     def count_rows(self) -> int:
         """Return the number of persisted policy rows."""
         session = self._get_session()
