@@ -231,6 +231,41 @@ def test_send_signal_registers_live_safety_ack_state() -> None:
     assert status_response.json()["ack_status"] == "PENDING"
 
 
+def test_send_signal_idempotency_key_replays_original_response() -> None:
+    client = _client()
+    payload = _payload()
+    payload["idempotency_key"] = "producer-retry-1"
+
+    first = client.post("/api/v1/notifications", json=payload)
+    second = client.post("/api/v1/notifications", json=payload)
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    first_data = first.json()
+    second_data = second.json()
+    assert first_data["notification_id"] == second_data["notification_id"]
+    assert first_data["idempotent_replay"] is False
+    assert second_data["idempotent_replay"] is True
+    assert second_data["idempotency_key"] == "producer-retry-1"
+
+
+def test_send_signal_idempotency_key_is_scoped_by_source() -> None:
+    client = _client()
+    first_payload = _payload()
+    second_payload = _payload()
+    first_payload["idempotency_key"] = "same-key"
+    second_payload["idempotency_key"] = "same-key"
+    second_payload["source"] = "different-producer"
+
+    first = client.post("/api/v1/notifications", json=first_payload)
+    second = client.post("/api/v1/notifications", json=second_payload)
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.json()["notification_id"] != second.json()["notification_id"]
+    assert second.json()["idempotent_replay"] is False
+
+
 def test_send_signal_delivers_to_connected_websocket_agent() -> None:
     client = _client()
     payload = _payload()
@@ -336,6 +371,11 @@ def test_simulate_signal_returns_routing_preview_without_registering_ack() -> No
     assert data["require_ack"] is True
     assert data["ack_status"] is None
     assert data["channels_attempted"]
+    assert data["delivery_mode"] == "GUARANTEED"
+    assert data["dedup_key"]
+    assert data["dedup_window_seconds"] == 300
+    assert data["policy_source"] in {"default", "policy"}
+    assert "resolved via" in data["warnings"][0]
 
     status_response = client.get(
         f"/api/v1/notifications/{data['notification_id']}/ack-status"
