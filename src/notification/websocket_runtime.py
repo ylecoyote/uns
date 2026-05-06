@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+from typing import Protocol
 from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
 
 from notification.acknowledgment import get_ack_engine
-from notification.models import AckStatus
+from notification.channel_health import ChannelHealthTracker
+from notification.models import AckStatus, Channel
+
+logger = logging.getLogger(__name__)
 
 
 class WebSocketConnectionManager:
@@ -33,6 +39,58 @@ class WebSocketConnectionManager:
         connections.discard(connection_id)
         if not connections:
             del self._connections_by_agent[agent_id]
+
+
+class WebSocketFanoutEnvelope(BaseModel):
+    """Stable envelope for optional cross-process WebSocket fanout."""
+
+    type: str = Field(description="Fanout message type")
+    agent_id: UUID = Field(description="Target agent identifier")
+    notification: dict[str, object] = Field(default_factory=dict)
+
+
+class RedisPublisher(Protocol):
+    """Redis-compatible publishing surface used by WebSocket fanout."""
+
+    def publish(self, channel: str, message: str) -> object: ...
+
+
+class RedisWebSocketFanout:
+    """Optional Redis-backed WebSocket fanout publisher."""
+
+    def __init__(
+        self,
+        redis_client: RedisPublisher,
+        channel: str,
+        channel_health_tracker: ChannelHealthTracker | None = None,
+    ) -> None:
+        self._redis = redis_client
+        self._channel = channel
+        self._channel_health_tracker = channel_health_tracker
+
+    @property
+    def channel(self) -> str:
+        return self._channel
+
+    def publish(self, envelope: WebSocketFanoutEnvelope) -> bool:
+        """Publish a fanout envelope.
+
+        Redis failures are observable via channel health but are not raised to
+        callers. Live fanout should not block the notification execution path.
+        """
+        payload = envelope.model_dump_json()
+        try:
+            publish = self._redis.publish
+            publish(self._channel, payload)
+        except Exception as exc:
+            logger.warning("Redis WebSocket fanout failed: %s", exc)
+            if self._channel_health_tracker is not None:
+                self._channel_health_tracker.record_failure(Channel.WEBSOCKET, reason=str(exc))
+            return False
+
+        if self._channel_health_tracker is not None:
+            self._channel_health_tracker.record_success(Channel.WEBSOCKET)
+        return True
 
 
 def get_missed_notifications(agent_id: UUID, last_seen: str | None = None) -> list[dict[str, str]]:

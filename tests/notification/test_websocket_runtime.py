@@ -8,9 +8,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+from notification.channel_health import ChannelHealthStatus, ChannelHealthTracker
 from notification.models import AckStatus, AutonomyContext, AutonomyMode, NotificationIntent
 from notification.websocket_runtime import (
+    RedisWebSocketFanout,
     WebSocketConnectionManager,
+    WebSocketFanoutEnvelope,
     get_missed_notifications,
     websocket_endpoint,
 )
@@ -101,3 +104,55 @@ def test_websocket_ping_returns_pong() -> None:
         websocket.send_json({"type": "ping"})
 
         assert websocket.receive_json()["type"] == "pong"
+
+
+class FakeRedis:
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.published: list[tuple[str, str]] = []
+
+    def publish(self, channel: str, payload: str) -> int:
+        if self.fail:
+            raise RuntimeError("redis unavailable")
+        self.published.append((channel, payload))
+        return 1
+
+
+def test_redis_fanout_publishes_stable_envelope() -> None:
+    redis = FakeRedis()
+    fanout = RedisWebSocketFanout(redis_client=redis, channel="agsignal:test")
+    agent_id = uuid4()
+
+    delivered = fanout.publish(
+        WebSocketFanoutEnvelope(
+            type="notification",
+            agent_id=agent_id,
+            notification={"notification_id": str(uuid4())},
+        )
+    )
+
+    assert delivered is True
+    channel, payload = redis.published[0]
+    assert channel == "agsignal:test"
+    assert '"type":"notification"' in payload
+    assert str(agent_id) in payload
+
+
+def test_redis_fanout_failure_degrades_websocket_health_without_raising() -> None:
+    tracker = ChannelHealthTracker(failure_threshold=1)
+    fanout = RedisWebSocketFanout(
+        redis_client=FakeRedis(fail=True),
+        channel="agsignal:test",
+        channel_health_tracker=tracker,
+    )
+
+    delivered = fanout.publish(
+        WebSocketFanoutEnvelope(
+            type="notification",
+            agent_id=uuid4(),
+            notification={"notification_id": str(uuid4())},
+        )
+    )
+
+    assert delivered is False
+    assert tracker.get_summary().status == ChannelHealthStatus.DEGRADED
