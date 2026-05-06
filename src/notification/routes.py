@@ -26,7 +26,12 @@ from notification.models import (
     NotificationResult,
     Priority,
 )
-from notification.policies import PolicyRegistry, configure_policy_registry
+from notification.policies import (
+    DEFAULT_DEDUP_WINDOW_SECONDS,
+    PolicyRegistry,
+    configure_policy_registry,
+    get_policy_registry,
+)
 from notification.policy_loader import load_policies_from_directory
 from notification.sdk import NotificationSDK, ValidationError
 from notification.websocket_runtime import (
@@ -101,6 +106,11 @@ class SendNotificationRequest(BaseModel):
     )
     priority: Priority | None = Field(default=None, description="Optional priority override")
     dedup_key: str | None = Field(default=None, description="Optional deduplication key")
+    idempotency_key: str | None = Field(
+        default=None,
+        description="Producer retry key scoped by source",
+        min_length=1,
+    )
 
 
 class SendNotificationResponse(BaseModel):
@@ -116,6 +126,14 @@ class SendNotificationResponse(BaseModel):
         default=None,
         description="Current acknowledgment status when tracked",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        description="Producer idempotency key when supplied",
+    )
+    idempotent_replay: bool = Field(
+        default=False,
+        description="Whether this response was replayed from a previous producer request",
+    )
     message: str = Field(description="Acceptance summary")
 
 
@@ -126,11 +144,19 @@ class SimulateNotificationResponse(BaseModel):
     simulated: bool = Field(description="Whether delivery was simulated")
     status: DeliveryStatus = Field(description="Simulated delivery outcome")
     channels_attempted: list[Channel] = Field(description="Router-derived channels")
+    delivery_mode: DeliveryMode = Field(description="Resolved delivery mode")
     require_ack: bool = Field(description="Whether the signal would require acknowledgment")
     ack_status: AckStatus | None = Field(
         default=None,
         description="Always null because simulation has no ack side effect",
     )
+    dedup_key: str = Field(description="Resolved deduplication key")
+    dedup_window_seconds: int | None = Field(
+        default=None,
+        description="Resolved deduplication window when configured",
+    )
+    policy_source: str = Field(description="Whether routing came from policy or defaults")
+    warnings: list[str] = Field(description="Human-readable simulation caveats")
     message: str = Field(description="Simulation summary")
 
 
@@ -218,6 +244,14 @@ async def send_notification(
     request: SendNotificationRequest,
 ) -> SendNotificationResponse:
     """Accept an AGSignal notification from an autonomous producer."""
+    if request.idempotency_key is not None:
+        idempotency_records = getattr(http_request.app.state, "http_idempotency_records", None)
+        if isinstance(idempotency_records, dict):
+            record_key = f"{request.source}:{request.idempotency_key}"
+            existing_response = idempotency_records.get(record_key)
+            if isinstance(existing_response, SendNotificationResponse):
+                return existing_response.model_copy(update={"idempotent_replay": True})
+
     result, notification = _resolve_notification(request)
     ack_status: AckStatus | None = None
     if notification.require_ack:
@@ -272,7 +306,7 @@ async def send_notification(
             )
         )
 
-    return SendNotificationResponse(
+    response = SendNotificationResponse(
         notification_id=result.notification_id,
         status=result.status,
         channels_attempted=result.channels_attempted,
@@ -280,22 +314,49 @@ async def send_notification(
         channels_failed=result.channels_failed,
         require_ack=bool(notification.require_ack),
         ack_status=ack_status,
+        idempotency_key=request.idempotency_key,
+        idempotent_replay=False,
         message="notification accepted",
     )
+    if request.idempotency_key is not None:
+        idempotency_records = getattr(http_request.app.state, "http_idempotency_records", None)
+        if isinstance(idempotency_records, dict):
+            idempotency_records[f"{request.source}:{request.idempotency_key}"] = response
+    return response
 
 
 @router.post("/simulate", response_model=SimulateNotificationResponse)
 async def simulate_notification(request: SendNotificationRequest) -> SimulateNotificationResponse:
     """Preview routing and acknowledgment behavior without delivery side effects."""
     result, notification = _resolve_notification(request)
+    policy = get_policy_registry().get_sync(notification.notification_type)
+    policy_source = (
+        "policy"
+        if policy is not None
+        else "default"
+    )
+    warnings = [
+        f"resolved via {policy_source} routing; no delivery, replay, or ack side effects were recorded"
+    ]
+    if notification.delivery_mode == DeliveryMode.BEST_EFFORT:
+        warnings.append("best-effort delivery does not raise on channel failure")
 
     return SimulateNotificationResponse(
         notification_id=result.notification_id,
         simulated=True,
         status=result.status,
         channels_attempted=result.channels_attempted,
+        delivery_mode=notification.delivery_mode,
         require_ack=bool(notification.require_ack),
         ack_status=None,
+        dedup_key=notification.dedup_key or "",
+        dedup_window_seconds=(
+            policy.dedup_window_seconds
+            if policy is not None and policy.dedup_window_seconds is not None
+            else DEFAULT_DEDUP_WINDOW_SECONDS
+        ),
+        policy_source=policy_source,
+        warnings=warnings,
         message="notification simulated",
     )
 

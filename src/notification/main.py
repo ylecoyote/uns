@@ -87,6 +87,7 @@ def create_app(
     app.state.policy_store = policy_store
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
+    app.state.http_idempotency_records = {}
     websocket_manager = WebSocketConnectionManager()
     app.state.websocket_manager = websocket_manager
     app.state.websocket_replay_store = websocket_replay_store or InMemoryWebSocketReplayStore()
