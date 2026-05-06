@@ -18,8 +18,9 @@ from notification.policies import get_policy_registry
 from notification.routes import ops_router
 from notification.routes import router as notification_router
 from notification.websocket_runtime import (
-    RedisPublisher,
+    RedisWebSocketClient,
     RedisWebSocketFanout,
+    RedisWebSocketSubscriber,
     WebSocketConnectionManager,
     websocket_endpoint,
 )
@@ -67,7 +68,7 @@ def create_app(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
     channel_health_tracker: ChannelHealthTracker | None = None,
-    redis_client_factory: Callable[[str], RedisPublisher] | None = None,
+    redis_client_factory: Callable[[str], RedisWebSocketClient] | None = None,
 ) -> FastAPI:
     """Create the standalone AGSignal Core HTTP application."""
     app = FastAPI(
@@ -83,15 +84,28 @@ def create_app(
     app.state.policy_store = policy_store
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
-    app.state.websocket_manager = WebSocketConnectionManager()
+    websocket_manager = WebSocketConnectionManager()
+    app.state.websocket_manager = websocket_manager
     app.state.websocket_fanout = None
+    app.state.websocket_subscriber = None
     if config.websocket_redis_enabled:
         factory = redis_client_factory or _create_redis_client
-        app.state.websocket_fanout = RedisWebSocketFanout(
-            redis_client=factory(config.redis_url),
-            channel=config.websocket_redis_channel,
+        redis_client = factory(config.redis_url)
+        websocket_fanout = RedisWebSocketFanout(
+            redis_client=redis_client,
+            channel_prefix=config.websocket_redis_channel,
             channel_health_tracker=tracker,
         )
+        app.state.websocket_fanout = websocket_fanout
+        websocket_subscriber = RedisWebSocketSubscriber(
+            redis_client=redis_client,
+            channel_prefix=config.websocket_redis_channel,
+            manager=websocket_manager,
+            origin_id=websocket_fanout.instance_id,
+            channel_health_tracker=tracker,
+        )
+        websocket_manager.set_subscriber(websocket_subscriber)
+        app.state.websocket_subscriber = websocket_subscriber
 
     app.include_router(notification_router)
     app.include_router(ops_router)
@@ -119,19 +133,18 @@ def create_app(
 
     return app
 
-
-app = create_app()
-
-
 def main() -> None:
     """Run the standalone AGSignal Core HTTP server."""
     uvicorn.run("notification.main:app", host="0.0.0.0", port=8000, reload=False)
 
 
-def _create_redis_client(redis_url: str) -> RedisPublisher:
+def _create_redis_client(redis_url: str) -> RedisWebSocketClient:
     from redis import Redis
 
     return Redis.from_url(redis_url)
+
+
+app = create_app()
 
 
 if __name__ == "__main__":

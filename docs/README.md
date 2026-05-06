@@ -17,6 +17,12 @@ while the public product API stabilizes.
 | [API.md](API.md) | API reference for the current SDK, models, and interfaces |
 | [uns/README.md](uns/README.md) | Historical UNS extraction materials and AGSignal terminology mapping |
 
+### Architecture Decisions
+
+| Decision | Description |
+|----------|-------------|
+| [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
+
 ### Topic Sections
 
 Detailed documentation for specific subsystems:
@@ -35,6 +41,7 @@ docs/
 ├── README.md           ← You are here
 ├── ARCHITECTURE.md     ← System architecture overview
 ├── API.md              ← API reference
+├── decisions/          ← Accepted architecture decisions
 └── sections/
     ├── delivery-semantics.md   ← Delivery behavior truth tables
     ├── integration-modes.md    ← Integration configuration options
