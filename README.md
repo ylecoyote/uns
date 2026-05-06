@@ -1,64 +1,95 @@
-# Unified Notification Service (UNS)
+# AGSignal
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](tests/)
 
-A standalone control-plane service for autonomous agent systems, providing policy-driven notification delivery, governance decision-making, and policy management. UNS is being extracted from the [Market Insights Platform (MIP)](https://github.com/your-org/market-insights-platform) into an independent, reusable service.
+Open source governance infrastructure for autonomous agents.
 
-## Roadmap: MIP Extraction
+AGSignal turns notifications, acknowledgments, and silence into durable governance
+signals, so teams can prove who knew, when they knew, and how the system
+responded. It is the missing control plane for accountable autonomy: agents emit
+semantic events, AGSignal routes and persists them by policy, humans acknowledge
+them through normal tools, and downstream governors can consume the resulting
+audit-grade signal.
 
-This repository is the target for extracting three tightly coupled subsystems from MIP into a single standalone product:
+## Product Boundary
 
-| Subsystem | Status | Description |
-|-----------|--------|-------------|
-| **Unified Notification Service** | Extracted | Multi-channel, policy-driven notification delivery with intent-based routing and delivery guarantees |
-| **Policy Engine** | Planned | Notification policy lifecycle (DRAFT → PREVIEW → ACTIVE → RETIRED), YAML-based policy definitions, versioning, persistence, and hot-reload |
-| **Agent Governance** | Planned | Autonomy-level management, decision policies, governor hooks, and circuit-breaker integration |
+AGSignal is control-plane infrastructure. It does:
 
-### Why Extract?
+- Receive semantic governance events from autonomous systems
+- Route by policy, intent, and autonomy context
+- Persist signal state and delivery outcomes
+- Record `ACKED`, `DISMISSED`, and `TIMED_OUT` as audit events
+- Escalate safety paths and make silence or delivery failure visible
+- Emit governance feedback to an external agent governor
 
-- **Reusability** — Governance + notifications are general-purpose capabilities, not trading-specific
-- **Independent Deployment** — Decouple release cycles from the trading platform
-- **Clear Domain Boundaries** — Notification delivery, policy management, and governance form a cohesive control-plane domain
-- **Simplified Testing** — Standalone test suite without trading-platform dependencies
+AGSignal does not:
 
-### Extraction Phases
+- Execute trades, actions, or commands
+- Block execution loops or put humans in the execution path
+- Replace Slack, PagerDuty, email, WebSocket, or MCP delivery surfaces
+- Own agent reasoning, strategy, or decision logic
 
-1. **Phase 1 (Complete):** Core UNS — SDK, delivery pipeline, adapters, deduplication, rate limiting, acknowledgment tracking, audit trail
-2. **Phase 2 (In Progress):** Policy Engine Stabilization — Lifecycle transitions, YAML loader, versioning, DB persistence, hot-reload, MIP-225 compliance (completed in MIP, pending port to this repo)
-3. **Phase 3 (Planned):** Governance Extraction — Agent Governor, decision policies, autonomy-level state machine, governor hooks, circuit-breaker hooks
-4. **Phase 4 (Planned):** Integration Consolidation — Unified API surface, shared DB schema, cross-subsystem contract tests
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **AGSignal** | The product and repository identity. |
+| **AGS** | Agent Governance Signaling, the product category. |
+| **Governance signal** | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
+| **AGSignal Core** | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
+| **Signal API** | Public API surface for producers that emit governance events. The current Python implementation is still exposed through `notification.*` while the product API stabilizes. |
+| **AGSignal Console** | The read-first operator UI for delivery timelines, policy inspection, audit history, and invariants. |
+| **UNS Core** | Historical extraction name for the notification runtime from MIP. Use this only for provenance or compatibility. |
 
 ## Features
 
-### Notification Service (Extracted)
+### AGSignal Core Runtime
 
-- **Multi-Channel Delivery**: Slack, Email, WebSocket, PagerDuty
-- **Intent-Based Routing**: SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL
-- **Delivery Guarantees**: GUARANTEED and BEST_EFFORT modes
-- **Mode-Aware Routing**: Different behavior for PREVIEW, SHADOW, and LIVE modes
-- **Acknowledgment Tracking**: Timeout handling and escalation
-- **Deduplication**: At-most-once semantics within configurable windows
-- **Rate Limiting**: Per-channel token bucket rate limiting
-- **Policy Registry**: Flexible per-notification-type overrides
-- **Audit Trail**: Comprehensive logging for compliance
+- **Multi-channel delivery:** Slack, Email, WebSocket, PagerDuty
+- **Intent-based routing:** SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL
+- **Delivery guarantees:** GUARANTEED and BEST_EFFORT modes
+- **Autonomy-aware routing:** PREVIEW, SHADOW, and LIVE behavior
+- **Acknowledgment tracking:** ACKED, DISMISSED, TIMED_OUT, timeout handling, escalation
+- **Deduplication:** Cognitive at-most-once semantics within configurable windows
+- **Producer idempotency:** Retry safety for event producers
+- **Rate limiting:** Per-channel token bucket rate limiting
+- **Policy registry:** Per-signal routing overrides, YAML loading, version/status metadata
+- **Audit trail:** Delivery, acknowledgment, and failure records for accountability
 
-### Policy Engine (Pending Port from MIP)
+### Policy-Driven Routing
 
-- **Policy Lifecycle**: DRAFT → PREVIEW → ACTIVE → RETIRED state machine
-- **YAML Policy Definitions**: File-based policy configuration with directory loading
-- **Policy Versioning**: `previous_version_id` chain for version history tracking
-- **Database Persistence**: `notification_policy` table with JSONB columns and content-hash dedup
-- **Hot-Reload**: `POST /api/v1/policies/reload` for runtime policy refresh without restart
-- **MIP-225 Compliance**: Producers cannot specify channels — policy engine owns routing decisions
+- **Policy lifecycle:** DRAFT → PREVIEW → ACTIVE → RETIRED
+- **YAML policy definitions:** File-based policy configuration under `config/notification_policies`
+- **Policy versioning:** Version and status fields on policy definitions
+- **Database persistence:** Planned `notification_policy` table with JSONB columns and content-hash dedup
+- **Hot reload:** Planned `POST /api/v1/policies/reload` for runtime refresh without restart
+- **Producer guardrail:** Producers should emit intent and context; AGSignal owns channel routing
 
-### Agent Governance (Planned)
+### Governance Feedback Integrations
 
-- **Autonomy-Level Management**: PREVIEW → SHADOW → LIVE state transitions
-- **Decision Policies**: Configurable rules for agent autonomy boundaries
-- **Governor Hooks**: Integration points for autonomy-level change notifications
-- **Circuit-Breaker Hooks**: Safety circuit-breaker engage/recover notification integration
+- **Autonomy context:** PREVIEW, SHADOW, LIVE, agent ID, plan ID, and evidence references
+- **Evidence links:** Decision, execution, and skip snapshot IDs can be attached without AGSignal owning those evidence models
+- **Governor hooks:** Planned integration points for autonomy-level change notifications
+- **Circuit-breaker hooks:** Planned safety event integrations for engage/recover notification flows
+
+## MIP Provenance
+
+AGSignal is being extracted from the Market Insights Platform (MIP), where
+autonomous trading workflows made the governance problem concrete. MIP’s
+decision transparency work produced external evidence artifacts such as
+DecisionSnapshot, ExecutionSnapshot, SkipSnapshot, slippage attribution, Why UI
+surfaces, and PREVIEW/SHADOW/LIVE autonomy workflows. AGSignal does not own
+those models; it provides the signal layer that records who was notified, what
+was acknowledged, and how that awareness can feed future autonomy decisions.
+
+### Extraction Phases
+
+1. **Phase 1 (Complete):** AGSignal Core runtime — SDK, delivery pipeline, adapters, deduplication, rate limiting, acknowledgment tracking, audit trail
+2. **Phase 2 (In Progress):** Policy-driven routing — lifecycle metadata, YAML loader, versioning, DB persistence, hot reload, producer channel guardrails
+3. **Phase 3 (Planned):** Governance feedback adapters — agent governor, autonomy state changes, circuit-breaker hooks
+4. **Phase 4 (Planned):** Integration consolidation — unified API surface, shared DB schema, cross-subsystem contract tests
 
 ## Quick Start
 
@@ -76,6 +107,9 @@ pip install -e ".[all]"
 ```
 
 ### Basic Usage
+
+AGSignal Core is currently exposed through the `notification.*` Python package
+while the public product API stabilizes.
 
 ```python
 from uuid import uuid4
@@ -419,7 +453,7 @@ result = NotificationResult(
 
 ### HTTP API
 
-UNS provides an HTTP API via FastAPI:
+AGSignal Core provides an HTTP API via FastAPI:
 
 ```bash
 # Start the server

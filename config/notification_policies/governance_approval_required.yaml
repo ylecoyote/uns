@@ -1,0 +1,24 @@
+notification_type: "governance.approval_required"
+version: "2.0.0"
+status: "ACTIVE"
+delivery_mode: "GUARANTEED"
+delivery_mode_by_autonomy:
+  PREVIEW: "BEST_EFFORT"
+channels:
+  PREVIEW:
+    - "WEBSOCKET"
+  SHADOW:
+    - "SLACK"
+    - "WEBSOCKET"
+  LIVE:
+    - "SLACK"
+    - "WEBSOCKET"
+channels_escalation:
+  LIVE:
+    - "PAGERDUTY"
+escalation_trigger: "ON_FAILURE"
+require_ack:
+  PREVIEW: false
+  SHADOW: false
+  LIVE: true
+description: "Approval requests - page on failure in LIVE"

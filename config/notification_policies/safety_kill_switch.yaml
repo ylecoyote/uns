@@ -1,0 +1,26 @@
+notification_type: "safety.kill_switch"
+version: "2.0.0"
+status: "ACTIVE"
+delivery_mode: "GUARANTEED"
+delivery_mode_by_autonomy:
+  PREVIEW: "BEST_EFFORT"
+  SHADOW: "GUARANTEED"
+  LIVE: "GUARANTEED"
+channels:
+  PREVIEW:
+    - "WEBSOCKET"
+  SHADOW:
+    - "SLACK"
+    - "WEBSOCKET"
+  LIVE:
+    - "SLACK"
+    - "WEBSOCKET"
+channels_escalation:
+  LIVE:
+    - "PAGERDUTY"
+escalation_trigger: "ALWAYS"
+require_ack:
+  PREVIEW: false
+  SHADOW: false
+  LIVE: true
+description: "Kill switch activation - ALWAYS page in LIVE (critical safety)"

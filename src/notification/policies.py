@@ -26,6 +26,7 @@ intent-based defaults as specified in the PRD.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -74,6 +75,15 @@ _DEFAULT_CHANNELS_SHADOW: dict[NotificationIntent, list[Channel]] = {
 DEFAULT_DEDUP_WINDOW_SECONDS = 300  # 5 minutes
 
 
+class PolicyStatus(str, Enum):
+    """Lifecycle status for notification routing policies."""
+
+    DRAFT = "DRAFT"
+    PREVIEW = "PREVIEW"
+    ACTIVE = "ACTIVE"
+    RETIRED = "RETIRED"
+
+
 class ModeOverride(BaseModel):
     """Mode-specific configuration overrides.
 
@@ -102,6 +112,10 @@ class NotificationPolicy(BaseModel):
     """
 
     notification_type: str = Field(..., description="Unique policy identifier")
+    version: str = Field(default="1.0.0", description="Policy version")
+    status: PolicyStatus = Field(
+        default=PolicyStatus.ACTIVE, description="Policy lifecycle status"
+    )
     intent: NotificationIntent | None = Field(
         default=None, description="Default intent if not specified in notification"
     )
@@ -134,6 +148,70 @@ class NotificationPolicy(BaseModel):
     priority_override: str | None = Field(default=None, description="Priority override")
 
     model_config = {"frozen": True}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> NotificationPolicy:
+        """Build a policy from the YAML/dict extraction contract.
+
+        The MIP source uses maps keyed by autonomy mode for `channels`,
+        `require_ack`, and sometimes `delivery_mode`. The standalone core keeps
+        those as mode overrides so routing remains deterministic while avoiding
+        MIP-specific persistence concerns.
+        """
+        if "notification_type" not in data:
+            raise ValueError("notification_type is required")
+
+        mode_overrides: dict[AutonomyMode, ModeOverride] = {}
+        raw_channels = data.get("channels")
+        raw_require_ack = data.get("require_ack")
+        raw_delivery_mode_by_mode = data.get("delivery_mode_by_autonomy")
+
+        if isinstance(raw_channels, dict):
+            for mode_text, channel_values in raw_channels.items():
+                mode = AutonomyMode(mode_text)
+                override = mode_overrides.get(mode) or ModeOverride()
+                mode_overrides[mode] = override.model_copy(
+                    update={"channels": [Channel(channel) for channel in channel_values]}
+                )
+
+        if isinstance(raw_require_ack, dict):
+            for mode_text, require_ack in raw_require_ack.items():
+                mode = AutonomyMode(mode_text)
+                override = mode_overrides.get(mode) or ModeOverride()
+                mode_overrides[mode] = override.model_copy(
+                    update={"require_ack": bool(require_ack)}
+                )
+
+        if isinstance(raw_delivery_mode_by_mode, dict):
+            for mode_text, delivery_mode in raw_delivery_mode_by_mode.items():
+                mode = AutonomyMode(mode_text)
+                override = mode_overrides.get(mode) or ModeOverride()
+                mode_overrides[mode] = override.model_copy(
+                    update={"delivery_mode": DeliveryMode(delivery_mode)}
+                )
+
+        base_channels: list[Channel] = []
+        if isinstance(raw_channels, list):
+            base_channels = [Channel(channel) for channel in raw_channels]
+
+        base_require_ack = raw_require_ack if isinstance(raw_require_ack, bool) else None
+
+        delivery_mode = data.get("delivery_mode")
+        intent = data.get("intent")
+
+        return cls(
+            notification_type=data["notification_type"],
+            version=data.get("version", "1.0.0"),
+            status=PolicyStatus(data.get("status", PolicyStatus.ACTIVE.value)),
+            intent=NotificationIntent(intent) if intent else None,
+            delivery_mode=DeliveryMode(delivery_mode) if delivery_mode else None,
+            channels=base_channels,
+            require_ack=base_require_ack,
+            ack_timeout_minutes=data.get("ack_timeout_minutes"),
+            dedup_window_seconds=data.get("dedup_window_seconds"),
+            mode_overrides=mode_overrides or None,
+            priority_override=data.get("priority_override"),
+        )
 
     def _get_mode_override(self, autonomy_mode: AutonomyMode) -> ModeOverride | None:
         """Get the override for a specific mode."""
@@ -455,6 +533,10 @@ class PolicyRegistry:
             When None is returned, callers should use SDK defaults.
         """
         return self._policies.get(notification_type)
+
+    def get(self, notification_type: str) -> NotificationPolicy | None:
+        """Compatibility alias for callers using the MIP extraction API."""
+        return self.get_sync(notification_type)
 
     def has_policy(self, notification_type: str) -> bool:
         """Check if a policy exists for a notification type.
