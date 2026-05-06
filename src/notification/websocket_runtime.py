@@ -20,25 +20,46 @@ class WebSocketConnectionManager:
     """In-memory connection tracker for standalone WebSocket sessions."""
 
     def __init__(self) -> None:
-        self._connections_by_agent: dict[UUID, set[str]] = {}
+        self._connections_by_agent: dict[UUID, dict[str, WebSocket | None]] = {}
 
     @property
     def connection_count(self) -> int:
         return sum(len(connections) for connections in self._connections_by_agent.values())
 
     def agent_connection_count(self, agent_id: UUID) -> int:
-        return len(self._connections_by_agent.get(agent_id, set()))
+        return len(self._connections_by_agent.get(agent_id, {}))
 
-    def register(self, agent_id: UUID, connection_id: str) -> None:
-        self._connections_by_agent.setdefault(agent_id, set()).add(connection_id)
+    def register(
+        self,
+        agent_id: UUID,
+        connection_id: str,
+        websocket: WebSocket | None = None,
+    ) -> None:
+        self._connections_by_agent.setdefault(agent_id, {})[connection_id] = websocket
 
     def unregister(self, agent_id: UUID, connection_id: str) -> None:
         connections = self._connections_by_agent.get(agent_id)
         if connections is None:
             return
-        connections.discard(connection_id)
+        connections.pop(connection_id, None)
         if not connections:
             del self._connections_by_agent[agent_id]
+
+    async def send_to_agent(self, agent_id: UUID, payload: dict[str, object]) -> int:
+        """Send a JSON payload to all local WebSocket sessions for an agent."""
+        connections = self._connections_by_agent.get(agent_id, {}).copy()
+        delivered = 0
+        for connection_id, websocket in connections.items():
+            if websocket is None:
+                continue
+            try:
+                await websocket.send_json(payload)
+            except Exception as exc:
+                logger.warning("WebSocket send failed: %s", exc)
+                self.unregister(agent_id, connection_id)
+                continue
+            delivered += 1
+        return delivered
 
 
 class WebSocketFanoutEnvelope(BaseModel):
@@ -108,7 +129,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
     manager: WebSocketConnectionManager = websocket.app.state.websocket_manager
     connection_id = str(uuid4())
     await websocket.accept()
-    manager.register(agent_id, connection_id)
+    manager.register(agent_id, connection_id, websocket)
     await websocket.send_json(
         {
             "type": "connected",
