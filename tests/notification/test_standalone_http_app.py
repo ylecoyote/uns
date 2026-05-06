@@ -443,6 +443,31 @@ def test_dlq_list_returns_seeded_entries() -> None:
     assert data["items"][0]["reason"] == "all persistent channels failed"
 
 
+def test_dlq_remove_deletes_seeded_entry() -> None:
+    redis = FakeRedisList()
+    dlq_service = DLQService(redis_client=redis, key="uns:test:dlq")
+    entry = dlq_service.enqueue(_notification(), reason="operator retried manually")
+    client = _client(dlq_service=dlq_service)
+
+    response = client.delete(f"/api/v1/dlq/{entry.entry_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["entry_id"] == str(entry.entry_id)
+    assert data["removed"] is True
+    assert data["depth"] == 0
+    assert dlq_service.list_entries() == []
+
+
+def test_dlq_remove_returns_404_for_unknown_entry() -> None:
+    client = _client(dlq_service=DLQService(redis_client=FakeRedisList(), key="uns:test:dlq"))
+
+    response = client.delete(f"/api/v1/dlq/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "dlq_entry_not_found"
+
+
 def test_policy_reload_loads_yaml_directory(tmp_path: Path) -> None:
     policy_file = tmp_path / "safety.yaml"
     policy_file.write_text(
