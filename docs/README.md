@@ -40,6 +40,7 @@ Detailed documentation for specific subsystems:
 
 | Guide | Description |
 |-------|-------------|
+| [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) | AGSignal-native smoke for host app evidence integration |
 | [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) | Real Redis smoke for cross-instance WebSocket fanout |
 | [WebSocket Replay Smoke](testing/websocket-replay-smoke.md) | Reconnect replay smoke for missed WebSocket notifications |
 
