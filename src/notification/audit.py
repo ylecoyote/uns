@@ -23,6 +23,7 @@ from typing import Any
 from uuid import UUID
 
 from notification.models import (
+    AckEvent,
     AckStatus,
     Channel,
     DeliveryStatus,
@@ -540,6 +541,71 @@ class PersistentAuditLogger:
             if self.fail_silently:
                 logger.error(
                     "Unexpected error persisting ack audit record "
+                    "(fail_silently=True): %s",
+                    str(e),
+                )
+            else:
+                raise AuditPersistenceError(
+                    f"Unexpected error: {e}", original_error=e
+                ) from e
+
+
+@dataclass
+class PersistentAcknowledgmentAuditCallback:
+    """Acknowledgment callback that persists ACK lifecycle state changes."""
+
+    store: AuditStore = field(default_factory=InMemoryAuditStore)
+    fail_silently: bool = False
+
+    def on_ack(self, event: AckEvent) -> None:
+        """ACK events are persisted from on_status_change to capture old status."""
+        return None
+
+    def on_dismiss(self, event: AckEvent) -> None:
+        """Dismiss events are persisted from on_status_change to capture old status."""
+        return None
+
+    def on_timeout(self, event: AckEvent) -> None:
+        """Timeout events are persisted from on_status_change to capture old status."""
+        return None
+
+    def on_status_change(
+        self,
+        notification_id: UUID,
+        old_status: AckStatus,
+        new_status: AckStatus,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Persist an acknowledgment status transition."""
+        if old_status == new_status:
+            return
+        try:
+            record = create_ack_audit_record(
+                notification_id=notification_id,
+                old_status=old_status,
+                new_status=new_status,
+                metadata=metadata,
+            )
+            self.store.save_ack_audit(record)
+            logger.info(
+                "Ack audit recorded from callback: notification_id=%s, %s -> %s",
+                notification_id,
+                old_status.value,
+                new_status.value,
+            )
+        except AuditPersistenceError as e:
+            if self.fail_silently:
+                logger.error(
+                    "Failed to persist ack audit callback record "
+                    "(fail_silently=True): %s",
+                    str(e),
+                )
+            else:
+                raise
+        except Exception as e:
+            if self.fail_silently:
+                logger.error(
+                    "Unexpected error persisting ack audit callback record "
                     "(fail_silently=True): %s",
                     str(e),
                 )

@@ -11,14 +11,17 @@ Tests cover:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 
+from notification.acknowledgment import AcknowledgmentEngine
 from notification.audit import (
     AuditPersistenceError,
     InMemoryAuditStore,
+    PersistentAcknowledgmentAuditCallback,
     PersistentAuditLogger,
     create_ack_audit_record,
     create_audit_record,
@@ -95,6 +98,7 @@ class TestAuditRecord:
         assert record.channels_failed == tuple(sample_result.channels_failed)
         assert record.error_message == sample_result.error_message
         assert record.intent == sample_notification.intent.value
+        assert sample_notification.delivery_mode is not None
         assert record.delivery_mode == sample_notification.delivery_mode.value
         assert record.autonomy_mode == sample_notification.autonomy_context.autonomy_mode.value
         assert record.agent_id == sample_notification.autonomy_context.agent_id
@@ -489,7 +493,7 @@ class TestFileAuditStore:
 
     def test_save_delivery_audit_writes_to_file(
         self,
-        tmp_path,
+        tmp_path: Path,
         sample_notification: Notification,
         sample_result: NotificationResult,
     ) -> None:
@@ -511,7 +515,7 @@ class TestFileAuditStore:
         content = delivery_path.read_text()
         assert str(record.notification_id) in content
 
-    def test_save_ack_audit_writes_to_file(self, tmp_path) -> None:
+    def test_save_ack_audit_writes_to_file(self, tmp_path: Path) -> None:
         """Test that ack audit is written to file."""
         from notification.audit import FileAuditStore
 
@@ -679,6 +683,42 @@ class TestGlobalAuditLogger:
         assert current is configured
         assert current.store is store
         assert current.fail_silently is True
+
+
+class TestPersistentAcknowledgmentAuditCallback:
+    """Tests for callback-based acknowledgment audit persistence."""
+
+    def test_check_all_timeouts_persists_timeout_audit(self) -> None:
+        """Timed-out ACK checks should be audit-visible through the callback."""
+        store = InMemoryAuditStore()
+        callback = PersistentAcknowledgmentAuditCallback(store=store)
+        engine = AcknowledgmentEngine(callback=callback)
+        notification_id = uuid4()
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        )
+        created_at = datetime(2026, 5, 6, 10, 0, tzinfo=UTC)
+
+        engine.register_notification(
+            notification_id=notification_id,
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=context,
+            timeout_minutes=5,
+            created_at=created_at,
+        )
+
+        events = engine.check_all_timeouts(
+            now=datetime(2026, 5, 6, 10, 6, tzinfo=UTC)
+        )
+
+        audits = store.get_ack_audits_for_notification(notification_id)
+        assert len(events) == 1
+        assert len(audits) == 1
+        assert audits[0].old_status == AckStatus.PENDING
+        assert audits[0].new_status == AckStatus.TIMED_OUT
+        assert audits[0].acked_by is None
+        assert "timed_out_at" in audits[0].metadata
 
 
 class TestAuditRecordIntegrityInvariants:
