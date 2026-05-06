@@ -68,6 +68,57 @@ Tests should use a fake `AppSignalAdapter` that records `AppSignalRequest`
 objects. They should assert the adapter builds the right request shape without
 calling real delivery adapters.
 
+## Donor Parity Checkpoint
+
+MIP-251 is an adapter-template port, not a verbatim code port. The donor code
+depends on MIP services, logging, runtime context, telemetry, database sessions,
+and governor implementations that must remain outside AGSignal Core.
+
+| Donor file | AGSignal mapping | Status |
+|---|---|---|
+| `src/notification/integrations/governor_hooks.py` | `MIPSignalAdapter.approval_required()`, `contract_approved()`, `contract_rejected()`, `autonomy_changed()` | Adapted |
+| `src/notification/integrations/circuit_breaker_hooks.py` | `MIPSignalAdapter.circuit_breaker_engaged()`, `circuit_breaker_recovered()` | Adapted |
+| `src/notification/integrations/execution_alerts.py` | `MIPSignalAdapter.execution_alert()`, `MIPExecutionAlert`, `MIPExecutionSummary` | Adapted |
+| `src/notification/integrations/atp_context.py` | `AppSignalRequest.autonomy_context` plus `AppEvidenceContext`; host app resolves context | Excluded from Core |
+| `src/notification/integrations/atp_callbacks.py` | Host-repo acknowledgment callback implementation; AGSignal carries metadata/evidence only | Excluded from Core |
+| `src/notification/integrations/__init__.py` | `notification.integrations` and `agsignal.integrations` exports | Adapted |
+
+### Ported
+
+- MIP-style event names, source labels, notification type strings, metadata
+  conventions, correlation IDs, and dedup key shapes.
+- Governor approval, approval result, autonomy change, circuit breaker, and
+  execution alert request construction.
+- Severity-to-intent and metric-to-notification-type mapping for execution
+  alerts.
+
+### Adapted
+
+- Donor async hook functions became synchronous adapter methods because
+  `AppSignalAdapter.send()` and `NotificationSDK.send()` are synchronous today.
+- Donor `get_atp_sdk()` factory became explicit dependency injection through an
+  `AppSignalAdapter` instance.
+- Donor runtime context lookup became explicit `AutonomyContext` and
+  `AppEvidenceContext` input.
+
+### Excluded
+
+- MIP service imports such as `src.services.agent_governor_service`.
+- ATP runtime context discovery from thread-local or request state.
+- Acknowledgment side effects that update MIP audit records, telemetry,
+  governor contracts, or learning services.
+- Real channel delivery, queueing, and MIP database behavior.
+
+### Remaining Host-Repo Validation
+
+- Wire `MIPSignalAdapter` into the actual MIP host repo and confirm each donor
+  hook call site can pass explicit context/evidence without importing AGSignal
+  Core internals.
+- Implement or adapt MIP-side acknowledgment callbacks if the host still needs
+  ACK-driven governor/learning side effects.
+- Run one end-to-end MIP host smoke for approval required, circuit breaker
+  engaged, and execution alert flows.
+
 ## Acceptance Criteria
 
 - MIP-shaped methods generate the expected `AppSignalRequest` values.
@@ -76,4 +127,3 @@ calling real delivery adapters.
   override, and stable dedup key.
 - Execution alert severity mapping is documented and tested.
 - Public aliases expose the adapter without breaking existing integration exports.
-
