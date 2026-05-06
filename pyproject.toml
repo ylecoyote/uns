@@ -42,7 +42,7 @@ all = [
 
 [tool.setuptools.packages.find]
 where = ["src", "apps"]
-include = ["notification*", "mcp_server*", "db*", "ui*"]
+include = ["agsignal*", "notification*", "mcp_server*", "db*", "ui*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/ui/tests"]
@@ -82,7 +82,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["notification", "mcp_server", "db", "apps"]
+known-first-party = ["agsignal", "notification", "mcp_server", "db", "apps"]
 
 [tool.mypy]
 python_version = "3.10"

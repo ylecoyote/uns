@@ -10,6 +10,7 @@ This document provides detailed API documentation for the AGSignal Core.
 
 ## Table of Contents
 
+- [AGSignal Public Aliases](#agsignal-public-aliases)
 - [SDK](#sdk)
 - [Models](#models)
 - [Policies](#policies)
@@ -19,6 +20,41 @@ This document provides detailed API documentation for the AGSignal Core.
 - [Acknowledgment](#acknowledgment)
 - [Interfaces](#interfaces)
 - [UI Endpoints](#ui-endpoints)
+
+---
+
+## AGSignal Public Aliases
+
+AGSignal-branded imports are available for new applications. The current
+implementation still lives in the historical `notification.*` modules, so these
+aliases are intentionally non-breaking re-exports.
+
+```python
+from agsignal.models import GovernanceSignal, SignalIntent
+from agsignal.sdk import SignalClient
+
+client = SignalClient()
+```
+
+| AGSignal import | Backed by |
+|-----------------|-----------|
+| `agsignal.sdk.SignalClient` | `notification.sdk.NotificationSDK` |
+| `agsignal.models.GovernanceSignal` | `notification.models.Notification` |
+| `agsignal.models.SignalIntent` | `notification.models.NotificationIntent` |
+| `agsignal.integrations.*` | `notification.integrations.*` |
+
+Existing `notification.*` imports remain supported.
+
+### Host App Boundary
+
+Applications that want a generic facade can use `agsignal.integrations`:
+
+```python
+from agsignal.integrations import AppEvidenceContext, AppSignalAdapter, AppSignalRequest
+```
+
+This boundary carries app-owned evidence references into AGSignal without making
+AGSignal own the host application's domain models.
 
 ---
 

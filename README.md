@@ -108,17 +108,19 @@ pip install -e ".[all]"
 
 ### Basic Usage
 
-AGSignal Core is currently exposed through the `notification.*` Python package
-while the public product API stabilizes.
+AGSignal Core now provides AGSignal-branded imports while preserving the
+historical runtime package. `notification.* imports remain supported` for
+existing users.
 
 ```python
 from uuid import uuid4
 
-from notification.models import AutonomyContext, AutonomyMode
-from notification.sdk import NotificationSDK
+from agsignal.models import AutonomyContext, AutonomyMode
+from agsignal.models import GovernanceSignal, SignalIntent
+from agsignal.sdk import SignalClient
 
 # Create SDK instance
-sdk = NotificationSDK()
+sdk = SignalClient()
 
 # Create autonomy context (REQUIRED for all notifications)
 context = AutonomyContext(
@@ -137,6 +139,11 @@ result = sdk.send_safety(
 
 print(f"Notification sent: {result.notification_id}")
 ```
+
+`GovernanceSignal` is an AGSignal-branded alias for the current notification
+model, and `SignalIntent` is an alias for `NotificationIntent`. Existing code
+can continue to import `NotificationSDK`, `Notification`, and
+`NotificationIntent` from `notification.*`.
 
 ### Intent-Based Notifications
 
