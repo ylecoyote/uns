@@ -32,6 +32,7 @@ while the public product API stabilizes.
 | [DLQ Remove Design](superpowers/specs/2026-05-06-mip-252c-dlq-remove-design.md) | MIP-252 admin parity slice for removing visible DLQ entries |
 | [Standalone Audit Persistence Design](superpowers/specs/2026-05-06-mip-253a-standalone-audit-persistence-design.md) | MIP-253 operational parity slice for audit-backed standalone sends |
 | [ACK Audit Persistence Design](superpowers/specs/2026-05-06-mip-253b-ack-audit-persistence-design.md) | MIP-253 operational parity slice for ACK and dismiss audit records |
+| [Timeout Audit Callback Design](superpowers/specs/2026-05-06-mip-253c-timeout-audit-callback-design.md) | MIP-253 operational parity slice for host-scheduled ACK timeout audits |
 
 ### Topic Sections
 
