@@ -9,8 +9,12 @@ from db.models import (
     Base,
     NotificationAuditRecord,
     PersistedNotificationPolicy,
+    PersistedPolicyDelta,
+    PersistedShadowEvaluationAggregate,
+    PersistedShadowEvaluationResult,
     WebSocketReplayRecord,
 )
+from db.policy_learning_store import SQLAlchemyPolicyLearningStore
 from db.policy_store import SQLAlchemyPolicyStore, create_sqlalchemy_policy_store
 from db.websocket_replay_store import (
     SQLAlchemyWebSocketReplayStore,
@@ -21,7 +25,11 @@ __all__ = [
     "AckAuditRecord",
     "Base",
     "NotificationAuditRecord",
+    "PersistedPolicyDelta",
     "PersistedNotificationPolicy",
+    "PersistedShadowEvaluationAggregate",
+    "PersistedShadowEvaluationResult",
+    "SQLAlchemyPolicyLearningStore",
     "SQLAlchemyPolicyStore",
     "SQLAlchemyWebSocketReplayStore",
     "WebSocketReplayRecord",

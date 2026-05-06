@@ -37,6 +37,7 @@ while the public product API stabilizes.
 | [Policy Lifecycle Runtime Boundary](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md) | MIP-254 policy engine slice for ACTIVE-only runtime loads and PREVIEW-only shadow loads |
 | [Policy Delta Core](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md) | MIP-254 policy engine slice for immutable delta transitions and auditable history |
 | [Shadow And Guard Core](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md) | MIP-254 policy engine slice for shadow evaluation and guard result primitives |
+| [Policy Learning Store](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md) | MIP-254 policy engine slice for persisted deltas, shadow results, aggregates, and approval gates |
 
 ### Topic Sections
 
