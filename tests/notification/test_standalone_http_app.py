@@ -80,6 +80,11 @@ def _client(
     )
 
 
+class ExplodingRedisFactory:
+    def __call__(self, url: str):
+        raise AssertionError("Redis should not be created unless fanout is enabled")
+
+
 def _notification() -> Notification:
     return Notification(
         notification_type="safety.kill_switch",
@@ -136,6 +141,37 @@ def test_channel_health_summary_is_separate_from_ready_status() -> None:
     assert health_response.json()["degraded_channels"] == ["SLACK"]
     assert ready_response.status_code == 200
     assert ready_response.json()["status"] == "ready"
+
+
+def test_app_does_not_create_redis_fanout_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("UNS_WEBSOCKET_REDIS_ENABLED", raising=False)
+
+    from notification.main import create_app
+
+    app = create_app(redis_client_factory=ExplodingRedisFactory())
+
+    assert app.state.websocket_fanout is None
+
+
+def test_app_creates_redis_fanout_when_enabled(monkeypatch) -> None:
+    class RedisFactory:
+        def __init__(self) -> None:
+            self.urls: list[str] = []
+
+        def __call__(self, url: str):
+            self.urls.append(url)
+            return FakeRedisList()
+
+    monkeypatch.setenv("UNS_WEBSOCKET_REDIS_ENABLED", "true")
+    monkeypatch.setenv("UNS_REDIS_URL", "redis://example/0")
+    factory = RedisFactory()
+
+    from notification.main import create_app
+
+    app = create_app(redis_client_factory=factory)
+
+    assert factory.urls == ["redis://example/0"]
+    assert app.state.websocket_fanout is not None
 
 
 def test_send_signal_registers_live_safety_ack_state() -> None:

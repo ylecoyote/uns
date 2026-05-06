@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import uvicorn
@@ -16,7 +17,12 @@ from notification.dlq import DLQService
 from notification.policies import get_policy_registry
 from notification.routes import ops_router
 from notification.routes import router as notification_router
-from notification.websocket_runtime import WebSocketConnectionManager, websocket_endpoint
+from notification.websocket_runtime import (
+    RedisPublisher,
+    RedisWebSocketFanout,
+    WebSocketConnectionManager,
+    websocket_endpoint,
+)
 
 
 class _InMemoryRedisList:
@@ -61,6 +67,7 @@ def create_app(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
     channel_health_tracker: ChannelHealthTracker | None = None,
+    redis_client_factory: Callable[[str], RedisPublisher] | None = None,
 ) -> FastAPI:
     """Create the standalone AGSignal Core HTTP application."""
     app = FastAPI(
@@ -71,10 +78,20 @@ def create_app(
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+    config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
-    app.state.channel_health_tracker = channel_health_tracker or ChannelHealthTracker()
+    tracker = channel_health_tracker or ChannelHealthTracker()
+    app.state.channel_health_tracker = tracker
     app.state.websocket_manager = WebSocketConnectionManager()
+    app.state.websocket_fanout = None
+    if config.websocket_redis_enabled:
+        factory = redis_client_factory or _create_redis_client
+        app.state.websocket_fanout = RedisWebSocketFanout(
+            redis_client=factory(config.redis_url),
+            channel=config.websocket_redis_channel,
+            channel_health_tracker=tracker,
+        )
 
     app.include_router(notification_router)
     app.include_router(ops_router)
@@ -109,6 +126,12 @@ app = create_app()
 def main() -> None:
     """Run the standalone AGSignal Core HTTP server."""
     uvicorn.run("notification.main:app", host="0.0.0.0", port=8000, reload=False)
+
+
+def _create_redis_client(redis_url: str) -> RedisPublisher:
+    from redis import Redis
+
+    return Redis.from_url(redis_url)
 
 
 if __name__ == "__main__":

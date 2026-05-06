@@ -13,6 +13,13 @@ def _env_int(name: str, default: int) -> int:
     return int(raw)
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class NotificationConfig:
     """Environment-backed AGSignal Core configuration with compatibility defaults."""
@@ -27,6 +34,8 @@ class NotificationConfig:
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
+    websocket_redis_enabled: bool = False
+    websocket_redis_channel: str = "agsignal:websocket"
 
     @classmethod
     def from_env(cls) -> NotificationConfig:
@@ -44,6 +53,14 @@ class NotificationConfig:
             smtp_port=_env_int("UNS_SMTP_PORT", cls.smtp_port),
             smtp_user=os.environ.get("UNS_SMTP_USER"),
             smtp_password=os.environ.get("UNS_SMTP_PASSWORD"),
+            websocket_redis_enabled=_env_bool(
+                "UNS_WEBSOCKET_REDIS_ENABLED",
+                cls.websocket_redis_enabled,
+            ),
+            websocket_redis_channel=os.environ.get(
+                "UNS_WEBSOCKET_REDIS_CHANNEL",
+                cls.websocket_redis_channel,
+            ),
         )
 
 
