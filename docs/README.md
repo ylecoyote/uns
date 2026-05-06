@@ -29,6 +29,7 @@ while the public product API stabilizes.
 | [MIP Adapter Design](superpowers/specs/2026-05-06-mip-251-mip-adapter-design.md) | Optional MIP-shaped adapter templates built on the generic app boundary |
 | [HTTP Idempotency and Simulation Design](superpowers/specs/2026-05-06-mip-252a-http-idempotency-simulate-design.md) | First MIP-252 HTTP parity slice for producer retry safety and simulation detail |
 | [Delivery Status Design](superpowers/specs/2026-05-06-mip-252b-delivery-status-design.md) | MIP-252 HTTP parity slice for audit-backed delivery readback |
+| [DLQ Remove Design](superpowers/specs/2026-05-06-mip-252c-dlq-remove-design.md) | MIP-252 admin parity slice for removing visible DLQ entries |
 
 ### Topic Sections
 

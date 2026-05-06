@@ -197,6 +197,14 @@ class DLQListResponse(BaseModel):
     items: list[DLQEntry] = Field(description="DLQ entries, newest first")
 
 
+class DLQRemoveResponse(BaseModel):
+    """HTTP response for DLQ entry removal."""
+
+    entry_id: UUID = Field(description="Removed DLQ entry identifier")
+    removed: bool = Field(description="Whether the entry was removed")
+    depth: int = Field(description="Current DLQ depth after removal")
+
+
 class PolicyReloadRequest(BaseModel):
     """Request body for reloading YAML notification policies."""
 
@@ -452,6 +460,26 @@ async def list_dlq(request: Request) -> DLQListResponse:
     return DLQListResponse(
         depth=dlq_service.depth(),
         items=dlq_service.list_entries(),
+    )
+
+
+@ops_router.delete("/dlq/{entry_id}", response_model=DLQRemoveResponse)
+async def remove_dlq_entry(request: Request, entry_id: UUID) -> DLQRemoveResponse:
+    """Remove a visible DLQ entry after external remediation."""
+    dlq_service: DLQService = request.app.state.dlq_service
+    if not dlq_service.remove(entry_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "dlq_entry_not_found",
+                "message": f"DLQ entry not found: {entry_id}",
+                "entry_id": str(entry_id),
+            },
+        )
+    return DLQRemoveResponse(
+        entry_id=entry_id,
+        removed=True,
+        depth=dlq_service.depth(),
     )
 
 
