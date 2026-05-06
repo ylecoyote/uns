@@ -22,9 +22,11 @@ and publishes Redis only for other processes.
 ## What It Does Not Prove
 
 - It does not validate durable missed replay. Redis pub/sub is live fanout only.
+  Use [WebSocket Replay Smoke](websocket-replay-smoke.md) for reconnect replay.
 - It does not run separate OS processes. The two app instances are independent
   FastAPI app objects in one Python process, sharing only Redis.
-- It does not prove long-running Redis reconnection behavior.
+- It does not run for hours. Transient Redis subscription reconnect behavior is
+  covered by unit tests.
 
 ## Prerequisites
 

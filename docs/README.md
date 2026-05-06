@@ -22,6 +22,7 @@ while the public product API stabilizes.
 | Decision | Description |
 |----------|-------------|
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
+| [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
 
 ### Topic Sections
 
@@ -39,6 +40,7 @@ Detailed documentation for specific subsystems:
 | Guide | Description |
 |-------|-------------|
 | [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) | Real Redis smoke for cross-instance WebSocket fanout |
+| [WebSocket Replay Smoke](testing/websocket-replay-smoke.md) | Reconnect replay smoke for missed WebSocket notifications |
 
 ## Document Map
 

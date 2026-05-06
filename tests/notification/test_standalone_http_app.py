@@ -250,6 +250,7 @@ def test_send_signal_delivers_to_connected_websocket_agent() -> None:
     assert event["notification"]["notification_id"] == response.json()["notification_id"]
     assert event["notification"]["ack_status"] == "PENDING"
     assert event["notification"]["require_ack"] is True
+    assert event["notification"]["replay_cursor"]
 
 
 def test_send_signal_publishes_optional_websocket_fanout() -> None:
@@ -275,6 +276,42 @@ def test_send_signal_publishes_optional_websocket_fanout() -> None:
     assert envelope.type == "notification"
     assert envelope.agent_id == agent_id
     assert envelope.notification["notification_id"] == response.json()["notification_id"]
+    assert envelope.notification["replay_cursor"]
+
+
+def test_send_signal_records_websocket_replay_payload() -> None:
+    configure_ack_engine(storage=InMemoryAckStorage())
+
+    from notification.main import create_app
+
+    app = create_app()
+    client = TestClient(app)
+    payload = _payload()
+    agent_id = uuid4()
+    autonomy_context = payload["autonomy_context"]
+    assert isinstance(autonomy_context, dict)
+    autonomy_context["agent_id"] = str(agent_id)
+
+    response = client.post("/api/v1/notifications", json=payload)
+
+    assert response.status_code == 202
+    replayed = app.state.websocket_replay_store.missed(
+        agent_id,
+        "1970-01-01T00:00:00+00:00",
+    )
+    assert replayed == [
+        {
+            "notification_id": response.json()["notification_id"],
+            "notification_type": payload["notification_type"],
+            "intent": payload["intent"],
+            "title": payload["title"],
+            "message": payload["message"],
+            "source": payload["source"],
+            "require_ack": True,
+            "ack_status": "PENDING",
+            "replay_cursor": replayed[0]["replay_cursor"],
+        }
+    ]
 
 
 def test_send_signal_rejects_producer_selected_channels() -> None:
