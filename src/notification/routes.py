@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -12,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from notification.acknowledgment import get_ack_engine
+from notification.audit import AuditRecord, AuditStore
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
 from notification.dlq import DLQEntry, DLQService
 from notification.models import (
@@ -158,6 +160,34 @@ class SimulateNotificationResponse(BaseModel):
     policy_source: str = Field(description="Whether routing came from policy or defaults")
     warnings: list[str] = Field(description="Human-readable simulation caveats")
     message: str = Field(description="Simulation summary")
+
+
+class DeliveryAuditItem(BaseModel):
+    """Single persisted delivery audit entry."""
+
+    audit_id: UUID = Field(description="Audit record identifier")
+    status: DeliveryStatus = Field(description="Delivery outcome for this attempt")
+    channels_attempted: list[Channel] = Field(description="Channels attempted")
+    channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
+    channels_failed: list[Channel] = Field(description="Channels that failed")
+    error_message: str | None = Field(default=None, description="Delivery error if present")
+    delivered_at: datetime = Field(description="Delivery attempt timestamp")
+    audit_created_at: datetime = Field(description="Audit persistence timestamp")
+
+
+class DeliveryStatusResponse(BaseModel):
+    """HTTP response for persisted delivery status."""
+
+    notification_id: UUID = Field(description="Notification identifier")
+    notification_type: str = Field(description="Namespaced signal type")
+    delivery_status: DeliveryStatus = Field(description="Latest persisted delivery status")
+    channels_attempted: list[Channel] = Field(description="Channels attempted in latest audit")
+    channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
+    channels_failed: list[Channel] = Field(description="Channels that failed")
+    error_message: str | None = Field(default=None, description="Latest delivery error")
+    delivered_at: datetime = Field(description="Latest delivery attempt timestamp")
+    audit_count: int = Field(description="Number of persisted delivery audits")
+    audits: list[DeliveryAuditItem] = Field(description="Delivery audits newest first")
 
 
 class DLQListResponse(BaseModel):
@@ -358,6 +388,60 @@ async def simulate_notification(request: SendNotificationRequest) -> SimulateNot
         policy_source=policy_source,
         warnings=warnings,
         message="notification simulated",
+    )
+
+
+def _delivery_audit_item(record: AuditRecord) -> DeliveryAuditItem:
+    return DeliveryAuditItem(
+        audit_id=record.audit_id,
+        status=record.status,
+        channels_attempted=list(record.channels_attempted),
+        channels_succeeded=list(record.channels_succeeded),
+        channels_failed=list(record.channels_failed),
+        error_message=record.error_message,
+        delivered_at=record.delivered_at,
+        audit_created_at=record.audit_created_at,
+    )
+
+
+@router.get("/{notification_id}/delivery", response_model=DeliveryStatusResponse)
+async def get_delivery_status(
+    http_request: Request,
+    notification_id: UUID,
+) -> DeliveryStatusResponse:
+    """Return persisted delivery status for a notification."""
+    audit_store = getattr(http_request.app.state, "audit_store", None)
+    if not isinstance(audit_store, AuditStore):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "audit_store_unavailable",
+                "message": "delivery audit storage is not configured",
+            },
+        )
+
+    audits = audit_store.get_delivery_audits_for_notification(notification_id)
+    if not audits:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "delivery_audit_not_found",
+                "message": f"no delivery audit exists for notification {notification_id}",
+            },
+        )
+
+    latest = audits[0]
+    return DeliveryStatusResponse(
+        notification_id=notification_id,
+        notification_type=latest.notification_type,
+        delivery_status=latest.status,
+        channels_attempted=list(latest.channels_attempted),
+        channels_succeeded=list(latest.channels_succeeded),
+        channels_failed=list(latest.channels_failed),
+        error_message=latest.error_message,
+        delivered_at=latest.delivered_at,
+        audit_count=len(audits),
+        audits=[_delivery_audit_item(record) for record in audits],
     )
 
 

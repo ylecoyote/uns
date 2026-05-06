@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from db.policy_store import SQLAlchemyPolicyStore
 from mcp_server.routes_notification import router as acknowledgment_router
 from notification import __version__
+from notification.audit import AuditStore, InMemoryAuditStore
 from notification.channel_health import ChannelHealthTracker
 from notification.config import get_notification_config
 from notification.dlq import DLQService
@@ -70,6 +71,7 @@ def create_app(
     dlq_service: DLQService | None = None,
     policy_store: SQLAlchemyPolicyStore | None = None,
     channel_health_tracker: ChannelHealthTracker | None = None,
+    audit_store: AuditStore | None = None,
     redis_client_factory: Callable[[str], RedisWebSocketClient] | None = None,
     websocket_replay_store: WebSocketReplayStore | None = None,
 ) -> FastAPI:
@@ -85,6 +87,7 @@ def create_app(
     config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
+    app.state.audit_store = audit_store or InMemoryAuditStore()
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
