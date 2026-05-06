@@ -1,3 +1,5 @@
+> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+
 # **Product Requirements Document: Unified Notification & Signaling (UNS) System for Autonomous Agent Governance**
 
 ## **1\. Introduction and Strategic Vision**

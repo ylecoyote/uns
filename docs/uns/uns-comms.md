@@ -1,3 +1,5 @@
+> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+
 ## Looking for Feedback: UNS (Unified Notification Service for Autonomous Agents)
 
 I’ve been working on a system called **UNS** and I’d love your take on whether this feels useful, over-engineered, obvious-in-hindsight, or genuinely novel.

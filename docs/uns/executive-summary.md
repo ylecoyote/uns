@@ -1,3 +1,5 @@
+> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+
 # 1️⃣ Executive Summary
 
 **Unified Notification Service (UNS)**
