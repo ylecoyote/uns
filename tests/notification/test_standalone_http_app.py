@@ -96,6 +96,7 @@ def _notification() -> Notification:
 
 def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
     client = _client()
+    from notification.main import create_app
 
     response = client.get("/openapi.json")
 
@@ -106,6 +107,7 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
     assert "/ready" in openapi["paths"]
     assert "/api/v1/notifications" in openapi["paths"]
     assert "/api/v1/notifications/{notification_id}/ack-status" in openapi["paths"]
+    assert "/ws/agents/{agent_id}" in [route.path for route in create_app().routes]
 
 
 def test_ready_does_not_require_market_insights_dependencies() -> None:

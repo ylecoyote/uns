@@ -16,6 +16,7 @@ from notification.dlq import DLQService
 from notification.policies import get_policy_registry
 from notification.routes import ops_router
 from notification.routes import router as notification_router
+from notification.websocket_runtime import WebSocketConnectionManager, websocket_endpoint
 
 
 class _InMemoryRedisList:
@@ -73,10 +74,12 @@ def create_app(
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
     app.state.channel_health_tracker = channel_health_tracker or ChannelHealthTracker()
+    app.state.websocket_manager = WebSocketConnectionManager()
 
     app.include_router(notification_router)
     app.include_router(ops_router)
     app.include_router(acknowledgment_router, prefix="/api")
+    app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
