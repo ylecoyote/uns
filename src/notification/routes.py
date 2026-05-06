@@ -32,6 +32,7 @@ from notification.sdk import NotificationSDK, ValidationError
 from notification.websocket_runtime import (
     WebSocketConnectionManager,
     WebSocketFanoutEnvelope,
+    WebSocketReplayStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -247,6 +248,14 @@ async def send_notification(
         "require_ack": bool(notification.require_ack),
         "ack_status": ack_status.value if ack_status is not None else None,
     }
+    replay_store = getattr(http_request.app.state, "websocket_replay_store", None)
+    if isinstance(replay_store, WebSocketReplayStore):
+        replay_cursor = replay_store.record(
+            notification.autonomy_context.agent_id,
+            websocket_payload,
+            created_at=notification.created_at,
+        )
+        websocket_payload["replay_cursor"] = replay_cursor
     manager = getattr(http_request.app.state, "websocket_manager", None)
     if isinstance(manager, WebSocketConnectionManager):
         await manager.send_to_agent(

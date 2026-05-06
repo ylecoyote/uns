@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from contextlib import suppress
-from typing import Protocol
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -16,6 +19,97 @@ from notification.channel_health import ChannelHealthTracker
 from notification.models import AckStatus, Channel
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class WebSocketReplayStore(Protocol):
+    """Read model for replaying WebSocket notifications after reconnect."""
+
+    def record(
+        self,
+        agent_id: UUID,
+        notification: Mapping[str, object],
+        created_at: datetime | None = None,
+    ) -> str: ...
+
+    def missed(
+        self,
+        agent_id: UUID,
+        last_seen: str | None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]: ...
+
+
+@dataclass(frozen=True)
+class _ReplayEntry:
+    agent_id: UUID
+    created_at: datetime
+    payload: dict[str, object]
+
+
+class InMemoryWebSocketReplayStore:
+    """Process-local WebSocket replay read model.
+
+    The store keeps a bounded payload log per agent and exposes cursor-based
+    replay. Durable deployments can provide another WebSocketReplayStore
+    implementation without changing the WebSocket protocol.
+    """
+
+    def __init__(self, max_entries_per_agent: int = 1000) -> None:
+        self._max_entries_per_agent = max_entries_per_agent
+        self._entries_by_agent: dict[UUID, list[_ReplayEntry]] = {}
+
+    def record(
+        self,
+        agent_id: UUID,
+        notification: Mapping[str, object],
+        created_at: datetime | None = None,
+    ) -> str:
+        created_at = _normalize_cursor_time(created_at or datetime.now(UTC))
+        replay_cursor = _format_replay_cursor(created_at)
+        payload = dict(notification)
+        payload["replay_cursor"] = replay_cursor
+        entries = self._entries_by_agent.setdefault(agent_id, [])
+        entries.append(_ReplayEntry(agent_id=agent_id, created_at=created_at, payload=payload))
+        if len(entries) > self._max_entries_per_agent:
+            del entries[: len(entries) - self._max_entries_per_agent]
+        return replay_cursor
+
+    def missed(
+        self,
+        agent_id: UUID,
+        last_seen: str | None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        since = _parse_replay_cursor(last_seen)
+        if since is None:
+            return []
+
+        entries = [
+            entry
+            for entry in self._entries_by_agent.get(agent_id, [])
+            if entry.created_at > since
+        ]
+        return [dict(entry.payload) for entry in entries[-limit:]]
+
+
+def _normalize_cursor_time(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _format_replay_cursor(value: datetime) -> str:
+    return _normalize_cursor_time(value).isoformat()
+
+
+def _parse_replay_cursor(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return _normalize_cursor_time(datetime.fromisoformat(value.replace("Z", "+00:00")))
+    except ValueError:
+        return None
 
 
 class WebSocketSubscriber(Protocol):
@@ -182,12 +276,16 @@ class RedisWebSocketSubscriber:
         manager: WebSocketConnectionManager,
         origin_id: str,
         channel_health_tracker: ChannelHealthTracker | None = None,
+        reconnect_initial_delay_seconds: float = 0.25,
+        reconnect_max_delay_seconds: float = 5.0,
     ) -> None:
         self._redis = redis_client
         self._channel_prefix = channel_prefix
         self._manager = manager
         self._origin_id = origin_id
         self._channel_health_tracker = channel_health_tracker
+        self._reconnect_initial_delay_seconds = reconnect_initial_delay_seconds
+        self._reconnect_max_delay_seconds = reconnect_max_delay_seconds
         self._tasks_by_agent: dict[UUID, asyncio.Task[None]] = {}
 
     @property
@@ -241,33 +339,57 @@ class RedisWebSocketSubscriber:
         return True
 
     async def _run_agent_subscription(self, agent_id: UUID) -> None:
-        pubsub: RedisPubSub | None = None
+        reconnect_delay = self._reconnect_initial_delay_seconds
         try:
-            pubsub = self._redis.pubsub()
-            await asyncio.to_thread(pubsub.subscribe, self.channel_for_agent(agent_id))
             while True:
-                message = await asyncio.to_thread(pubsub.get_message, True, 0.5)
-                await self.handle_message(message)
+                pubsub: RedisPubSub | None = None
+                try:
+                    pubsub = self._redis.pubsub()
+                    await asyncio.to_thread(pubsub.subscribe, self.channel_for_agent(agent_id))
+                    reconnect_delay = self._reconnect_initial_delay_seconds
+                    while True:
+                        message = await asyncio.to_thread(pubsub.get_message, True, 0.5)
+                        await self.handle_message(message)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logger.warning("Redis WebSocket subscription failed: %s", exc)
+                    if self._channel_health_tracker is not None:
+                        self._channel_health_tracker.record_failure(
+                            Channel.WEBSOCKET,
+                            reason=str(exc),
+                        )
+                    if reconnect_delay > 0:
+                        await asyncio.sleep(reconnect_delay)
+                    reconnect_delay = min(
+                        self._reconnect_max_delay_seconds,
+                        reconnect_delay * 2
+                        if reconnect_delay > 0
+                        else self._reconnect_initial_delay_seconds,
+                    )
+                finally:
+                    if pubsub is not None:
+                        with suppress(Exception):
+                            await asyncio.to_thread(pubsub.close)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
-            logger.warning("Redis WebSocket subscription failed: %s", exc)
-            if self._channel_health_tracker is not None:
-                self._channel_health_tracker.record_failure(Channel.WEBSOCKET, reason=str(exc))
         finally:
-            if pubsub is not None:
-                await asyncio.to_thread(pubsub.close)
             self._tasks_by_agent.pop(agent_id, None)
 
 
-def get_missed_notifications(agent_id: UUID, last_seen: str | None = None) -> list[dict[str, str]]:
+def get_missed_notifications(
+    agent_id: UUID,
+    last_seen: str | None = None,
+    replay_store: WebSocketReplayStore | None = None,
+) -> list[dict[str, object]]:
     """Return missed notifications for a reconnecting agent.
 
-    Replay persistence is intentionally not implemented in this slice. Returning
-    an explicit empty list keeps the runtime contract honest until a durable
-    notification read model owns replay assembly.
+    Missing or invalid cursors return an empty list so reconnecting clients do
+    not accidentally request the entire retained history.
     """
-    return []
+    if replay_store is None:
+        return []
+    return replay_store.missed(agent_id=agent_id, last_seen=last_seen)
 
 
 async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
@@ -292,7 +414,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
             if message_type == "ping":
                 await websocket.send_json({"type": "pong"})
             elif message_type == "subscribe":
-                missed = get_missed_notifications(agent_id, message.get("last_seen"))
+                replay_store = getattr(websocket.app.state, "websocket_replay_store", None)
+                missed = get_missed_notifications(
+                    agent_id,
+                    str(message["last_seen"]) if message.get("last_seen") is not None else None,
+                    replay_store=replay_store,
+                )
                 await websocket.send_json(
                     {
                         "type": "subscribed",

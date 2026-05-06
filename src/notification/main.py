@@ -18,10 +18,12 @@ from notification.policies import get_policy_registry
 from notification.routes import ops_router
 from notification.routes import router as notification_router
 from notification.websocket_runtime import (
+    InMemoryWebSocketReplayStore,
     RedisWebSocketClient,
     RedisWebSocketFanout,
     RedisWebSocketSubscriber,
     WebSocketConnectionManager,
+    WebSocketReplayStore,
     websocket_endpoint,
 )
 
@@ -69,6 +71,7 @@ def create_app(
     policy_store: SQLAlchemyPolicyStore | None = None,
     channel_health_tracker: ChannelHealthTracker | None = None,
     redis_client_factory: Callable[[str], RedisWebSocketClient] | None = None,
+    websocket_replay_store: WebSocketReplayStore | None = None,
 ) -> FastAPI:
     """Create the standalone AGSignal Core HTTP application."""
     app = FastAPI(
@@ -86,6 +89,7 @@ def create_app(
     app.state.channel_health_tracker = tracker
     websocket_manager = WebSocketConnectionManager()
     app.state.websocket_manager = websocket_manager
+    app.state.websocket_replay_store = websocket_replay_store or InMemoryWebSocketReplayStore()
     app.state.websocket_fanout = None
     app.state.websocket_subscriber = None
     if config.websocket_redis_enabled:

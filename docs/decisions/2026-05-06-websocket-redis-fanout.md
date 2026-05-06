@@ -48,8 +48,10 @@ suppression:
   stopped when the last local connection for that agent disconnects.
 - Redis subscription polling uses bounded `get_message(..., timeout=0.5)` calls
   through `asyncio.to_thread()` rather than a blocking `listen()` loop.
-- Durable missed replay remains out of scope for Redis pub/sub and must be
-  implemented with a separate persisted notification read model.
+- Redis subscription tasks retry transient subscription failures with bounded
+  backoff until the local agent subscription is cancelled.
+- Durable missed replay remains out of scope for Redis pub/sub and is owned by
+  a separate WebSocket replay read model.
 
 ## Alternatives Considered
 
@@ -81,5 +83,10 @@ avoid duplicate delivery caused by AGSignal's direct local send path.
 - Multi-process deployments can fan out live WebSocket events across instances.
 - Redis pub/sub is still best-effort live delivery. It does not provide durable
   replay, ordering guarantees across reconnects, or historical recovery.
+- Transient Redis subscription failures do not permanently drop an active
+  local agent subscription task.
 - Tests can validate message parsing, origin suppression, local forwarding, and
   app wiring without requiring a real Redis server.
+
+See [WebSocket Replay Read Model](2026-05-06-websocket-replay-read-model.md)
+for the reconnect replay decision.
