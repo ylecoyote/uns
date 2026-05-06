@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import yaml
 from fastapi.testclient import TestClient
@@ -254,6 +254,46 @@ def test_send_signal_persists_delivery_audit_for_status_readback() -> None:
     assert data["audit_count"] == 1
     assert data["audits"][0]["status"] == "SUCCESS"
     assert data["audits"][0]["channels_attempted"] == response.json()["channels_attempted"]
+
+
+def test_ack_route_persists_ack_audit_in_standalone_app() -> None:
+    audit_store = InMemoryAuditStore()
+    client = _client(audit_store=audit_store)
+    send_response = client.post("/api/v1/notifications", json=_payload())
+    notification_id = send_response.json()["notification_id"]
+
+    ack_response = client.post(
+        f"/api/v1/notifications/{notification_id}/ack",
+        json={"acked_by": "risk-operator", "metadata": {"reason": "reviewed"}},
+    )
+
+    assert ack_response.status_code == 200
+    audits = audit_store.get_ack_audits_for_notification(UUID(notification_id))
+    assert len(audits) == 1
+    assert audits[0].old_status == "PENDING"
+    assert audits[0].new_status == "ACKED"
+    assert audits[0].acked_by == "risk-operator"
+    assert audits[0].metadata["reason"] == "reviewed"
+
+
+def test_dismiss_route_persists_ack_audit_in_standalone_app() -> None:
+    audit_store = InMemoryAuditStore()
+    client = _client(audit_store=audit_store)
+    send_response = client.post("/api/v1/notifications", json=_payload())
+    notification_id = send_response.json()["notification_id"]
+
+    dismiss_response = client.post(
+        f"/api/v1/notifications/{notification_id}/dismiss",
+        json={"dismissed_by": "risk-operator", "metadata": {"reason": "not actionable"}},
+    )
+
+    assert dismiss_response.status_code == 200
+    audits = audit_store.get_ack_audits_for_notification(UUID(notification_id))
+    assert len(audits) == 1
+    assert audits[0].old_status == "PENDING"
+    assert audits[0].new_status == "DISMISSED"
+    assert audits[0].acked_by == "risk-operator"
+    assert audits[0].metadata["reason"] == "not actionable"
 
 
 def test_send_signal_idempotency_key_replays_original_response() -> None:
