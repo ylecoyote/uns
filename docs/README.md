@@ -34,6 +34,12 @@ Detailed documentation for specific subsystems:
 | [Observability](sections/observability.md) | Health states, metrics, DLQ visibility, monitoring |
 | [Policy Lifecycle](sections/policy-lifecycle.md) | Policy states, loading, versioning, and resolution |
 
+### Testing Guides
+
+| Guide | Description |
+|-------|-------------|
+| [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) | Real Redis smoke for cross-instance WebSocket fanout |
+
 ## Document Map
 
 ```
@@ -42,11 +48,13 @@ docs/
 ├── ARCHITECTURE.md     ← System architecture overview
 ├── API.md              ← API reference
 ├── decisions/          ← Accepted architecture decisions
-└── sections/
+├── sections/
     ├── delivery-semantics.md   ← Delivery behavior truth tables
     ├── integration-modes.md    ← Integration configuration options
     ├── observability.md        ← Health, metrics, and monitoring
     └── policy-lifecycle.md     ← Policy management
+└── testing/
+    └── websocket-redis-fanout-smoke.md
 ```
 
 ## Reading Guide
