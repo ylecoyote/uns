@@ -169,6 +169,24 @@ evidence: code, tests, smoke docs, examples, or explicit known limitations.
 | [MIP-254](https://linear.app/awiley-personal/issue/MIP-254/port-mip-policy-engine-concepts-into-agsignal-native-policy-package) | Port reusable policy engine concepts | Enables defensible enforcement and governance memory |
 | [MIP-255](https://linear.app/awiley-personal/issue/MIP-255/prepare-agsignal-for-publish-with-full-documentation-set) | Prepare full docs and publish checklist | Makes the landing page publishable and supportable |
 
+## Donor Parity Protocol
+
+Every M5 implementation issue must include a donor parity checkpoint before it
+is marked done in Linear.
+
+Required fields:
+
+- Donor files reviewed.
+- Behavior ported into AGSignal.
+- Behavior adapted to AGSignal's product boundary.
+- Behavior intentionally excluded from AGSignal Core.
+- Tests proving adapted AGSignal behavior.
+- Remaining validation that must happen in the MIP host repo.
+
+The checkpoint belongs in the issue spec or implementation note, and the Linear
+completion update must summarize the same `Ported`, `Adapted`, `Excluded`,
+`Verification`, and `Remaining host-repo validation` sections.
+
 ## Truth-in-Publishing Rules
 
 Use these rules when editing the landing page, README, docs, or examples:
