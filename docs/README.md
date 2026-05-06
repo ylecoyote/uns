@@ -46,6 +46,12 @@ Detailed documentation for specific subsystems:
 | [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) | Real Redis smoke for cross-instance WebSocket fanout |
 | [WebSocket Replay Smoke](testing/websocket-replay-smoke.md) | Reconnect replay smoke for missed WebSocket notifications |
 
+### Examples
+
+| Example | Description |
+|---------|-------------|
+| [MIP UNS Sample Policy Pack](../examples/policies/mip-uns/README.md) | Realistic MIP-derived sample policies for safety, governance, and operational signaling |
+
 ## Document Map
 
 ```
@@ -63,6 +69,8 @@ docs/
 ├── testing/           ← Reusable smoke-test guides
 └── uns/               ← Historical UNS extraction materials, not public product docs
 ```
+
+Sample policy packs live outside `docs/` under `examples/policies/`.
 
 ## Reading Guide
 
