@@ -103,9 +103,23 @@ pip install -e ".[dev]"
 # Install with adapter dependencies
 pip install -e ".[adapters]"
 
+# Install with local MCP server dependencies
+pip install -e ".[mcp]"
+
 # Install everything
 pip install -e ".[all]"
 ```
+
+### MCP Server
+
+AGSignal includes a local stdio MCP server for agent clients:
+
+```bash
+uv run python -m agsignal_mcp.transports.stdio
+```
+
+The v1 server is stdio-only. HTTP/SSE transport is a deferred option documented
+in `docs/superpowers/specs/2026-05-06-agsignal-mcp-server-design.md`.
 
 ### Basic Usage
 
