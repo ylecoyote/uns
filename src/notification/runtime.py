@@ -6,10 +6,17 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
-from notification.audit import AuditStore, InMemoryAuditStore
+from notification.acknowledgment import get_ack_engine
+from notification.audit import AuditStore, InMemoryAuditStore, create_audit_record
 from notification.channel_health import ChannelHealthTracker
 from notification.dlq import DLQService
-from notification.routes import SendNotificationRequest, SimulateNotificationResponse
+from notification.models import AckStatus
+from notification.routes import (
+    SendNotificationRequest,
+    SendNotificationResponse,
+    SimulateNotificationResponse,
+    _resolve_notification,
+)
 from notification.routes import simulate_notification as simulate_notification_route
 
 
@@ -51,6 +58,7 @@ class RuntimeState:
         default_factory=lambda: DLQService(redis_client=InMemoryRedisList())
     )
     channel_health_tracker: ChannelHealthTracker = field(default_factory=ChannelHealthTracker)
+    idempotency_records: dict[str, SendNotificationResponse] = field(default_factory=dict)
 
 
 async def simulate_signal_async(
@@ -69,3 +77,52 @@ def simulate_signal(
 ) -> SimulateNotificationResponse:
     """Synchronous wrapper for local MCP tool execution."""
     return asyncio.run(simulate_signal_async(state, payload))
+
+
+def send_signal(
+    state: RuntimeState,
+    payload: dict[str, Any],
+) -> SendNotificationResponse:
+    """Accept an AGSignal signal through a local runtime state."""
+    request = SendNotificationRequest.model_validate(payload)
+    if request.idempotency_key is not None:
+        record_key = f"{request.source}:{request.idempotency_key}"
+        existing_response = state.idempotency_records.get(record_key)
+        if existing_response is not None:
+            return existing_response.model_copy(update={"idempotent_replay": True})
+
+    result, notification = _resolve_notification(request)
+    ack_status: AckStatus | None = None
+    if notification.require_ack:
+        engine = get_ack_engine()
+        engine.register_notification(
+            notification_id=notification.notification_id,
+            intent=notification.intent,
+            autonomy_context=notification.autonomy_context,
+            timeout_minutes=notification.ack_timeout_minutes,
+            created_at=notification.created_at,
+        )
+        ack_status = engine.get_status(notification.notification_id)
+
+    state.audit_store.save_delivery_audit(
+        create_audit_record(
+            notification,
+            result,
+            metadata={"runtime": "agsignal_mcp"},
+        )
+    )
+    response = SendNotificationResponse(
+        notification_id=result.notification_id,
+        status=result.status,
+        channels_attempted=result.channels_attempted,
+        channels_succeeded=result.channels_succeeded,
+        channels_failed=result.channels_failed,
+        require_ack=bool(notification.require_ack),
+        ack_status=ack_status,
+        idempotency_key=request.idempotency_key,
+        idempotent_replay=False,
+        message="notification accepted",
+    )
+    if request.idempotency_key is not None:
+        state.idempotency_records[f"{request.source}:{request.idempotency_key}"] = response
+    return response
