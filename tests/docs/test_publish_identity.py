@@ -15,7 +15,7 @@ def test_pyproject_uses_agsignal_publish_identity() -> None:
     assert "AGSignal - Control-plane governance signaling infrastructure" in content
     assert "Unified Notification Service" not in content
     assert '{name = "AGSignal Maintainers"}' in content
-    assert '"agsignal[adapters,dev]"' in content
+    assert '"agsignal[adapters,dev,mcp]"' in content
 
 
 def test_agsignal_integrations_exposes_generic_boundary_only() -> None:
