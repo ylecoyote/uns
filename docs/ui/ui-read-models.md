@@ -1,10 +1,11 @@
-# UI Read Models
+# AGSignal Console Read Models
 
-This document describes the read model adapters that connect the UI dashboard endpoints to the underlying persistence and audit stores.
+This document describes the read model adapters that connect AGSignal Console
+endpoints to the underlying persistence and audit stores.
 
 ## Overview
 
-The UI dashboard requires read-only access to:
+AGSignal Console requires read-only access to:
 - **Delivery timelines** - History of notification deliveries and channel attempts
 - **Audit events** - Detailed audit trail of delivery and acknowledgment events
 - **Policy resolution** - Real-time policy resolution (already functional via PolicyRegistry)

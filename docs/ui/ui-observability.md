@@ -1,6 +1,8 @@
-# UI Observability
+# AGSignal Console Observability
 
-This document describes the observability instrumentation for UNS UI endpoints, including request metrics, error tracking, structured logging, and dashboard/query recommendations.
+This document describes the observability instrumentation for AGSignal Console
+endpoints, including request metrics, error tracking, structured logging, and
+dashboard/query recommendations.
 
 ## Overview
 

@@ -1,5 +1,5 @@
 /**
- * Centralized router configuration for UNS UI Dashboard.
+ * Centralized router configuration for AGSignal Console.
  *
  * This module defines all application routes and provides:
  * - Route element mapping

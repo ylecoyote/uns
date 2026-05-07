@@ -1,4 +1,4 @@
-"""Main layout component for the UNS UI Dashboard.
+"""Main layout component for the AGSignal Console.
 
 This module provides the primary layout shell including navigation
 and content area structure.

@@ -1,5 +1,5 @@
 /**
- * Main App component for UNS UI Dashboard.
+ * Main App component for AGSignal Console.
  *
  * Provides routing and layout for all UI pages.
  * All pages are READ-ONLY per ui-scope.md.
@@ -17,7 +17,7 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <nav className="app-nav">
-          <div className="nav-brand">UNS Dashboard</div>
+          <div className="nav-brand">AGSignal Console</div>
           <ul className="nav-links">
             {navRoutes.map((route) => (
               <li key={route.path}>
