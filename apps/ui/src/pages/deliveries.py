@@ -12,6 +12,7 @@ The React frontend handles all HTML rendering.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -29,6 +30,45 @@ from notification.models import (
 )
 
 router = APIRouter(prefix="/pages/deliveries", tags=["ui-pages"])
+
+
+@dataclass(frozen=True)
+class DeliveriesPageState:
+    """State for the Deliveries list page."""
+
+    cursor: str | None = None
+    filters: dict[str, str] | None = None
+    loading: bool = False
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class DeliveryDetailPageState:
+    """State for the Delivery detail page."""
+
+    notification_id: UUID | None = None
+    loading: bool = False
+    error: str | None = None
+
+
+def get_deliveries_page_title() -> str:
+    """Get the page title for the Deliveries Explorer."""
+    return "Deliveries Explorer"
+
+
+def get_available_filters() -> tuple[str, ...]:
+    """Return the available filter keys for the Deliveries page."""
+    return (
+        "intent",
+        "delivery_mode",
+        "status",
+        "agent_id",
+        "autonomy_mode",
+        "channel",
+        "notification_type",
+        "start_time",
+        "end_time",
+    )
 
 
 # =============================================================================
