@@ -1,0 +1,15 @@
+title = "AGSignal gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore generated local artifacts that are never published"
+paths = [
+  '''(^|/)__pycache__/''',
+  '''(^|/)\.mypy_cache/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)htmlcov/''',
+  '''\.pyc$''',
+]

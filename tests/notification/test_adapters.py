@@ -179,7 +179,7 @@ class TestSlackConfig:
 
     def test_valid_config(self) -> None:
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         assert config.bot_token.startswith("xoxb-")
@@ -196,7 +196,7 @@ class TestSlackConfig:
     def test_missing_channel(self) -> None:
         with pytest.raises(ValueError, match="default_channel is required"):
             SlackConfig(
-                bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+                bot_token="xoxb-test-token",
                 default_channel="",
             )
 
@@ -207,7 +207,7 @@ class TestSlackAdapter:
     @pytest.fixture
     def slack_config(self) -> SlackConfig:
         return SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
             timeout_seconds=10.0,
             retry_attempts=2,
@@ -1283,7 +1283,7 @@ class TestGetAdapter:
 
     def test_get_slack_adapter(self) -> None:
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         adapter = get_adapter(Channel.SLACK, config=config)
@@ -1315,7 +1315,7 @@ class TestGetAdapter:
     def test_get_adapter_with_kwargs(self) -> None:
         adapter = get_adapter(
             Channel.SLACK,
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         assert isinstance(adapter, SlackAdapter)
@@ -1335,7 +1335,7 @@ class TestGetAdapter:
     def test_get_adapter_email_wrong_config_type(self) -> None:
         """Test error when wrong config type is provided for Email adapter."""
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         with pytest.raises(AdapterConfigurationError, match="Expected EmailConfig"):
@@ -1344,7 +1344,7 @@ class TestGetAdapter:
     def test_get_adapter_websocket_wrong_config_type(self) -> None:
         """Test error when wrong config type is provided for WebSocket adapter."""
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         with pytest.raises(AdapterConfigurationError, match="Expected WebSocketConfig"):
@@ -1353,7 +1353,7 @@ class TestGetAdapter:
     def test_get_adapter_pagerduty_wrong_config_type(self) -> None:
         """Test error when wrong config type is provided for PagerDuty adapter."""
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         with pytest.raises(AdapterConfigurationError, match="Expected PagerDutyConfig"):
@@ -1391,7 +1391,7 @@ class TestAdapterRegistry:
     @pytest.fixture
     def slack_adapter(self) -> SlackAdapter:
         config = SlackConfig(
-            bot_token="xoxb-1234567890-1234567890123-abcdefghijklmnop",
+            bot_token="xoxb-test-token",
             default_channel="#alerts",
         )
         return SlackAdapter(config=config)

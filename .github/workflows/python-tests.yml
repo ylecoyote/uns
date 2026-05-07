@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Pytest and Ruff
@@ -27,6 +30,12 @@ jobs:
 
       - name: Run ruff
         run: uv run ruff check src tests scripts apps
+
+      - name: Run Bandit
+        run: uv run bandit -q -r src
+
+      - name: Run pip-audit
+        run: uv run pip-audit --cache-dir /tmp/pip-audit-cache .
 
       - name: Run Python tests
         run: >

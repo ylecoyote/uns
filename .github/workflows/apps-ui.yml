@@ -12,6 +12,9 @@ on:
       - 'apps/ui/**'
       - '.github/workflows/apps-ui.yml'
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: apps/ui
