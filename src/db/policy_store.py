@@ -110,7 +110,9 @@ class SQLAlchemyPolicyStore:
                 .scalars()
                 .all()
             )
-            registry = PolicyRegistry()
+            registry = PolicyRegistry(
+                runtime_only=statuses == (PolicyStatus.ACTIVE,)
+            )
             for row in sorted(rows, key=lambda item: _status_sort_key(item.status)):
                 registry.register(_row_to_policy(row))
             return registry

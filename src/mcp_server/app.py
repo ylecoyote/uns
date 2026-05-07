@@ -8,14 +8,21 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
 
+from mcp_server.auth import configure_cors
 from mcp_server.observability import ObservabilityMiddleware
 from mcp_server.routes_notification import router as notification_router
 from mcp_server.routes_ui import router as ui_router
 
 logger = logging.getLogger(__name__)
+
+
+def _policy_dir_from_env() -> Path | None:
+    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR") or os.environ.get("UNS_POLICY_DIR")
+    return Path(raw_path) if raw_path else None
 
 
 def configure_persistence() -> None:
@@ -27,7 +34,8 @@ def configure_persistence() -> None:
     - DATABASE_URL: If set, uses SQLAlchemy with the specified database.
       If not set, uses in-memory storage (suitable for local demo only).
 
-    - UNS_CREATE_TABLES: If "true", creates database tables on startup.
+    - AGSIGNAL_CREATE_TABLES: If "true", creates database tables on startup.
+      UNS_CREATE_TABLES remains supported as a compatibility alias.
       Default is "true" for local development convenience.
 
     For local demo/development:
@@ -38,7 +46,7 @@ def configure_persistence() -> None:
     For production:
         - Set DATABASE_URL to a PostgreSQL/MySQL connection string
         - Uses SQLAlchemy-backed stores with proper persistence
-        - Tables are created on first run if UNS_CREATE_TABLES=true
+        - Tables are created on first run if AGSIGNAL_CREATE_TABLES=true
     """
     from mcp_server.read_models import (
         InMemoryReadModelAdapter,
@@ -51,7 +59,11 @@ def configure_persistence() -> None:
     )
 
     database_url = os.environ.get("DATABASE_URL")
-    create_tables = os.environ.get("UNS_CREATE_TABLES", "true").lower() == "true"
+    create_tables = (
+        os.environ.get("AGSIGNAL_CREATE_TABLES")
+        or os.environ.get("UNS_CREATE_TABLES")
+        or "true"
+    ).lower() == "true"
 
     if database_url:
         # Production mode: use SQLAlchemy-backed storage
@@ -105,6 +117,18 @@ def configure_persistence() -> None:
 
         logger.info("In-memory persistence configured (shared store for reads and writes)")
 
+        policy_dir = _policy_dir_from_env()
+        if policy_dir is not None:
+            from notification.policies import configure_policy_registry
+            from notification.policy_loader import load_runtime_registry_from_directory
+
+            loaded_count, registry = load_runtime_registry_from_directory(policy_dir)
+            configure_policy_registry(registry=registry)
+            logger.info(
+                "Loaded ACTIVE runtime policies from AGSIGNAL_POLICY_DIR",
+                extra={"loaded_count": loaded_count, "policy_count": len(registry)},
+            )
+
 
 def create_app(skip_persistence_config: bool = False) -> FastAPI:
     """Create and configure the FastAPI application.
@@ -128,6 +152,8 @@ def create_app(skip_persistence_config: bool = False) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    configure_cors(app)
 
     # Add observability middleware for UI endpoints
     # This provides request ID generation, metrics, and structured logging

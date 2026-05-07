@@ -34,6 +34,7 @@ from notification.adapters.base import (
     DeliveryResult,
 )
 from notification.deduplication import should_deduplicate
+from notification.dlq import DLQService
 from notification.models import (
     Channel,
     DeliveryMode,
@@ -173,6 +174,7 @@ class DeliveryService:
     audit_logger: AuditLogger = field(default_factory=NoOpAuditLogger)
     ack_scheduler: AckScheduler = field(default_factory=NoOpAckScheduler)
     escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None
+    dlq_service: DLQService | None = None
 
     async def deliver(self, notification: Notification) -> NotificationResult:
         """Deliver a notification through the configured channels.
@@ -196,8 +198,11 @@ class DeliveryService:
         """
         start_time = datetime.now(UTC)
 
+        policy_registry = get_policy_registry()
+
         # Step 1: Deduplication check
-        if should_deduplicate(notification):
+        dedup_window = policy_registry.get_dedup_window(notification.notification_type)
+        if should_deduplicate(notification, window_seconds=dedup_window):
             result = NotificationResult(
                 notification_id=notification.notification_id,
                 status=DeliveryStatus.DEDUPLICATED,
@@ -207,7 +212,6 @@ class DeliveryService:
             return result
 
         # Step 2: Resolve delivery mode and channels
-        policy_registry = get_policy_registry()
         delivery_mode = (
             notification.delivery_mode
             if notification.delivery_mode
@@ -317,7 +321,20 @@ class DeliveryService:
 
         # Step 7: GUARANTEED failure handling
         if delivery_mode == DeliveryMode.GUARANTEED and status == DeliveryStatus.FAILED:
-            # Escalate via callback or DLQ
+            # Record visible degradation before surfacing the delivery error.
+            if self.dlq_service is not None:
+                self.dlq_service.enqueue(
+                    notification,
+                    reason="guaranteed_delivery_failed",
+                    metadata={
+                        "channel_errors": {
+                            channel.value: error for channel, error in channel_errors.items()
+                        },
+                        "channels_attempted": [channel.value for channel in channels_attempted],
+                        "channels_failed": [channel.value for channel in channels_failed],
+                    },
+                )
+
             if self.escalation_callback:
                 try:
                     self.escalation_callback(notification, channel_errors)
@@ -556,6 +573,7 @@ def configure_delivery_service(
     audit_logger: AuditLogger | None = None,
     ack_scheduler: AckScheduler | None = None,
     escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None,
+    dlq_service: DLQService | None = None,
 ) -> DeliveryService:
     """Configure the global delivery service.
 
@@ -564,6 +582,7 @@ def configure_delivery_service(
         audit_logger: Optional custom audit logger
         ack_scheduler: Optional custom ack scheduler
         escalation_callback: Optional callback for GUARANTEED failures
+        dlq_service: Optional DLQ writer for visible delivery failures
 
     Returns:
         The configured DeliveryService instance
@@ -574,6 +593,7 @@ def configure_delivery_service(
         audit_logger=audit_logger or NoOpAuditLogger(),
         ack_scheduler=ack_scheduler or NoOpAckScheduler(),
         escalation_callback=escalation_callback,
+        dlq_service=dlq_service,
     )
     return _delivery_service
 
@@ -600,6 +620,7 @@ def configure_delivery_service_with_audit(
     fail_silently: bool = False,
     ack_scheduler: AckScheduler | None = None,
     escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None,
+    dlq_service: DLQService | None = None,
 ) -> DeliveryService:
     """Configure the delivery service with persistent audit logging.
 
@@ -613,6 +634,7 @@ def configure_delivery_service_with_audit(
         fail_silently: Whether audit failures should be suppressed
         ack_scheduler: Optional custom ack scheduler
         escalation_callback: Optional callback for GUARANTEED failures
+        dlq_service: Optional DLQ writer for visible delivery failures
 
     Returns:
         The configured DeliveryService instance
@@ -653,5 +675,5 @@ def configure_delivery_service_with_audit(
         audit_logger=audit_logger,
         ack_scheduler=ack_scheduler,
         escalation_callback=escalation_callback,
+        dlq_service=dlq_service,
     )
-

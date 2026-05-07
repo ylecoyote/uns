@@ -13,5 +13,7 @@ class MCPRuntimeConfig:
     """Safe local runtime defaults for the AGSignal MCP server."""
 
     mode: RuntimeMode = "stdio-local"
-    read_only: bool = False
+    read_only: bool = True
     require_delivery_confirmation: bool = True
+    operator_principal: str | None = None
+    delivery_confirmation_token: str | None = None

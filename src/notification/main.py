@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
 
 from db.policy_store import SQLAlchemyPolicyStore
+from mcp_server.auth import configure_cors
 from mcp_server.routes_notification import router as acknowledgment_router
 from notification import __version__
 from notification.audit import AuditStore, InMemoryAuditStore
 from notification.channel_health import ChannelHealthTracker
 from notification.config import get_notification_config
 from notification.dlq import DLQService
-from notification.policies import get_policy_registry
+from notification.policies import configure_policy_registry, get_policy_registry
+from notification.policy_loader import load_runtime_registry_from_directory
 from notification.routes import ops_router
 from notification.routes import router as notification_router
 from notification.websocket_runtime import (
@@ -58,6 +62,11 @@ class _InMemoryRedisList:
         return len(self.values)
 
 
+def _policy_dir_from_env() -> Path | None:
+    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR") or os.environ.get("UNS_POLICY_DIR")
+    return Path(raw_path) if raw_path else None
+
+
 def _channel_readiness() -> dict[str, bool]:
     config = get_notification_config()
     return {
@@ -84,6 +93,7 @@ def create_app(
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+    configure_cors(app)
     config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
@@ -91,6 +101,10 @@ def create_app(
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
+    policy_dir = _policy_dir_from_env()
+    if policy_dir is not None:
+        _, runtime_registry = load_runtime_registry_from_directory(policy_dir)
+        configure_policy_registry(registry=runtime_registry)
     websocket_manager = WebSocketConnectionManager()
     app.state.websocket_manager = websocket_manager
     app.state.websocket_replay_store = websocket_replay_store or InMemoryWebSocketReplayStore()

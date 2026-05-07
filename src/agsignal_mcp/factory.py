@@ -56,9 +56,7 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
     @mcp.tool(name="send_signal")
     def send_signal_tool(payload: SendSignalInput) -> dict[str, object]:
         """Preview or send an AGSignal signal."""
-        if config.read_only:
-            raise ValueError("send_signal is disabled in read-only mode")
-        return send_signal_impl(payload)
+        return send_signal_impl(payload, config=config)
 
     @mcp.tool(name="get_delivery_status")
     def get_delivery_status_tool(notification_id: str) -> dict[str, object]:
@@ -86,24 +84,24 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
         return get_ack_status_impl(notification_id)
 
     @mcp.tool(name="list_deliveries")
-    def list_deliveries_tool(limit: int = 25) -> dict[str, object]:
+    async def list_deliveries_tool(limit: int = 25) -> dict[str, object]:
         """Return delivery read-model entries."""
-        return list_deliveries_impl(limit=limit)
+        return await list_deliveries_impl(limit=limit)
 
     @mcp.tool(name="list_audit_events")
-    def list_audit_events_tool(limit: int = 25) -> dict[str, object]:
+    async def list_audit_events_tool(limit: int = 25) -> dict[str, object]:
         """Return audit read-model entries."""
-        return list_audit_events_impl(limit=limit)
+        return await list_audit_events_impl(limit=limit)
 
     @mcp.tool(name="get_effective_policy")
-    def get_effective_policy_tool(
+    async def get_effective_policy_tool(
         notification_type: str,
         intent: str,
         autonomy_mode: str,
         irreversible: bool = False,
     ) -> dict[str, object]:
         """Return effective policy resolution for a signal shape."""
-        return get_effective_policy_impl(
+        return await get_effective_policy_impl(
             notification_type=notification_type,
             intent=intent,
             autonomy_mode=autonomy_mode,
@@ -111,14 +109,14 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
         )
 
     @mcp.tool(name="list_invariants")
-    def list_invariants_tool(limit: int = 25) -> dict[str, object]:
+    async def list_invariants_tool(limit: int = 25) -> dict[str, object]:
         """Return registered AGSignal invariants."""
-        return list_invariants_impl(limit=limit)
+        return await list_invariants_impl(limit=limit)
 
     @mcp.tool(name="get_invariants_summary")
-    def get_invariants_summary_tool() -> dict[str, object]:
+    async def get_invariants_summary_tool() -> dict[str, object]:
         """Return invariant summary counts."""
-        return get_invariants_summary_impl()
+        return await get_invariants_summary_impl()
 
     @mcp.tool(name="list_dlq")
     def list_dlq_tool() -> dict[str, object]:

@@ -104,6 +104,29 @@ class TestNotificationPolicy:
         assert draft.is_editable is True
         assert retired.is_terminal is True
 
+    def test_runtime_registry_rejects_non_active_policy(self) -> None:
+        """Runtime registries should not enforce PREVIEW/DRAFT/RETIRED policies."""
+        registry = PolicyRegistry()
+        policy = NotificationPolicy(
+            notification_type="test.preview",
+            status=PolicyStatus.PREVIEW,
+        )
+
+        with pytest.raises(ValueError, match="only accepts ACTIVE"):
+            registry.register(policy)
+
+    def test_non_runtime_registry_can_hold_preview_policy(self) -> None:
+        """Shadow/editing registries can still hold non-ACTIVE policy versions."""
+        registry = PolicyRegistry(runtime_only=False)
+        policy = NotificationPolicy(
+            notification_type="test.preview",
+            status=PolicyStatus.PREVIEW,
+        )
+
+        registry.register(policy)
+
+        assert registry.get_sync("test.preview") == policy
+
     def test_create_full_policy(self) -> None:
         """Policy with all fields specified."""
         policy = NotificationPolicy(

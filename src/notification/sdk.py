@@ -181,7 +181,12 @@ class NotificationSDK:
             intent, context.autonomy_mode, policy, require_ack_override
         )
         priority = self._resolve_priority(intent, policy, priority_override)
-        ack_timeout = self._resolve_ack_timeout(intent, require_ack, policy)
+        ack_timeout = self._resolve_ack_timeout(
+            intent,
+            context.autonomy_mode,
+            require_ack,
+            policy,
+        )
         resolved_dedup_key = self._resolve_dedup_key(notification_type, context, dedup_key)
 
         # Create notification
@@ -531,7 +536,7 @@ class NotificationSDK:
 
         Priority:
         1. Explicit override
-        2. Policy require_ack
+        2. Policy mode-specific/base require_ack
         3. Default (SAFETY + LIVE → True, else False)
 
         Args:
@@ -546,8 +551,8 @@ class NotificationSDK:
         if override is not None:
             return override
 
-        if policy is not None and policy.require_ack is not None:
-            return policy.require_ack
+        if policy is not None:
+            return policy.get_require_ack_for_mode(autonomy_mode, intent)
 
         return get_default_require_ack(intent, autonomy_mode)
 
@@ -585,6 +590,7 @@ class NotificationSDK:
     def _resolve_ack_timeout(
         self,
         intent: NotificationIntent,
+        autonomy_mode: AutonomyMode,
         require_ack: bool,
         policy: NotificationPolicy | None,
     ) -> int | None:
@@ -592,6 +598,7 @@ class NotificationSDK:
 
         Args:
             intent: The notification intent
+            autonomy_mode: The current autonomy mode
             require_ack: Whether ack is required
             policy: The applicable policy, if any
 
@@ -601,8 +608,8 @@ class NotificationSDK:
         if not require_ack:
             return None
 
-        if policy is not None and policy.ack_timeout_minutes is not None:
-            return policy.ack_timeout_minutes
+        if policy is not None:
+            return policy.get_ack_timeout_minutes_for_mode(autonomy_mode, intent)
 
         return get_default_ack_timeout(intent)
 

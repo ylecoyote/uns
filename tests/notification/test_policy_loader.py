@@ -9,6 +9,7 @@ from notification.policy_loader import (
     compute_policy_content_hash,
     load_policies_from_directory,
     load_policy_from_yaml,
+    load_runtime_registry_from_directory,
 )
 
 SAMPLE_POLICY = {
@@ -105,6 +106,27 @@ def test_load_policy_from_yaml_rejects_empty_file(tmp_path):
 
     with pytest.raises(ValueError, match="Empty or null"):
         load_policy_from_yaml(policy_file)
+
+
+def test_load_runtime_registry_from_directory_filters_non_active(tmp_path):
+    active = tmp_path / "active.yaml"
+    preview = tmp_path / "preview.yaml"
+    active.write_text(yaml.safe_dump(SAMPLE_POLICY))
+    preview.write_text(
+        yaml.safe_dump(
+            {
+                **SAMPLE_POLICY,
+                "notification_type": "safety.preview_only",
+                "status": "PREVIEW",
+            }
+        )
+    )
+
+    loaded_count, registry = load_runtime_registry_from_directory(tmp_path)
+
+    assert loaded_count == 2
+    assert registry.get_sync("safety.kill_switch") is not None
+    assert registry.get_sync("safety.preview_only") is None
 
 
 def test_loads_extracted_mip_policy_directory():

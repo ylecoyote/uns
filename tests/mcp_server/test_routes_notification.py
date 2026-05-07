@@ -19,6 +19,7 @@ from notification.acknowledgment import (
     InMemoryAckStorage,
     configure_ack_engine,
 )
+from notification.audit import AckAuditRecord, AuditPersistenceError, AuditRecord, AuditStore
 from notification.models import (
     AckStatus,
     AutonomyContext,
@@ -26,6 +27,22 @@ from notification.models import (
     Notification,
     NotificationIntent,
 )
+
+
+class FailingAckAuditStore(AuditStore):
+    """Audit store that fails ack writes for rollback tests."""
+
+    def save_delivery_audit(self, record: AuditRecord) -> None:
+        return None
+
+    def save_ack_audit(self, record: AckAuditRecord) -> None:
+        raise AuditPersistenceError("ack audit failed", record=record)
+
+    def get_delivery_audits_for_notification(self, notification_id):
+        return []
+
+    def get_ack_audits_for_notification(self, notification_id):
+        return []
 
 
 @pytest.fixture
@@ -44,7 +61,9 @@ def engine(storage: InMemoryAckStorage):
 def client(engine) -> TestClient:
     """Create a test client with configured engine."""
     app = create_app()
-    return TestClient(app)
+    app.state.agsignal_api_key = "test-key"
+    app.state.agsignal_api_principal = "test_user"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 @pytest.fixture
@@ -115,7 +134,7 @@ class TestAckEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["ack_status"] == "ACKED"
-        assert data["acked_by"] is None
+        assert data["acked_by"] == "test_user"
 
     def test_ack_notification_idempotent(
         self,
@@ -129,14 +148,14 @@ class TestAckEndpoint:
         # First ack
         response1 = client.post(
             f"/v1/notifications/{sample_notification.notification_id}/ack",
-            json={"acked_by": "user1"},
+            json={"acked_by": "test_user"},
         )
         assert response1.status_code == 200
 
         # Second ack (idempotent)
         response2 = client.post(
             f"/v1/notifications/{sample_notification.notification_id}/ack",
-            json={"acked_by": "user2"},
+            json={"acked_by": "test_user"},
         )
         assert response2.status_code == 200
         assert response2.json()["ack_status"] == "ACKED"
@@ -223,6 +242,59 @@ class TestDismissEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["ack_status"] == "DISMISSED"
+
+    def test_ack_rejects_unauthenticated_request(
+        self,
+        engine,
+        sample_notification: Notification,
+    ):
+        """Mutating ACK routes require a valid AGSignal API key."""
+        app = create_app()
+        app.state.agsignal_api_key = "test-key"
+        app.state.agsignal_api_principal = "test_user"
+        unauthenticated_client = TestClient(app)
+        register_notification_with_engine(engine, sample_notification)
+
+        response = unauthenticated_client.post(
+            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            json={"acked_by": "test_user"},
+        )
+
+        assert response.status_code == 401
+
+    def test_ack_rejects_principal_override(
+        self,
+        client: TestClient,
+        engine,
+        sample_notification: Notification,
+    ):
+        """Body identity cannot override the authenticated principal."""
+        register_notification_with_engine(engine, sample_notification)
+
+        response = client.post(
+            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            json={"acked_by": "other_user"},
+        )
+
+        assert response.status_code == 403
+
+    def test_ack_audit_failure_does_not_mutate_ack_state(
+        self,
+        client: TestClient,
+        engine,
+        sample_notification: Notification,
+    ):
+        """ACK state should not commit when audit persistence fails."""
+        client.app.state.audit_store = FailingAckAuditStore()
+        register_notification_with_engine(engine, sample_notification)
+
+        response = client.post(
+            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            json={"acked_by": "test_user"},
+        )
+
+        assert response.status_code == 503
+        assert engine.get_status(sample_notification.notification_id) == AckStatus.PENDING
 
     def test_dismiss_acked_notification_fails(
         self,

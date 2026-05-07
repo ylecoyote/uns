@@ -12,7 +12,9 @@ Key features:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
@@ -245,8 +247,9 @@ class AcknowledgmentEngine:
     - Checking for and handling timeouts
     - Triggering escalation callbacks for SAFETY timeouts
 
-    Thread-safety: This implementation assumes single-threaded access.
-    For concurrent access, use a storage backend with proper locking.
+    Thread-safety: transitions through this engine are serialized with a
+    process-local lock. For multi-process deployments, use a storage backend
+    with its own compare-and-set semantics.
     """
 
     def __init__(
@@ -267,6 +270,7 @@ class AcknowledgmentEngine:
         self._storage = storage or InMemoryAckStorage()
         self._callback = callback or NoOpAcknowledgmentCallback()
         self._escalation_handler = escalation_handler
+        self._lock = RLock()
 
     def register_notification(
         self,
@@ -291,20 +295,21 @@ class AcknowledgmentEngine:
         Returns:
             AckState for the registered notification
         """
-        # Use provided timeout or intent-based default
-        if timeout_minutes is None:
-            timeout_minutes = DEFAULT_ACK_TIMEOUTS.get(intent)
+        with self._lock:
+            # Use provided timeout or intent-based default
+            if timeout_minutes is None:
+                timeout_minutes = DEFAULT_ACK_TIMEOUTS.get(intent)
 
-        state = AckState(
-            notification_id=notification_id,
-            status=AckStatus.PENDING,
-            intent=intent,
-            autonomy_context=autonomy_context,
-            timeout_minutes=timeout_minutes,
-            created_at=created_at,
-        )
+            state = AckState(
+                notification_id=notification_id,
+                status=AckStatus.PENDING,
+                intent=intent,
+                autonomy_context=autonomy_context,
+                timeout_minutes=timeout_minutes,
+                created_at=created_at,
+            )
 
-        self._storage.set_ack_state(state)
+            self._storage.set_ack_state(state)
 
         logger.info(
             "Registered notification for ack tracking: notification_id=%s, intent=%s, timeout=%s",
@@ -321,6 +326,7 @@ class AcknowledgmentEngine:
         ack_status: AckStatus,
         acked_by: str | None = None,
         metadata: dict[str, Any] | None = None,
+        before_commit: Callable[[AckStatus | None, AckEvent], None] | None = None,
     ) -> AckEvent:
         """Acknowledge a notification.
 
@@ -332,6 +338,9 @@ class AcknowledgmentEngine:
             ack_status: Target status (ACKED or DISMISSED)
             acked_by: Identifier of the acknowledging user/system
             metadata: Additional context for the acknowledgment
+            before_commit: Optional callback invoked with the old status and
+                new event before the state transition is committed. Exceptions
+                abort the state transition.
 
         Returns:
             AckEvent describing the acknowledgment
@@ -343,71 +352,82 @@ class AcknowledgmentEngine:
         if ack_status not in (AckStatus.ACKED, AckStatus.DISMISSED):
             raise ValueError(f"Invalid ack_status for ack(): {ack_status}. Use ACKED or DISMISSED.")
 
-        state = self._storage.get_ack_state(notification_id)
-        if state is None:
-            raise KeyError(f"Notification not found: {notification_id}")
+        with self._lock:
+            state = self._storage.get_ack_state(notification_id)
+            if state is None:
+                raise KeyError(f"Notification not found: {notification_id}")
 
-        old_status = state.status
-        now = datetime.now(UTC)
+            old_status = state.status
+            now = datetime.now(UTC)
 
-        # Idempotency: if already in target status, return existing event
-        if state.status == ack_status:
-            logger.debug(
-                "Idempotent ack: notification_id=%s already in status %s",
-                notification_id,
-                ack_status.value,
-            )
-            return AckEvent(
+            # Idempotency: if already in target status, return existing event
+            if state.status == ack_status:
+                logger.debug(
+                    "Idempotent ack: notification_id=%s already in status %s",
+                    notification_id,
+                    ack_status.value,
+                )
+                return AckEvent(
+                    notification_id=notification_id,
+                    ack_status=ack_status,
+                    acked_by=state.acked_by,
+                    acked_at=state.acked_at or now,
+                    metadata=state.metadata,
+                )
+
+            # Cannot ack a timed-out notification
+            if state.status == AckStatus.TIMED_OUT:
+                logger.warning(
+                    "Attempted to ack timed-out notification: notification_id=%s",
+                    notification_id,
+                )
+                return AckEvent(
+                    notification_id=notification_id,
+                    ack_status=AckStatus.TIMED_OUT,
+                    acked_by=acked_by,
+                    acked_at=now,
+                    metadata={"error": "Notification already timed out"},
+                )
+
+            # Cannot transition between ACKED and DISMISSED
+            if state.status in (AckStatus.ACKED, AckStatus.DISMISSED) and state.status != ack_status:
+                logger.warning(
+                    "Invalid transition attempted: notification_id=%s from %s to %s",
+                    notification_id,
+                    state.status.value,
+                    ack_status.value,
+                )
+                raise InvalidAckTransitionError(
+                    f"Cannot transition from {state.status.value} to {ack_status.value}",
+                    current_status=state.status,
+                    requested_status=ack_status,
+                )
+
+            merged_metadata = dict(state.metadata)
+            merged_metadata.update(metadata or {})
+
+            event = AckEvent(
                 notification_id=notification_id,
                 ack_status=ack_status,
-                acked_by=state.acked_by,
-                acked_at=state.acked_at or now,
-                metadata=state.metadata,
-            )
-
-        # Cannot ack a timed-out notification
-        if state.status == AckStatus.TIMED_OUT:
-            logger.warning(
-                "Attempted to ack timed-out notification: notification_id=%s",
-                notification_id,
-            )
-            return AckEvent(
-                notification_id=notification_id,
-                ack_status=AckStatus.TIMED_OUT,
                 acked_by=acked_by,
                 acked_at=now,
-                metadata={"error": "Notification already timed out"},
+                metadata=merged_metadata,
             )
+            if before_commit is not None:
+                before_commit(old_status, event)
 
-        # Cannot transition between ACKED and DISMISSED
-        if state.status in (AckStatus.ACKED, AckStatus.DISMISSED) and state.status != ack_status:
-            logger.warning(
-                "Invalid transition attempted: notification_id=%s from %s to %s",
-                notification_id,
-                state.status.value,
-                ack_status.value,
+            new_state = AckState(
+                notification_id=state.notification_id,
+                status=ack_status,
+                intent=state.intent,
+                autonomy_context=state.autonomy_context,
+                timeout_minutes=state.timeout_minutes,
+                created_at=state.created_at,
+                acked_by=acked_by,
+                acked_at=now,
+                metadata=merged_metadata,
             )
-            raise InvalidAckTransitionError(
-                f"Cannot transition from {state.status.value} to {ack_status.value}",
-                current_status=state.status,
-                requested_status=ack_status,
-            )
-
-        # Update state
-        state.status = ack_status
-        state.acked_by = acked_by
-        state.acked_at = now
-        state.metadata.update(metadata or {})
-
-        self._storage.set_ack_state(state)
-
-        event = AckEvent(
-            notification_id=notification_id,
-            ack_status=ack_status,
-            acked_by=acked_by,
-            acked_at=now,
-            metadata=state.metadata,
-        )
+            self._storage.set_ack_state(new_state)
 
         # Trigger callbacks
         if ack_status == AckStatus.ACKED:
@@ -419,7 +439,7 @@ class AcknowledgmentEngine:
             notification_id=notification_id,
             old_status=old_status,
             new_status=ack_status,
-            metadata=state.metadata,
+            metadata=event.metadata,
         )
 
         logger.info(

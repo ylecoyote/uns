@@ -9,7 +9,12 @@ from typing import Any
 
 import yaml
 
-from notification.policies import NotificationPolicy, PolicyRegistry, get_policy_registry
+from notification.policies import (
+    NotificationPolicy,
+    PolicyRegistry,
+    PolicyStatus,
+    get_policy_registry,
+)
 
 _HASH_EXCLUDED_FIELDS = {"description"}
 
@@ -56,6 +61,17 @@ def load_policies_from_directory(
         load_policy_from_yaml(policy_path, registry=target_registry)
         count += 1
     return count
+
+
+def load_runtime_registry_from_directory(path: str | Path) -> tuple[int, PolicyRegistry]:
+    """Load YAML policies and return an ACTIVE-only runtime registry."""
+    staging_registry = PolicyRegistry(runtime_only=False)
+    loaded_count = load_policies_from_directory(path, registry=staging_registry)
+    runtime_registry = PolicyRegistry()
+    for policy in staging_registry.get_all().values():
+        if policy.status == PolicyStatus.ACTIVE:
+            runtime_registry.register(policy)
+    return loaded_count, runtime_registry
 
 
 def compute_policy_content_hash(data: dict[str, Any]) -> str:
