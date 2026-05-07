@@ -1,0 +1,39 @@
+name: Python CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Pytest and Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install package
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run ruff
+        run: uv run ruff check src tests scripts apps
+
+      - name: Run Python tests
+        run: >
+          uv run pytest tests apps/ui/tests --tb=short
+          --cov=src/agsignal
+          --cov=src/notification
+          --cov=src/db
+          --cov=src/agsignal_mcp
+          --cov-report=term
+          --cov-fail-under=75

@@ -173,7 +173,7 @@ The application automatically configures persistence at startup via `configure_p
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | SQLAlchemy database URL | Not set (uses in-memory) |
-| `UNS_CREATE_TABLES` | Create tables on startup | `true` |
+| `AGSIGNAL_CREATE_TABLES` | Create tables on startup (`UNS_CREATE_TABLES` compatibility alias is also supported) | `true` |
 
 **Local Demo Mode (no DATABASE_URL):**
 ```bash
@@ -186,7 +186,7 @@ uvicorn mcp_server.app:app --reload
 ```bash
 # Uses SQLAlchemy with PostgreSQL
 export DATABASE_URL="postgresql://user:pass@localhost/uns"
-export UNS_CREATE_TABLES="true"
+export AGSIGNAL_CREATE_TABLES="true"
 uvicorn mcp_server.app:app
 ```
 

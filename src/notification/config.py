@@ -6,15 +6,19 @@ import os
 from dataclasses import dataclass
 
 
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+def _env(name: str, legacy_name: str, default: str | None = None) -> str | None:
+    return os.environ.get(name) or os.environ.get(legacy_name) or default
+
+
+def _env_int_pair(name: str, legacy_name: str, default: int) -> int:
+    raw = os.environ.get(name) or os.environ.get(legacy_name)
     if raw is None:
         return default
     return int(raw)
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
+def _env_bool_pair(name: str, legacy_name: str, default: bool) -> bool:
+    raw = os.environ.get(name) or os.environ.get(legacy_name)
     if raw is None:
         return default
     return raw.lower() in {"1", "true", "yes", "on"}
@@ -39,28 +43,41 @@ class NotificationConfig:
 
     @classmethod
     def from_env(cls) -> NotificationConfig:
-        """Create config from current `UNS_*` compatibility environment variables."""
+        """Create config from `AGSIGNAL_*` variables with `UNS_*` compatibility."""
         return cls(
-            redis_url=os.environ.get("UNS_REDIS_URL", cls.redis_url),
-            dedup_ttl_seconds=_env_int("UNS_DEDUP_TTL_SECONDS", cls.dedup_ttl_seconds),
-            idempotency_ttl_seconds=_env_int(
-                "UNS_IDEMPOTENCY_TTL_SECONDS", cls.idempotency_ttl_seconds
+            redis_url=_env("AGSIGNAL_REDIS_URL", "UNS_REDIS_URL", cls.redis_url)
+            or cls.redis_url,
+            dedup_ttl_seconds=_env_int_pair(
+                "AGSIGNAL_DEDUP_TTL_SECONDS",
+                "UNS_DEDUP_TTL_SECONDS",
+                cls.dedup_ttl_seconds,
             ),
-            dlq_key=os.environ.get("UNS_DLQ_KEY", cls.dlq_key),
-            slack_webhook_url=os.environ.get("UNS_SLACK_WEBHOOK_URL"),
-            pagerduty_routing_key=os.environ.get("UNS_PAGERDUTY_ROUTING_KEY"),
-            smtp_host=os.environ.get("UNS_SMTP_HOST"),
-            smtp_port=_env_int("UNS_SMTP_PORT", cls.smtp_port),
-            smtp_user=os.environ.get("UNS_SMTP_USER"),
-            smtp_password=os.environ.get("UNS_SMTP_PASSWORD"),
-            websocket_redis_enabled=_env_bool(
+            idempotency_ttl_seconds=_env_int_pair(
+                "AGSIGNAL_IDEMPOTENCY_TTL_SECONDS",
+                "UNS_IDEMPOTENCY_TTL_SECONDS",
+                cls.idempotency_ttl_seconds,
+            ),
+            dlq_key=_env("AGSIGNAL_DLQ_KEY", "UNS_DLQ_KEY", cls.dlq_key) or cls.dlq_key,
+            slack_webhook_url=_env("AGSIGNAL_SLACK_WEBHOOK_URL", "UNS_SLACK_WEBHOOK_URL"),
+            pagerduty_routing_key=_env(
+                "AGSIGNAL_PAGERDUTY_ROUTING_KEY",
+                "UNS_PAGERDUTY_ROUTING_KEY",
+            ),
+            smtp_host=_env("AGSIGNAL_SMTP_HOST", "UNS_SMTP_HOST"),
+            smtp_port=_env_int_pair("AGSIGNAL_SMTP_PORT", "UNS_SMTP_PORT", cls.smtp_port),
+            smtp_user=_env("AGSIGNAL_SMTP_USER", "UNS_SMTP_USER"),
+            smtp_password=_env("AGSIGNAL_SMTP_PASSWORD", "UNS_SMTP_PASSWORD"),
+            websocket_redis_enabled=_env_bool_pair(
+                "AGSIGNAL_WEBSOCKET_REDIS_ENABLED",
                 "UNS_WEBSOCKET_REDIS_ENABLED",
                 cls.websocket_redis_enabled,
             ),
-            websocket_redis_channel=os.environ.get(
+            websocket_redis_channel=_env(
+                "AGSIGNAL_WEBSOCKET_REDIS_CHANNEL",
                 "UNS_WEBSOCKET_REDIS_CHANNEL",
                 cls.websocket_redis_channel,
-            ),
+            )
+            or cls.websocket_redis_channel,
         )
 
 

@@ -290,9 +290,11 @@ The delivery service (`DeliveryService`) executes the following pipeline steps:
 ### Signal Client Configuration
 
 ```python
-from agsignal.sdk import configure_signal_client
-from notification.interfaces import LoggingAcknowledgmentCallback
-from notification.policies import PolicyRegistry
+from agsignal import (
+    LoggingAcknowledgmentCallback,
+    PolicyRegistry,
+    configure_signal_client,
+)
 
 # Configure with custom components
 client = configure_signal_client(
@@ -302,22 +304,22 @@ client = configure_signal_client(
 )
 ```
 
-`notification.*` imports remain supported for existing integrations and for
-lower-level policy/runtime modules that do not yet have AGSignal-branded aliases.
+`notification.*` imports remain supported for existing integrations; new public
+examples should prefer the AGSignal-branded aliases.
 
 ### Policy Overrides
 
 ```python
-from notification.policies import (
-    NotificationPolicy,
+from agsignal.models import AutonomyMode, Channel, DeliveryMode
+from agsignal.policies import (
     ModeOverride,
+    SignalPolicy,
     configure_policy_registry,
 )
-from notification.models import Channel, DeliveryMode, AutonomyMode
 
 # Define custom policy
-policy = NotificationPolicy(
-    notification_type="trading.order_placed",
+policy = SignalPolicy(
+    notification_type="agent.order_placed",
     delivery_mode=DeliveryMode.GUARANTEED,
     require_ack=True,
     ack_timeout_minutes=10,

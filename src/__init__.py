@@ -1,1 +1,1 @@
-"""Unified Notification Service (UNS) source package."""
+"""AGSignal source package."""

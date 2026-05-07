@@ -26,6 +26,8 @@ __all__ = [
     "DeliveryMode",
     "DeliveryStatus",
     "GovernanceSignal",
+    "Notification",
+    "NotificationIntent",
     "NotificationResult",
     "Priority",
     "SignalIntent",

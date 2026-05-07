@@ -20,12 +20,31 @@ def test_governance_signal_aliases_notification_model() -> None:
 
 def test_agsignal_root_exports_public_aliases() -> None:
     import agsignal
+    from notification.interfaces import LoggingAcknowledgmentCallback
     from notification.models import Notification, NotificationIntent
+    from notification.policies import NotificationPolicy, PolicyRegistry
     from notification.sdk import NotificationSDK
 
     assert agsignal.SignalClient is NotificationSDK
     assert agsignal.GovernanceSignal is Notification
     assert agsignal.SignalIntent is NotificationIntent
+    assert agsignal.SignalPolicy is NotificationPolicy
+    assert agsignal.PolicyRegistry is PolicyRegistry
+    assert agsignal.LoggingAcknowledgmentCallback is LoggingAcknowledgmentCallback
+
+
+def test_agsignal_policy_aliases_cover_configuration_api() -> None:
+    from agsignal.policies import SignalPolicy
+    from notification.policies import NotificationPolicy
+
+    assert SignalPolicy is NotificationPolicy
+
+
+def test_agsignal_interface_aliases_cover_callbacks() -> None:
+    from agsignal.interfaces import SignalContextProvider
+    from notification.interfaces import NotificationContextProvider
+
+    assert SignalContextProvider is NotificationContextProvider
 
 
 def test_agsignal_integrations_reexport_app_boundary() -> None:

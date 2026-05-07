@@ -24,6 +24,17 @@ def test_notification_config_reads_uns_prefixed_environment(monkeypatch):
     assert config.dedup_ttl_seconds == 900
 
 
+def test_notification_config_prefers_agsignal_environment(monkeypatch):
+    monkeypatch.setenv("UNS_REDIS_URL", "redis://legacy.example:6379/4")
+    monkeypatch.setenv("AGSIGNAL_REDIS_URL", "redis://agsignal.example:6379/5")
+    monkeypatch.setenv("AGSIGNAL_DLQ_KEY", "agsignal:dlq")
+
+    config = NotificationConfig.from_env()
+
+    assert config.redis_url == "redis://agsignal.example:6379/5"
+    assert config.dlq_key == "agsignal:dlq"
+
+
 def test_websocket_redis_fanout_can_be_enabled(monkeypatch):
     monkeypatch.setenv("UNS_WEBSOCKET_REDIS_ENABLED", "true")
     monkeypatch.setenv("UNS_WEBSOCKET_REDIS_CHANNEL", "agsignal:test")
