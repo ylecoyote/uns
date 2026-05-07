@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from apps.ui.src.api.models import EffectivePolicyResponse
 from apps.ui.src.api.types import (
     DeliveryFilterParams,
     DeliveryTimelineListResponse,
@@ -54,9 +55,11 @@ class APIError(Exception):
         status_code: int,
         error_response: ErrorResponse | None = None,
         message: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         self.status_code = status_code
         self.error_response = error_response
+        self.request_id = request_id or (error_response.request_id if error_response else None)
         self.message = message or (
             error_response.error.message if error_response else "Unknown error"
         )
@@ -117,6 +120,30 @@ class UNSUIClient:
                 error_response=error_response,
                 message=response.text if error_response is None else None,
             )
+
+    def get_effective_policy(
+        self,
+        notification_type: str,
+        intent: NotificationIntent,
+        autonomy_mode: AutonomyMode,
+        irreversible: bool = False,
+        request_id: str | None = None,
+    ) -> EffectivePolicyResponse:
+        """Get effective policy resolution for the policy inspector."""
+        params = {
+            "notification_type": notification_type,
+            "intent": intent.value,
+            "autonomy_mode": autonomy_mode.value,
+            "irreversible": str(irreversible).lower(),
+        }
+        response = self._client.get(
+            f"{self.base_url}/ui/policies/effective",
+            params=params,
+            headers=self._get_headers(request_id),
+        )
+
+        self._handle_error(response)
+        return EffectivePolicyResponse.model_validate(response.json())
 
     def list_deliveries(
         self,
@@ -214,3 +241,7 @@ class UNSUIClient:
     def __exit__(self, *args: object) -> None:
         """Exit context manager."""
         self.close()
+
+
+UNSApiClient = UNSUIClient
+UNSApiError = APIError

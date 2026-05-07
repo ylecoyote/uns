@@ -1,6 +1,6 @@
-# UNS Dashboard UI
+# UNS UI Dashboard
 
-Read-only dashboard for the Unified Notification Service.
+Read-Only dashboard for the Unified Notification Service.
 
 ## Stack
 
