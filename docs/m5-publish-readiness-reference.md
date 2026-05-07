@@ -189,8 +189,8 @@ evidence: code, tests, smoke docs, examples, or explicit known limitations.
 
 These are not M5 blockers:
 
-- Decide whether the landing page screenshot is an external design artifact or a
-  site implemented in this repo.
+- Landing page implementation is external to this repo. The screenshot remains
+  the product narrative/design reference, not an AGSignal Core code surface.
 - Create public URL, contact, blog, discussions, and spec/RFC documentation
   issues after the distribution path is decided.
 - Add HTTP/Streamable HTTP MCP transport only when there is a named remote
@@ -254,7 +254,7 @@ AGSignal is ready to publish when:
   limitations, and verification evidence.
 
 As of M5 completion, AGSignal satisfies this definition for a public
-source-level publish. Distribution-specific assets such as the landing page
-implementation, public domain, contact routes, blog, discussions, and hosted MCP
-transport are post-M5 publication/distribution decisions, not evidence gaps in
-AGSignal Core.
+source-level publish. Distribution-specific assets such as the external landing
+page implementation, public domain, contact routes, blog, discussions, and
+hosted MCP transport are post-M5 publication/distribution decisions, not
+evidence gaps in AGSignal Core.
