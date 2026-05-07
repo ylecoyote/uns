@@ -31,7 +31,9 @@ def load_policy_from_yaml(
     if "notification_type" not in data:
         raise ValueError(f"Policy YAML missing notification_type: {policy_path}")
 
-    policy = NotificationPolicy.from_dict(data)
+    policy = NotificationPolicy.from_dict(data).model_copy(
+        update={"config_hash": compute_policy_content_hash(data)}
+    )
     if registry is not None:
         registry.register(policy)
     return policy

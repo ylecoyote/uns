@@ -248,6 +248,15 @@ class Notification(BaseModel):
     delivery_mode: DeliveryMode | None = Field(
         default=None, description="Derived from intent or policy"
     )
+    policy_config_id: UUID | None = Field(
+        default=None, description="Policy config identifier used for routing"
+    )
+    policy_config_hash: str | None = Field(
+        default=None, description="Exact policy config hash used for routing"
+    )
+    policy_evaluation_id: UUID | None = Field(
+        default=None, description="Policy evaluation identifier for audit correlation"
+    )
 
     require_ack: bool | None = Field(
         default=None, description="Derived from intent + mode + policy"

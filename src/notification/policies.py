@@ -28,6 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -126,6 +127,12 @@ class NotificationPolicy(BaseModel):
     require_ack: bool | None = Field(default=None, description="Base ack requirement")
     ack_timeout_minutes: int | None = Field(default=None, description="Base ack timeout")
     dedup_window_seconds: int | None = Field(default=None, description="Deduplication window")
+    config_id: UUID | None = Field(
+        default=None, description="Persisted policy config identifier"
+    )
+    config_hash: str | None = Field(
+        default=None, description="Stable hash of the policy config used for audit"
+    )
 
     # Mode-specific overrides
     preview_override: ModeOverride | None = Field(
