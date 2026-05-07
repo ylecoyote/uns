@@ -64,7 +64,7 @@ class TestPackageStructure:
         import src.notification.integrations
 
         assert src.notification.__doc__ is not None
-        assert "Unified Notification Service" in src.notification.__doc__
+        assert "AGSignal Core compatibility package" in src.notification.__doc__
 
         assert src.notification.adapters.__doc__ is not None
         assert "Adapters" in src.notification.adapters.__doc__

@@ -1,11 +1,11 @@
 """
-Unified Notification Service (UNS) - Core Package
+AGSignal Core compatibility package
 
 A control-plane notification and acknowledgment service that:
 - MUST NOT block execution loops
 - MUST NOT participate in order routing or trade timing
 
-This package provides the core notification infrastructure including:
+This historical `notification` package provides the core infrastructure including:
 - Models and data contracts
 - Delivery adapters (Slack, Email, WebSocket, PagerDuty)
 - Policy registry and routing rules
