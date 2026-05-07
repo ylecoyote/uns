@@ -3,15 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "unified-notification-service"
+name = "agsignal"
 version = "0.1.0"
-description = "Unified Notification Service (UNS) - Control-plane notification and acknowledgment service for autonomous agent systems"
+description = "AGSignal - Control-plane governance signaling infrastructure for autonomous agent systems"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 keywords = ["notifications", "alerts", "messaging"]
 authors = [
-    {name = "UNS Team"}
+    {name = "AGSignal Maintainers"}
 ]
 dependencies = [
     "pydantic>=2.0.0",
@@ -37,7 +37,7 @@ dev = [
     "mypy>=1.5.0",
 ]
 all = [
-    "unified-notification-service[adapters,dev]",
+    "agsignal[adapters,dev]",
 ]
 
 [tool.setuptools.packages.find]

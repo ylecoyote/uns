@@ -195,6 +195,9 @@ Use these rules when editing the landing page, README, docs, or examples:
 2. Use UNS as historical provenance or compatibility language only.
 3. Use MIP policies as sample content, not default product behavior.
 4. Keep MIP/ATP integration outside AGSignal Core unless explicitly optional.
+   The AGSignal public integration facade exports only the generic host-app
+   boundary; MIP-shaped adapters stay in `notification.integrations.mip_adapter`
+   as optional sample/proving code.
 5. Do not describe full MIP UNS parity as shipped until M5 says so.
 6. Separate shipped behavior, sample behavior, and planned behavior.
 7. Public examples should prefer `agsignal.*` imports.
