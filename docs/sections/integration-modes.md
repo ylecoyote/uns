@@ -92,6 +92,8 @@ AGSignal Core receives autonomy context from an external provider, but acknowled
 **Configuration:**
 
 ```python
+from uuid import uuid4
+
 from notification.interfaces import DefaultContextProvider
 from notification.models import AutonomyMode
 from notification.sdk import NotificationSDK, configure_sdk
@@ -253,16 +255,30 @@ The adapter does NOT:
 Systems integrating with AGSignal Core provide their own WebSocket manager:
 
 ```python
-from notification.adapters import WebSocketAdapter
+from uuid import UUID
+
+from notification.adapters import WebSocketAdapter, WebSocketConfig
 
 # External system provides connection manager
 class MyWebSocketManager:
-    async def send(self, message: str) -> None:
+    async def broadcast(self, message: str) -> int:
         # Implementation owned by external system
-        ...
+        return 0
+
+    async def send_to_user(self, user_id: str, message: str) -> bool:
+        return False
+
+    async def send_to_agent(self, agent_id: UUID, message: str) -> bool:
+        return False
+
+    def get_connection_count(self) -> int:
+        return 0
 
 # Inject into AGSignal Core adapter
-adapter = WebSocketAdapter(connection_manager=MyWebSocketManager())
+adapter = WebSocketAdapter(
+    config=WebSocketConfig(),
+    connection_manager=MyWebSocketManager(),
+)
 ```
 
 ### ATP WebSocket Assumptions

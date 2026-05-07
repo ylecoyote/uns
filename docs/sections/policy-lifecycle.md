@@ -110,7 +110,7 @@ registry.load_from_dict(policies_data)
 AGSignal Core uses a global singleton registry:
 
 ```python
-from notification.policies import get_policy_registry, set_policy_registry
+from notification.policies import PolicyRegistry, get_policy_registry, set_policy_registry
 
 # Get the global registry (creates if None)
 registry = get_policy_registry()

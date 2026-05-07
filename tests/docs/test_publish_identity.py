@@ -69,6 +69,16 @@ def test_publish_ui_surface_uses_agsignal_console_name() -> None:
         assert "UNS UI" not in content
 
 
+def test_ui_package_manifest_uses_console_identity() -> None:
+    package_json = (ROOT / "apps" / "ui" / "package.json").read_text()
+    package_lock = (ROOT / "apps" / "ui" / "package-lock.json").read_text()
+
+    assert '"name": "agsignal-console"' in package_json
+    assert '"name": "agsignal-console"' in package_lock
+    assert '"name": "uns-ui"' not in package_json
+    assert '"name": "uns-ui"' not in package_lock
+
+
 def test_console_contract_docs_use_ui_endpoint_prefix() -> None:
     content = (ROOT / "docs" / "ui" / "ui-data-contracts.md").read_text()
 

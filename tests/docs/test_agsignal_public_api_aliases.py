@@ -12,7 +12,7 @@ def test_readme_documents_agsignal_public_aliases() -> None:
 
     assert "from agsignal.sdk import SignalClient" in content
     assert "from agsignal.models import GovernanceSignal, SignalIntent" in content
-    assert "notification.* imports remain supported" in content
+    assert "`notification.*` imports remain supported" in content
 
 
 def test_api_documents_agsignal_public_aliases() -> None:
