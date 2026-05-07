@@ -557,6 +557,35 @@ def test_policy_reload_loads_yaml_directory(tmp_path: Path) -> None:
     assert data["notification_types"] == ["safety.kill_switch"]
 
 
+def test_policy_reload_excludes_preview_policy_from_runtime_registry(tmp_path: Path) -> None:
+    from notification.policies import configure_policy_registry, get_policy_registry
+
+    policy_file = tmp_path / "preview.yaml"
+    policy_file.write_text(
+        yaml.safe_dump(
+            {
+                "notification_type": "safety.preview_only",
+                "version": "0.9.0",
+                "status": "PREVIEW",
+                "delivery_mode": "BEST_EFFORT",
+                "channels": {"PREVIEW": ["WEBSOCKET"]},
+                "require_ack": {"PREVIEW": False},
+            }
+        )
+    )
+    configure_policy_registry()
+    client = _client()
+
+    response = client.post("/api/v1/policies/reload", json={"policy_dir": str(tmp_path)})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["loaded_count"] == 1
+    assert data["policy_count"] == 0
+    assert data["notification_types"] == []
+    assert get_policy_registry().get_sync("safety.preview_only") is None
+
+
 def test_policy_reload_persists_loaded_yaml_when_policy_store_is_configured(
     tmp_path: Path,
 ) -> None:

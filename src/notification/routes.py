@@ -31,6 +31,7 @@ from notification.models import (
 from notification.policies import (
     DEFAULT_DEDUP_WINDOW_SECONDS,
     PolicyRegistry,
+    PolicyStatus,
     configure_policy_registry,
     get_policy_registry,
 )
@@ -540,6 +541,11 @@ async def reload_policies(
             detail={"error": "invalid_policy", "message": str(exc)},
         ) from exc
 
+    runtime_registry = PolicyRegistry()
+    for policy in registry.get_all().values():
+        if policy.status == PolicyStatus.ACTIVE:
+            runtime_registry.register(policy)
+
     persisted_count = 0
     policy_store = getattr(http_request.app.state, "policy_store", None)
     if policy_store is not None:
@@ -548,11 +554,11 @@ async def reload_policies(
             if result.created:
                 persisted_count += 1
 
-    configure_policy_registry(registry=registry)
-    notification_types = sorted(registry.list_notification_types())
+    configure_policy_registry(registry=runtime_registry)
+    notification_types = sorted(runtime_registry.list_notification_types())
     return PolicyReloadResponse(
         loaded_count=loaded_count,
         persisted_count=persisted_count,
-        policy_count=len(registry),
+        policy_count=len(runtime_registry),
         notification_types=notification_types,
     )
