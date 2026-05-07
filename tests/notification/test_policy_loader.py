@@ -47,6 +47,7 @@ def test_load_policy_from_yaml_registers_mode_routing(tmp_path):
         Channel.PAGERDUTY,
     ]
     assert policy.get_require_ack_for_mode(AutonomyMode.LIVE) is True
+    assert policy.config_hash == compute_policy_content_hash(SAMPLE_POLICY)
     assert registry.get_sync("safety.kill_switch") == policy
 
 

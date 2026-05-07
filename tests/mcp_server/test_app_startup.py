@@ -242,7 +242,7 @@ class TestCreateApp:
         assert isinstance(adapter, InMemoryReadModelAdapter)
 
         assert app is not None
-        assert app.title == "Unified Notification Service"
+        assert app.title == "AGSignal Console API"
 
     def test_create_app_skip_persistence_config(self):
         """Test create_app skips persistence config when requested."""
@@ -260,7 +260,7 @@ class TestCreateApp:
         assert rm._read_model_adapter is None
 
         assert app is not None
-        assert app.title == "Unified Notification Service"
+        assert app.title == "AGSignal Console API"
 
     def test_create_app_includes_ui_routes(self):
         """Test create_app includes UI routes."""

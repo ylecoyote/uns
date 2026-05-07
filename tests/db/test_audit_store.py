@@ -116,6 +116,34 @@ class TestSQLAlchemyAuditStore:
         assert record.title == sample_audit_record.title
         assert record.source == sample_audit_record.source
 
+    def test_save_and_retrieve_delivery_audit_policy_evaluation_identity(
+        self,
+        audit_store: SQLAlchemyAuditStore,
+        sample_audit_record: AuditRecord,
+    ):
+        """Test delivery audits preserve exact policy evaluation identity."""
+        policy_config_id = uuid4()
+        policy_evaluation_id = uuid4()
+        record_with_policy_identity = AuditRecord(
+            **{
+                **sample_audit_record.__dict__,
+                "policy_config_id": policy_config_id,
+                "policy_config_hash": "policy-hash-123",
+                "policy_evaluation_id": policy_evaluation_id,
+            }
+        )
+
+        audit_store.save_delivery_audit(record_with_policy_identity)
+        records = audit_store.get_delivery_audits_for_notification(
+            sample_audit_record.notification_id
+        )
+
+        assert len(records) == 1
+        record = records[0]
+        assert record.policy_config_id == policy_config_id
+        assert record.policy_config_hash == "policy-hash-123"
+        assert record.policy_evaluation_id == policy_evaluation_id
+
     def test_save_and_retrieve_ack_audit(
         self,
         audit_store: SQLAlchemyAuditStore,

@@ -118,6 +118,28 @@ class TestAuditRecord:
 
         assert record.audit_metadata == audit_metadata
 
+    def test_create_audit_record_captures_policy_evaluation_identity(
+        self,
+        sample_notification: Notification,
+        sample_result: NotificationResult,
+    ) -> None:
+        """Test audit records preserve exact policy evaluation identifiers."""
+        policy_config_id = uuid4()
+        policy_evaluation_id = uuid4()
+        notification = sample_notification.model_copy(
+            update={
+                "policy_config_id": policy_config_id,
+                "policy_config_hash": "policy-hash-123",
+                "policy_evaluation_id": policy_evaluation_id,
+            }
+        )
+
+        record = create_audit_record(notification, sample_result)
+
+        assert record.policy_config_id == policy_config_id
+        assert record.policy_config_hash == "policy-hash-123"
+        assert record.policy_evaluation_id == policy_evaluation_id
+
     def test_create_audit_record_derives_delivery_mode(
         self,
         sample_autonomy_context: AutonomyContext,

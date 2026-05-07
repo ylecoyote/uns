@@ -17,6 +17,7 @@ import hashlib
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from notification.interfaces import (
     AcknowledgmentCallback,
@@ -188,6 +189,11 @@ class NotificationSDK:
             notification_type=notification_type,
             intent=intent,
             delivery_mode=delivery_mode,
+            policy_config_id=policy.config_id if policy is not None else None,
+            policy_config_hash=policy.config_hash if policy is not None else None,
+            policy_evaluation_id=(
+                uuid4() if policy is not None and policy.config_hash is not None else None
+            ),
             irreversible=irreversible,
             autonomy_context=context,
             require_ack=require_ack,

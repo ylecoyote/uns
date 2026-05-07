@@ -693,6 +693,52 @@ class TestSDKPolicyOverrides:
         assert delivered is not None
         assert delivered.delivery_mode == DeliveryMode.GUARANTEED
 
+    def test_policy_identity_is_attached_to_notification_for_audit(self) -> None:
+        """Policy config identity should flow into runtime notifications."""
+        delivered: Notification | None = None
+        policy_config_id = uuid4()
+
+        def handler(n: Notification) -> NotificationResult:
+            nonlocal delivered
+            delivered = n
+            return NotificationResult(
+                notification_id=n.notification_id,
+                status=DeliveryStatus.SUCCESS,
+            )
+
+        registry = PolicyRegistry()
+        registry.register(
+            NotificationPolicy(
+                notification_type="test.info",
+                delivery_mode=DeliveryMode.GUARANTEED,
+                config_id=policy_config_id,
+                config_hash="policy-hash-123",
+            )
+        )
+
+        sdk = NotificationSDK(
+            policy_registry=registry,
+            delivery_handler=handler,
+        )
+
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        )
+
+        sdk.send_info(
+            notification_type="test.info",
+            title="Info",
+            message="Info message",
+            source="test",
+            autonomy_context=context,
+        )
+
+        assert delivered is not None
+        assert delivered.policy_config_id == policy_config_id
+        assert delivered.policy_config_hash == "policy-hash-123"
+        assert delivered.policy_evaluation_id is not None
+
     def test_policy_mode_override_controls_delivery_mode(self) -> None:
         """Policy delivery_mode_by_autonomy should override base policy mode."""
         delivered: Notification | None = None
