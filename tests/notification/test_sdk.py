@@ -20,7 +20,7 @@ from notification.models import (
     NotificationResult,
     Priority,
 )
-from notification.policies import NotificationPolicy, PolicyRegistry
+from notification.policies import ModeOverride, NotificationPolicy, PolicyRegistry
 from notification.sdk import NotificationSDK, ValidationError, create_sdk, get_sdk
 
 
@@ -692,6 +692,48 @@ class TestSDKPolicyOverrides:
 
         assert delivered is not None
         assert delivered.delivery_mode == DeliveryMode.GUARANTEED
+
+    def test_policy_mode_override_controls_delivery_mode(self) -> None:
+        """Policy delivery_mode_by_autonomy should override base policy mode."""
+        delivered: Notification | None = None
+
+        def handler(n: Notification) -> NotificationResult:
+            nonlocal delivered
+            delivered = n
+            return NotificationResult(
+                notification_id=n.notification_id,
+                status=DeliveryStatus.SUCCESS,
+            )
+
+        registry = PolicyRegistry()
+        registry.register(
+            NotificationPolicy(
+                notification_type="test.safety",
+                delivery_mode=DeliveryMode.GUARANTEED,
+                preview_override=ModeOverride(delivery_mode=DeliveryMode.BEST_EFFORT),
+            )
+        )
+
+        sdk = NotificationSDK(
+            policy_registry=registry,
+            delivery_handler=handler,
+        )
+
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.PREVIEW,
+            agent_id=uuid4(),
+        )
+
+        sdk.send_safety(
+            notification_type="test.safety",
+            title="Safety preview",
+            message="Preview should be best effort",
+            source="test",
+            autonomy_context=context,
+        )
+
+        assert delivered is not None
+        assert delivered.delivery_mode == DeliveryMode.BEST_EFFORT
 
     def test_policy_overrides_channels(self) -> None:
         """Policy channels_by_mode should override defaults."""
