@@ -61,7 +61,8 @@ AGSignal does not:
 ### Policy-Driven Routing
 
 - **Policy lifecycle:** DRAFT → PREVIEW → ACTIVE → RETIRED
-- **YAML policy definitions:** File-based policy configuration under `config/notification_policies`
+- **YAML policy definitions:** File-based policy configuration with sample policies under `examples/policies/mip-uns`
+- **Demo config compatibility:** `config/notification_policies` remains loadable for local demos and compatibility, but those MIP-derived policies are sample content and not AGSignal Core defaults
 - **Policy versioning:** Version and status fields on policy definitions
 - **Database persistence:** Planned `notification_policy` table with JSONB columns and content-hash dedup
 - **Hot reload:** Planned `POST /api/v1/policies/reload` for runtime refresh without restart

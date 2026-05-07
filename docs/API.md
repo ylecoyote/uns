@@ -41,7 +41,9 @@ client = SignalClient()
 | `agsignal.sdk.SignalClient` | `notification.sdk.NotificationSDK` |
 | `agsignal.models.GovernanceSignal` | `notification.models.Notification` |
 | `agsignal.models.SignalIntent` | `notification.models.NotificationIntent` |
-| `agsignal.integrations.*` | `notification.integrations.*` |
+| `agsignal.integrations.AppSignalAdapter` | `notification.integrations.AppSignalAdapter` |
+| `agsignal.integrations.AppSignalRequest` | `notification.integrations.AppSignalRequest` |
+| `agsignal.integrations.AppEvidenceContext` | `notification.integrations.AppEvidenceContext` |
 
 Existing `notification.*` imports remain supported.
 
@@ -55,6 +57,10 @@ from agsignal.integrations import AppEvidenceContext, AppSignalAdapter, AppSigna
 
 This boundary carries app-owned evidence references into AGSignal without making
 AGSignal own the host application's domain models.
+
+MIP-shaped adapters remain available from `notification.integrations.mip_adapter`
+as optional sample/proving code. They are intentionally not exported from the
+AGSignal-branded public integration facade.
 
 ---
 

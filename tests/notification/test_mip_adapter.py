@@ -109,8 +109,8 @@ def test_execution_alert_maps_critical_slippage_to_safety_signal() -> None:
     assert request.evidence.execution_snapshot_id == EXECUTION_ID
 
 
-def test_agsignal_public_integration_alias_exports_mip_adapter() -> None:
-    from agsignal.integrations import MIPExecutionAlert, MIPSignalAdapter
+def test_agsignal_public_integration_alias_excludes_mip_adapter() -> None:
+    import agsignal.integrations as agsignal_integrations
     from notification.integrations.mip_adapter import (
         MIPExecutionAlert as NotificationMIPExecutionAlert,
     )
@@ -118,6 +118,7 @@ def test_agsignal_public_integration_alias_exports_mip_adapter() -> None:
         MIPSignalAdapter as NotificationMIPSignalAdapter,
     )
 
-    assert MIPSignalAdapter is NotificationMIPSignalAdapter
-    assert MIPExecutionAlert is NotificationMIPExecutionAlert
-
+    assert not hasattr(agsignal_integrations, "MIPSignalAdapter")
+    assert not hasattr(agsignal_integrations, "MIPExecutionAlert")
+    assert NotificationMIPSignalAdapter.__name__ == "MIPSignalAdapter"
+    assert NotificationMIPExecutionAlert.__name__ == "MIPExecutionAlert"
