@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+
 from apps.ui.src.api.client import UNSApiClient, UNSApiError
 from apps.ui.src.api.models import (
     AutonomyMode,
