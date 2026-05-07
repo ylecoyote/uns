@@ -118,8 +118,8 @@ AGSignal includes a local stdio MCP server for agent clients:
 uv run python -m agsignal_mcp.transports.stdio
 ```
 
-The v1 server is stdio-only. HTTP/SSE transport is a deferred option documented
-in `docs/superpowers/specs/2026-05-06-agsignal-mcp-server-design.md`.
+The v1 server is stdio-only. HTTP/SSE transport is a deferred option until a
+hosted integration requires it.
 
 ### Basic Usage
 
@@ -525,7 +525,7 @@ AGSignal documentation is task-routed from [docs/README.md](docs/README.md):
 | Configure policies | [Policy Lifecycle](docs/sections/policy-lifecycle.md), [MIP UNS Sample Policy Pack](examples/policies/mip-uns/README.md) |
 | Integrate an app | [Integration Modes](docs/sections/integration-modes.md), [Host App Boundary](docs/API.md#host-app-boundary) |
 | Operate and audit | [Observability](docs/sections/observability.md), [Delivery Semantics](docs/sections/delivery-semantics.md) |
-| Verify publish readiness | [M5 Publish Readiness Reference](docs/m5-publish-readiness-reference.md) |
+| Verify implementation | [Testing Guides](docs/README.md#testing-guides), [Architecture Decisions](docs/README.md#architecture-decisions) |
 
 ### Project Structure
 

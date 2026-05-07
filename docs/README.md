@@ -17,13 +17,13 @@ sample content.
 
 | Task | Start Here | Then Read |
 |------|------------|-----------|
-| **Evaluate AGSignal** | [Root README](../README.md) | [Architecture](ARCHITECTURE.md), [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) |
+| **Evaluate AGSignal** | [Root README](../README.md) | [Architecture](ARCHITECTURE.md), [API Reference](API.md) |
 | **Quickstart: send a signal** | [Root README Quick Start](../README.md#quick-start) | [API Reference](API.md), [Running the Service](../README.md#running-the-service) |
 | **Configure policies** | [Policy Lifecycle](sections/policy-lifecycle.md) | [MIP UNS Sample Policy Pack](../examples/policies/mip-uns/README.md), [Delivery Semantics](sections/delivery-semantics.md) |
 | **Integrate an app** | [Integration Modes](sections/integration-modes.md) | [API Host App Boundary](API.md#host-app-boundary), [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) |
 | **Operate and audit** | [Observability](sections/observability.md) | [Delivery Semantics](sections/delivery-semantics.md), [WebSocket Replay Smoke](testing/websocket-replay-smoke.md), [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) |
 | **Extend AGSignal** | [Architecture](ARCHITECTURE.md) | [API Reference](API.md), [Architecture Decisions](#architecture-decisions) |
-| **Verify publish readiness** | [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) | [Testing Guides](#testing-guides), [UNS Provenance](uns/README.md) |
+| **Verify implementation** | [Testing Guides](#testing-guides) | [Architecture Decisions](#architecture-decisions), [UNS Provenance](uns/README.md) |
 
 ## Document Inventory
 
@@ -32,7 +32,6 @@ sample content.
 | [../README.md](../README.md) | AGSignal product overview, boundary, terminology, and quick start |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Core runtime architecture, components, and data flow |
 | [API.md](API.md) | API reference for the current SDK, models, and interfaces |
-| [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) | Landing page, completed M5 parity work, and publish-readiness alignment |
 | [uns/README.md](uns/README.md) | Historical UNS extraction materials and AGSignal terminology mapping |
 
 ### Architecture Decisions
@@ -43,19 +42,6 @@ sample content.
 | [UNS Taxonomy](decisions/2026-05-06-uns-taxonomy.md) | Keeps `docs/uns/` as provenance while AGSignal remains the public product identity |
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
 | [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
-| [MIP Adapter Design](superpowers/specs/2026-05-06-mip-251-mip-adapter-design.md) | Optional MIP-shaped adapter templates built on the generic app boundary |
-| [HTTP Idempotency and Simulation Design](superpowers/specs/2026-05-06-mip-252a-http-idempotency-simulate-design.md) | First MIP-252 HTTP parity slice for producer retry safety and simulation detail |
-| [Delivery Status Design](superpowers/specs/2026-05-06-mip-252b-delivery-status-design.md) | MIP-252 HTTP parity slice for audit-backed delivery readback |
-| [DLQ Remove Design](superpowers/specs/2026-05-06-mip-252c-dlq-remove-design.md) | MIP-252 admin parity slice for removing visible DLQ entries |
-| [Standalone Audit Persistence Design](superpowers/specs/2026-05-06-mip-253a-standalone-audit-persistence-design.md) | MIP-253 operational parity slice for audit-backed standalone sends |
-| [ACK Audit Persistence Design](superpowers/specs/2026-05-06-mip-253b-ack-audit-persistence-design.md) | MIP-253 operational parity slice for ACK and dismiss audit records |
-| [Timeout Audit Callback Design](superpowers/specs/2026-05-06-mip-253c-timeout-audit-callback-design.md) | MIP-253 operational parity slice for host-scheduled ACK timeout audits |
-| [Operational Parity Contract](superpowers/specs/2026-05-06-mip-253-operational-parity-contract.md) | MIP-253 Core-versus-host runtime ownership decision |
-| [Policy Lifecycle Runtime Boundary](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md) | MIP-254 policy engine slice for ACTIVE-only runtime loads and PREVIEW-only shadow loads |
-| [Policy Delta Core](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md) | MIP-254 policy engine slice for immutable delta transitions and auditable history |
-| [Shadow And Guard Core](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md) | MIP-254 policy engine slice for shadow evaluation and guard result primitives |
-| [Policy Learning Store](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md) | MIP-254 policy engine slice for persisted deltas, shadow results, aggregates, and approval gates |
-| [Policy Config Envelope](superpowers/specs/2026-05-06-mip-254e-policy-config-envelope-design.md) | MIP-254 policy engine slice for config hashes, evaluation records, and applying approved deltas |
 
 ### Topic Sections
 
@@ -89,7 +75,6 @@ docs/
 ├── README.md           ← You are here
 ├── ARCHITECTURE.md     ← System architecture overview
 ├── API.md              ← API reference
-├── m5-publish-readiness-reference.md ← Landing page and completed M5 alignment
 ├── decisions/          ← Accepted architecture decisions
 ├── sections/
 │   ├── delivery-semantics.md   ← Delivery behavior truth tables
@@ -101,6 +86,9 @@ docs/
 ```
 
 Sample policy packs live outside `docs/` under `examples/policies/`.
+Local-only implementation plans and audit reports may exist under
+`docs/internal/`, which is intentionally ignored and not part of the public
+documentation set.
 
 ## Reading Guide
 
@@ -117,9 +105,8 @@ AGSignal Core public facade.
 **Setting up monitoring?** Use **Operate and audit** for health, audit, DLQ,
 WebSocket replay, and fanout guidance.
 
-**Preparing a publish checkpoint?** Use **Verify publish readiness** and keep
-each public claim tied to shipped behavior, sample assets, or explicit
-limitations.
+**Verifying implementation claims?** Use **Verify implementation** and keep each
+public claim tied to shipped behavior, sample assets, or explicit limitations.
 
 ## Key Concepts Summary
 

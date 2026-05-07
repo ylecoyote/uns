@@ -192,7 +192,8 @@ The first AGSignal-native slice preserves the MIP enforcement boundary:
   compatibility while new callers can choose `load_runtime_registry()` or
   `load_shadow_registry()`.
 
-See [MIP-254A Policy Lifecycle Runtime Boundary Design](superpowers/specs/2026-05-06-mip-254a-policy-lifecycle-runtime-boundary-design.md).
+Detailed implementation notes for this slice are kept in the local internal
+docs archive, not the public documentation set.
 
 The second slice ports the MIP delta state machine into AGSignal-neutral
 learning primitives:
@@ -204,7 +205,8 @@ learning primitives:
 - `transition_to()` validates moves, returns immutable copies, and appends
   auditable transition history.
 
-See [MIP-254B Policy Delta Core Design](superpowers/specs/2026-05-06-mip-254b-policy-delta-core-design.md).
+Detailed implementation notes for this slice are kept in the local internal
+docs archive, not the public documentation set.
 
 The third slice ports the reusable shadow and guard primitives:
 
@@ -215,7 +217,8 @@ The third slice ports the reusable shadow and guard primitives:
 - `GuardResult` and `FieldBound` make guard checks explicit and auditable
   without importing trading snapshots or ticker-specific metrics.
 
-See [MIP-254C Shadow And Guard Core Design](superpowers/specs/2026-05-06-mip-254c-shadow-guard-core-design.md).
+Detailed implementation notes for this slice are kept in the local internal
+docs archive, not the public documentation set.
 
 The fourth slice ports the donor repository behavior into AGSignal's sync
 SQLAlchemy style:
@@ -228,7 +231,8 @@ SQLAlchemy style:
 - Approval is blocked until the shadow aggregate passes its sample and threshold
   gates.
 
-See [MIP-254D Policy Learning Store Design](superpowers/specs/2026-05-06-mip-254d-policy-learning-store-design.md).
+Detailed implementation notes for this slice are kept in the local internal
+docs archive, not the public documentation set.
 
 The fifth slice ports the config envelope and evaluation hash guarantees:
 
@@ -240,7 +244,8 @@ The fifth slice ports the config envelope and evaluation hash guarantees:
 - `PolicyEvaluationRecord` captures the exact config hash used for an
   evaluation.
 
-See [MIP-254E Policy Config Envelope Design](superpowers/specs/2026-05-06-mip-254e-policy-config-envelope-design.md).
+Detailed implementation notes for this slice are kept in the local internal
+docs archive, not the public documentation set.
 
 ### Phase 1 — Port the learning layer first (highest value, most unique)
 

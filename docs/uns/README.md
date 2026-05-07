@@ -48,5 +48,4 @@ tools, or own agent reasoning.
 | [unified-notification-service-tech-spec.md](unified-notification-service-tech-spec.md) | Technical specification |
 | [unified_notification_and_signaling_prd.md](unified_notification_and_signaling_prd.md) | PRD source material |
 | [uns-comms.md](uns-comms.md) | Feedback/comms draft |
-| [uns_ralphy_task_list.md](uns_ralphy_task_list.md) | Historical build-task breakdown |
 | [walking-deck.md](walking-deck.md) | Narrative deck outline |

@@ -25,15 +25,6 @@ class TestUIBoundaryDocReferencesExist:
         path = PROJECT_ROOT / "apps" / "ui" / "README.md"
         assert path.exists(), f"Apps UI README not found at {path}"
 
-    def test_phase_verification_reports_dir_exists(self) -> None:
-        """Verify docs/reports/ui/ directory exists with verification reports."""
-        path = PROJECT_ROOT / "docs" / "reports" / "ui"
-        assert path.exists(), f"Phase verification reports dir not found at {path}"
-        assert path.is_dir()
-        # Should have at least one verification report
-        reports = list(path.glob("*.md"))
-        assert len(reports) > 0, "No verification reports found in docs/reports/ui/"
-
     def test_invariants_yml_exists(self) -> None:
         """Verify docs/verification/invariants.yml exists."""
         path = PROJECT_ROOT / "docs" / "verification" / "invariants.yml"
