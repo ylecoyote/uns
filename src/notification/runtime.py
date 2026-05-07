@@ -6,7 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
-from notification.acknowledgment import get_ack_engine
+from notification.acknowledgment import configure_ack_engine, get_ack_engine
 from notification.audit import AuditStore, InMemoryAuditStore, create_audit_record
 from notification.channel_health import ChannelHealthTracker
 from notification.dlq import DLQService
@@ -94,7 +94,10 @@ def send_signal(
     result, notification = _resolve_notification(request)
     ack_status: AckStatus | None = None
     if notification.require_ack:
-        engine = get_ack_engine()
+        try:
+            engine = get_ack_engine()
+        except RuntimeError:
+            engine = configure_ack_engine()
         engine.register_notification(
             notification_id=notification.notification_id,
             intent=notification.intent,
