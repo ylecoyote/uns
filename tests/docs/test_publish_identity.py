@@ -14,8 +14,19 @@ def test_pyproject_uses_agsignal_publish_identity() -> None:
     assert 'name = "agsignal"' in content
     assert "AGSignal - Control-plane governance signaling infrastructure" in content
     assert "Unified Notification Service" not in content
+    assert 'license = {text = "Apache-2.0"}' in content
     assert '{name = "AGSignal Maintainers"}' in content
     assert '"agsignal[adapters,dev,mcp]"' in content
+
+
+def test_license_file_uses_apache_2_0() -> None:
+    license_text = (ROOT / "LICENSE").read_text()
+    readme = (ROOT / "README.md").read_text()
+
+    assert "Apache License" in license_text
+    assert "Version 2.0, January 2004" in license_text
+    assert "License-Apache--2.0" in readme
+    assert "Apache License 2.0 - see [LICENSE](LICENSE)" in readme
 
 
 def test_agsignal_integrations_exposes_generic_boundary_only() -> None:
