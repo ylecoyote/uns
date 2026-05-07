@@ -415,7 +415,7 @@ class TestPaginationConsistency:
         """Verify cursor semantics section exists."""
         assert "## Cursor Semantics" in data_contracts_doc
         assert "opaque" in data_contracts_doc.lower()
-        assert "expire" in data_contracts_doc.lower()
+        assert "Invalid cursors currently restart pagination" in data_contracts_doc
 
 
 class TestErrorHandling:
@@ -433,7 +433,7 @@ class TestErrorHandling:
     def test_rate_limiting_documented(self, data_contracts_doc: str) -> None:
         """Verify rate limiting is documented."""
         assert "## Rate Limiting" in data_contracts_doc
-        assert "X-RateLimit" in data_contracts_doc
+        assert "do not currently add HTTP rate-limit headers" in data_contracts_doc
 
 
 class TestRelatedDocumentation:

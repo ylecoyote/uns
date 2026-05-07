@@ -11,7 +11,7 @@ mode-aware routing, acknowledgments, escalation, and deduplication.
 
 | File | Notification type | Demonstrates |
 |---|---|---|
-| `safety_kill_switch.yaml` | `safety.kill_switch` | LIVE-mode guaranteed delivery, PagerDuty escalation, required acknowledgment |
+| `safety_kill_switch.yaml` | `safety.kill_switch` | LIVE-mode guaranteed delivery, required acknowledgment, and MIP escalation metadata |
 | `governance_approval_required.yaml` | `governance.approval_required` | Approval workflow routing and failure escalation |
 | `execution_slippage.yaml` | `execution.slippage` | Best-effort operational signaling and a five-minute deduplication window |
 

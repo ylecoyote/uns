@@ -110,7 +110,7 @@ pip install -e ".[all]"
 ### Basic Usage
 
 AGSignal Core now provides AGSignal-branded imports while preserving the
-historical runtime package. `notification.* imports remain supported` for
+historical runtime package. `notification.*` imports remain supported for
 existing users.
 
 ```python
@@ -278,7 +278,7 @@ The delivery service (`DeliveryService`) executes the following pipeline steps:
 ```python
 from agsignal.sdk import configure_signal_client
 from notification.interfaces import LoggingAcknowledgmentCallback
-from notification.policies import NotificationPolicy, PolicyRegistry
+from notification.policies import PolicyRegistry
 
 # Configure with custom components
 client = configure_signal_client(
@@ -486,16 +486,16 @@ curl http://localhost:8000/health
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=src --cov-report=html
+uv run pytest --cov=src --cov-report=html
 
 # Run specific test file
-pytest tests/notification/test_sdk.py
+uv run pytest tests/notification/test_sdk.py
 
 # Run tests matching pattern
-pytest -k "test_safety"
+uv run pytest -k "test_safety"
 ```
 
 ## Development
@@ -553,13 +553,13 @@ tests/                         # Runtime, docs, examples, DB, and UI tests
 
 ```bash
 # Lint code
-ruff check src tests
+uv run ruff check src tests
 
 # Format code
-ruff format src tests
+uv run ruff format src tests
 
 # Type check
-mypy src
+uv run mypy src
 ```
 
 ## Dependencies
