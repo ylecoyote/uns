@@ -77,11 +77,22 @@ class PolicyConfigEnvelope(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    def __getattribute__(self, name: str) -> Any:
+        """Return defensive copies for nested mutable config payloads."""
+        value = super().__getattribute__(name)
+        if name == "config_json":
+            return copy.deepcopy(value)
+        return value
+
     @model_validator(mode="after")
-    def compute_hash_if_missing(self) -> PolicyConfigEnvelope:
-        """Compute config_hash if the caller did not provide one."""
-        if self.config_hash is None:
-            object.__setattr__(self, "config_hash", compute_config_hash(self.config_json))
+    def validate_or_compute_hash(self) -> PolicyConfigEnvelope:
+        """Validate caller-provided config_hash or compute it from config_json."""
+        config = copy.deepcopy(self.config_json)
+        computed_hash = compute_config_hash(config)
+        if self.config_hash is not None and self.config_hash != computed_hash:
+            raise ValueError("config_hash does not match config_json")
+        object.__setattr__(self, "config_json", config)
+        object.__setattr__(self, "config_hash", computed_hash)
         return self
 
 
