@@ -41,7 +41,7 @@ class TestUIScopeDocStructure:
 
     def test_has_title(self, ui_scope_doc: str) -> None:
         """Verify document has correct title."""
-        assert "# UI Scope" in ui_scope_doc
+        assert "# AGSignal Console Scope" in ui_scope_doc
 
     def test_has_design_philosophy_section(self, ui_scope_doc: str) -> None:
         """Verify document has design philosophy section."""

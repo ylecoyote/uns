@@ -1,4 +1,4 @@
-"""Typed models for UNS UI API responses.
+"""Typed models for AGSignal Console API responses.
 
 These models match the contracts in docs/ui/ui-data-contracts.md.
 All models are read-only (frozen) to enforce the non-mutating UI posture.

@@ -1,4 +1,4 @@
-"""Authentication placeholder for UNS UI Dashboard.
+"""Authentication placeholder for AGSignal Console.
 
 This module provides a minimal authentication integration placeholder
 for the read-only UI. In v1, the UI has a read-only posture with no
@@ -10,7 +10,7 @@ will depend on the deployment environment (e.g., OAuth, SSO, API keys).
 Security Model:
     - Read-only: No write operations are available
     - No privileged actions: UI cannot modify notifications, policies, or system state
-    - Backend is authoritative: All business rules enforced by UNS backend
+    - Backend is authoritative: All business rules enforced by AGSignal backend
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class UserContext:
 
     In v1 (read-only), this is a minimal representation.
     The UI does not perform authorization decisions - all
-    access control is enforced by the UNS backend.
+    access control is enforced by the AGSignal backend.
 
     Attributes:
         user_id: Unique identifier for the user (or 'anonymous').

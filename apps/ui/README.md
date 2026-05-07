@@ -1,6 +1,6 @@
-# UNS UI Dashboard
+# AGSignal Console
 
-Read-Only dashboard for the Unified Notification Service.
+Read-only dashboard for AGSignal Core.
 
 ## Stack
 
@@ -19,7 +19,9 @@ Read-Only dashboard for the Unified Notification Service.
 
 ### Non-Authoritative UI
 
-The UI is a **read-first "flight instruments" dashboard** per [ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the notification system's state and health without offering direct manipulation capabilities.
+AGSignal Console is a **read-first "flight instruments" dashboard** per
+[ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the signal
+system's state and health without offering direct manipulation capabilities.
 
 **Key constraints:**
 
@@ -202,7 +204,7 @@ npm run preview
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_UNS_API_BASE_URL` | Base URL for UNS API endpoints | `http://localhost:8000` |
+| `VITE_UNS_API_BASE_URL` | Base URL for AGSignal Console endpoints | `http://localhost:8000` |
 
 All environment variables must be prefixed with `VITE_` to be exposed to the browser.
 

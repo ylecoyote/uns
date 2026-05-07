@@ -1,5 +1,5 @@
 /**
- * Page component exports for UNS UI Dashboard.
+ * Page component exports for AGSignal Console.
  *
  * Export all page-level components from this index.
  */

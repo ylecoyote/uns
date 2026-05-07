@@ -1,4 +1,4 @@
-"""Typed API client for UNS UI endpoints."""
+"""Typed API client for AGSignal Console endpoints."""
 
 from apps.ui.src.api.client import UNSUIClient
 from apps.ui.src.api.types import (

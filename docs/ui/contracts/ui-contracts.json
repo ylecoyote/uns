@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "UNS UI Contracts",
-  "description": "Machine-readable contract snapshot for /ui endpoints in the Unified Notification Service",
+  "title": "AGSignal Console Contracts",
+  "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-01-24T06:09:10.223266+00:00",
+  "generated_at": "2026-05-07T03:26:48.368741+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
@@ -220,7 +220,6 @@
           "$ref": "#/$defs/AutonomyContextResponse"
         },
         "payload": {
-          "additionalProperties": true,
           "title": "Payload",
           "type": "object"
         },
@@ -279,7 +278,6 @@
               "$ref": "#/$defs/AutonomyContextResponse"
             },
             "payload": {
-              "additionalProperties": true,
               "title": "Payload",
               "type": "object"
             },
@@ -618,7 +616,6 @@
         "metadata": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -980,7 +977,6 @@
             "metadata": {
               "anyOf": [
                 {
-                  "additionalProperties": true,
                   "type": "object"
                 },
                 {
@@ -1537,7 +1533,6 @@
         "details": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1574,7 +1569,6 @@
             "details": {
               "anyOf": [
                 {
-                  "additionalProperties": true,
                   "type": "object"
                 },
                 {

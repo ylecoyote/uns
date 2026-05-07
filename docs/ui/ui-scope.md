@@ -1,8 +1,10 @@
-# UI Scope – v1
+# AGSignal Console Scope v1
 
 ## Design Philosophy
 
-The UNS UI is a **read-first "flight instruments" dashboard**, not a control cockpit. It provides visibility into the notification system's state and health without offering direct manipulation capabilities in the initial release.
+AGSignal Console is a **read-first "flight instruments" dashboard**, not a
+control cockpit. It provides visibility into the signal system's state and
+health without offering direct manipulation capabilities in the initial release.
 
 ## v1 Constraints
 
