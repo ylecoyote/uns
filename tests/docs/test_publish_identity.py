@@ -59,7 +59,7 @@ def test_docs_index_routes_publish_readers_by_task() -> None:
         "Integrate an app",
         "Operate and audit",
         "Extend AGSignal",
-        "Verify publish readiness",
+        "Verify implementation",
     ):
         assert task in content
 
