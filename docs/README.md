@@ -32,7 +32,7 @@ sample content.
 | [../README.md](../README.md) | AGSignal product overview, boundary, terminology, and quick start |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Core runtime architecture, components, and data flow |
 | [API.md](API.md) | API reference for the current SDK, models, and interfaces |
-| [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) | Landing page, MIP UNS parity backlog, and publish-readiness alignment |
+| [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) | Landing page, completed M5 parity work, and publish-readiness alignment |
 | [uns/README.md](uns/README.md) | Historical UNS extraction materials and AGSignal terminology mapping |
 
 ### Architecture Decisions
@@ -89,7 +89,7 @@ docs/
 ├── README.md           ← You are here
 ├── ARCHITECTURE.md     ← System architecture overview
 ├── API.md              ← API reference
-├── m5-publish-readiness-reference.md ← Landing page and M5 backlog alignment
+├── m5-publish-readiness-reference.md ← Landing page and completed M5 alignment
 ├── decisions/          ← Accepted architecture decisions
 ├── sections/
 │   ├── delivery-semantics.md   ← Delivery behavior truth tables
