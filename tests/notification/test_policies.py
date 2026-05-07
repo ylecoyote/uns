@@ -865,6 +865,13 @@ class TestResolveDeliveryMode:
                 delivery_mode=DeliveryMode.GUARANTEED,
             )
         )
+        reg.register(
+            NotificationPolicy(
+                notification_type="mode.delivery.event",
+                delivery_mode=DeliveryMode.GUARANTEED,
+                preview_override=ModeOverride(delivery_mode=DeliveryMode.BEST_EFFORT),
+            )
+        )
         return reg
 
     def test_resolve_with_policy(self, registry: PolicyRegistry) -> None:
@@ -876,6 +883,16 @@ class TestResolveDeliveryMode:
             registry=registry,
         )
         assert result == DeliveryMode.GUARANTEED
+
+    def test_resolve_with_mode_override(self, registry: PolicyRegistry) -> None:
+        """Uses policy mode-specific delivery_mode when configured."""
+        result = resolve_delivery_mode(
+            notification_type="mode.delivery.event",
+            autonomy_mode=AutonomyMode.PREVIEW,
+            intent=NotificationIntent.SAFETY,
+            registry=registry,
+        )
+        assert result == DeliveryMode.BEST_EFFORT
 
     def test_resolve_sdk_default(self, registry: PolicyRegistry) -> None:
         """Falls back to SDK default based on intent."""
