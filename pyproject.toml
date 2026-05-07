@@ -24,6 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp[cli]>=1.0.0",
+]
 adapters = [
     "httpx>=0.25.0",
 ]
@@ -35,14 +38,15 @@ dev = [
     "httpx>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
+    "mcp[cli]>=1.0.0",
 ]
 all = [
-    "agsignal[adapters,dev]",
+    "agsignal[adapters,dev,mcp]",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src", "apps"]
-include = ["agsignal*", "notification*", "mcp_server*", "db*", "ui*"]
+include = ["agsignal*", "agsignal_mcp*", "notification*", "mcp_server*", "db*", "ui*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/ui/tests"]
