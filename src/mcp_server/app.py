@@ -82,7 +82,7 @@ def configure_persistence() -> None:
             database_url=database_url,
             create_tables=create_tables,
         )
-        configure_policy_registry(registry=policy_store.load_registry())
+        configure_policy_registry(registry=policy_store.load_runtime_registry())
 
         logger.info("SQLAlchemy persistence configured successfully")
     else:

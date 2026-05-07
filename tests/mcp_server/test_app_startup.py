@@ -187,6 +187,37 @@ class TestConfigurePersistence:
         assert policy.version == "1.0.0"
         assert policy.status == PolicyStatus.ACTIVE
 
+    def test_sqlalchemy_mode_excludes_preview_policies_from_runtime_registry(self, tmp_path):
+        """Test SQLAlchemy startup does not runtime-enforce PREVIEW policies."""
+        from db.policy_store import create_sqlalchemy_policy_store
+        from notification.policies import (
+            NotificationPolicy,
+            PolicyStatus,
+            configure_policy_registry,
+            get_policy_registry,
+        )
+
+        db_path = tmp_path / "preview-policy.db"
+        database_url = f"sqlite:///{db_path}"
+        store = create_sqlalchemy_policy_store(database_url, create_tables=True)
+        store.save_policy(
+            NotificationPolicy.from_dict(
+                {
+                    "notification_type": "safety.preview_only",
+                    "version": "0.9.0",
+                    "status": PolicyStatus.PREVIEW.value,
+                    "channels": {"PREVIEW": ["WEBSOCKET"]},
+                    "require_ack": {"PREVIEW": False},
+                }
+            )
+        )
+        configure_policy_registry()
+
+        with patch.dict(os.environ, {"DATABASE_URL": database_url, "UNS_CREATE_TABLES": "true"}):
+            configure_persistence()
+
+        assert get_policy_registry().get_sync("safety.preview_only") is None
+
 
 class TestCreateApp:
     """Tests for create_app function."""
