@@ -278,7 +278,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         try:
             data = json.loads(base64.b64decode(cursor))
             offset = data.get("offset", 0)
-            return int(offset) if offset is not None else 0
+            return min(max(int(offset), 0), 10_000) if offset is not None else 0
         except (ValueError, KeyError):
             logger.warning("Invalid cursor: %s", cursor)
             return 0
@@ -610,7 +610,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
         try:
             data = json.loads(base64.b64decode(cursor))
             offset = data.get("offset", 0)
-            return int(offset) if offset is not None else 0
+            return min(max(int(offset), 0), 10_000) if offset is not None else 0
         except (ValueError, KeyError):
             logger.warning("Invalid cursor: %s", cursor)
             return 0
@@ -783,7 +783,10 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
         session = self._get_session()
         try:
-            # Build events from both tables
+            # Build events from bounded pages from both tables. Each side fetches
+            # enough rows to satisfy the merged offset without loading all history.
+            offset = self._decode_cursor(cursor)
+            fetch_limit = offset + limit + 1
             all_events: list[AuditEvent] = []
 
             # Query delivery audits
@@ -814,8 +817,6 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                     NotificationAuditRecord.correlation_id == filter_criteria.correlation_id
                 )
 
-            delivery_results = session.execute(delivery_stmt).scalars().all()
-
             status_to_event = {
                 "DELIVERED": "delivery.succeeded",
                 "FAILED": "delivery.failed",
@@ -824,33 +825,46 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 "PENDING": "delivery.started",
             }
 
-            for r in delivery_results:
-                event_type = status_to_event.get(r.status, "delivery.unknown")
-                if filter_criteria.event_type and event_type != filter_criteria.event_type:
-                    continue
-                all_events.append(
-                    AuditEvent(
-                        audit_id=r.id,
-                        event_type=event_type,
-                        event_time=r.created_at,
-                        notification_id=r.notification_id,
-                        notification_type=r.notification_type,
-                        autonomy_mode=AutonomyMode(r.autonomy_mode),
-                        agent_id=r.agent_id,
-                        plan_id=r.plan_id,
-                        decision_snapshot_id=r.decision_snapshot_id,
-                        execution_snapshot_id=r.execution_snapshot_id,
-                        skip_snapshot_id=r.skip_snapshot_id,
-                        payload={
-                            "status": r.status,
-                            "channels_attempted": r.channels_attempted,
-                            "channels_succeeded": r.channels_succeeded,
-                            "channels_failed": r.channels_failed,
-                            "error_message": r.error_message,
-                        },
-                        correlation_id=r.correlation_id,
+            if filter_criteria.event_type is None or filter_criteria.event_type.startswith(
+                "delivery."
+            ):
+                delivery_results = (
+                    session.execute(
+                        delivery_stmt.order_by(NotificationAuditRecord.created_at.desc()).limit(
+                            fetch_limit
+                        )
                     )
+                    .scalars()
+                    .all()
                 )
+
+                for r in delivery_results:
+                    event_type = status_to_event.get(r.status, "delivery.unknown")
+                    if filter_criteria.event_type and event_type != filter_criteria.event_type:
+                        continue
+                    all_events.append(
+                        AuditEvent(
+                            audit_id=r.id,
+                            event_type=event_type,
+                            event_time=r.created_at,
+                            notification_id=r.notification_id,
+                            notification_type=r.notification_type,
+                            autonomy_mode=AutonomyMode(r.autonomy_mode),
+                            agent_id=r.agent_id,
+                            plan_id=r.plan_id,
+                            decision_snapshot_id=r.decision_snapshot_id,
+                            execution_snapshot_id=r.execution_snapshot_id,
+                            skip_snapshot_id=r.skip_snapshot_id,
+                            payload={
+                                "status": r.status,
+                                "channels_attempted": r.channels_attempted,
+                                "channels_succeeded": r.channels_succeeded,
+                                "channels_failed": r.channels_failed,
+                                "error_message": r.error_message,
+                            },
+                            correlation_id=r.correlation_id,
+                        )
+                    )
 
             # Query ack audits (if not filtering for delivery-only events)
             if filter_criteria.event_type is None or filter_criteria.event_type.startswith("ack."):
@@ -869,7 +883,13 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         AckAuditRecordDB.notification_id == filter_criteria.notification_id
                     )
 
-                ack_results = session.execute(ack_stmt).scalars().all()
+                ack_results = (
+                    session.execute(
+                        ack_stmt.order_by(AckAuditRecordDB.created_at.desc()).limit(fetch_limit)
+                    )
+                    .scalars()
+                    .all()
+                )
 
                 ack_status_to_event = {
                     "PENDING": "ack.pending",
@@ -906,7 +926,6 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             all_events.sort(key=lambda e: e.event_time, reverse=True)
 
             # Apply pagination
-            offset = self._decode_cursor(cursor)
             total_count = len(all_events)
             page = all_events[offset : offset + limit]
             has_more = offset + limit < total_count
