@@ -694,3 +694,97 @@ class TestSQLAlchemyAdapter:
 
         assert result.items == []
         assert result.total_count == 0
+
+    def test_get_audit_events_uses_bounded_sql_queries(self, tmp_path):
+        """Audit list queries should apply SQL limits before Python merge/sort."""
+        from sqlalchemy import create_engine, event
+        from sqlalchemy.orm import sessionmaker
+
+        from db.models import AckAuditRecord as AckAuditRecordDB
+        from db.models import Base, NotificationAuditRecord
+        from mcp_server.read_models import SQLAlchemyReadModelAdapter
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'audit-pagination.db'}")
+        Base.metadata.create_all(engine)
+        session_factory = sessionmaker(bind=engine)
+        adapter = SQLAlchemyReadModelAdapter(session_factory=session_factory)
+
+        now = datetime.now(UTC)
+        session = session_factory()
+        try:
+            for offset_seconds in range(30):
+                created_at = now - timedelta(seconds=offset_seconds)
+                session.add(
+                    NotificationAuditRecord(
+                        id=uuid4(),
+                        notification_id=uuid4(),
+                        notification_type="test.notification",
+                        status="DELIVERED",
+                        channels_attempted=["SLACK"],
+                        channels_succeeded=["SLACK"],
+                        channels_failed=[],
+                        error_message=None,
+                        intent="OPERATIONAL",
+                        delivery_mode="BEST_EFFORT",
+                        autonomy_mode="LIVE",
+                        agent_id=uuid4(),
+                        plan_id=None,
+                        decision_snapshot_id=None,
+                        execution_snapshot_id=None,
+                        skip_snapshot_id=None,
+                        title="Test",
+                        source="test",
+                        correlation_id=None,
+                        notification_metadata={},
+                        audit_metadata={},
+                        notification_created_at=created_at,
+                        delivered_at=created_at,
+                        created_at=created_at,
+                    )
+                )
+                session.add(
+                    AckAuditRecordDB(
+                        id=uuid4(),
+                        notification_id=uuid4(),
+                        old_status="PENDING",
+                        new_status="ACKED",
+                        acked_by="test-user",
+                        acked_at=created_at,
+                        created_at=created_at,
+                        ack_metadata={},
+                    )
+                )
+            session.commit()
+        finally:
+            session.close()
+
+        statements: list[str] = []
+
+        def capture_statement(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture_statement)
+        try:
+            result = adapter.get_audit_events(AuditEventFilter(), limit=10)
+        finally:
+            event.remove(engine, "before_cursor_execute", capture_statement)
+
+        assert len(result.items) == 10
+        assert result.has_more is True
+        audit_selects = [
+            statement
+            for statement in statements
+            if statement.lstrip().upper().startswith("SELECT")
+            and (
+                "notification_audit_records" in statement
+                or "ack_audit_records" in statement
+            )
+        ]
+        assert any(
+            "notification_audit_records" in statement and "LIMIT" in statement.upper()
+            for statement in audit_selects
+        )
+        assert any(
+            "ack_audit_records" in statement and "LIMIT" in statement.upper()
+            for statement in audit_selects
+        )
