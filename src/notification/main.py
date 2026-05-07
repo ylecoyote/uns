@@ -157,7 +157,9 @@ def create_app(
 
 def main() -> None:
     """Run the standalone AGSignal Core HTTP server."""
-    uvicorn.run("notification.main:app", host="0.0.0.0", port=8000, reload=False)
+    host = os.environ.get("AGSIGNAL_HOST", "127.0.0.1")
+    port = int(os.environ.get("AGSIGNAL_PORT", "8000"))
+    uvicorn.run("notification.main:app", host=host, port=port, reload=False)
 
 
 def _create_redis_client(redis_url: str) -> RedisWebSocketClient:

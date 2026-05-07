@@ -13,6 +13,9 @@ on:
       - 'scripts/ci/check_ui_boundary.py'
       - '.github/workflows/ui.yaml'
 
+permissions:
+  contents: read
+
 jobs:
   boundary-check:
     name: UI Boundary Guardrail

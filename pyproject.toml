@@ -39,14 +39,16 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "mcp[cli]>=1.0.0",
+    "bandit>=1.8.0",
+    "pip-audit>=2.9.0",
 ]
 all = [
     "agsignal[adapters,dev,mcp]",
 ]
 
 [tool.setuptools.packages.find]
-where = ["src", "apps"]
-include = ["agsignal*", "agsignal_mcp*", "notification*", "mcp_server*", "db*", "ui*"]
+where = ["src"]
+include = ["agsignal*", "agsignal_mcp*", "notification*", "mcp_server*", "db*", "ui_client*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/ui/tests"]

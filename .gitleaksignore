@@ -1,0 +1,14 @@
+# Historical false positives from synthetic test fixtures.
+b2cb72e96eb4e651476f77d1ae1cca23c990b849:tests/notification/test_adapters.py:slack-bot-token:1338
+b2cb72e96eb4e651476f77d1ae1cca23c990b849:tests/notification/test_adapters.py:slack-bot-token:1347
+b2cb72e96eb4e651476f77d1ae1cca23c990b849:tests/notification/test_adapters.py:slack-bot-token:1356
+2356b20e6819dd0ee695d11d4a174a88922aadf7:tests/notification/test_deduplication.py:generic-api-key:141
+2356b20e6819dd0ee695d11d4a174a88922aadf7:tests/notification/test_deduplication.py:generic-api-key:145
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:182
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:199
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:210
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:749
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:781
+434b8f78d7954e7543250f3ac483817d75b185ee:tests/notification/test_adapters.py:slack-bot-token:809
+c139ffb5de0a69625f01773d2ac97b86792d8538:tests/notification/test_deduplication.py:generic-api-key:67
+c139ffb5de0a69625f01773d2ac97b86792d8538:tests/notification/test_deduplication.py:generic-api-key:248

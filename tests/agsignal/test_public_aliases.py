@@ -47,6 +47,25 @@ def test_agsignal_interface_aliases_cover_callbacks() -> None:
     assert SignalContextProvider is NotificationContextProvider
 
 
+def test_agsignal_adapter_aliases_cover_delivery_api() -> None:
+    from agsignal.adapters import SlackConfig, get_adapter
+    from notification.adapters import SlackConfig as NotificationSlackConfig
+    from notification.adapters import get_adapter as notification_get_adapter
+
+    assert SlackConfig is NotificationSlackConfig
+    assert get_adapter is notification_get_adapter
+
+
+def test_agsignal_runtime_helper_aliases_cover_lower_level_api() -> None:
+    from agsignal.deduplication import RedisDeduplicationStore
+    from agsignal.rate_limiting import RateLimitConfig
+    from notification.deduplication import RedisDeduplicationStore as NotificationRedisStore
+    from notification.rate_limiting import RateLimitConfig as NotificationRateLimitConfig
+
+    assert RedisDeduplicationStore is NotificationRedisStore
+    assert RateLimitConfig is NotificationRateLimitConfig
+
+
 def test_agsignal_integrations_reexport_app_boundary() -> None:
     from agsignal.integrations import AppSignalAdapter
     from notification.integrations import AppSignalAdapter as NotificationAppSignalAdapter

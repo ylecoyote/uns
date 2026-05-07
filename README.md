@@ -39,7 +39,7 @@ AGSignal does not:
 | **AGS** | Agent Governance Signaling, the product category. |
 | **Governance signal** | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
 | **AGSignal Core** | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
-| **Signal API** | Public API surface for producers that emit governance events. The current Python implementation is still exposed through `notification.*` while the product API stabilizes. |
+| **Signal API** | Public API surface for producers that emit governance events. New integrations should use `agsignal.*`; `notification.*` remains as a compatibility layer. |
 | **AGSignal Console** | The read-first operator UI for delivery timelines, policy inspection, audit history, and invariants. |
 | **UNS Core** | Historical extraction name for the notification runtime from MIP. Use this only for provenance or compatibility. |
 
@@ -342,12 +342,12 @@ configure_policy_registry(policies=[policy])
 ### Adapter Configuration
 
 ```python
-from notification.adapters import get_adapter, SlackConfig
-from notification.models import Channel
+from agsignal.adapters import SlackConfig, get_adapter
+from agsignal.models import Channel
 
 # Configure Slack adapter
 config = SlackConfig(
-    bot_token="xoxb-your-token",
+    bot_token="xoxb-your-workspace-token",
     default_channel="#alerts",
 )
 adapter = get_adapter(Channel.SLACK, config=config)
@@ -356,8 +356,8 @@ adapter = get_adapter(Channel.SLACK, config=config)
 ### Rate Limiting
 
 ```python
-from notification.rate_limiting import configure_rate_limiter, RateLimitConfig
-from notification.models import Channel
+from agsignal.models import Channel
+from agsignal.rate_limiting import RateLimitConfig, configure_rate_limiter
 
 # Configure custom rate limits
 config = {
@@ -370,8 +370,7 @@ configure_rate_limiter(config)
 ### Deduplication
 
 ```python
-from notification.deduplication import configure_deduplication_engine
-from notification.deduplication import RedisDeduplicationStore
+from agsignal.deduplication import RedisDeduplicationStore, configure_deduplication_engine
 
 # Configure Redis-backed deduplication
 store = RedisDeduplicationStore(redis_client)
@@ -380,9 +379,9 @@ configure_deduplication_engine(store=store, window_seconds=300)
 
 ## API Reference
 
-### NotificationSDK
+### SignalClient
 
-The primary interface for sending notifications.
+The primary interface for sending governance signals.
 
 #### Methods
 
@@ -398,7 +397,7 @@ The primary interface for sending notifications.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `notification_type` | str | Yes | Namespaced type (e.g., "trading.order_placed") |
+| `notification_type` | str | Yes | Namespaced type (e.g., "agent.order_placed") |
 | `title` | str | Yes | Title (max 200 chars) |
 | `message` | str | Yes | Body (max 4000 chars) |
 | `source` | str | Yes | Producer identifier |
@@ -414,7 +413,7 @@ The primary interface for sending notifications.
 #### AutonomyContext
 
 ```python
-from notification.models import AutonomyContext, AutonomyMode
+from agsignal.models import AutonomyContext, AutonomyMode
 
 context = AutonomyContext(
     autonomy_mode=AutonomyMode.LIVE,      # Required: PREVIEW, SHADOW, or LIVE
@@ -429,7 +428,7 @@ context = AutonomyContext(
 #### Notification
 
 ```python
-from notification.models import (
+from agsignal.models import (
     Notification,
     NotificationIntent,
     DeliveryMode,
@@ -438,12 +437,12 @@ from notification.models import (
 )
 
 notification = Notification(
-    notification_type="trading.order_placed",
+    notification_type="agent.order_placed",
     intent=NotificationIntent.OPERATIONAL,
     autonomy_context=context,
     title="Order Placed",
-    message="Buy order for 100 shares of AAPL",
-    source="order_manager",
+    message="Agent completed the guarded operation",
+    source="agent-runtime",
     delivery_mode=DeliveryMode.BEST_EFFORT,
     channels=[Channel.SLACK],
     priority=Priority.NORMAL,
@@ -453,7 +452,7 @@ notification = Notification(
 #### NotificationResult
 
 ```python
-from notification.models import NotificationResult, DeliveryStatus
+from agsignal.models import DeliveryStatus, NotificationResult
 
 result = NotificationResult(
     notification_id=notification.notification_id,
@@ -463,6 +462,12 @@ result = NotificationResult(
     channels_failed=[],
 )
 ```
+
+## Support and Security
+
+Use GitHub issues for public bugs and feature requests. Do not report security
+vulnerabilities in public issues; use the private reporting process in
+[`SECURITY.md`](SECURITY.md).
 
 ### Enums
 

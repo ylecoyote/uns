@@ -69,7 +69,7 @@ def notification_with_dedup_key(autonomy_context: AutonomyContext) -> Notificati
         title="Test Notification",
         message="This is a test notification message.",
         source="test-suite",
-        dedup_key="explicit-dedup-key-123",
+        dedup_key="example",
     )
 
 
@@ -293,7 +293,7 @@ class TestDeduplicationEngine:
     def test_generate_dedup_key_uses_explicit_key(self, notification_with_dedup_key: Notification):
         """Test that explicit dedup_key is used when provided."""
         key = DeduplicationEngine.generate_dedup_key(notification_with_dedup_key)
-        assert key == "explicit-dedup-key-123"
+        assert key == "example"
 
     def test_generate_dedup_key_generates_hash(self, sample_notification: Notification):
         """Test that a hash is generated when no explicit key."""
@@ -523,7 +523,7 @@ class TestGenerateDedupKey:
     def test_explicit_dedup_key_used(self, notification_with_dedup_key: Notification):
         """Test explicit dedup_key is used if provided."""
         key = generate_dedup_key(notification_with_dedup_key)
-        assert key == "explicit-dedup-key-123"
+        assert key == "example"
 
     def test_generated_key_is_stable(self, sample_notification: Notification):
         """Test generated key is deterministic for same notification properties."""

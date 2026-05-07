@@ -95,10 +95,13 @@ CLAUDE.local.md
 notepad.md
 
 # Local research/export artifacts
+REVIEW.md
 Unified Notification Service (UNS) › Issues.csv
 agent_governance_control_plane_prd.md
 evaluating_trading_notification_engine.md
 uns-invariants-as-contractual-guarantees.md
+uns-doc-*.yaml
+uns-ui-phase-*.yaml
 uns-ui-phase-1_1-standardize-ui.yaml
 uns-ui-phase-1_2-guardrails-ci-contracts.yaml
 
