@@ -122,8 +122,8 @@ def create_app(skip_persistence_config: bool = False) -> FastAPI:
         configure_persistence()
 
     app = FastAPI(
-        title="Unified Notification Service",
-        description="Control-plane notification and acknowledgment service",
+        title="AGSignal Console API",
+        description="Read-first console API for AGSignal governance signals",
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",

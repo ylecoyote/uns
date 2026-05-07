@@ -134,6 +134,15 @@ class NotificationAuditRecord(Base):
     skip_snapshot_id: Mapped[UUID | None] = mapped_column(
         Uuid, nullable=True, comment="Optional skip snapshot ID"
     )
+    policy_config_id: Mapped[UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True, comment="Policy config used for routing"
+    )
+    policy_config_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True, comment="Exact policy config hash used"
+    )
+    policy_evaluation_id: Mapped[UUID | None] = mapped_column(
+        Uuid, nullable=True, index=True, comment="Policy evaluation audit correlation ID"
+    )
 
     # Notification content
     title: Mapped[str] = mapped_column(

@@ -451,7 +451,15 @@ def test_simulate_signal_returns_routing_preview_without_registering_ack() -> No
 
 
 def test_delivery_status_returns_latest_seeded_audit_record() -> None:
-    notification = _notification()
+    policy_config_id = uuid4()
+    policy_evaluation_id = uuid4()
+    notification = _notification().model_copy(
+        update={
+            "policy_config_id": policy_config_id,
+            "policy_config_hash": "policy-hash-123",
+            "policy_evaluation_id": policy_evaluation_id,
+        }
+    )
     result = NotificationResult(
         notification_id=notification.notification_id,
         status=DeliveryStatus.SUCCESS,
@@ -477,6 +485,9 @@ def test_delivery_status_returns_latest_seeded_audit_record() -> None:
     assert data["error_message"] == "websocket disconnected"
     assert data["audit_count"] == 1
     assert data["audits"][0]["audit_id"]
+    assert data["audits"][0]["policy_config_id"] == str(policy_config_id)
+    assert data["audits"][0]["policy_config_hash"] == "policy-hash-123"
+    assert data["audits"][0]["policy_evaluation_id"] == str(policy_evaluation_id)
 
 
 def test_delivery_status_returns_404_when_no_delivery_audit_exists() -> None:
