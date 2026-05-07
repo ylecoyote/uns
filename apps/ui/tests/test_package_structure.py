@@ -1,4 +1,4 @@
-"""Tests for UNS UI package structure.
+"""Tests for AGSignal Console package structure.
 
 These tests verify that the UI package is properly structured
 and that all expected modules can be imported.
@@ -443,9 +443,9 @@ class TestFileStructure:
         readme = ui_root / "README.md"
         content = readme.read_text()
 
-        assert "# UNS UI Dashboard" in content
+        assert "# AGSignal Console" in content
         assert "Non-Authoritative" in content
-        assert "Read-Only" in content or "read-only" in content
+        assert "read-only" in content.lower()
         assert "Local Development" in content
         assert "UNS_API_BASE_URL" in content
 

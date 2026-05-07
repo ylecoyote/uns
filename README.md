@@ -64,8 +64,8 @@ AGSignal does not:
 - **YAML policy definitions:** File-based policy configuration with sample policies under `examples/policies/mip-uns`
 - **Demo config compatibility:** `config/notification_policies` remains loadable for local demos and compatibility, but those MIP-derived policies are sample content and not AGSignal Core defaults
 - **Policy versioning:** Version and status fields on policy definitions
-- **Database persistence:** Planned `notification_policy` table with JSONB columns and content-hash dedup
-- **Hot reload:** Planned `POST /api/v1/policies/reload` for runtime refresh without restart
+- **Database persistence:** `notification_policy` storage with JSON columns and content-hash deduplication
+- **Hot reload:** `POST /api/v1/policies/reload` for runtime refresh without restart
 - **Producer guardrail:** Producers should emit intent and context; AGSignal owns channel routing
 
 ### Governance Feedback Integrations
@@ -110,7 +110,7 @@ pip install -e ".[all]"
 ### Basic Usage
 
 AGSignal Core now provides AGSignal-branded imports while preserving the
-historical runtime package. `notification.* imports remain supported` for
+historical runtime package. `notification.*` imports remain supported for
 existing users.
 
 ```python
@@ -273,20 +273,23 @@ The delivery service (`DeliveryService`) executes the following pipeline steps:
 
 ## Configuration
 
-### SDK Configuration
+### Signal Client Configuration
 
 ```python
-from notification.sdk import configure_sdk
-from notification.policies import PolicyRegistry, NotificationPolicy
+from agsignal.sdk import configure_signal_client
 from notification.interfaces import LoggingAcknowledgmentCallback
+from notification.policies import PolicyRegistry
 
 # Configure with custom components
-sdk = configure_sdk(
+client = configure_signal_client(
     policy_registry=PolicyRegistry(),
     ack_callback=LoggingAcknowledgmentCallback(),
     delivery_handler=my_delivery_handler,
 )
 ```
+
+`notification.*` imports remain supported for existing integrations and for
+lower-level policy/runtime modules that do not yet have AGSignal-branded aliases.
 
 ### Policy Overrides
 
@@ -483,87 +486,80 @@ curl http://localhost:8000/health
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=src --cov-report=html
+uv run pytest --cov=src --cov-report=html
 
 # Run specific test file
-pytest tests/notification/test_sdk.py
+uv run pytest tests/notification/test_sdk.py
 
 # Run tests matching pattern
-pytest -k "test_safety"
+uv run pytest -k "test_safety"
 ```
 
 ## Development
+
+### Documentation Map
+
+AGSignal documentation is task-routed from [docs/README.md](docs/README.md):
+
+| Task | Start Here |
+|------|------------|
+| Evaluate AGSignal | [Product overview](#agsignal), [Architecture](docs/ARCHITECTURE.md) |
+| Quickstart: send a signal | [Quick Start](#quick-start), [API Reference](docs/API.md) |
+| Configure policies | [Policy Lifecycle](docs/sections/policy-lifecycle.md), [MIP UNS Sample Policy Pack](examples/policies/mip-uns/README.md) |
+| Integrate an app | [Integration Modes](docs/sections/integration-modes.md), [Host App Boundary](docs/API.md#host-app-boundary) |
+| Operate and audit | [Observability](docs/sections/observability.md), [Delivery Semantics](docs/sections/delivery-semantics.md) |
+| Verify publish readiness | [M5 Publish Readiness Reference](docs/m5-publish-readiness-reference.md) |
 
 ### Project Structure
 
 ```
 src/
-├── notification/              # ── Notification Service (Extracted) ──
-│   ├── __init__.py
+├── agsignal/                  # AGSignal-branded public aliases
+├── notification/              # Historical runtime package, still supported
 │   ├── models.py              # Core data contracts
 │   ├── interfaces.py          # Integration protocols
 │   ├── policies.py            # Policy schema & registry
-│   ├── policy_loader.py       # YAML policy loader (pending port)
+│   ├── policy_loader.py       # YAML policy loader and reload helpers
+│   ├── policy_config.py       # Hash-bearing policy config envelopes
+│   ├── policy_learning.py     # Policy delta, shadow, and guard primitives
 │   ├── sdk.py                 # Producer interface
 │   ├── service.py             # Delivery orchestration
 │   ├── deduplication.py       # Deduplication engine
 │   ├── rate_limiting.py       # Rate limiting
 │   ├── acknowledgment.py      # Ack lifecycle management
 │   ├── audit.py               # Audit logging
-│   ├── adapters/
-│   │   ├── __init__.py
-│   │   ├── base.py            # Base adapter protocol
-│   │   ├── slack.py           # Slack adapter
-│   │   ├── email.py           # Email adapter
-│   │   ├── websocket.py       # WebSocket adapter
-│   │   └── pagerduty.py       # PagerDuty adapter
-│   └── integrations/          # ── Hook Integrations (pending port) ──
-│       ├── governor_hooks.py  # Autonomy-level change notifications
-│       └── circuit_breaker_hooks.py  # Circuit-breaker notifications
-├── governance/                # ── Agent Governance (planned) ──
-│   ├── governor.py            # Agent Governor state machine
-│   ├── decision_policies.py   # Decision policy models
-│   └── autonomy.py            # Autonomy-level management
+│   ├── adapters/              # Slack, email, WebSocket, PagerDuty adapters
+│   └── integrations/          # Generic app boundary and optional MIP adapter
 ├── db/
 │   ├── models.py              # Database models
 │   ├── audit_store.py         # Audit persistence
-│   └── migrations/            # SQL migrations (pending port)
+│   ├── policy_store.py        # Policy persistence
+│   ├── policy_learning_store.py
+│   └── migrations/            # SQL migrations
 ├── mcp_server/
-│   └── routes_notification.py # HTTP API routes
-└── config/
-    └── notification_policies/ # YAML policy definitions (pending port)
-tests/
-└── notification/
-    ├── test_models.py
-    ├── test_interfaces.py
-    ├── test_policies.py
-    ├── test_policy_lifecycle.py   # (pending port)
-    ├── test_policy_loader.py      # (pending port)
-    ├── test_policy_persistence.py # (pending port)
-    ├── test_policy_hot_reload.py  # (pending port)
-    ├── test_sdk.py
-    ├── test_service.py
-    ├── test_deduplication.py
-    ├── test_rate_limiting.py
-    ├── test_adapters.py
-    ├── test_acknowledgment.py
-    └── test_audit.py
+│   ├── app.py                 # AGSignal Console API app
+│   └── routes_ui.py           # Read-only console endpoints
+apps/ui/                       # AGSignal Console frontend
+docs/                          # Task-routed docs, decisions, reports
+examples/policies/mip-uns/     # Canonical MIP-derived sample policy pack
+config/notification_policies/  # Demo/compatibility policy config, not defaults
+tests/                         # Runtime, docs, examples, DB, and UI tests
 ```
 
 ### Code Quality
 
 ```bash
 # Lint code
-ruff check src tests
+uv run ruff check src tests
 
 # Format code
-ruff format src tests
+uv run ruff format src tests
 
 # Type check
-mypy src
+uv run mypy src
 ```
 
 ## Dependencies

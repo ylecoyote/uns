@@ -1,5 +1,5 @@
 /**
- * Standardized typed API client for UNS UI endpoints.
+ * Standardized typed API client for AGSignal Console endpoints.
  *
  * This is the SINGLE SOURCE OF TRUTH for all API communication.
  * All endpoints are READ-ONLY per ui-scope.md.

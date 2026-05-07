@@ -1,6 +1,6 @@
-# UNS UI Dashboard
+# AGSignal Console
 
-Read-Only dashboard for the Unified Notification Service.
+Read-only dashboard for AGSignal Core.
 
 ## Stack
 
@@ -19,7 +19,9 @@ Read-Only dashboard for the Unified Notification Service.
 
 ### Non-Authoritative UI
 
-The UI is a **read-first "flight instruments" dashboard** per [ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the notification system's state and health without offering direct manipulation capabilities.
+AGSignal Console is a **read-first "flight instruments" dashboard** per
+[ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the signal
+system's state and health without offering direct manipulation capabilities.
 
 **Key constraints:**
 
@@ -138,7 +140,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Configure the API base URL (defaults to local dev server):
+Keep the compatibility API base URL in `.env` for components that read it:
 
 ```bash
 # .env
@@ -160,7 +162,9 @@ npm run dev
 
 Then visit http://localhost:5173
 
-The Vite dev server proxies `/ui/*` requests to the backend at `http://localhost:8000` (configurable via `VITE_UNS_API_BASE_URL`).
+The Vite dev server currently proxies `/ui/*` requests to
+`http://localhost:8000` from `vite.config.ts`. Update `vite.config.ts` if your
+backend runs elsewhere.
 
 ### Run Tests
 
@@ -202,7 +206,7 @@ npm run preview
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_UNS_API_BASE_URL` | Base URL for UNS API endpoints | `http://localhost:8000` |
+| `VITE_UNS_API_BASE_URL` | Base URL for AGSignal Console endpoints | `http://localhost:8000` |
 
 All environment variables must be prefixed with `VITE_` to be exposed to the browser.
 
@@ -288,21 +292,24 @@ Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md)
 
 ## Boundary Rules
 
-The canonical `apps/ui/` directory enforces strict boundaries to prevent Flask/Python HTML-serving patterns from returning. The canonical UI is a **React SPA** served by Vite. Python files are not permitted in the canonical UI directory structure (except for legacy reference code). This is enforced by a CI guardrail.
+The intended canonical UI boundary is a **React SPA** served by Vite, with
+backend JSON APIs in `src/mcp_server/`. The current tree still contains Python
+UI compatibility artifacts under `apps/ui/`; treat them as migration debt until
+they are moved or explicitly exempted.
 
 ### Rules Enforced by CI
 
 | Rule | Description |
 |------|-------------|
-| **NO_PYTHON_IN_CANONICAL_UI** | No `.py` files allowed in `apps/ui/` except under `legacy_flask_reference/` |
+| **NO_PYTHON_IN_CANONICAL_UI** | Target rule: no `.py` files in canonical React UI paths once compatibility artifacts are moved |
 | **NO_TEMPLATES_DIRECTORY** | No `templates/` directories (Flask-style HTML templating) |
 | **NO_FLASK_APP_IN_UI** | No Flask imports or `render_template` patterns in app.py files |
 
 ### Allowed Exceptions
 
-Python files are allowed **only** under `apps/ui/legacy_flask_reference/` for migration reference purposes. This folder is intended for:
-- Temporary preservation of old Flask code during migration
-- Reference for developers migrating functionality to the canonical React/TypeScript stack
+Python files currently remain under `apps/ui/` for compatibility tests and
+migration support. New public UI work should use the React/TypeScript stack and
+keep backend logic in `src/mcp_server/`.
 
 ### Migration Guidance
 
@@ -335,11 +342,15 @@ The UI boundary guardrail runs in CI on every PR that touches:
 - `scripts/ci/check_ui_boundary.py`
 - `.github/workflows/ui.yaml`
 
-The guardrail fails with `--strict` mode, preventing merges that violate boundary rules.
+Strict mode is the target CI posture after the remaining compatibility artifacts
+are moved or explicitly exempted.
 
 ### Current Status
 
-The guardrail currently detects Python files in `apps/ui/` that need to be migrated. These files are legacy artifacts from the initial FastAPI-based UI implementation and should be moved to the appropriate backend locations.
+The guardrail currently detects Python files in `apps/ui/`. Those files are
+legacy/compatibility artifacts from the initial FastAPI-based UI implementation
+and should be moved to the appropriate backend locations before strict
+enforcement is treated as a release gate.
 
 See [scripts/ci/check_ui_boundary.py](../../scripts/ci/check_ui_boundary.py) for the full guardrail implementation.
 

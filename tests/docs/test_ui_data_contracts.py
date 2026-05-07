@@ -46,7 +46,7 @@ class TestDocumentStructure:
 
     def test_has_title(self, data_contracts_doc: str) -> None:
         """Verify document has correct title."""
-        assert data_contracts_doc.startswith("# UI Data Contracts")
+        assert data_contracts_doc.startswith("# AGSignal Console Data Contracts")
 
     def test_has_design_principles(self, data_contracts_doc: str) -> None:
         """Verify document has design principles section."""
@@ -125,7 +125,7 @@ class TestDeliveryTimelineContract:
     def test_has_endpoint_definition(self, data_contracts_doc: str) -> None:
         """Verify delivery timeline endpoint is documented."""
         section = self._get_delivery_timeline_section(data_contracts_doc)
-        assert "GET /api/v1/notifications/{notification_id}/delivery-timeline" in section
+        assert "GET /ui/deliveries/{notification_id}" in section
 
     def test_has_response_shape(self, data_contracts_doc: str) -> None:
         """Verify DeliveryTimelineResponse interface is documented."""
@@ -158,7 +158,7 @@ class TestDeliveryTimelineContract:
     def test_has_list_endpoint(self, data_contracts_doc: str) -> None:
         """Verify list delivery timelines endpoint is documented."""
         section = self._get_delivery_timeline_section(data_contracts_doc)
-        assert "GET /api/v1/delivery-timelines" in section
+        assert "GET /ui/deliveries" in section
 
     def test_has_channel_type(self, data_contracts_doc: str) -> None:
         """Verify Channel type aligns with existing models."""
@@ -181,7 +181,7 @@ class TestEscalationsContract:
     def test_has_endpoint_definition(self, data_contracts_doc: str) -> None:
         """Verify escalations endpoint is documented."""
         section = self._get_escalations_section(data_contracts_doc)
-        assert "GET /api/v1/escalations" in section
+        assert "Planned: GET /ui/escalations" in section
 
     def test_has_escalation_event_shape(self, data_contracts_doc: str) -> None:
         """Verify EscalationEvent interface is documented."""
@@ -225,7 +225,7 @@ class TestPolicyResolutionContract:
     def test_has_endpoint_definition(self, data_contracts_doc: str) -> None:
         """Verify policy trace endpoint is documented."""
         section = self._get_policy_section(data_contracts_doc)
-        assert "GET /api/v1/notifications/{notification_id}/policy-trace" in section
+        assert "GET /ui/policies/effective" in section
 
     def test_has_resolution_trace_response(self, data_contracts_doc: str) -> None:
         """Verify PolicyResolutionTraceResponse interface is documented."""
@@ -258,7 +258,7 @@ class TestPolicyResolutionContract:
     def test_has_simulate_endpoint(self, data_contracts_doc: str) -> None:
         """Verify simulation endpoint is documented."""
         section = self._get_policy_section(data_contracts_doc)
-        assert "POST /api/v1/policy-trace/simulate" in section
+        assert "Planned: POST /ui/policies/simulate" in section
 
 
 class TestInvariantRegistryContract:
@@ -273,7 +273,7 @@ class TestInvariantRegistryContract:
     def test_has_endpoint_definition(self, data_contracts_doc: str) -> None:
         """Verify invariants endpoint is documented."""
         section = self._get_invariant_section(data_contracts_doc)
-        assert "GET /api/v1/invariants" in section
+        assert "GET /ui/invariants" in section
 
     def test_has_invariant_entry_shape(self, data_contracts_doc: str) -> None:
         """Verify InvariantEntry interface is documented."""
@@ -305,7 +305,7 @@ class TestInvariantRegistryContract:
     def test_has_summary_endpoint(self, data_contracts_doc: str) -> None:
         """Verify summary statistics endpoint is documented."""
         section = self._get_invariant_section(data_contracts_doc)
-        assert "GET /api/v1/invariants/summary" in section
+        assert "GET /ui/invariants/summary" in section
 
 
 class TestAuditEventStreamContract:
@@ -319,7 +319,7 @@ class TestAuditEventStreamContract:
     def test_has_endpoint_definition(self, data_contracts_doc: str) -> None:
         """Verify audit events endpoint is documented."""
         section = self._get_audit_section(data_contracts_doc)
-        assert "GET /api/v1/audit-events" in section
+        assert "GET /ui/audit" in section
 
     def test_has_audit_event_shape(self, data_contracts_doc: str) -> None:
         """Verify AuditEvent interface is documented."""
@@ -351,12 +351,12 @@ class TestAuditEventStreamContract:
     def test_has_notification_events_endpoint(self, data_contracts_doc: str) -> None:
         """Verify endpoint for notification-specific events is documented."""
         section = self._get_audit_section(data_contracts_doc)
-        assert "GET /api/v1/notifications/{notification_id}/audit-events" in section
+        assert "GET /ui/audit?notification_id={notification_id}" in section
 
     def test_has_statistics_endpoint(self, data_contracts_doc: str) -> None:
         """Verify audit statistics endpoint is documented."""
         section = self._get_audit_section(data_contracts_doc)
-        assert "GET /api/v1/audit-events/statistics" in section
+        assert "Planned: GET /ui/audit/statistics" in section
 
 
 class TestModelAlignment:
@@ -415,7 +415,7 @@ class TestPaginationConsistency:
         """Verify cursor semantics section exists."""
         assert "## Cursor Semantics" in data_contracts_doc
         assert "opaque" in data_contracts_doc.lower()
-        assert "expire" in data_contracts_doc.lower()
+        assert "Invalid cursors currently restart pagination" in data_contracts_doc
 
 
 class TestErrorHandling:
@@ -433,7 +433,7 @@ class TestErrorHandling:
     def test_rate_limiting_documented(self, data_contracts_doc: str) -> None:
         """Verify rate limiting is documented."""
         assert "## Rate Limiting" in data_contracts_doc
-        assert "X-RateLimit" in data_contracts_doc
+        assert "do not currently add HTTP rate-limit headers" in data_contracts_doc
 
 
 class TestRelatedDocumentation:

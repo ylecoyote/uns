@@ -1,5 +1,5 @@
 /**
- * Component exports for UNS UI Dashboard.
+ * Component exports for AGSignal Console.
  *
  * Export all reusable UI components from this index.
  */

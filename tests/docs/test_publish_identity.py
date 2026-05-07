@@ -34,6 +34,59 @@ def test_readme_labels_current_policy_directory_as_sample_config() -> None:
     assert "config/notification_policies" in content
     assert "sample" in content.lower()
     assert "not AGSignal Core defaults" in content
+    assert "Planned `notification_policy`" not in content
+    assert "Planned `POST /api/v1/policies/reload`" not in content
+
+
+def test_docs_index_routes_publish_readers_by_task() -> None:
+    content = (ROOT / "docs" / "README.md").read_text()
+
+    for task in (
+        "Evaluate AGSignal",
+        "Quickstart: send a signal",
+        "Configure policies",
+        "Integrate an app",
+        "Operate and audit",
+        "Extend AGSignal",
+        "Verify publish readiness",
+    ):
+        assert task in content
+
+
+def test_publish_ui_surface_uses_agsignal_console_name() -> None:
+    paths = (
+        ROOT / "apps" / "ui" / "README.md",
+        ROOT / "apps" / "ui" / "index.html",
+        ROOT / "apps" / "ui" / "src" / "App.tsx",
+        ROOT / "docs" / "ui" / "ui-data-contracts.md",
+        ROOT / "docs" / "ui" / "contracts" / "ui-contracts.json",
+    )
+
+    for path in paths:
+        content = path.read_text()
+        assert "AGSignal Console" in content
+        assert "UNS Dashboard" not in content
+        assert "UNS UI" not in content
+
+
+def test_ui_package_manifest_uses_console_identity() -> None:
+    package_json = (ROOT / "apps" / "ui" / "package.json").read_text()
+    package_lock = (ROOT / "apps" / "ui" / "package-lock.json").read_text()
+
+    assert '"name": "agsignal-console"' in package_json
+    assert '"name": "agsignal-console"' in package_lock
+    assert '"name": "uns-ui"' not in package_json
+    assert '"name": "uns-ui"' not in package_lock
+
+
+def test_console_contract_docs_use_ui_endpoint_prefix() -> None:
+    content = (ROOT / "docs" / "ui" / "ui-data-contracts.md").read_text()
+
+    assert "GET /ui/deliveries" in content
+    assert "GET /ui/policies/effective" in content
+    assert "GET /ui/invariants" in content
+    assert "GET /ui/audit" in content
+    assert "GET /api/v1/notifications/{notification_id}/delivery-timeline" not in content
 
 
 def test_no_bytecode_artifacts_are_tracked() -> None:

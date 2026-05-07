@@ -60,7 +60,8 @@ class TestDocsReadmeExists:
 
     def test_has_navigation_section(self, docs_readme: str) -> None:
         """Verify docs/README.md has navigation."""
-        assert "## Quick Navigation" in docs_readme
+        assert "## Task Navigation" in docs_readme
+        assert "Evaluate AGSignal" in docs_readme
 
     def test_has_document_map(self, docs_readme: str) -> None:
         """Verify docs/README.md has document map."""

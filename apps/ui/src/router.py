@@ -1,4 +1,4 @@
-"""Router configuration for UNS UI Dashboard.
+"""Router configuration for AGSignal Console.
 
 This module defines the routing structure for the UI application,
 mapping URL paths to page handlers.
