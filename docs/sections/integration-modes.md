@@ -290,7 +290,9 @@ When AGSignal Core is integrated with ATP:
 3. **Reconnection**: ATP implements reconnection strategies
 4. **Message Routing**: ATP routes messages to appropriate clients
 
-AGSignal Core assumes only that the injected connection manager implements a `send()` method.
+AGSignal Core assumes the injected connection manager implements the
+`WebSocketConnectionManager` protocol: `broadcast()`, `send_to_user()`,
+`send_to_agent()`, and `get_connection_count()`.
 
 ## Default Implementations
 
