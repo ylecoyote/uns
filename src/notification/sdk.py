@@ -167,7 +167,12 @@ class NotificationSDK:
         policy = self._policy_registry.get_sync(notification_type)
 
         # Derive values using policy overrides and defaults
-        delivery_mode = self._resolve_delivery_mode(intent, policy, delivery_mode_override)
+        delivery_mode = self._resolve_delivery_mode(
+            intent,
+            context.autonomy_mode,
+            policy,
+            delivery_mode_override,
+        )
         channels = self._resolve_channels(
             intent, context.autonomy_mode, irreversible, policy, channels_override
         )
@@ -447,6 +452,7 @@ class NotificationSDK:
     def _resolve_delivery_mode(
         self,
         intent: NotificationIntent,
+        autonomy_mode: AutonomyMode,
         policy: NotificationPolicy | None,
         override: DeliveryMode | None,
     ) -> DeliveryMode:
@@ -454,11 +460,13 @@ class NotificationSDK:
 
         Priority:
         1. Explicit override
-        2. Policy delivery_mode
-        3. Intent default (SAFETY/GOVERNANCE → GUARANTEED, else BEST_EFFORT)
+        2. Policy mode-specific delivery_mode
+        3. Policy delivery_mode
+        4. Intent default (SAFETY/GOVERNANCE → GUARANTEED, else BEST_EFFORT)
 
         Args:
             intent: The notification intent
+            autonomy_mode: Current operating mode
             policy: The applicable policy, if any
             override: Explicit override, if any
 
@@ -467,8 +475,8 @@ class NotificationSDK:
         """
         if override is not None:
             return override
-        if policy is not None and policy.delivery_mode is not None:
-            return policy.delivery_mode
+        if policy is not None:
+            return policy.get_delivery_mode_for_mode(autonomy_mode, intent)
         return get_default_delivery_mode(intent)
 
     def _resolve_channels(

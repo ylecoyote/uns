@@ -720,6 +720,19 @@ class PolicyRegistry:
 
         return _get_default_delivery_mode_from_models(intent)
 
+    def get_delivery_mode_for_mode(
+        self,
+        notification_type: str,
+        intent: NotificationIntent,
+        autonomy_mode: AutonomyMode,
+    ) -> DeliveryMode:
+        """Get delivery mode, considering mode-specific policy overrides."""
+        policy = self.get_sync(notification_type)
+        if policy is not None:
+            return policy.get_delivery_mode_for_mode(autonomy_mode, intent)
+
+        return _get_default_delivery_mode_from_models(intent)
+
     def get_ack_timeout(
         self,
         notification_type: str,
@@ -875,4 +888,4 @@ def resolve_delivery_mode(
         The delivery mode to use
     """
     reg = registry if registry is not None else get_policy_registry()
-    return reg.get_delivery_mode(notification_type, intent)
+    return reg.get_delivery_mode_for_mode(notification_type, intent, autonomy_mode)
