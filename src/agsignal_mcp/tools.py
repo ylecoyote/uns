@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -46,6 +45,7 @@ class SendSignalInput(BaseModel):
     idempotency_key: str | None = None
     deliver: bool = False
     operator_intent: Literal["deliver"] | None = None
+    operator_confirmation_token: str | None = None
 
 
 class AckNotificationInput(BaseModel):
@@ -59,7 +59,10 @@ class AckNotificationInput(BaseModel):
 
 
 def _runtime_payload(payload: SendSignalInput) -> dict[str, Any]:
-    data = payload.model_dump(exclude={"deliver", "operator_intent"}, exclude_none=True)
+    data = payload.model_dump(
+        exclude={"deliver", "operator_intent", "operator_confirmation_token"},
+        exclude_none=True,
+    )
     return dict(data)
 
 
@@ -100,12 +103,23 @@ def simulate_signal(
 def send_signal(
     payload: SendSignalInput,
     runtime_state: RuntimeState | None = None,
+    config: MCPRuntimeConfig | None = None,
 ) -> dict[str, Any]:
     """Preview or send an AGSignal signal through MCP."""
-    if payload.deliver and payload.operator_intent != "deliver":
-        raise ValueError("send_signal deliver=true requires operator_intent='deliver'")
     if not payload.deliver:
         return simulate_signal(payload, runtime_state=runtime_state)
+
+    active_config = config or MCPRuntimeConfig()
+    if active_config.read_only:
+        raise ValueError("send_signal is disabled in read-only mode")
+    if payload.operator_intent != "deliver":
+        raise ValueError("send_signal deliver=true requires operator_intent='deliver'")
+    if active_config.require_delivery_confirmation:
+        if not active_config.delivery_confirmation_token:
+            raise ValueError("send_signal delivery requires a configured confirmation token")
+        if payload.operator_confirmation_token != active_config.delivery_confirmation_token:
+            raise ValueError("send_signal delivery confirmation token is invalid")
+
     response = send_runtime_signal(runtime_state or RuntimeState(), _runtime_payload(payload))
     data = response.model_dump(mode="json")
     data["delivered"] = True
@@ -121,25 +135,32 @@ def ack_notification(
     active_config = config or MCPRuntimeConfig()
     if active_config.read_only:
         raise ValueError("ack_notification is disabled in read-only mode")
+    if not active_config.operator_principal:
+        raise ValueError("ack_notification requires an operator principal")
+    if payload.acked_by is not None and payload.acked_by != active_config.operator_principal:
+        raise ValueError("ack_notification acked_by must match the operator principal")
     engine = _get_ack_engine()
-    old_status = engine.get_status(payload.notification_id)
+    before_commit = None
+    if runtime_state is not None:
+        def before_commit(old_status: AckStatus | None, ack_event) -> None:
+            runtime_state.audit_store.save_ack_audit(
+                create_ack_audit_record(
+                    notification_id=ack_event.notification_id,
+                    old_status=old_status,
+                    new_status=ack_event.ack_status,
+                    acked_by=ack_event.acked_by,
+                    acked_at=ack_event.acked_at,
+                    metadata=ack_event.metadata,
+                )
+            )
+
     event = engine.ack(
         notification_id=payload.notification_id,
         ack_status=AckStatus.ACKED,
-        acked_by=payload.acked_by,
+        acked_by=active_config.operator_principal,
         metadata=payload.metadata,
+        before_commit=before_commit,
     )
-    if runtime_state is not None and old_status != event.ack_status:
-        runtime_state.audit_store.save_ack_audit(
-            create_ack_audit_record(
-                notification_id=event.notification_id,
-                old_status=old_status,
-                new_status=event.ack_status,
-                acked_by=event.acked_by,
-                acked_at=event.acked_at,
-                metadata=event.metadata,
-            )
-        )
     return {
         "notification_id": str(event.notification_id),
         "ack_status": event.ack_status.value,
@@ -158,25 +179,32 @@ def dismiss_notification(
     active_config = config or MCPRuntimeConfig()
     if active_config.read_only:
         raise ValueError("dismiss_notification is disabled in read-only mode")
+    if not active_config.operator_principal:
+        raise ValueError("dismiss_notification requires an operator principal")
+    if payload.acked_by is not None and payload.acked_by != active_config.operator_principal:
+        raise ValueError("dismiss_notification acked_by must match the operator principal")
     engine = _get_ack_engine()
-    old_status = engine.get_status(payload.notification_id)
+    before_commit = None
+    if runtime_state is not None:
+        def before_commit(old_status: AckStatus | None, ack_event) -> None:
+            runtime_state.audit_store.save_ack_audit(
+                create_ack_audit_record(
+                    notification_id=ack_event.notification_id,
+                    old_status=old_status,
+                    new_status=ack_event.ack_status,
+                    acked_by=ack_event.acked_by,
+                    acked_at=ack_event.acked_at,
+                    metadata=ack_event.metadata,
+                )
+            )
+
     event = engine.ack(
         notification_id=payload.notification_id,
         ack_status=AckStatus.DISMISSED,
-        acked_by=payload.acked_by,
+        acked_by=active_config.operator_principal,
         metadata=payload.metadata,
+        before_commit=before_commit,
     )
-    if runtime_state is not None and old_status != event.ack_status:
-        runtime_state.audit_store.save_ack_audit(
-            create_ack_audit_record(
-                notification_id=event.notification_id,
-                old_status=old_status,
-                new_status=event.ack_status,
-                acked_by=event.acked_by,
-                acked_at=event.acked_at,
-                metadata=event.metadata,
-            )
-        )
     return {
         "notification_id": str(event.notification_id),
         "ack_status": event.ack_status.value,
@@ -279,43 +307,63 @@ def health() -> dict[str, str]:
     }
 
 
-def get_effective_policy(
+async def get_effective_policy(
     notification_type: str,
     intent: str,
     autonomy_mode: str,
     irreversible: bool = False,
 ) -> dict[str, Any]:
     """Return effective policy resolution for a signal shape."""
-    response = asyncio.run(
-        get_effective_policy_route(
-            notification_type=notification_type,
-            intent=NotificationIntent(intent),
-            autonomy_mode=AutonomyMode(autonomy_mode),
-            irreversible=irreversible,
-        )
+    response = await get_effective_policy_route(
+        notification_type=notification_type,
+        intent=NotificationIntent(intent),
+        autonomy_mode=AutonomyMode(autonomy_mode),
+        irreversible=irreversible,
     )
     return response.model_dump(mode="json")
 
 
-def list_invariants(limit: int = 25) -> dict[str, Any]:
+async def list_invariants(limit: int = 25) -> dict[str, Any]:
     """Return registered AGSignal invariants."""
-    response = asyncio.run(list_invariants_route(limit=limit))
+    response = await list_invariants_route(limit=limit)
     return response.model_dump(mode="json")
 
 
-def get_invariants_summary() -> dict[str, Any]:
+async def get_invariants_summary() -> dict[str, Any]:
     """Return invariant summary counts."""
-    response = asyncio.run(get_invariants_summary_route())
+    response = await get_invariants_summary_route()
     return response.model_dump(mode="json")
 
 
-def list_deliveries(limit: int = 25) -> dict[str, Any]:
+async def list_deliveries(limit: int = 25) -> dict[str, Any]:
     """Return delivery read-model entries."""
-    response = asyncio.run(list_deliveries_route(limit=limit))
+    response = await list_deliveries_route(
+        cursor=None,
+        limit=limit,
+        start_time=None,
+        end_time=None,
+        status=None,
+        intent=None,
+        delivery_mode=None,
+        agent_id=None,
+        autonomy_mode=None,
+        notification_type=None,
+        channel=None,
+    )
     return response.model_dump(mode="json")
 
 
-def list_audit_events(limit: int = 25) -> dict[str, Any]:
+async def list_audit_events(limit: int = 25) -> dict[str, Any]:
     """Return audit read-model entries."""
-    response = asyncio.run(list_audit_events_route(limit=limit))
+    response = await list_audit_events_route(
+        cursor=None,
+        limit=limit,
+        start_time=None,
+        end_time=None,
+        event_type=None,
+        notification_id=None,
+        agent_id=None,
+        autonomy_mode=None,
+        correlation_id=None,
+    )
     return response.model_dump(mode="json")

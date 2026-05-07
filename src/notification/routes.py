@@ -31,11 +31,13 @@ from notification.models import (
 from notification.policies import (
     DEFAULT_DEDUP_WINDOW_SECONDS,
     PolicyRegistry,
-    PolicyStatus,
     configure_policy_registry,
     get_policy_registry,
 )
-from notification.policy_loader import load_policies_from_directory
+from notification.policy_loader import (
+    load_policies_from_directory,
+    load_runtime_registry_from_directory,
+)
 from notification.sdk import NotificationSDK, ValidationError
 from notification.websocket_runtime import (
     WebSocketConnectionManager,
@@ -534,7 +536,7 @@ async def reload_policies(
 ) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
     policy_dir = Path(reload_request.policy_dir)
-    registry = PolicyRegistry()
+    registry = PolicyRegistry(runtime_only=False)
     try:
         loaded_count = load_policies_from_directory(policy_dir, registry=registry)
     except FileNotFoundError as exc:
@@ -553,10 +555,7 @@ async def reload_policies(
             detail={"error": "invalid_policy", "message": str(exc)},
         ) from exc
 
-    runtime_registry = PolicyRegistry()
-    for policy in registry.get_all().values():
-        if policy.status == PolicyStatus.ACTIVE:
-            runtime_registry.register(policy)
+    _, runtime_registry = load_runtime_registry_from_directory(policy_dir)
 
     persisted_count = 0
     policy_store = getattr(http_request.app.state, "policy_store", None)

@@ -99,14 +99,15 @@ def _client(
 
     from notification.main import create_app
 
-    return TestClient(
-        create_app(
-            dlq_service=dlq_service,
-            policy_store=policy_store,
-            channel_health_tracker=channel_health_tracker,
-            audit_store=audit_store,
-        )
+    app = create_app(
+        dlq_service=dlq_service,
+        policy_store=policy_store,
+        channel_health_tracker=channel_health_tracker,
+        audit_store=audit_store,
     )
+    app.state.agsignal_api_key = "test-key"
+    app.state.agsignal_api_principal = "risk-operator"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 class ExplodingRedisFactory:

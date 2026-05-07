@@ -9,6 +9,7 @@ Tests cover:
 """
 
 from datetime import UTC, datetime, timedelta
+from threading import Thread
 from typing import Any
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -518,6 +519,47 @@ class TestAcknowledgmentEngine:
         # Only one ack callback should be invoked
         assert len(callback.ack_events) == 1
         # Only one status change
+        assert len(callback.status_changes) == 1
+
+    def test_concurrent_duplicate_ack_is_idempotent(self) -> None:
+        """Concurrent duplicate ACK calls should not clobber actor or callbacks."""
+        callback = MockCallback()
+        engine = AcknowledgmentEngine(callback=callback)
+        notification_id = uuid4()
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        )
+        errors: list[Exception] = []
+
+        engine.register_notification(
+            notification_id=notification_id,
+            intent=NotificationIntent.SAFETY,
+            autonomy_context=context,
+        )
+
+        def ack() -> None:
+            try:
+                engine.ack(
+                    notification_id=notification_id,
+                    ack_status=AckStatus.ACKED,
+                    acked_by="operator@example.com",
+                )
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        threads = [Thread(target=ack) for _ in range(10)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        state = engine.get_state(notification_id)
+
+        assert errors == []
+        assert state is not None
+        assert state.acked_by == "operator@example.com"
+        assert len(callback.ack_events) == 1
         assert len(callback.status_changes) == 1
 
     def test_ack_invalid_status_raises(self) -> None:

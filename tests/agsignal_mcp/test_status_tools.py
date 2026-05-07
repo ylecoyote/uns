@@ -12,11 +12,18 @@ from agsignal_mcp.tools import (
     ack_notification,
     get_ack_status,
     get_channel_health,
+    list_deliveries,
     list_dlq,
     ready,
     send_signal,
 )
 from notification.runtime import RuntimeState
+
+WRITABLE_CONFIG = MCPRuntimeConfig(
+    read_only=False,
+    operator_principal="operator",
+    delivery_confirmation_token="approved",
+)
 
 
 def _signal_input(**overrides: object) -> SendSignalInput:
@@ -70,13 +77,19 @@ def test_ack_notification_is_disabled_in_read_only_mode() -> None:
 def test_ack_notification_updates_tracked_signal() -> None:
     state = RuntimeState()
     sent = send_signal(
-        _signal_input(deliver=True, operator_intent="deliver"),
+        _signal_input(
+            deliver=True,
+            operator_intent="deliver",
+            operator_confirmation_token="approved",
+        ),
         runtime_state=state,
+        config=WRITABLE_CONFIG,
     )
 
     acked = ack_notification(
-        AckNotificationInput(notification_id=sent["notification_id"], acked_by="operator"),
+        AckNotificationInput(notification_id=sent["notification_id"]),
         runtime_state=state,
+        config=WRITABLE_CONFIG,
     )
     status = get_ack_status(sent["notification_id"])
 
@@ -93,3 +106,11 @@ def test_runtime_inspection_tools_are_json_safe() -> None:
     channel_health = get_channel_health(state)
 
     assert "status" in channel_health
+
+
+@pytest.mark.asyncio
+async def test_read_model_tool_can_run_inside_existing_event_loop() -> None:
+    response = await list_deliveries(limit=1)
+
+    assert "items" in response
+    assert "pagination" in response

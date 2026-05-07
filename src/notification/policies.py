@@ -97,6 +97,9 @@ class ModeOverride(BaseModel):
     require_ack: bool | None = Field(
         default=None, description="Override ack requirement for this mode"
     )
+    ack_timeout_minutes: int | None = Field(
+        default=None, description="Override ack timeout for this mode"
+    )
     delivery_mode: DeliveryMode | None = Field(
         default=None, description="Override delivery mode for this mode"
     )
@@ -366,7 +369,11 @@ class NotificationPolicy(BaseModel):
         Returns:
             Timeout in minutes, or None if no timeout.
         """
-        # Policy timeout takes precedence
+        override = self._get_mode_override(autonomy_mode)
+        if override and override.ack_timeout_minutes is not None:
+            return override.ack_timeout_minutes
+
+        # Policy timeout takes precedence over defaults
         if self.ack_timeout_minutes is not None:
             return self.ack_timeout_minutes
 
@@ -517,6 +524,7 @@ class PolicyRegistry:
     """
 
     _policies: dict[str, NotificationPolicy] = field(default_factory=dict)
+    runtime_only: bool = True
 
     def register(self, policy: NotificationPolicy) -> None:
         """Register a policy for a notification type.
@@ -524,6 +532,11 @@ class PolicyRegistry:
         Args:
             policy: The policy to register.
         """
+        if self.runtime_only and policy.status != PolicyStatus.ACTIVE:
+            raise ValueError(
+                f"Runtime policy registry only accepts ACTIVE policies: "
+                f"{policy.notification_type} is {policy.status.value}"
+            )
         self._policies[policy.notification_type] = policy
 
     def register_many(self, policies: list[NotificationPolicy]) -> None:

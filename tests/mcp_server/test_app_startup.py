@@ -287,6 +287,51 @@ class TestCreateApp:
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
+    def test_create_app_allows_console_cors_preflight(self):
+        """Browser console origins can preflight read and write API headers."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        response = client.options(
+            "/ui/audit",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": (
+                    "Authorization, X-AGSignal-API-Key, X-UNS-API-Key, X-Request-ID"
+                ),
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+        allowed_headers = response.headers["access-control-allow-headers"].lower()
+        assert "authorization" in allowed_headers
+        assert "x-agsignal-api-key" in allowed_headers
+        assert "x-uns-api-key" in allowed_headers
+
+    def test_create_app_rejects_unknown_cors_origin(self):
+        """CORS stays closed by default for non-console origins."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        response = client.options(
+            "/ui/audit",
+            headers={
+                "Origin": "https://untrusted.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "access-control-allow-origin" not in response.headers
+
 
 class TestEndToEndIntegration:
     """End-to-end tests for the full data flow."""

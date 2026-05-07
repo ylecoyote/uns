@@ -28,6 +28,7 @@ from notification.deduplication import (
     InMemoryDeduplicationStore,
     configure_deduplication_engine,
 )
+from notification.dlq import DLQService
 from notification.models import (
     AutonomyContext,
     AutonomyMode,
@@ -96,6 +97,35 @@ class MockAdapter(BaseAdapter):
             status=AdapterStatus.HEALTHY,
             message="OK",
         )
+
+
+class FakeRedisList:
+    """Minimal Redis-list fake for DLQ tests."""
+
+    def __init__(self) -> None:
+        self.values: list[str] = []
+
+    def lpush(self, key: str, value: str) -> int:
+        self.values.insert(0, value)
+        return len(self.values)
+
+    def lrange(self, key: str, start: int, end: int) -> list[str]:
+        stop = None if end == -1 else end + 1
+        return self.values[start:stop]
+
+    def lrem(self, key: str, count: int, value: str) -> int:
+        removed = 0
+        next_values = []
+        for item in self.values:
+            if item == value and (count == 0 or removed < count):
+                removed += 1
+                continue
+            next_values.append(item)
+        self.values = next_values
+        return removed
+
+    def llen(self, key: str) -> int:
+        return len(self.values)
 
 
 def create_notification(
@@ -319,6 +349,34 @@ class TestGuaranteedDelivery:
         assert escalation_called[0][0] == notification
 
     @pytest.mark.asyncio
+    async def test_guaranteed_failure_enqueues_dlq_entry(
+        self, adapter_registry: SimpleAdapterRegistry
+    ):
+        """GUARANTEED all-channel failure should be visible through the DLQ."""
+        slack_adapter = MockAdapter(Channel.SLACK, success=False, error="Failed")
+        adapter_registry.register(slack_adapter)
+
+        notification = create_notification(
+            intent=NotificationIntent.SAFETY,
+            channels=[Channel.SLACK],
+            delivery_mode=DeliveryMode.GUARANTEED,
+        )
+        dlq_service = DLQService(FakeRedisList(), key="test:dlq")
+        service = DeliveryService(
+            adapter_registry=adapter_registry,
+            dlq_service=dlq_service,
+        )
+
+        with pytest.raises(DeliveryError):
+            await service.deliver(notification)
+
+        assert dlq_service.depth() == 1
+        entry = dlq_service.list_entries()[0]
+        assert entry.notification_id == notification.notification_id
+        assert entry.reason == "guaranteed_delivery_failed"
+        assert entry.metadata["channel_errors"] == {"SLACK": "Failed"}
+
+    @pytest.mark.asyncio
     async def test_guaranteed_with_adapter_exception(
         self, adapter_registry: SimpleAdapterRegistry
     ):
@@ -472,6 +530,37 @@ class TestDeduplication:
         assert result2.status == DeliveryStatus.SUCCESS
 
         # Both should be delivered
+        assert len(slack_adapter.deliver_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_policy_dedup_window_is_honored(
+        self, adapter_registry: SimpleAdapterRegistry
+    ):
+        """A policy dedup window of zero should allow immediate redelivery."""
+        slack_adapter = MockAdapter(Channel.SLACK, success=True)
+        adapter_registry.register(slack_adapter)
+
+        registry = PolicyRegistry()
+        registry.register(
+            NotificationPolicy(
+                notification_type="test.policy-dedup",
+                dedup_window_seconds=0,
+            )
+        )
+        configure_policy_registry(registry)
+
+        notification = create_notification(
+            notification_type="test.policy-dedup",
+            channels=[Channel.SLACK],
+            dedup_key="policy-window-key",
+        )
+
+        service = DeliveryService(adapter_registry=adapter_registry)
+        result1 = await service.deliver(notification)
+        result2 = await service.deliver(notification)
+
+        assert result1.status == DeliveryStatus.SUCCESS
+        assert result2.status == DeliveryStatus.SUCCESS
         assert len(slack_adapter.deliver_calls) == 2
 
 

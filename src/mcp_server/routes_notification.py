@@ -18,9 +18,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from mcp_server.auth import WritePrincipal, require_write_principal, resolve_requested_actor
 from notification.acknowledgment import (
     AcknowledgmentEngine,
     InvalidAckTransitionError,
@@ -124,6 +125,7 @@ def get_engine() -> AcknowledgmentEngine:
 async def acknowledge_notification(
     notification_id: UUID,
     http_request: Request,
+    principal: WritePrincipal = Depends(require_write_principal),
     request: AckRequest | None = None,
 ) -> AckResponse:
     """Acknowledge a notification.
@@ -145,31 +147,30 @@ async def acknowledge_notification(
     """
     engine = get_engine()
     request = request or AckRequest()
-    old_status = engine.get_status(notification_id)
+    acked_by = resolve_requested_actor(principal, request.acked_by)
 
     try:
         event = engine.ack(
             notification_id=notification_id,
             ack_status=AckStatus.ACKED,
-            acked_by=request.acked_by,
+            acked_by=acked_by,
             metadata=request.metadata,
+            before_commit=lambda old_status, ack_event: _persist_ack_audit(
+                http_request=http_request,
+                notification_id=notification_id,
+                old_status=old_status,
+                new_status=ack_event.ack_status,
+                acked_by=ack_event.acked_by,
+                acked_at=ack_event.acked_at,
+                metadata=ack_event.metadata,
+            ),
         )
 
         logger.info(
             "Notification acknowledged via API: notification_id=%s acked_by=%s",
             notification_id,
-            request.acked_by,
+            acked_by,
         )
-        _persist_ack_audit(
-            http_request=http_request,
-            notification_id=notification_id,
-            old_status=old_status,
-            new_status=AckStatus.ACKED,
-            acked_by=event.acked_by,
-            acked_at=event.acked_at,
-            metadata=event.metadata,
-        )
-
         return AckResponse(
             notification_id=event.notification_id,
             ack_status=event.ack_status,
@@ -220,6 +221,7 @@ async def acknowledge_notification(
 async def dismiss_notification(
     notification_id: UUID,
     http_request: Request,
+    principal: WritePrincipal = Depends(require_write_principal),
     request: DismissRequest | None = None,
 ) -> AckResponse:
     """Dismiss a notification.
@@ -240,31 +242,30 @@ async def dismiss_notification(
     """
     engine = get_engine()
     request = request or DismissRequest()
-    old_status = engine.get_status(notification_id)
+    dismissed_by = resolve_requested_actor(principal, request.dismissed_by)
 
     try:
         event = engine.ack(
             notification_id=notification_id,
             ack_status=AckStatus.DISMISSED,
-            acked_by=request.dismissed_by,
+            acked_by=dismissed_by,
             metadata=request.metadata,
+            before_commit=lambda old_status, ack_event: _persist_ack_audit(
+                http_request=http_request,
+                notification_id=notification_id,
+                old_status=old_status,
+                new_status=ack_event.ack_status,
+                acked_by=ack_event.acked_by,
+                acked_at=ack_event.acked_at,
+                metadata=ack_event.metadata,
+            ),
         )
 
         logger.info(
             "Notification dismissed via API: notification_id=%s dismissed_by=%s",
             notification_id,
-            request.dismissed_by,
+            dismissed_by,
         )
-        _persist_ack_audit(
-            http_request=http_request,
-            notification_id=notification_id,
-            old_status=old_status,
-            new_status=AckStatus.DISMISSED,
-            acked_by=event.acked_by,
-            acked_at=event.acked_at,
-            metadata=event.metadata,
-        )
-
         return AckResponse(
             notification_id=event.notification_id,
             ack_status=event.ack_status,
@@ -413,7 +414,7 @@ def _persist_ack_audit(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "error": "ack_audit_persistence_failed",
-                "message": "ack state changed but audit record could not be persisted",
+                "message": "ack state was not committed because audit could not be persisted",
                 "notification_id": str(notification_id),
             },
         ) from exc

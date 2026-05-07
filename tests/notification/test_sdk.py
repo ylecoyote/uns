@@ -869,6 +869,83 @@ class TestSDKPolicyOverrides:
         assert delivered is not None
         assert delivered.require_ack is True
 
+    def test_policy_mode_override_controls_require_ack(self) -> None:
+        """Mode-specific require_ack should override the base policy in the SDK."""
+        delivered: Notification | None = None
+
+        def handler(n: Notification) -> NotificationResult:
+            nonlocal delivered
+            delivered = n
+            return NotificationResult(
+                notification_id=n.notification_id,
+                status=DeliveryStatus.SUCCESS,
+            )
+
+        registry = PolicyRegistry()
+        registry.register(
+            NotificationPolicy(
+                notification_type="test.operational",
+                require_ack=False,
+                live_override=ModeOverride(require_ack=True),
+            )
+        )
+
+        sdk = NotificationSDK(policy_registry=registry, delivery_handler=handler)
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        )
+
+        sdk.send_operational(
+            notification_type="test.operational",
+            title="Operational",
+            message="Operational message",
+            source="test",
+            autonomy_context=context,
+        )
+
+        assert delivered is not None
+        assert delivered.require_ack is True
+
+    def test_policy_mode_override_controls_ack_timeout(self) -> None:
+        """Mode-specific ack timeout should flow into SDK notifications."""
+        delivered: Notification | None = None
+
+        def handler(n: Notification) -> NotificationResult:
+            nonlocal delivered
+            delivered = n
+            return NotificationResult(
+                notification_id=n.notification_id,
+                status=DeliveryStatus.SUCCESS,
+            )
+
+        registry = PolicyRegistry()
+        registry.register(
+            NotificationPolicy(
+                notification_type="test.governance",
+                require_ack=True,
+                ack_timeout_minutes=30,
+                live_override=ModeOverride(ack_timeout_minutes=5),
+            )
+        )
+
+        sdk = NotificationSDK(policy_registry=registry, delivery_handler=handler)
+        context = AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        )
+
+        sdk.send_governance(
+            notification_type="test.governance",
+            title="Governance",
+            message="Governance message",
+            source="test",
+            autonomy_context=context,
+        )
+
+        assert delivered is not None
+        assert delivered.ack_timeout_minutes == 5
+
     def test_explicit_override_takes_precedence_over_policy(self) -> None:
         """Explicit overrides should take precedence over policy."""
         delivered: Notification | None = None
