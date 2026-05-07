@@ -1,4 +1,4 @@
-"""Typed API client for UNS UI endpoints.
+"""Typed API client for AGSignal Console endpoints.
 
 This client provides typed access to the /ui/* endpoints defined in
 src/mcp_server/routes_ui.py. It supports:
@@ -67,10 +67,10 @@ class APIError(Exception):
 
 
 class UNSUIClient:
-    """Typed client for UNS UI API endpoints.
+    """Typed client for AGSignal Console API endpoints.
 
     Attributes:
-        base_url: Base URL of the UNS API server
+        base_url: Base URL of the AGSignal API server
         timeout: Request timeout in seconds
     """
 
@@ -82,7 +82,7 @@ class UNSUIClient:
         """Initialize the UI client.
 
         Args:
-            base_url: Base URL of the UNS API server
+            base_url: Base URL of the AGSignal API server
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")

@@ -1,10 +1,14 @@
-# UI Data Contracts
+# AGSignal Console Data Contracts
 
-This document defines the response shapes, filters, pagination, and error semantics for all UI data endpoints in the Unified Notification Service (UNS).
+This document defines the response shapes, filters, pagination, and error
+semantics for AGSignal Console data endpoints.
 
 ## Endpoint Path Convention
 
-All UI endpoints use the `/api/v1/` prefix for versioning (e.g., `/api/v1/notifications`, `/api/v1/audit-events`). Implementation endpoints may use `/ui/` internally.
+AGSignal Console read endpoints are mounted under `/ui/*` (for example,
+`/ui/deliveries` and `/ui/audit`). Producer/admin API endpoints use `/api/v1/*`;
+do not document Console read endpoints as `/api/v1/*` unless the implementation
+adds that public proxy.
 
 ## Phase Scope
 
@@ -96,7 +100,7 @@ View notification delivery history including all channel attempts, outcomes, and
 ### Endpoint
 
 ```
-GET /api/v1/notifications/{notification_id}/delivery-timeline
+GET /ui/deliveries/{notification_id}
 ```
 
 ### Response Shape
@@ -154,7 +158,7 @@ type Channel = "SLACK" | "EMAIL" | "WEBSOCKET" | "PAGERDUTY";
 ### List Delivery Timelines
 
 ```
-GET /api/v1/delivery-timelines
+GET /ui/deliveries
 ```
 
 Query multiple delivery timelines with filtering.
@@ -211,7 +215,7 @@ View escalation events and delivery failures, particularly for GUARANTEED delive
 ### Endpoint
 
 ```
-GET /api/v1/escalations
+Planned: GET /ui/escalations
 ```
 
 ### Query Parameters
@@ -283,7 +287,7 @@ interface AckTimeoutDetails {
 ### Get Single Escalation
 
 ```
-GET /api/v1/escalations/{escalation_id}
+Planned: GET /ui/escalations/{escalation_id}
 ```
 
 Returns full `EscalationEvent` with complete details.
@@ -304,13 +308,13 @@ View how a notification's routing was determined, showing the resolution chain f
 ### Endpoint
 
 ```
-GET /api/v1/notifications/{notification_id}/policy-trace
+GET /ui/policies/effective
 ```
 
 For live resolution preview (without a notification):
 
 ```
-GET /api/v1/policy-trace
+GET /ui/policies/effective
 ```
 
 #### Query Parameters (Required)
@@ -384,7 +388,7 @@ The `resolution` field shows the full resolution chain per [Policy Lifecycle](..
 ### Policy Simulation
 
 ```
-POST /api/v1/policy-trace/simulate
+Planned: POST /ui/policies/simulate
 ```
 
 Preview how a hypothetical notification would be resolved without sending it.
@@ -420,7 +424,7 @@ View the system invariant registry for compliance and audit purposes.
 ### Endpoint
 
 ```
-GET /api/v1/invariants
+GET /ui/invariants
 ```
 
 ### Query Parameters
@@ -469,7 +473,7 @@ interface EvidenceLink {
 ### Get Single Invariant
 
 ```
-GET /api/v1/invariants/{invariant_id}
+Planned: GET /ui/invariants/{invariant_id}
 ```
 
 Returns full `InvariantEntry` with all details.
@@ -477,7 +481,7 @@ Returns full `InvariantEntry` with all details.
 ### Invariant Summary Statistics
 
 ```
-GET /api/v1/invariants/summary
+GET /ui/invariants/summary
 ```
 
 ```typescript
@@ -519,13 +523,13 @@ View the audit trail of all notification-related events.
 ### Endpoint
 
 ```
-GET /api/v1/audit-events
+GET /ui/audit
 ```
 
 For notification-specific audit events:
 
 ```
-GET /api/v1/notifications/{notification_id}/audit-events
+GET /ui/audit?notification_id={notification_id}
 ```
 
 ### Query Parameters
@@ -546,7 +550,7 @@ GET /api/v1/notifications/{notification_id}/audit-events
 
 | Type | Description |
 |------|-------------|
-| `notification.created` | Notification submitted to UNS |
+| `notification.created` | Notification submitted to AGSignal |
 | `delivery.started` | Delivery attempt initiated |
 | `delivery.channel_attempted` | Individual channel attempt |
 | `delivery.succeeded` | Delivery completed successfully |
@@ -659,7 +663,7 @@ interface EscalationPayload {
 ### Audit Event Statistics
 
 ```
-GET /api/v1/audit-events/statistics
+Planned: GET /ui/audit/statistics
 ```
 
 #### Query Parameters
@@ -726,7 +730,7 @@ WebSocket endpoint for real-time audit event streaming.
 ### Endpoint
 
 ```
-WS /api/v1/audit-events/stream
+Planned: WS /ui/audit/stream
 ```
 
 ### Connection Parameters
@@ -758,7 +762,7 @@ Batch queries for multiple notifications.
 ### Endpoint
 
 ```
-POST /api/v1/batch/delivery-timelines
+Planned: POST /ui/deliveries/batch
 ```
 
 ### Request Body
@@ -794,21 +798,18 @@ interface BatchTimelineResponse {
 
 ## Rate Limiting
 
-All endpoints are subject to rate limiting:
-
-- **Default**: 100 requests/minute per client
-- **Burst**: Up to 10 requests/second
-- Rate limit headers included in responses:
-  - `X-RateLimit-Limit`: Requests allowed per window
-  - `X-RateLimit-Remaining`: Requests remaining
-  - `X-RateLimit-Reset`: Unix timestamp when window resets
+AGSignal Console endpoints do not currently add HTTP rate-limit headers. Channel
+delivery rate limiting is documented separately in
+[Delivery Semantics](../sections/delivery-semantics.md) and [API Reference](../API.md#rate-limiting).
 
 ## Cursor Semantics
 
-- Cursors are opaque strings; clients must not parse or construct them
-- Cursors expire after 1 hour of inactivity
-- Expired cursors return `invalid_cursor` error
-- Cursors are specific to the original query parameters; changing filters invalidates the cursor
+- Cursors are opaque strings generated by the read model adapter; clients must
+  not parse or construct them.
+- Invalid cursors currently restart pagination from the first page and are
+  logged.
+- Cursors should be treated as specific to the original query parameters;
+  changing filters should start a new query.
 
 ## Related Documentation
 

@@ -1,4 +1,4 @@
-"""Typed response models for UNS UI API.
+"""Typed response models for AGSignal Console API.
 
 These types match the contracts defined in docs/ui/ui-data-contracts.md
 and mirror the Pydantic models in src/mcp_server/routes_ui.py.

@@ -1,8 +1,8 @@
 {
-  "name": "uns-ui",
+  "name": "agsignal-console",
   "version": "1.0.0",
   "private": true,
-  "description": "Read-only UI dashboard for Unified Notification Service",
+  "description": "Read-only AGSignal Console dashboard",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -8,7 +8,24 @@ into durable governance signals. The current Python runtime is still exposed
 through the historical `notification.*` package and UNS-compatible terminology
 while the public product API stabilizes.
 
-## Quick Navigation
+## Task Navigation
+
+Start from the task you need to complete, not from the implementation package
+name. Public docs lead with AGSignal terminology; `notification.*`, `UNS_*`, and
+UNS/MIP names appear only where they describe compatibility, provenance, or
+sample content.
+
+| Task | Start Here | Then Read |
+|------|------------|-----------|
+| **Evaluate AGSignal** | [Root README](../README.md) | [Architecture](ARCHITECTURE.md), [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) |
+| **Quickstart: send a signal** | [Root README Quick Start](../README.md#quick-start) | [API Reference](API.md), [Running the Service](../README.md#running-the-service) |
+| **Configure policies** | [Policy Lifecycle](sections/policy-lifecycle.md) | [MIP UNS Sample Policy Pack](../examples/policies/mip-uns/README.md), [Delivery Semantics](sections/delivery-semantics.md) |
+| **Integrate an app** | [Integration Modes](sections/integration-modes.md) | [API Host App Boundary](API.md#host-app-boundary), [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) |
+| **Operate and audit** | [Observability](sections/observability.md) | [Delivery Semantics](sections/delivery-semantics.md), [WebSocket Replay Smoke](testing/websocket-replay-smoke.md), [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) |
+| **Extend AGSignal** | [Architecture](ARCHITECTURE.md) | [API Reference](API.md), [Architecture Decisions](#architecture-decisions) |
+| **Verify publish readiness** | [M5 Publish Readiness Reference](m5-publish-readiness-reference.md) | [Testing Guides](#testing-guides), [UNS Provenance](uns/README.md) |
+
+## Document Inventory
 
 | Document | Description |
 |----------|-------------|
@@ -87,22 +104,22 @@ Sample policy packs live outside `docs/` under `examples/policies/`.
 
 ## Reading Guide
 
-**New to AGSignal?** Start with:
-1. [Root README](../README.md) - product framing, boundaries, terminology, and quick start
-2. [ARCHITECTURE.md](ARCHITECTURE.md) - understand the core runtime design
-3. [API.md](API.md) - learn the current SDK interface
+**New to AGSignal?** Use the **Evaluate AGSignal** and **Quickstart: send a
+signal** rows above.
 
-**Implementing signal delivery logic?** Read:
-1. [Delivery Semantics](sections/delivery-semantics.md) - Understand GUARANTEED vs BEST_EFFORT
-2. [Policy Lifecycle](sections/policy-lifecycle.md) - Configure routing policies
+**Implementing delivery logic or policies?** Use **Configure policies** first,
+then follow the delivery semantics links for reliability behavior.
 
-**Integrating with external systems?** Read:
-1. [Integration Modes](sections/integration-modes.md) - Choose your integration approach
-2. [API.md](API.md) - Implement required protocols
+**Integrating with external systems?** Use **Integrate an app** for the generic
+host boundary. MIP-shaped adapters are optional proving/sample code, not the
+AGSignal Core public facade.
 
-**Setting up monitoring?** Read:
-1. [Observability](sections/observability.md) - Health states and metrics
-2. [Delivery Semantics](sections/delivery-semantics.md) - DLQ and escalation handling
+**Setting up monitoring?** Use **Operate and audit** for health, audit, DLQ,
+WebSocket replay, and fanout guidance.
+
+**Preparing a publish checkpoint?** Use **Verify publish readiness** and keep
+each public claim tied to shipped behavior, sample assets, or explicit
+limitations.
 
 ## Key Concepts Summary
 

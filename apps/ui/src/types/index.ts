@@ -1,5 +1,5 @@
 /**
- * Central type exports for UNS UI.
+ * Central type exports for AGSignal Console.
  *
  * Import types from this module for convenience:
  * import type { AuditEvent, InvariantEntry, PaginationInfo } from '../types';

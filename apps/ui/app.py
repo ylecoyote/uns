@@ -1,6 +1,6 @@
-"""UNS UI Application.
+"""AGSignal Console application.
 
-This module provides a FastAPI application for the UNS Dashboard API.
+This module provides a FastAPI application for the AGSignal Console API.
 It provides JSON API endpoints for the React frontend to consume,
 serving data about notification delivery timelines, policies,
 invariants, and audit events.
@@ -41,8 +41,8 @@ def create_ui_app() -> FastAPI:
         Configured FastAPI app with UI routes and static files
     """
     app = FastAPI(
-        title="UNS Dashboard",
-        description="Read-only dashboard for the Unified Notification Service",
+        title="AGSignal Console",
+        description="Read-only dashboard for AGSignal Core",
         version="0.1.0",
         docs_url=None,  # Disable Swagger UI for the dashboard
         redoc_url=None,  # Disable ReDoc
