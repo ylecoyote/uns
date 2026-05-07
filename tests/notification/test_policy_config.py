@@ -50,6 +50,51 @@ def test_policy_config_envelope_computes_hash_and_is_immutable() -> None:
         envelope.version = 2
 
 
+def test_policy_config_envelope_defends_config_json_from_nested_mutation() -> None:
+    envelope = PolicyConfigEnvelope(
+        policy_type="notification.routing",
+        version=1,
+        status=PolicyStatus.ACTIVE,
+        config_json={"routing": {"channels": {"LIVE": ["SLACK", "WEBSOCKET"]}}},
+        created_by="operator@example.com",
+    )
+    original_hash = envelope.config_hash
+
+    envelope.config_json["routing"]["channels"]["LIVE"].append("PAGERDUTY")
+
+    assert envelope.config_json["routing"]["channels"]["LIVE"] == ["SLACK", "WEBSOCKET"]
+    assert envelope.config_hash == original_hash
+    assert envelope.config_hash == compute_config_hash(envelope.config_json)
+
+
+def test_policy_config_envelope_defends_against_caller_payload_mutation() -> None:
+    config = {"routing": {"channels": {"LIVE": ["SLACK", "WEBSOCKET"]}}}
+    envelope = PolicyConfigEnvelope(
+        policy_type="notification.routing",
+        version=1,
+        status=PolicyStatus.ACTIVE,
+        config_json=config,
+        created_by="operator@example.com",
+    )
+
+    config["routing"]["channels"]["LIVE"].append("PAGERDUTY")
+
+    assert envelope.config_json["routing"]["channels"]["LIVE"] == ["SLACK", "WEBSOCKET"]
+    assert envelope.config_hash == compute_config_hash(envelope.config_json)
+
+
+def test_policy_config_envelope_rejects_mismatched_config_hash() -> None:
+    with pytest.raises(ValidationError, match="config_hash does not match config_json"):
+        PolicyConfigEnvelope(
+            policy_type="notification.routing",
+            version=1,
+            status=PolicyStatus.ACTIVE,
+            config_json={"routing": {"channels": {"LIVE": ["SLACK", "WEBSOCKET"]}}},
+            config_hash="not-the-real-hash",
+            created_by="operator@example.com",
+        )
+
+
 def test_apply_policy_delta_requires_approved_delta() -> None:
     envelope = PolicyConfigEnvelope(
         policy_type="notification.routing",
