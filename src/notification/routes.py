@@ -172,6 +172,15 @@ class DeliveryAuditItem(BaseModel):
     channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
     channels_failed: list[Channel] = Field(description="Channels that failed")
     error_message: str | None = Field(default=None, description="Delivery error if present")
+    policy_config_id: UUID | None = Field(
+        default=None, description="Policy config used for routing"
+    )
+    policy_config_hash: str | None = Field(
+        default=None, description="Exact policy config hash used"
+    )
+    policy_evaluation_id: UUID | None = Field(
+        default=None, description="Policy evaluation identifier"
+    )
     delivered_at: datetime = Field(description="Delivery attempt timestamp")
     audit_created_at: datetime = Field(description="Audit persistence timestamp")
 
@@ -432,6 +441,9 @@ def _delivery_audit_item(record: AuditRecord) -> DeliveryAuditItem:
         channels_succeeded=list(record.channels_succeeded),
         channels_failed=list(record.channels_failed),
         error_message=record.error_message,
+        policy_config_id=record.policy_config_id,
+        policy_config_hash=record.policy_config_hash,
+        policy_evaluation_id=record.policy_evaluation_id,
         delivered_at=record.delivered_at,
         audit_created_at=record.audit_created_at,
     )

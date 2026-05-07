@@ -249,6 +249,8 @@ def _row_to_policy(row: PersistedNotificationPolicy) -> NotificationPolicy:
         require_ack=base_require_ack,
         ack_timeout_minutes=row.ack_timeout_minutes,
         dedup_window_seconds=row.dedup_window_seconds,
+        config_id=row.policy_id,
+        config_hash=row.content_hash,
         mode_overrides=mode_overrides or None,
     )
 

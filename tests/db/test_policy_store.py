@@ -116,6 +116,8 @@ def test_load_registry_includes_active_and_preview_policies_only() -> None:
     assert policy.status == PolicyStatus.ACTIVE
     assert policy.version == "1.0.0"
     assert policy.delivery_mode == DeliveryMode.GUARANTEED
+    assert policy.config_id is not None
+    assert policy.config_hash is not None
     assert policy.get_channels_for_mode(AutonomyMode.LIVE) == [
         Channel.SLACK,
         Channel.WEBSOCKET,

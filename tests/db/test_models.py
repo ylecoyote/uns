@@ -95,6 +95,41 @@ class TestNotificationAuditRecord:
         assert retrieved.channels_attempted == ["SLACK", "EMAIL"]
         assert retrieved.title == "Test Notification"
 
+    def test_policy_evaluation_identity_fields(self, session):
+        """Test notification audits can store policy evaluation identity."""
+        policy_config_id = uuid4()
+        policy_evaluation_id = uuid4()
+        record = NotificationAuditRecord(
+            id=uuid4(),
+            notification_id=uuid4(),
+            notification_type="test.notification",
+            status="SUCCESS",
+            channels_attempted=["SLACK"],
+            channels_succeeded=["SLACK"],
+            channels_failed=[],
+            error_message=None,
+            intent="OPERATIONAL",
+            delivery_mode="BEST_EFFORT",
+            autonomy_mode="LIVE",
+            agent_id=uuid4(),
+            policy_config_id=policy_config_id,
+            policy_config_hash="policy-hash-123",
+            policy_evaluation_id=policy_evaluation_id,
+            title="Test Notification",
+            source="test_suite",
+            notification_created_at=datetime.now(UTC),
+            delivered_at=datetime.now(UTC),
+        )
+
+        session.add(record)
+        session.commit()
+
+        retrieved = session.query(NotificationAuditRecord).first()
+        assert retrieved is not None
+        assert retrieved.policy_config_id == policy_config_id
+        assert retrieved.policy_config_hash == "policy-hash-123"
+        assert retrieved.policy_evaluation_id == policy_evaluation_id
+
     def test_optional_fields(self, session):
         """Test that optional fields can be None."""
         record = NotificationAuditRecord(

@@ -80,6 +80,11 @@ class AuditRecord:
     delivered_at: datetime
     audit_created_at: datetime
 
+    # Policy evaluation identity
+    policy_config_id: UUID | None = None
+    policy_config_hash: str | None = None
+    policy_evaluation_id: UUID | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert audit record to dictionary for serialization.
 
@@ -108,6 +113,13 @@ class AuditRecord:
             ),
             "skip_snapshot_id": (
                 str(self.skip_snapshot_id) if self.skip_snapshot_id else None
+            ),
+            "policy_config_id": (
+                str(self.policy_config_id) if self.policy_config_id else None
+            ),
+            "policy_config_hash": self.policy_config_hash,
+            "policy_evaluation_id": (
+                str(self.policy_evaluation_id) if self.policy_evaluation_id else None
             ),
             "title": self.title,
             "source": self.source,
@@ -396,6 +408,9 @@ def create_audit_record(
         decision_snapshot_id=notification.autonomy_context.decision_snapshot_id,
         execution_snapshot_id=notification.autonomy_context.execution_snapshot_id,
         skip_snapshot_id=notification.autonomy_context.skip_snapshot_id,
+        policy_config_id=notification.policy_config_id,
+        policy_config_hash=notification.policy_config_hash,
+        policy_evaluation_id=notification.policy_evaluation_id,
         title=notification.title,
         source=notification.source,
         correlation_id=notification.correlation_id,
