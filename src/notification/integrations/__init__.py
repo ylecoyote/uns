@@ -15,11 +15,6 @@ from notification.integrations.app_boundary import (
     AppSignalRequest,
     DefaultAppSignalContextProvider,
 )
-from notification.integrations.mip_adapter import (
-    MIPExecutionAlert,
-    MIPExecutionSummary,
-    MIPSignalAdapter,
-)
 
 __all__ = [
     "AppEvidenceContext",
@@ -27,7 +22,4 @@ __all__ = [
     "AppSignalContextProvider",
     "AppSignalRequest",
     "DefaultAppSignalContextProvider",
-    "MIPExecutionAlert",
-    "MIPExecutionSummary",
-    "MIPSignalAdapter",
 ]
