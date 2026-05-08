@@ -8,7 +8,10 @@ SDK consumers and operators can import exclusively from ``agsignal.*``.
 """
 
 # Re-exports forwarded through the agsignal-branded shim modules.
-from agsignal import queries  # noqa: F401  (sub-module access via agsignal.queries.foo)
+from agsignal import (
+    queries,  # noqa: F401  (sub-module access via agsignal.queries.foo)
+    signaling,  # noqa: F401  (sub-module access via agsignal.signaling.foo)
+)
 from agsignal.interfaces import (
     AcknowledgmentCallback,
     CompositeAcknowledgmentCallback,
