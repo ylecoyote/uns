@@ -49,14 +49,14 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
     mcp = FastMCP("AGSignal")
 
     @mcp.tool(name="simulate_signal")
-    def simulate_signal_tool(payload: SendSignalInput) -> dict[str, object]:
+    async def simulate_signal_tool(payload: SendSignalInput) -> dict[str, object]:
         """Preview AGSignal routing and policy behavior without side effects."""
-        return simulate_signal_impl(payload)
+        return await simulate_signal_impl(payload)
 
     @mcp.tool(name="send_signal")
-    def send_signal_tool(payload: SendSignalInput) -> dict[str, object]:
+    async def send_signal_tool(payload: SendSignalInput) -> dict[str, object]:
         """Preview or send an AGSignal signal."""
-        return send_signal_impl(payload, config=config)
+        return await send_signal_impl(payload, config=config)
 
     @mcp.tool(name="get_delivery_status")
     def get_delivery_status_tool(notification_id: str) -> dict[str, object]:
@@ -64,14 +64,14 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
         return get_delivery_status_impl(notification_id)
 
     @mcp.tool(name="ack_notification")
-    def ack_notification_tool(payload: AckNotificationInput) -> dict[str, object]:
+    async def ack_notification_tool(payload: AckNotificationInput) -> dict[str, object]:
         """Acknowledge a tracked AGSignal notification."""
-        return ack_notification_impl(payload, config=config)
+        return await ack_notification_impl(payload, config=config)
 
     @mcp.tool(name="dismiss_notification")
-    def dismiss_notification_tool(payload: AckNotificationInput) -> dict[str, object]:
+    async def dismiss_notification_tool(payload: AckNotificationInput) -> dict[str, object]:
         """Dismiss a tracked AGSignal notification."""
-        return dismiss_notification_impl(payload, config=config)
+        return await dismiss_notification_impl(payload, config=config)
 
     @mcp.tool(name="get_notification_status")
     async def get_notification_status_tool(notification_id: str) -> dict[str, object]:

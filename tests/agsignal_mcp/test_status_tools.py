@@ -5,11 +5,12 @@ from uuid import UUID
 import pytest
 
 from agsignal_mcp.factory import AGSIGNAL_MCP_TOOL_NAMES
-from agsignal_mcp.runtime import MCPRuntimeConfig
+from agsignal_mcp.runtime import MCPRuntimeConfig, RuntimeState
 from agsignal_mcp.tools import (
     AckNotificationInput,
     SendSignalInput,
     ack_notification,
+    dismiss_notification,
     get_ack_status,
     get_channel_health,
     list_deliveries,
@@ -17,7 +18,6 @@ from agsignal_mcp.tools import (
     ready,
     send_signal,
 )
-from notification.runtime import RuntimeState
 
 WRITABLE_CONFIG = MCPRuntimeConfig(
     read_only=False,
@@ -66,9 +66,10 @@ def test_ready_reports_runtime_mode() -> None:
     assert response["read_only"] is True
 
 
-def test_ack_notification_is_disabled_in_read_only_mode() -> None:
+@pytest.mark.asyncio
+async def test_ack_notification_is_disabled_in_read_only_mode() -> None:
     with pytest.raises(ValueError, match="disabled in read-only mode"):
-        ack_notification(
+        await ack_notification(
             AckNotificationInput(notification_id="00000000-0000-0000-0000-000000000001"),
             config=MCPRuntimeConfig(mode="read-only", read_only=True),
         )
@@ -77,7 +78,7 @@ def test_ack_notification_is_disabled_in_read_only_mode() -> None:
 @pytest.mark.asyncio
 async def test_ack_notification_updates_tracked_signal() -> None:
     state = RuntimeState()
-    sent = send_signal(
+    sent = await send_signal(
         _signal_input(
             deliver=True,
             operator_intent="deliver",
@@ -87,7 +88,7 @@ async def test_ack_notification_updates_tracked_signal() -> None:
         config=WRITABLE_CONFIG,
     )
 
-    acked = ack_notification(
+    acked = await ack_notification(
         AckNotificationInput(notification_id=sent["notification_id"]),
         runtime_state=state,
         config=WRITABLE_CONFIG,
@@ -98,6 +99,70 @@ async def test_ack_notification_updates_tracked_signal() -> None:
     assert acked["acked_by"] == "operator"
     assert status["ack_status"] == "ACKED"
     assert len(state.audit_store.get_ack_audits_for_notification(UUID(sent["notification_id"]))) == 1
+
+
+@pytest.mark.asyncio
+async def test_dismiss_notification_is_disabled_in_read_only_mode() -> None:
+    with pytest.raises(ValueError, match="dismiss_notification is disabled in read-only mode"):
+        await dismiss_notification(
+            AckNotificationInput(notification_id="00000000-0000-0000-0000-000000000001"),
+            config=MCPRuntimeConfig(mode="read-only", read_only=True),
+        )
+
+
+@pytest.mark.asyncio
+async def test_dismiss_notification_marks_signal_dismissed() -> None:
+    state = RuntimeState()
+    sent = await send_signal(
+        _signal_input(
+            deliver=True,
+            operator_intent="deliver",
+            operator_confirmation_token="approved",
+        ),
+        runtime_state=state,
+        config=WRITABLE_CONFIG,
+    )
+
+    dismissed = await dismiss_notification(
+        AckNotificationInput(notification_id=sent["notification_id"]),
+        runtime_state=state,
+        config=WRITABLE_CONFIG,
+    )
+    status = await get_ack_status(sent["notification_id"])
+
+    assert dismissed["notification_id"] == sent["notification_id"]
+    assert dismissed["ack_status"] == "DISMISSED"
+    assert dismissed["acked_by"] == "operator"
+    assert "acked_at" in dismissed
+    assert dismissed["metadata"] == {}
+    assert status["ack_status"] == "DISMISSED"
+    assert (
+        len(state.audit_store.get_ack_audits_for_notification(UUID(sent["notification_id"]))) == 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_dismiss_notification_requires_acked_by_match_when_provided() -> None:
+    state = RuntimeState()
+    sent = await send_signal(
+        _signal_input(
+            deliver=True,
+            operator_intent="deliver",
+            operator_confirmation_token="approved",
+        ),
+        runtime_state=state,
+        config=WRITABLE_CONFIG,
+    )
+
+    with pytest.raises(ValueError, match="acked_by must match the operator principal"):
+        await dismiss_notification(
+            AckNotificationInput(
+                notification_id=sent["notification_id"],
+                acked_by="someone-else",
+            ),
+            runtime_state=state,
+            config=WRITABLE_CONFIG,
+        )
 
 
 def test_runtime_inspection_tools_are_json_safe() -> None:

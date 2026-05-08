@@ -3,7 +3,7 @@
   "title": "AGSignal Console Contracts",
   "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-05-08T00:53:06.227037+00:00",
+  "generated_at": "2026-05-08T09:22:20.394626+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
