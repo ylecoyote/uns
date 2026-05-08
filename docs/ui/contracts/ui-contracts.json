@@ -3,7 +3,7 @@
   "title": "AGSignal Console Contracts",
   "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-05-08T09:22:20.394626+00:00",
+  "generated_at": "2026-05-08T19:59:49.600081+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
@@ -192,7 +192,7 @@
           "type": "string"
         }
       },
-      "description": "Single audit event.",
+      "description": "Single audit event.\n\nNote: this is the Pydantic version. ``mcp_server.read_models.AuditEvent``\nis a different ``@dataclass`` that shares the name; the two are NOT\ninterchangeable.",
       "properties": {
         "audit_id": {
           "format": "uuid",
@@ -251,7 +251,7 @@
     "AuditEventListResponse": {
       "$defs": {
         "AuditEvent": {
-          "description": "Single audit event.",
+          "description": "Single audit event.\n\nNote: this is the Pydantic version. ``mcp_server.read_models.AuditEvent``\nis a different ``@dataclass`` that shares the name; the two are NOT\ninterchangeable.",
           "properties": {
             "audit_id": {
               "format": "uuid",
@@ -1556,62 +1556,6 @@
       "title": "ErrorDetail",
       "type": "object"
     },
-    "ErrorResponse": {
-      "$defs": {
-        "ErrorDetail": {
-          "description": "Error detail structure.",
-          "properties": {
-            "code": {
-              "description": "Machine-readable error code",
-              "title": "Code",
-              "type": "string"
-            },
-            "message": {
-              "description": "Human-readable description",
-              "title": "Message",
-              "type": "string"
-            },
-            "details": {
-              "anyOf": [
-                {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Additional context",
-              "title": "Details"
-            }
-          },
-          "required": [
-            "code",
-            "message"
-          ],
-          "title": "ErrorDetail",
-          "type": "object"
-        }
-      },
-      "description": "Standard error response.",
-      "properties": {
-        "error": {
-          "$ref": "#/$defs/ErrorDetail"
-        },
-        "request_id": {
-          "description": "Request ID for correlation/support",
-          "title": "Request Id",
-          "type": "string"
-        }
-      },
-      "required": [
-        "error",
-        "request_id"
-      ],
-      "title": "ErrorResponse",
-      "type": "object"
-    },
     "EvidenceLink": {
       "description": "Link to evidence for an invariant.",
       "properties": {
@@ -2237,6 +2181,62 @@
         "applied"
       ],
       "title": "ResolutionStep",
+      "type": "object"
+    },
+    "UIErrorResponse": {
+      "$defs": {
+        "ErrorDetail": {
+          "description": "Error detail structure.",
+          "properties": {
+            "code": {
+              "description": "Machine-readable error code",
+              "title": "Code",
+              "type": "string"
+            },
+            "message": {
+              "description": "Human-readable description",
+              "title": "Message",
+              "type": "string"
+            },
+            "details": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Additional context",
+              "title": "Details"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "title": "ErrorDetail",
+          "type": "object"
+        }
+      },
+      "description": "Standard error response.\n\nRenamed from ``ErrorResponse`` (in ``mcp_server.routes_ui``) to\ndisambiguate from the structurally incompatible\n:class:`NotificationErrorResponse`. Field set: ``error: ErrorDetail``,\n``request_id: str``.",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        },
+        "request_id": {
+          "description": "Request ID for correlation/support",
+          "title": "Request Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error",
+        "request_id"
+      ],
+      "title": "UIErrorResponse",
       "type": "object"
     }
   },

@@ -12,14 +12,13 @@ This module provides the HTTP endpoints for the UI dashboard per
 
 All endpoints are READ-ONLY. No mutating actions are permitted.
 
-Architecture (post-Phase-2 Task 3):
+Architecture (post-Phase-2 Task 3, post-Phase-3 Task 1):
 - Each route handler is a thin adapter: parameter parsing (Query/Depends)
   + log_endpoint_call observability + ``await agsignal.queries.X(...)``.
 - The canonical implementation of each read operation lives in
   :mod:`agsignal.queries`. Routes do not contain business logic.
-- Pydantic response models are co-located here for now (Phase 5 of the
-  v0.2 cleanup will relocate them, eliminating the legacy import in
-  :mod:`agsignal.queries`).
+- Pydantic response models live in :mod:`agsignal.responses`; this
+  module re-exports them at the bottom for backward compatibility.
 
 Authentication/Authorization:
 - All endpoints require read-only permissions (stub: no auth enforcement yet)
@@ -34,13 +33,56 @@ Observability:
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel, Field
 
+from agsignal.queries import (
+    get_delivery_timeline as _query_delivery_timeline,
+)
+from agsignal.queries import (
+    get_effective_policy as _query_effective_policy,
+)
+from agsignal.queries import (
+    get_invariants_summary as _query_invariants_summary,
+)
+from agsignal.queries import (
+    list_audit_events as _query_list_audit_events,
+)
+from agsignal.queries import (
+    list_deliveries as _query_list_deliveries,
+)
+from agsignal.queries import (
+    list_invariants as _query_list_invariants,
+)
+from agsignal.responses import (
+    AuditEvent,
+    AuditEventListResponse,
+    AuditEventType,
+    AutonomyContextResponse,
+    DeliveryAttempt,
+    DeliveryTimelineListResponse,
+    DeliveryTimelineResponse,
+    DeliveryTimelineSummary,
+    EffectivePolicyResponse,
+    EffectivePolicyValues,
+    EnforcementType,
+    ErrorDetail,
+    EvidenceLink,
+    InvariantEnforcement,
+    InvariantEntry,
+    InvariantListResponse,
+    InvariantSeverity,
+    InvariantStatus,
+    InvariantSummaryResponse,
+    PaginationInfo,
+    ResolutionContext,
+    ResolutionSource,
+    ResolutionStep,
+)
+from agsignal.responses import (
+    UIErrorResponse as ErrorResponse,
+)
 from mcp_server.observability import (
     get_structured_logger,
     log_endpoint_call,
@@ -56,280 +98,6 @@ from notification.models import (
 logger = get_structured_logger(__name__)
 
 router = APIRouter(prefix="/ui", tags=["ui"])
-
-
-# =============================================================================
-# Common Types (per ui-data-contracts.md)
-# =============================================================================
-
-
-class PaginationInfo(BaseModel):
-    """Pagination metadata for list responses."""
-
-    next_cursor: str | None = Field(
-        default=None, description="Opaque cursor for next page, null if no more pages"
-    )
-    has_more: bool = Field(default=False, description="Whether more pages exist")
-    total_count: int | None = Field(
-        default=None, description="Total count (included when efficient to compute)"
-    )
-
-
-class ErrorDetail(BaseModel):
-    """Error detail structure."""
-
-    code: str = Field(description="Machine-readable error code")
-    message: str = Field(description="Human-readable description")
-    details: dict[str, Any] | None = Field(default=None, description="Additional context")
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-
-    error: ErrorDetail
-    request_id: str = Field(description="Request ID for correlation/support")
-
-
-# =============================================================================
-# Delivery Timeline Types
-# =============================================================================
-
-
-class DeliveryAttempt(BaseModel):
-    """Single channel delivery attempt."""
-
-    attempt_id: UUID
-    channel: Channel
-    status: str  # SUCCESS, FAILED, RATE_LIMITED, SKIPPED
-    started_at: datetime
-    completed_at: datetime
-    duration_ms: int
-    error_message: str | None = None
-    error_code: str | None = None
-    metadata: dict[str, Any] | None = None
-
-
-class AutonomyContextResponse(BaseModel):
-    """Autonomy context in responses."""
-
-    autonomy_mode: AutonomyMode
-    agent_id: UUID
-    plan_id: UUID | None = None
-    decision_snapshot_id: UUID | None = None
-    execution_snapshot_id: UUID | None = None
-    skip_snapshot_id: UUID | None = None
-
-
-class DeliveryTimelineResponse(BaseModel):
-    """Full delivery timeline for a notification."""
-
-    notification_id: UUID
-    notification_type: str
-    intent: NotificationIntent
-    delivery_mode: DeliveryMode
-    status: DeliveryStatus
-    created_at: datetime
-    delivered_at: datetime | None = None
-    attempts: list[DeliveryAttempt] = Field(default_factory=list)
-    channels_attempted: list[Channel] = Field(default_factory=list)
-    channels_succeeded: list[Channel] = Field(default_factory=list)
-    channels_failed: list[Channel] = Field(default_factory=list)
-    autonomy_context: AutonomyContextResponse
-
-
-class DeliveryTimelineSummary(BaseModel):
-    """Summary view of delivery timeline for list responses."""
-
-    notification_id: UUID
-    notification_type: str
-    intent: NotificationIntent
-    delivery_mode: DeliveryMode
-    status: DeliveryStatus
-    created_at: datetime
-    delivered_at: datetime | None = None
-    channels_attempted: list[Channel] = Field(default_factory=list)
-    channels_succeeded: list[Channel] = Field(default_factory=list)
-    autonomy_mode: AutonomyMode
-    agent_id: UUID
-
-
-class DeliveryTimelineListResponse(BaseModel):
-    """Paginated list of delivery timelines."""
-
-    items: list[DeliveryTimelineSummary] = Field(default_factory=list)
-    pagination: PaginationInfo
-
-
-# =============================================================================
-# Policy Resolution Types
-# =============================================================================
-
-
-class ResolutionSource(str, Enum):
-    """Source of a policy resolution value."""
-
-    EXPLICIT_OVERRIDE = "explicit_override"
-    MODE_OVERRIDE = "mode_override"
-    POLICY_BASE = "policy_base"
-    SDK_DEFAULT = "sdk_default"
-
-
-class ResolutionStep(BaseModel):
-    """Single step in policy resolution chain."""
-
-    source: ResolutionSource
-    value: Any = Field(description="The value at this resolution step")
-    applied: bool = Field(description="Whether this value was used")
-    reason: str | None = Field(default=None, description="Explanation if not applied")
-
-
-class EffectivePolicyValues(BaseModel):
-    """Effective policy values that were actually used."""
-
-    delivery_mode: DeliveryMode
-    channels: list[Channel]
-    require_ack: bool
-    ack_timeout_minutes: int | None = None
-    dedup_window_seconds: int
-
-
-class ResolutionContext(BaseModel):
-    """Context used for policy resolution."""
-
-    intent: NotificationIntent
-    autonomy_mode: AutonomyMode
-    irreversible: bool
-    policy_found: bool
-    policy_notification_type: str | None = None
-
-
-class EffectivePolicyResponse(BaseModel):
-    """Response for effective policy resolution."""
-
-    notification_type: str
-    effective: EffectivePolicyValues
-    resolution: dict[str, list[ResolutionStep]] = Field(
-        description="Resolution trace for each field"
-    )
-    resolution_context: ResolutionContext
-
-
-# =============================================================================
-# Invariant Types
-# =============================================================================
-
-
-class EnforcementType(str, Enum):
-    """Invariant enforcement mechanism."""
-
-    GUARD = "guard"
-    ISOLATION = "isolation"
-    TEST = "test"
-    EXCEPTION = "exception"
-
-
-class InvariantSeverity(str, Enum):
-    """Invariant severity level."""
-
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-
-
-class InvariantStatus(str, Enum):
-    """Invariant status."""
-
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-
-
-class EvidenceLink(BaseModel):
-    """Link to evidence for an invariant."""
-
-    path: str = Field(description="Repo-relative path")
-    note: str = Field(description="Description of what this evidences")
-    line_ref: str | None = Field(default=None, description="Optional line reference")
-
-
-class InvariantEnforcement(BaseModel):
-    """Enforcement details for an invariant."""
-
-    type: EnforcementType
-    description: str
-
-
-class InvariantEntry(BaseModel):
-    """Single invariant entry."""
-
-    id: str = Field(description="e.g., INV-ACK-001")
-    statement: str = Field(description="The invariant claim")
-    severity: InvariantSeverity
-    status: InvariantStatus
-    enforcement: InvariantEnforcement
-    evidence: list[EvidenceLink] = Field(default_factory=list)
-    owner: str = Field(description="Team/role responsible")
-    last_reviewed: str = Field(description="ISO 8601 date")
-    mitigation: list[str] | None = Field(default=None, description="For exceptions only")
-
-
-class InvariantListResponse(BaseModel):
-    """Paginated list of invariants."""
-
-    items: list[InvariantEntry] = Field(default_factory=list)
-    pagination: PaginationInfo
-
-
-class InvariantSummaryResponse(BaseModel):
-    """Summary statistics for invariants."""
-
-    total_count: int
-    by_severity: dict[str, int]
-    by_enforcement_type: dict[str, int]
-    by_status: dict[str, int]
-    exceptions_requiring_review: int
-    last_updated: str
-
-
-# =============================================================================
-# Audit Event Types
-# =============================================================================
-
-
-class AuditEventType(str, Enum):
-    """Types of audit events."""
-
-    NOTIFICATION_CREATED = "notification.created"
-    DELIVERY_STARTED = "delivery.started"
-    DELIVERY_CHANNEL_ATTEMPTED = "delivery.channel_attempted"
-    DELIVERY_SUCCEEDED = "delivery.succeeded"
-    DELIVERY_FAILED = "delivery.failed"
-    DELIVERY_DEDUPLICATED = "delivery.deduplicated"
-    DELIVERY_RATE_LIMITED = "delivery.rate_limited"
-    ACK_PENDING = "ack.pending"
-    ACK_RECEIVED = "ack.received"
-    ACK_DISMISSED = "ack.dismissed"
-    ACK_TIMED_OUT = "ack.timed_out"
-    ESCALATION_TRIGGERED = "escalation.triggered"
-
-
-class AuditEvent(BaseModel):
-    """Single audit event."""
-
-    audit_id: UUID
-    event_type: AuditEventType
-    event_time: datetime
-    notification_id: UUID
-    notification_type: str
-    autonomy_context: AutonomyContextResponse
-    payload: dict[str, Any] = Field(default_factory=dict)
-    correlation_id: str | None = None
-
-
-class AuditEventListResponse(BaseModel):
-    """Paginated list of audit events."""
-
-    items: list[AuditEvent] = Field(default_factory=list)
-    pagination: PaginationInfo
 
 
 # =============================================================================
@@ -372,11 +140,7 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode.value if autonomy_mode else None,
     )
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import list_deliveries as _query
-
-    return await _query(
+    return await _query_list_deliveries(
         cursor=cursor,
         limit=limit,
         start_time=start_time,
@@ -411,11 +175,7 @@ async def get_delivery_timeline(
         notification_id=str(notification_id),
     )
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import get_delivery_timeline as _query
-
-    return await _query(notification_id=notification_id)
+    return await _query_delivery_timeline(notification_id=notification_id)
 
 
 @router.get(
@@ -444,11 +204,7 @@ async def get_effective_policy(
         irreversible=irreversible,
     )
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import get_effective_policy as _query
-
-    return await _query(
+    return await _query_effective_policy(
         notification_type=notification_type,
         intent=intent,
         autonomy_mode=autonomy_mode,
@@ -490,11 +246,7 @@ async def list_invariants(
         search=search,
     )
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import list_invariants as _query
-
-    return await _query(
+    return await _query_list_invariants(
         cursor=cursor,
         limit=limit,
         severity=severity,
@@ -517,11 +269,7 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
     """HTTP adapter — delegates to agsignal.queries.get_invariants_summary."""
     log_endpoint_call(logger, "get_invariants_summary")
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import get_invariants_summary as _query
-
-    return await _query()
+    return await _query_invariants_summary()
 
 
 @router.get(
@@ -558,11 +306,7 @@ async def list_audit_events(
         correlation_id=correlation_id,
     )
 
-    # Local import avoids circular dependency: agsignal.queries imports
-    # response models from this module.
-    from agsignal.queries import list_audit_events as _query
-
-    return await _query(
+    return await _query_list_audit_events(
         cursor=cursor,
         limit=limit,
         start_time=start_time,
@@ -582,3 +326,36 @@ def create_ui_router() -> APIRouter:
         Configured APIRouter with UI endpoints
     """
     return router
+
+
+# Re-export for backward compatibility. tests/ui_contract/test_ui_contracts.py
+# and scripts/generate_ui_contracts.py historically imported these classes
+# directly from this module; the alias preserves their import path while the
+# canonical home is now :mod:`agsignal.responses`.
+__all__ = [
+    "AuditEvent",
+    "AuditEventListResponse",
+    "AuditEventType",
+    "AutonomyContextResponse",
+    "DeliveryAttempt",
+    "DeliveryTimelineListResponse",
+    "DeliveryTimelineResponse",
+    "DeliveryTimelineSummary",
+    "EffectivePolicyResponse",
+    "EffectivePolicyValues",
+    "EnforcementType",
+    "ErrorDetail",
+    "ErrorResponse",  # alias for UIErrorResponse
+    "EvidenceLink",
+    "InvariantEnforcement",
+    "InvariantEntry",
+    "InvariantListResponse",
+    "InvariantSeverity",
+    "InvariantStatus",
+    "InvariantSummaryResponse",
+    "PaginationInfo",
+    "ResolutionContext",
+    "ResolutionSource",
+    "ResolutionStep",
+    "router",
+]

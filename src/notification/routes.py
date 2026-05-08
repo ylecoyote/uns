@@ -7,32 +7,39 @@ parsing + observability + delegation + error translation. The websocket
 dispatch (replay store, connection manager, fanout publisher) remains in
 the route layer because the websocket runtime state is FastAPI-app-scoped
 and is a transport-layer concern.
+
+Per Phase 3 Task 1, the Pydantic Request/Response DTOs that previously
+lived in this module have been relocated to :mod:`agsignal.responses`.
+The ``__all__`` re-export block at the bottom preserves the historical
+import path so external callers (notably ``agsignal_mcp.tools``) continue
+to work without code changes.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
 
+from agsignal.responses import (
+    AutonomyContextRequest,
+    DeliveryAuditItem,
+    DeliveryStatusResponse,
+    DLQListResponse,
+    DLQRemoveResponse,
+    PolicyReloadRequest,
+    PolicyReloadResponse,
+    SendNotificationRequest,
+    SendNotificationResponse,
+    SimulateNotificationResponse,
+)
+from agsignal.signaling import send_signal as service_send_signal
+from agsignal.signaling import simulate_signal as service_simulate_signal
 from notification.audit import AuditPersistenceError, AuditRecord, AuditStore
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
-from notification.dlq import DLQEntry, DLQService
-from notification.models import (
-    AckStatus,
-    AutonomyContext,
-    AutonomyMode,
-    Channel,
-    DeliveryMode,
-    DeliveryStatus,
-    NotificationIntent,
-    Priority,
-)
+from notification.dlq import DLQService
 from notification.policies import (
     PolicyRegistry,
     configure_policy_registry,
@@ -52,195 +59,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["signals"])
 ops_router = APIRouter(prefix="/api/v1", tags=["operations"])
-
-
-class AutonomyContextRequest(BaseModel):
-    """Producer-supplied autonomy context."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    autonomy_mode: AutonomyMode = Field(description="Current autonomy mode")
-    agent_id: UUID = Field(description="Agent identifier for attribution")
-    plan_id: UUID | None = Field(default=None, description="Optional plan identifier")
-    decision_snapshot_id: UUID | None = Field(
-        default=None,
-        description="Optional decision snapshot identifier",
-    )
-    execution_snapshot_id: UUID | None = Field(
-        default=None,
-        description="Optional execution snapshot identifier",
-    )
-    skip_snapshot_id: UUID | None = Field(
-        default=None,
-        description="Optional skip snapshot identifier",
-    )
-
-    def to_domain(self) -> AutonomyContext:
-        """Convert request context into the domain model."""
-        return AutonomyContext(
-            autonomy_mode=self.autonomy_mode,
-            agent_id=self.agent_id,
-            plan_id=self.plan_id,
-            decision_snapshot_id=self.decision_snapshot_id,
-            execution_snapshot_id=self.execution_snapshot_id,
-            skip_snapshot_id=self.skip_snapshot_id,
-        )
-
-
-class SendNotificationRequest(BaseModel):
-    """HTTP request for sending an AGSignal notification."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    notification_type: str = Field(description="Namespaced signal type", min_length=1)
-    intent: NotificationIntent = Field(description="Signal intent")
-    title: str = Field(description="Signal title", min_length=1, max_length=200)
-    message: str = Field(description="Signal body", min_length=1, max_length=4000)
-    source: str = Field(description="Producer identifier", min_length=1)
-    autonomy_context: AutonomyContextRequest = Field(description="Required autonomy context")
-    irreversible: bool = Field(default=False, description="Whether the action is irreversible")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional JSON metadata",
-    )
-    correlation_id: str | None = Field(default=None, description="Optional trace correlation ID")
-    delivery_mode: DeliveryMode | None = Field(
-        default=None,
-        description="Optional delivery mode override",
-    )
-    require_ack: bool | None = Field(
-        default=None,
-        description="Optional acknowledgment override",
-    )
-    priority: Priority | None = Field(default=None, description="Optional priority override")
-    dedup_key: str | None = Field(default=None, description="Optional deduplication key")
-    idempotency_key: str | None = Field(
-        default=None,
-        description="Producer retry key scoped by source",
-        min_length=1,
-    )
-
-
-class SendNotificationResponse(BaseModel):
-    """HTTP response for an accepted AGSignal notification."""
-
-    notification_id: UUID = Field(description="Notification identifier")
-    status: DeliveryStatus = Field(description="Delivery outcome")
-    channels_attempted: list[Channel] = Field(description="Router-derived channels attempted")
-    channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
-    channels_failed: list[Channel] = Field(description="Channels that failed")
-    require_ack: bool = Field(description="Whether the signal requires acknowledgment")
-    ack_status: AckStatus | None = Field(
-        default=None,
-        description="Current acknowledgment status when tracked",
-    )
-    idempotency_key: str | None = Field(
-        default=None,
-        description="Producer idempotency key when supplied",
-    )
-    idempotent_replay: bool = Field(
-        default=False,
-        description="Whether this response was replayed from a previous producer request",
-    )
-    created_at: datetime = Field(
-        description="Timestamp the notification was created (assigned by the SDK at signal acceptance)",
-    )
-    message: str = Field(description="Acceptance summary")
-
-
-class SimulateNotificationResponse(BaseModel):
-    """HTTP response for a simulated AGSignal notification."""
-
-    notification_id: UUID = Field(description="Preview notification identifier")
-    simulated: bool = Field(description="Whether delivery was simulated")
-    status: DeliveryStatus = Field(description="Simulated delivery outcome")
-    channels_attempted: list[Channel] = Field(description="Router-derived channels")
-    delivery_mode: DeliveryMode = Field(description="Resolved delivery mode")
-    require_ack: bool = Field(description="Whether the signal would require acknowledgment")
-    ack_status: AckStatus | None = Field(
-        default=None,
-        description="Always null because simulation has no ack side effect",
-    )
-    dedup_key: str = Field(description="Resolved deduplication key")
-    dedup_window_seconds: int | None = Field(
-        default=None,
-        description="Resolved deduplication window when configured",
-    )
-    policy_source: str = Field(description="Whether routing came from policy or defaults")
-    warnings: list[str] = Field(description="Human-readable simulation caveats")
-    message: str = Field(description="Simulation summary")
-
-
-class DeliveryAuditItem(BaseModel):
-    """Single persisted delivery audit entry."""
-
-    audit_id: UUID = Field(description="Audit record identifier")
-    status: DeliveryStatus = Field(description="Delivery outcome for this attempt")
-    channels_attempted: list[Channel] = Field(description="Channels attempted")
-    channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
-    channels_failed: list[Channel] = Field(description="Channels that failed")
-    error_message: str | None = Field(default=None, description="Delivery error if present")
-    policy_config_id: UUID | None = Field(
-        default=None, description="Policy config used for routing"
-    )
-    policy_config_hash: str | None = Field(
-        default=None, description="Exact policy config hash used"
-    )
-    policy_evaluation_id: UUID | None = Field(
-        default=None, description="Policy evaluation identifier"
-    )
-    delivered_at: datetime = Field(description="Delivery attempt timestamp")
-    audit_created_at: datetime = Field(description="Audit persistence timestamp")
-
-
-class DeliveryStatusResponse(BaseModel):
-    """HTTP response for persisted delivery status."""
-
-    notification_id: UUID = Field(description="Notification identifier")
-    notification_type: str = Field(description="Namespaced signal type")
-    delivery_status: DeliveryStatus = Field(description="Latest persisted delivery status")
-    channels_attempted: list[Channel] = Field(description="Channels attempted in latest audit")
-    channels_succeeded: list[Channel] = Field(description="Channels that succeeded")
-    channels_failed: list[Channel] = Field(description="Channels that failed")
-    error_message: str | None = Field(default=None, description="Latest delivery error")
-    delivered_at: datetime = Field(description="Latest delivery attempt timestamp")
-    audit_count: int = Field(description="Number of persisted delivery audits")
-    audits: list[DeliveryAuditItem] = Field(description="Delivery audits newest first")
-
-
-class DLQListResponse(BaseModel):
-    """HTTP response for DLQ inspection."""
-
-    depth: int = Field(description="Current DLQ depth")
-    items: list[DLQEntry] = Field(description="DLQ entries, newest first")
-
-
-class DLQRemoveResponse(BaseModel):
-    """HTTP response for DLQ entry removal."""
-
-    entry_id: UUID = Field(description="Removed DLQ entry identifier")
-    removed: bool = Field(description="Whether the entry was removed")
-    depth: int = Field(description="Current DLQ depth after removal")
-
-
-class PolicyReloadRequest(BaseModel):
-    """Request body for reloading YAML notification policies."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    policy_dir: str = Field(
-        default="config/notification_policies",
-        description="Directory containing YAML policy files",
-    )
-
-
-class PolicyReloadResponse(BaseModel):
-    """HTTP response for policy reload operations."""
-
-    loaded_count: int = Field(description="Number of policy files loaded")
-    persisted_count: int = Field(description="Number of policies newly persisted")
-    policy_count: int = Field(description="Number of policies active after reload")
-    notification_types: list[str] = Field(description="Registered notification types")
 
 
 @router.post(
@@ -263,15 +81,11 @@ async def send_notification(
     succeeds because the websocket runtime state is FastAPI-app-scoped
     transport infrastructure that does not belong in the service layer.
     """
-    # Local import avoids circular dependency: agsignal.signaling imports
-    # response models from this module.
-    from agsignal import signaling
-
     audit_store = http_request.app.state.audit_store
     idempotency_store = http_request.app.state.http_idempotency_records
 
     try:
-        response = await signaling.send_signal(
+        response = await service_send_signal(
             request=request,
             audit_store=audit_store,
             idempotency_store=idempotency_store,
@@ -350,12 +164,8 @@ async def simulate_notification(request: SendNotificationRequest) -> SimulateNot
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
     """
-    # Local import avoids circular dependency: agsignal.signaling imports
-    # response models from this module.
-    from agsignal import signaling
-
     try:
-        return await signaling.simulate_signal(request=request)
+        return await service_simulate_signal(request=request)
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -501,3 +311,23 @@ async def reload_policies(
         policy_count=len(runtime_registry),
         notification_types=notification_types,
     )
+
+
+# Re-export for backward compatibility. agsignal_mcp.tools and any other
+# downstream caller that does ``from notification.routes import
+# SendNotificationRequest`` (etc.) continues to work. Canonical home is
+# ``agsignal.responses``.
+__all__ = [
+    "AutonomyContextRequest",
+    "DLQListResponse",
+    "DLQRemoveResponse",
+    "DeliveryAuditItem",
+    "DeliveryStatusResponse",
+    "PolicyReloadRequest",
+    "PolicyReloadResponse",
+    "SendNotificationRequest",
+    "SendNotificationResponse",
+    "SimulateNotificationResponse",
+    "ops_router",
+    "router",
+]

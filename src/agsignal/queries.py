@@ -22,35 +22,12 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-# NOTE: response models (`InvariantSummaryResponse`, `DeliveryTimelineListResponse`,
-# `DeliveryTimelineResponse`, `EffectivePolicyResponse`, `InvariantListResponse`,
-# `AuditEventListResponse`) and the supporting enums (`EnforcementType`,
-# `InvariantSeverity`, `InvariantStatus`, `AuditEventType`, `ResolutionSource`)
-# currently live in `mcp_server.routes_ui` alongside the legacy route handlers.
-# Phase 5 of the v0.2 refactor relocates them to a dedicated module (likely
-# `mcp_server.read_models` or a new `agsignal.responses` module). Until then we
-# import from their current home.
-from mcp_server.observability import (
-    create_error_response_with_request_id,
-    get_structured_logger,
-    record_endpoint_error,
-)
-from mcp_server.read_models import (  # legacy location; Phase 5 relocates
-    AuditEventFilter,
-    DeliveryFilter,
-    get_read_model_adapter,
-)
-
-# NOTE: response models for notification status (`NotificationStatusResponse`,
-# `AckStatusResponse`) currently live in `mcp_server.routes_notification`.
-# Phase 5 of the v0.2 refactor relocates them. Until then we import from their
-# current home.
-from mcp_server.routes_notification import (  # legacy location; Phase 5 relocates
+# CAUTION: agsignal.responses.AuditEvent is the Pydantic class (relocated from
+# routes_ui); mcp_server.read_models.AuditEvent is a different @dataclass. They
+# are not interchangeable. The import below is the Pydantic version; if your
+# code needs the dataclass, import it explicitly from mcp_server.read_models.
+from agsignal.responses import (
     AckStatusResponse,
-    NotificationStatusResponse,
-    get_engine,
-)
-from mcp_server.routes_ui import (  # legacy location; Phase 5 relocates
     AuditEvent,
     AuditEventListResponse,
     AuditEventType,
@@ -69,12 +46,28 @@ from mcp_server.routes_ui import (  # legacy location; Phase 5 relocates
     InvariantSeverity,
     InvariantStatus,
     InvariantSummaryResponse,
+    NotificationStatusResponse,
     PaginationInfo,
     ResolutionContext,
     ResolutionSource,
     ResolutionStep,
 )
-from notification.models import (  # legacy location; Phase 5 relocates
+from mcp_server.observability import (
+    create_error_response_with_request_id,
+    get_structured_logger,
+    record_endpoint_error,
+)
+from mcp_server.read_models import (  # internal adapter types; Phase 5 relocates
+    AuditEventFilter,
+    DeliveryFilter,
+    get_read_model_adapter,
+)
+from notification.acknowledgment import (
+    AcknowledgmentEngine,
+    configure_ack_engine,
+    get_ack_engine,
+)
+from notification.models import (
     AckStatus,
     AutonomyMode,
     Channel,
@@ -97,12 +90,29 @@ __all__ = [
     "get_ack_status",
     "get_delivery_timeline",
     "get_effective_policy",
+    "get_engine",
     "get_invariants_summary",
     "get_notification_status",
     "list_audit_events",
     "list_deliveries",
     "list_invariants",
 ]
+
+
+def get_engine() -> AcknowledgmentEngine:
+    """Get the acknowledgment engine, initializing if needed.
+
+    Phase 3 Task 1 relocated this factory from
+    ``mcp_server.routes_notification`` into the service layer to break a
+    circular import (the routes module now imports the queries that use
+    this factory; previously the queries module imported the factory from
+    the routes module). Behavior is unchanged.
+    """
+    try:
+        return get_ack_engine()
+    except RuntimeError:
+        # Auto-configure with defaults for convenience
+        return configure_ack_engine()
 
 
 async def list_deliveries(

@@ -21,12 +21,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_server.app import create_app
-from mcp_server.read_models import (
-    InMemoryReadModelAdapter,
-    configure_read_model_adapter,
-)
-from mcp_server.routes_ui import (
+from agsignal.responses import (
     AuditEvent,
     AuditEventType,
     AutonomyContextResponse,
@@ -35,7 +30,6 @@ from mcp_server.routes_ui import (
     EffectivePolicyValues,
     EnforcementType,
     ErrorDetail,
-    ErrorResponse,
     EvidenceLink,
     InvariantEnforcement,
     InvariantEntry,
@@ -45,6 +39,14 @@ from mcp_server.routes_ui import (
     ResolutionContext,
     ResolutionSource,
     ResolutionStep,
+)
+from agsignal.responses import (
+    UIErrorResponse as ErrorResponse,
+)
+from mcp_server.app import create_app
+from mcp_server.read_models import (
+    InMemoryReadModelAdapter,
+    configure_read_model_adapter,
 )
 from notification.audit import InMemoryAuditStore
 from notification.models import (

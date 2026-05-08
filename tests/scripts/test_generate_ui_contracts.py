@@ -199,10 +199,16 @@ class TestSchemas:
         assert schema["type"] == "object"
 
     def test_has_error_response_schema(self, contract_data: dict) -> None:
-        """Verify ErrorResponse schema is present."""
+        """Verify UIErrorResponse schema is present.
+
+        Phase 3 Task 1 renamed ``ErrorResponse`` (the routes_ui flavor) to
+        ``UIErrorResponse`` because two structurally incompatible
+        ``ErrorResponse`` classes coexisted; both moved to
+        :mod:`agsignal.responses` under disambiguated names.
+        """
         schemas = contract_data["schemas"]
-        assert "ErrorResponse" in schemas
-        schema = schemas["ErrorResponse"]
+        assert "UIErrorResponse" in schemas
+        schema = schemas["UIErrorResponse"]
         assert schema["type"] == "object"
         assert "error" in schema["properties"]
         assert "request_id" in schema["properties"]
