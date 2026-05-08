@@ -1,0 +1,47 @@
+# VCS
+.git/
+.gitignore
+.gitleaks.toml
+.gitleaksignore
+
+# Python build artifacts
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+dist/
+build/
+*.egg-info/
+src/*.egg-info/
+
+# Workspace / planning artifacts (not shipped publicly)
+.worktrees/
+.ralphy-worktrees/
+.omx/
+docs/internal/
+.DS_Store
+**/.DS_Store
+
+# Tests are not needed in the production image (we rely on CI for testing).
+tests/
+
+# UI source: not part of the Python wheel — its own deploy story.
+apps/
+
+# CI/dev tooling unrelated to the wheel
+.github/
+docker-compose*.yml
+Dockerfile
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp

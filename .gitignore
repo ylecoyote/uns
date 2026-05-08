@@ -104,6 +104,11 @@ uns-doc-*.yaml
 uns-ui-phase-*.yaml
 uns-ui-phase-1_1-standardize-ui.yaml
 uns-ui-phase-1_2-guardrails-ci-contracts.yaml
+docs/plans/
+
+# UI test/coverage outputs
+apps/ui/test-results/
+apps/ui/coverage/
 
 # Generated logs
 docs/reports/ui/_logs/*.log

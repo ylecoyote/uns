@@ -295,6 +295,16 @@ class DeliveryService:
             delivered_at=datetime.now(UTC),
         )
 
+        # Record per-channel delivery metrics (post-result, so the success/failure
+        # split is final). Lazy-imported to avoid loading prometheus_client when
+        # the service is exercised in unit-test contexts that don't install it.
+        from notification.metrics import record_delivery
+
+        for ch in channels_succeeded:
+            record_delivery(channel=ch.value, status="succeeded")
+        for ch in channels_failed:
+            record_delivery(channel=ch.value, status="failed")
+
         # Step 5: Ack timeout scheduling (if required)
         require_ack = (
             notification.require_ack

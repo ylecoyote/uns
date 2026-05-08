@@ -1,0 +1,148 @@
+# Release workflow for AGSignal.
+#
+# Triggers on tags matching "v*" (e.g. "v0.1.0"). Builds wheel + sdist with
+# uv, publishes to PyPI via Trusted Publishing (OIDC; no API tokens), and
+# creates a GitHub Release with artifacts attached and auto-generated notes.
+#
+# ---------------------------------------------------------------------------
+# ONE-TIME SETUP (required before the first successful release run)
+# ---------------------------------------------------------------------------
+#
+# 1. Configure a "Pending" Trusted Publisher on PyPI:
+#       https://pypi.org/manage/account/publishing/
+#    Fill in:
+#       - PyPI Project Name:    agsignal
+#       - Owner:                ylecoyote
+#       - Repository name:      agsignal
+#       - Workflow name:        release.yml
+#       - Environment name:     pypi
+#
+# 2. Create a "pypi" environment in this repo's settings:
+#       Settings -> Environments -> New environment -> "pypi"
+#    Optionally add a deployment protection rule (manual approval) so a human
+#    confirms each release.
+#
+# 3. Tag and push:
+#       git tag v0.1.0
+#       git push origin v0.1.0
+#    The workflow runs automatically.
+#
+# Sigstore attestations are generated automatically by pypa/gh-action-pypi-publish
+# when invoked with the "id-token: write" permission below.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Verify tag matches package version
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          pkg_version=$(grep '^version' pyproject.toml | head -1 | sed -E 's/version *= *"([^"]+)"/\1/')
+          if [ "$tag" != "$pkg_version" ]; then
+            echo "Tag v$tag does not match pyproject.toml version $pkg_version"
+            exit 1
+          fi
+          echo "Tag and version agree: v$tag"
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Verify build artifacts exist
+        run: |
+          ls -la dist/
+          test -f dist/agsignal-*.whl || (echo "wheel missing" && exit 1)
+          test -f dist/agsignal-*.tar.gz || (echo "sdist missing" && exit 1)
+
+      - name: Smoke-test installed wheel imports cleanly
+        run: |
+          uv venv --python 3.12 /tmp/release-smoke
+          uv pip install --python /tmp/release-smoke/bin/python dist/agsignal-*.whl
+          /tmp/release-smoke/bin/python -c "
+          import agsignal, agsignal_mcp, notification, db, mcp_server, ui_client
+          from agsignal import SignalClient, GovernanceSignal
+          from agsignal_mcp import MCPRuntimeConfig
+          assert MCPRuntimeConfig().read_only is True
+          print('Release artifact smoke test OK')
+          "
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/agsignal
+    permissions:
+      id-token: write   # required for PyPI Trusted Publishing (OIDC)
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI via Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
+
+  github-release:
+    name: Create GitHub Release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release with artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release create "$tag" \
+            --title "AGSignal $tag" \
+            --generate-notes \
+            --verify-tag \
+            dist/agsignal-*.whl \
+            dist/agsignal-*.tar.gz

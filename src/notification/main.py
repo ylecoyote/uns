@@ -67,6 +67,17 @@ def _policy_dir_from_env() -> Path | None:
     return Path(raw_path) if raw_path else None
 
 
+def _docs_url(suffix: str) -> str | None:
+    """Return ``suffix`` only when interactive API docs are explicitly enabled.
+
+    Disabled by default so production deployments do not leak the full API
+    surface to anonymous callers. Set ``AGSIGNAL_ENABLE_DOCS=true`` to expose
+    ``/docs``, ``/redoc``, and ``/openapi.json``.
+    """
+    enabled = os.environ.get("AGSIGNAL_ENABLE_DOCS", "false").strip().lower()
+    return suffix if enabled in ("1", "true", "yes", "on") else None
+
+
 def _channel_readiness() -> dict[str, bool]:
     config = get_notification_config()
     return {
@@ -89,11 +100,21 @@ def create_app(
         title="AGSignal Core",
         description="Control-plane notification and acknowledgment service for autonomous agents.",
         version=__version__,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url=_docs_url("/docs"),
+        redoc_url=_docs_url("/redoc"),
+        openapi_url=_docs_url("/openapi.json"),
     )
     configure_cors(app)
+
+    # Prometheus instrumentation: /metrics endpoint + request middleware.
+    from notification.metrics import install_metrics
+
+    install_metrics(app)
+
+    # Install API rate limiting (default 1000/minute per principal/IP).
+    from notification.rate_limiter import install_rate_limiter
+
+    install_rate_limiter(app)
     config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
     app.state.policy_store = policy_store
@@ -135,6 +156,7 @@ def create_app(
     app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
 
     @app.get("/health", tags=["system"])
+    @app.get("/healthz", tags=["system"])
     async def health() -> dict[str, str]:
         return {
             "status": "alive",
@@ -143,6 +165,7 @@ def create_app(
         }
 
     @app.get("/ready", tags=["system"])
+    @app.get("/readyz", tags=["system"])
     async def ready() -> dict[str, Any]:
         return {
             "status": "ready",

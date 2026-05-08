@@ -5,6 +5,12 @@
 AGSignal is pre-1.0 software. Security fixes are provided for the latest released
 minor version.
 
+## Threat Model
+
+For an explicit description of trust boundaries, threats, mitigations, and
+known gaps, see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md). Read it
+before relying on AGSignal in a high-stakes deployment.
+
 ## Reporting a Vulnerability
 
 Report suspected vulnerabilities through GitHub private vulnerability reporting

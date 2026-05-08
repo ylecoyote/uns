@@ -287,6 +287,142 @@ class TestCreateApp:
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
+    def test_healthz_returns_kubernetes_convention_payload(self):
+        """`/healthz` is the Kubernetes-convention liveness probe."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        response = client.get("/healthz")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "alive"
+        assert body["service"] == "agsignal-console"
+        assert "version" in body
+
+    def test_ready_reports_persistence_dependencies(self):
+        """`/ready` confirms the read-model adapter and audit logger are wired."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app()
+            client = TestClient(app)
+
+        response = client.get("/ready")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ready"
+        assert body["service"] == "agsignal-console"
+        assert "read_model_adapter" in body
+        assert "audit_logger" in body
+
+    def test_readyz_aliases_ready(self):
+        """`/readyz` returns the same payload as `/ready`."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app()
+            client = TestClient(app)
+
+        ready_body = client.get("/ready").json()
+        readyz_body = client.get("/readyz").json()
+        assert readyz_body == ready_body
+
+    def test_metrics_endpoint_exposes_prometheus_format(self):
+        """`/metrics` returns Prometheus exposition format with expected metric names."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        content_type = response.headers["content-type"]
+        # prometheus-client returns: text/plain; version=0.0.4; charset=utf-8
+        assert content_type.startswith("text/plain")
+        assert "version=" in content_type
+
+        body = response.text
+        # The four metric families AGSignal exposes must all appear in the
+        # output, even if their counters are still at zero.
+        for metric_name in (
+            "agsignal_http_requests_total",
+            "agsignal_http_request_duration_seconds",
+            "agsignal_signals_received_total",
+            "agsignal_deliveries_total",
+        ):
+            assert metric_name in body, f"missing metric {metric_name}"
+
+    def test_metrics_records_http_requests(self):
+        """Each non-/metrics request increments the http counter."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        # Drive a request through a known route template.
+        client.get("/healthz")
+        body = client.get("/metrics").text
+
+        # The healthz hit should appear with status_code="200".
+        assert "agsignal_http_requests_total" in body
+        # The /metrics endpoint itself is excluded from instrumentation.
+        assert 'path_template="/metrics"' not in body
+
+    def test_rate_limit_returns_429_after_threshold(self):
+        """Hitting any non-exempt route past its limit returns 429 with Retry-After."""
+        from fastapi.testclient import TestClient
+
+        env = {"AGSIGNAL_RATE_LIMIT_DEFAULT": "3/minute"}
+        with patch.dict(os.environ, env, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+            # Probes all key against the same TestClient remote IP.
+            statuses = [client.get("/healthz").status_code for _ in range(4)]
+
+        assert statuses[:3] == [200, 200, 200], statuses
+        assert statuses[3] == 429, statuses
+
+        # Confirm the 429 carries Retry-After (any positive integer string).
+        with patch.dict(os.environ, env, clear=True):
+            app2 = create_app(skip_persistence_config=True)
+            client2 = TestClient(app2)
+            for _ in range(3):
+                client2.get("/healthz")
+            response = client2.get("/healthz")
+
+        assert response.status_code == 429
+        retry_after = response.headers.get("retry-after") or response.headers.get(
+            "Retry-After"
+        )
+        assert retry_after is not None and retry_after.isdigit()
+        assert int(retry_after) >= 1
+
+    def test_rate_limit_keys_independently_per_principal(self):
+        """Different Bearer tokens get independent rate-limit counters."""
+        from fastapi.testclient import TestClient
+
+        env = {"AGSIGNAL_RATE_LIMIT_DEFAULT": "2/minute"}
+        with patch.dict(os.environ, env, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+            headers_alice = {"Authorization": "Bearer alice-key"}
+            headers_bob = {"Authorization": "Bearer bob-key"}
+
+            # Alice hits her limit.
+            assert client.get("/healthz", headers=headers_alice).status_code == 200
+            assert client.get("/healthz", headers=headers_alice).status_code == 200
+            assert client.get("/healthz", headers=headers_alice).status_code == 429
+
+            # Bob is independent — first request still passes.
+            assert client.get("/healthz", headers=headers_bob).status_code == 200
+
     def test_create_app_allows_console_cors_preflight(self):
         """Browser console origins can preflight read and write API headers."""
         from fastapi.testclient import TestClient
@@ -312,6 +448,33 @@ class TestCreateApp:
         assert "authorization" in allowed_headers
         assert "x-agsignal-api-key" in allowed_headers
         assert "x-uns-api-key" in allowed_headers
+
+    def test_create_app_disables_interactive_docs_by_default(self):
+        """Console API does not expose /docs, /redoc, or /openapi.json by default."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            response = client.get(path)
+            assert response.status_code == 404, (
+                f"{path} should be disabled by default; got {response.status_code}"
+            )
+
+    def test_create_app_exposes_interactive_docs_when_enabled(self):
+        """Operators can opt in to interactive docs via AGSIGNAL_ENABLE_DOCS=true."""
+        from fastapi.testclient import TestClient
+
+        with patch.dict(os.environ, {"AGSIGNAL_ENABLE_DOCS": "true"}, clear=True):
+            app = create_app(skip_persistence_config=True)
+            client = TestClient(app)
+
+            response = client.get("/openapi.json")
+
+        assert response.status_code == 200
+        assert response.json()["info"]["title"] == "AGSignal Console API"
 
     def test_create_app_rejects_unknown_cors_origin(self):
         """CORS stays closed by default for non-console origins."""

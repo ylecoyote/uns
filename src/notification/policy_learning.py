@@ -6,6 +6,7 @@ bringing over trading-specific policy names or payload schemas.
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar
@@ -13,10 +14,28 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+#: Default cap on the per-delta transition history. Defense-in-depth against
+#: future evolution of the state machine that could allow ping-pong cycles.
+#: Configurable via ``AGSIGNAL_TRANSITION_HISTORY_LIMIT``; set to ``0`` to
+#: disable capping (operator opt-out).
+DEFAULT_TRANSITION_HISTORY_LIMIT = 100
+
 
 def _utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
     return datetime.now(UTC)
+
+
+def _transition_history_limit() -> int:
+    """Resolve the configured cap from the environment, with a safe default."""
+    raw = os.environ.get("AGSIGNAL_TRANSITION_HISTORY_LIMIT")
+    if raw is None or raw.strip() == "":
+        return DEFAULT_TRANSITION_HISTORY_LIMIT
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_TRANSITION_HISTORY_LIMIT
+    return value
 
 
 class DeltaState(str, Enum):
@@ -344,9 +363,13 @@ class PolicyDelta(BaseModel):
             guard_stage=guard_stage,
             transitioned_at=now,
         )
+        new_history: tuple[PolicyDeltaTransition, ...] = (*self.transition_history, transition)
+        limit = _transition_history_limit()
+        if limit > 0 and len(new_history) > limit:
+            new_history = new_history[-limit:]
         updates: dict[str, Any] = {
             "state": new_state,
-            "transition_history": (*self.transition_history, transition),
+            "transition_history": new_history,
             "updated_at": now,
         }
 

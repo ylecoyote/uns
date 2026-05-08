@@ -138,7 +138,10 @@ def _notification() -> Notification:
     )
 
 
-def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
+def test_standalone_app_metadata_and_routes_are_agsignal_native(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGSIGNAL_ENABLE_DOCS", "true")
     client = _client()
     from notification.main import create_app
 
@@ -154,6 +157,58 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native() -> None:
     assert "/ws/agents/{agent_id}" in [
         getattr(route, "path", None) for route in create_app().routes
     ]
+
+
+def test_healthz_aliases_health() -> None:
+    """`/healthz` returns the same payload as `/health` for k8s probes."""
+    client = _client()
+
+    health_body = client.get("/health").json()
+    healthz_body = client.get("/healthz").json()
+    assert healthz_body == health_body
+    assert healthz_body["status"] == "alive"
+    assert healthz_body["service"] == "agsignal-core"
+
+
+def test_readyz_aliases_ready() -> None:
+    """`/readyz` returns the same payload as `/ready` for k8s probes."""
+    client = _client()
+
+    ready_body = client.get("/ready").json()
+    readyz_body = client.get("/readyz").json()
+    assert readyz_body == ready_body
+    assert readyz_body["status"] == "ready"
+
+
+def test_metrics_endpoint_returns_prometheus_format() -> None:
+    """AGSignal Core exposes /metrics in Prometheus exposition format."""
+    client = _client()
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    body = response.text
+    for metric_name in (
+        "agsignal_http_requests_total",
+        "agsignal_signals_received_total",
+        "agsignal_deliveries_total",
+    ):
+        assert metric_name in body
+
+
+def test_standalone_app_disables_interactive_docs_by_default(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """AGSignal Core does not expose /docs, /redoc, or /openapi.json by default."""
+    monkeypatch.delenv("AGSIGNAL_ENABLE_DOCS", raising=False)
+    client = _client()
+
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        response = client.get(path)
+        assert response.status_code == 404, (
+            f"{path} should be disabled by default; got {response.status_code}"
+        )
 
 
 def test_ready_does_not_require_market_insights_dependencies() -> None:
