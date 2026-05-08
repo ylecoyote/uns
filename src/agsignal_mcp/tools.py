@@ -10,12 +10,28 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agsignal.queries import (
+    get_ack_status as query_get_ack_status,
+)
+from agsignal.queries import (
+    get_effective_policy as query_get_effective_policy,
+)
+from agsignal.queries import (
+    get_invariants_summary as query_get_invariants_summary,
+)
+from agsignal.queries import (
+    get_notification_status as query_get_notification_status,
+)
+from agsignal.queries import (
+    list_audit_events as query_list_audit_events,
+)
+from agsignal.queries import (
+    list_deliveries as query_list_deliveries,
+)
+from agsignal.queries import (
+    list_invariants as query_list_invariants,
+)
 from agsignal_mcp.runtime import MCPRuntimeConfig
-from mcp_server.routes_ui import get_effective_policy as get_effective_policy_route
-from mcp_server.routes_ui import get_invariants_summary as get_invariants_summary_route
-from mcp_server.routes_ui import list_audit_events as list_audit_events_route
-from mcp_server.routes_ui import list_deliveries as list_deliveries_route
-from mcp_server.routes_ui import list_invariants as list_invariants_route
 from notification.acknowledgment import configure_ack_engine, get_ack_engine
 from notification.audit import create_ack_audit_record
 from notification.models import AckStatus, AutonomyMode, NotificationIntent
@@ -214,33 +230,29 @@ def dismiss_notification(
     }
 
 
-def get_ack_status(notification_id: str | UUID) -> dict[str, Any]:
-    """Return ACK status for a notification if it is tracked."""
+async def get_ack_status(notification_id: str | UUID) -> dict[str, Any]:
+    """Return ACK status for a notification if it is tracked.
+
+    Delegates to ``agsignal.queries.get_ack_status``. Returns the
+    ``AckStatusResponse`` schema (``notification_id``, ``ack_status``).
+    """
     notification_uuid = UUID(str(notification_id))
-    ack_status = _get_ack_engine().get_status(notification_uuid)
-    return {
-        "notification_id": str(notification_uuid),
-        "ack_status": ack_status.value if ack_status is not None else None,
-    }
+    response = await query_get_ack_status(notification_id=notification_uuid)
+    return _json_safe(response.model_dump())
 
 
-def get_notification_status(notification_id: str | UUID) -> dict[str, Any]:
-    """Return the tracked notification status available from the ACK engine."""
+async def get_notification_status(notification_id: str | UUID) -> dict[str, Any]:
+    """Return the tracked notification status available from the ACK engine.
+
+    Delegates to ``agsignal.queries.get_notification_status``. Returns the
+    ``NotificationStatusResponse`` schema. Several fields
+    (``notification_type``, ``title``, ``message``, ``require_ack``) may be
+    ``None`` when only ack-engine state is available — the canonical schema
+    is defined in ``mcp_server.routes_notification.NotificationStatusResponse``.
+    """
     notification_uuid = UUID(str(notification_id))
-    state = _get_ack_engine().get_state(notification_uuid)
-    if state is None:
-        return {
-            "notification_id": str(notification_uuid),
-            "found": False,
-            "ack_status": None,
-        }
-    return {
-        "notification_id": str(notification_uuid),
-        "found": True,
-        "intent": state.intent.value if state.intent else None,
-        "ack_status": state.status.value if state.status else None,
-        "created_at": state.created_at.isoformat() if state.created_at else None,
-    }
+    response = await query_get_notification_status(notification_id=notification_uuid)
+    return _json_safe(response.model_dump())
 
 
 def get_delivery_status(
@@ -313,31 +325,43 @@ async def get_effective_policy(
     autonomy_mode: str,
     irreversible: bool = False,
 ) -> dict[str, Any]:
-    """Return effective policy resolution for a signal shape."""
-    response = await get_effective_policy_route(
+    """Return effective policy resolution for a signal shape.
+
+    Delegates to ``agsignal.queries.get_effective_policy``.
+    """
+    response = await query_get_effective_policy(
         notification_type=notification_type,
         intent=NotificationIntent(intent),
         autonomy_mode=AutonomyMode(autonomy_mode),
         irreversible=irreversible,
     )
-    return response.model_dump(mode="json")
+    return _json_safe(response.model_dump())
 
 
 async def list_invariants(limit: int = 25) -> dict[str, Any]:
-    """Return registered AGSignal invariants."""
-    response = await list_invariants_route(limit=limit)
-    return response.model_dump(mode="json")
+    """Return registered AGSignal invariants.
+
+    Delegates to ``agsignal.queries.list_invariants``.
+    """
+    response = await query_list_invariants(limit=limit)
+    return _json_safe(response.model_dump())
 
 
 async def get_invariants_summary() -> dict[str, Any]:
-    """Return invariant summary counts."""
-    response = await get_invariants_summary_route()
-    return response.model_dump(mode="json")
+    """Return invariant summary counts.
+
+    Delegates to ``agsignal.queries.get_invariants_summary``.
+    """
+    response = await query_get_invariants_summary()
+    return _json_safe(response.model_dump())
 
 
 async def list_deliveries(limit: int = 25) -> dict[str, Any]:
-    """Return delivery read-model entries."""
-    response = await list_deliveries_route(
+    """Return delivery read-model entries.
+
+    Delegates to ``agsignal.queries.list_deliveries``.
+    """
+    response = await query_list_deliveries(
         cursor=None,
         limit=limit,
         start_time=None,
@@ -350,12 +374,15 @@ async def list_deliveries(limit: int = 25) -> dict[str, Any]:
         notification_type=None,
         channel=None,
     )
-    return response.model_dump(mode="json")
+    return _json_safe(response.model_dump())
 
 
 async def list_audit_events(limit: int = 25) -> dict[str, Any]:
-    """Return audit read-model entries."""
-    response = await list_audit_events_route(
+    """Return audit read-model entries.
+
+    Delegates to ``agsignal.queries.list_audit_events``.
+    """
+    response = await query_list_audit_events(
         cursor=None,
         limit=limit,
         start_time=None,
@@ -366,4 +393,4 @@ async def list_audit_events(limit: int = 25) -> dict[str, Any]:
         autonomy_mode=None,
         correlation_id=None,
     )
-    return response.model_dump(mode="json")
+    return _json_safe(response.model_dump())

@@ -74,14 +74,14 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
         return dismiss_notification_impl(payload, config=config)
 
     @mcp.tool(name="get_notification_status")
-    def get_notification_status_tool(notification_id: str) -> dict[str, object]:
+    async def get_notification_status_tool(notification_id: str) -> dict[str, object]:
         """Return notification status from the ACK runtime."""
-        return get_notification_status_impl(notification_id)
+        return await get_notification_status_impl(notification_id)
 
     @mcp.tool(name="get_ack_status")
-    def get_ack_status_tool(notification_id: str) -> dict[str, object]:
+    async def get_ack_status_tool(notification_id: str) -> dict[str, object]:
         """Return ACK status for a notification."""
-        return get_ack_status_impl(notification_id)
+        return await get_ack_status_impl(notification_id)
 
     @mcp.tool(name="list_deliveries")
     async def list_deliveries_tool(limit: int = 25) -> dict[str, object]:

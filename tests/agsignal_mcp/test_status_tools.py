@@ -74,7 +74,8 @@ def test_ack_notification_is_disabled_in_read_only_mode() -> None:
         )
 
 
-def test_ack_notification_updates_tracked_signal() -> None:
+@pytest.mark.asyncio
+async def test_ack_notification_updates_tracked_signal() -> None:
     state = RuntimeState()
     sent = send_signal(
         _signal_input(
@@ -91,7 +92,7 @@ def test_ack_notification_updates_tracked_signal() -> None:
         runtime_state=state,
         config=WRITABLE_CONFIG,
     )
-    status = get_ack_status(sent["notification_id"])
+    status = await get_ack_status(sent["notification_id"])
 
     assert acked["ack_status"] == "ACKED"
     assert acked["acked_by"] == "operator"
