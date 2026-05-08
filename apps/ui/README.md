@@ -277,6 +277,32 @@ All endpoints are **GET-only** per Phase 1 posture. The UI consumes only `/ui/*`
 | `test:run` | `npm run test:run` | Run tests once (CI mode) |
 | `lint` | `npm run lint` | Run ESLint |
 | `type-check` | `npm run type-check` | Run TypeScript type checking |
+| `generate-types` | `npm run generate-types` | Regenerate `src/types/generated.ts` from the FastAPI OpenAPI spec |
+
+## Generated types
+
+`src/types/generated.ts` is generated from the AGSignal Console OpenAPI
+spec by `scripts/generate-types.ts`. It is committed to the repo so
+day-to-day type-check, lint, build, and test do not require backend
+tooling.
+
+Refresh after a backend API change:
+
+```bash
+npm run generate-types
+```
+
+The script imports the FastAPI app offline (no running server required)
+via `uv run python ... create_app(skip_persistence_config=True).openapi()`,
+so it works in any environment with the Python deps installed.
+
+The hand-written types in `src/types/{api,common,invariants,routes,index}.ts`
+remain the current source of truth for UI code; `generated.ts` is added
+alongside as a parallel source of truth so consumers can migrate gradually.
+Zod schemas stay where they are (zod expressivity exceeds OpenAPI).
+
+CI does **not** regenerate the file. Drift is the maintainer's
+responsibility — re-run after backend changes and commit the result.
 
 ## Data Contracts
 
