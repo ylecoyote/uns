@@ -35,8 +35,9 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 
+from agsignal.errors import NotFoundError
 from agsignal.queries import (
     get_delivery_timeline as _query_delivery_timeline,
 )
@@ -84,8 +85,10 @@ from agsignal.responses import (
     UIErrorResponse as ErrorResponse,
 )
 from mcp_server.observability import (
+    create_error_response_with_request_id,
     get_structured_logger,
     log_endpoint_call,
+    record_endpoint_error,
 )
 from notification.models import (
     AutonomyMode,
@@ -168,14 +171,37 @@ async def list_deliveries(
 async def get_delivery_timeline(
     notification_id: UUID,
 ) -> DeliveryTimelineResponse:
-    """HTTP adapter — delegates to agsignal.queries.get_delivery_timeline."""
+    """HTTP adapter — delegates to agsignal.queries.get_delivery_timeline.
+
+    Translates the typed :class:`agsignal.errors.NotFoundError` raised by
+    the service layer to an HTTP 404 response with the standard error
+    envelope. Observability metric emission for the 404 path lives here
+    in the route adapter (not in the service layer).
+    """
     log_endpoint_call(
         logger,
         "get_delivery_timeline",
         notification_id=str(notification_id),
     )
 
-    return await _query_delivery_timeline(notification_id=notification_id)
+    try:
+        return await _query_delivery_timeline(notification_id=notification_id)
+    except NotFoundError:
+        message = f"Delivery timeline not found for notification {notification_id}"
+        error_response = create_error_response_with_request_id(
+            code="not_found",
+            message=message,
+        )
+        record_endpoint_error(
+            endpoint="/ui/deliveries/{id}",
+            error_code="not_found",
+            error_message=message,
+            status_code=404,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_response,
+        ) from None
 
 
 @router.get(

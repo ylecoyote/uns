@@ -64,17 +64,21 @@ async def test_list_deliveries_returns_paginated_response_shape() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_delivery_timeline_returns_404_for_missing_notification() -> None:
-    """get_delivery_timeline raises HTTPException for missing notifications."""
-    from fastapi import HTTPException
+async def test_get_delivery_timeline_raises_not_found_for_unknown_id() -> None:
+    """get_delivery_timeline raises typed NotFoundError for missing notifications.
 
+    Phase 3 Task 2: the service layer no longer raises ``HTTPException``;
+    it raises :class:`agsignal.errors.NotFoundError` and the route adapter
+    translates that to HTTP 404.
+    """
+    from agsignal.errors import NotFoundError
     from agsignal.queries import get_delivery_timeline
 
-    # Use a randomly generated UUID that should not exist in the in-memory store
     missing_id = uuid4()
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(NotFoundError) as exc_info:
         await get_delivery_timeline(notification_id=missing_id)
-    assert excinfo.value.status_code == 404
+    assert exc_info.value.resource == "delivery_timeline"
+    assert exc_info.value.identifier == str(missing_id)
 
 
 @pytest.mark.asyncio

@@ -9,10 +9,11 @@ Each function in this module is the canonical implementation of its
 operation. `mcp_server.routes_ui` and `agsignal_mcp.tools` both call into
 these — there is no other source of truth.
 
-Note: a thin FastAPI `HTTPException` import is currently retained so the
-verbatim-extracted route bodies (e.g. `get_delivery_timeline`'s 404) keep
-their behavior. Phase 5 of the v0.2 refactor relocates HTTP-shaped error
-handling back into the route adapter layer.
+Service-layer error handling: these functions raise typed domain errors
+from :mod:`agsignal.errors` (e.g. :class:`~agsignal.errors.NotFoundError`)
+instead of HTTP-shaped exceptions. Route adapters translate the typed
+errors to HTTP status codes; non-HTTP transports handle them as Python
+exceptions.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from agsignal.errors import NotFoundError
 
 # CAUTION: agsignal.responses.AuditEvent is the Pydantic class (relocated from
 # routes_ui); mcp_server.read_models.AuditEvent is a different @dataclass. They
@@ -53,7 +54,6 @@ from agsignal.responses import (
     ResolutionStep,
 )
 from mcp_server.observability import (
-    create_error_response_with_request_id,
     get_structured_logger,
     record_endpoint_error,
 )
@@ -209,23 +209,9 @@ async def get_delivery_timeline(
     timeline = adapter.get_delivery_timeline(notification_id)
 
     if timeline is None:
-        error_response = create_error_response_with_request_id(
-            code="not_found",
-            message=f"Notification not found: {notification_id}",
-        )
-        record_endpoint_error(
-            endpoint="/ui/deliveries/{id}",
-            error_code="not_found",
-            error_message=f"Notification not found: {notification_id}",
-            status_code=404,
-        )
-        logger.warning(
-            "Delivery timeline not found",
-            extra={"notification_id": str(notification_id)},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=error_response,
+        raise NotFoundError(
+            resource="delivery_timeline",
+            identifier=str(notification_id),
         )
 
     # Convert attempts to response model
