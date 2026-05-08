@@ -314,38 +314,12 @@ async def dismiss_notification(
 async def get_notification_status(
     notification_id: UUID,
 ) -> NotificationStatusResponse:
-    """Get the status of a notification.
+    """HTTP adapter — delegates to agsignal.queries.get_notification_status."""
+    # Local import avoids circular dependency: agsignal.queries imports
+    # response models from this module.
+    from agsignal.queries import get_notification_status as _query
 
-    Returns notification details including the current acknowledgment status.
-    If the notification is not found, returns a response with found=False.
-
-    Note: The engine only stores ack state, not full notification details.
-    So this endpoint returns ack state info only.
-
-    Args:
-        notification_id: UUID of the notification
-
-    Returns:
-        NotificationStatusResponse with ack status
-    """
-    engine = get_engine()
-
-    state = engine.get_state(notification_id)
-
-    if state is None:
-        return NotificationStatusResponse(
-            notification_id=notification_id,
-            found=False,
-            ack_status=None,
-        )
-
-    return NotificationStatusResponse(
-        notification_id=notification_id,
-        intent=state.intent.value if state.intent else None,
-        ack_status=state.status,
-        created_at=state.created_at,
-        found=True,
-    )
+    return await _query(notification_id=notification_id)
 
 
 @router.get(
@@ -358,24 +332,12 @@ async def get_notification_status(
 async def get_ack_status(
     notification_id: UUID,
 ) -> AckStatusResponse:
-    """Get the acknowledgment status of a notification.
+    """HTTP adapter — delegates to agsignal.queries.get_ack_status."""
+    # Local import avoids circular dependency: agsignal.queries imports
+    # response models from this module.
+    from agsignal.queries import get_ack_status as _query
 
-    Returns just the ack status for a notification.
-    Returns null ack_status if the notification is not being tracked.
-
-    Args:
-        notification_id: UUID of the notification
-
-    Returns:
-        AckStatusResponse with the current ack status
-    """
-    engine = get_engine()
-    ack_status = engine.get_status(notification_id)
-
-    return AckStatusResponse(
-        notification_id=notification_id,
-        ack_status=ack_status,
-    )
+    return await _query(notification_id=notification_id)
 
 
 def _persist_ack_audit(
