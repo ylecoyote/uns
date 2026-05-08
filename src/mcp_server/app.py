@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -32,7 +33,17 @@ def _docs_url(suffix: str) -> str | None:
 
 
 def _policy_dir_from_env() -> Path | None:
-    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR") or os.environ.get("UNS_POLICY_DIR")
+    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR")
+    if raw_path is None:
+        legacy = os.environ.get("UNS_POLICY_DIR")
+        if legacy is not None:
+            warnings.warn(
+                "UNS_POLICY_DIR is deprecated. Use AGSIGNAL_POLICY_DIR instead. "
+                "UNS_* aliases will be removed in v1.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            raw_path = legacy
     return Path(raw_path) if raw_path else None
 
 
@@ -72,11 +83,18 @@ def configure_persistence() -> None:
     )
 
     database_url = os.environ.get("DATABASE_URL")
-    create_tables = (
-        os.environ.get("AGSIGNAL_CREATE_TABLES")
-        or os.environ.get("UNS_CREATE_TABLES")
-        or "false"
-    ).lower() == "true"
+    agsignal_create_tables = os.environ.get("AGSIGNAL_CREATE_TABLES")
+    if agsignal_create_tables is None:
+        legacy_create_tables = os.environ.get("UNS_CREATE_TABLES")
+        if legacy_create_tables is not None:
+            warnings.warn(
+                "UNS_CREATE_TABLES is deprecated. Use AGSIGNAL_CREATE_TABLES instead. "
+                "UNS_* aliases will be removed in v1.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            agsignal_create_tables = legacy_create_tables
+    create_tables = (agsignal_create_tables or "false").lower() == "true"
 
     if database_url:
         # Production mode: use SQLAlchemy-backed storage

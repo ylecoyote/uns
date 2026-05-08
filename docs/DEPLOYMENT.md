@@ -132,6 +132,10 @@ AGSignal does **not** terminate TLS itself.
 
 ### Environment template
 
+> Legacy `UNS_*` env vars are honored as compatibility aliases for the
+> `AGSIGNAL_*` variants. Each fallback emits a one-time `DeprecationWarning`
+> per process. The `UNS_*` aliases will be removed in v1.0.
+
 Save as `.env` and load in your process supervisor:
 
 ```bash
