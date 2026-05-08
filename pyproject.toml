@@ -9,46 +9,98 @@ description = "AGSignal - Control-plane governance signaling infrastructure for 
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
-keywords = ["notifications", "alerts", "messaging"]
+keywords = ["notifications", "alerts", "messaging", "mcp", "governance", "audit", "agents"]
 authors = [
     {name = "AGSignal Maintainers"}
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Framework :: FastAPI",
+    "Framework :: Pydantic :: 2",
+    "Typing :: Typed",
+]
 dependencies = [
+    # Core SDK only needs the data model + YAML policy loader. Everything
+    # else (HTTP, persistence, channel adapters, MCP) is opt-in via extras.
     "pydantic>=2.0.0",
     "PyYAML>=6.0.0",
-    "redis>=5.0.0",
-    "rq>=1.15.0",
-    "fastapi>=0.100.0",
-    "uvicorn>=0.22.0",
-    "sqlalchemy>=2.0",
 ]
 
 [project.optional-dependencies]
+# HTTP runtime: needed to run AGSignal Core / AGSignal Console FastAPI apps.
+# Includes the Prometheus exposition layer and the slowapi-backed rate limiter.
+server = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "slowapi>=0.1.9",
+    "prometheus-client>=0.20.0",
+]
+# Production storage backend for idempotency, dedup, DLQ, rate-limit shared state.
+redis = [
+    "redis>=5.0.0",
+]
+# SQLAlchemy-backed audit / policy / replay stores.
+sql = [
+    "sqlalchemy>=2.0",
+]
+# MCP server transports (FastMCP + stdio).
 mcp = [
     "mcp[cli]>=1.0.0",
 ]
+# HTTP-based channel adapters (Slack, PagerDuty webhooks).
 adapters = [
     "httpx>=0.25.0",
 ]
+# Everything an operator needs to self-host both apps end-to-end.
+full = [
+    "agsignal[server,redis,sql,mcp,adapters]",
+]
+# Test + lint + security tooling. Pulls in [full] so every code path is reachable.
 dev = [
+    "agsignal[full]",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "fakeredis>=2.20.0",
-    "httpx>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
-    "mcp[cli]>=1.0.0",
     "bandit>=1.8.0",
     "pip-audit>=2.9.0",
 ]
+# Backwards-compatible alias for legacy install instructions.
 all = [
-    "agsignal[adapters,dev,mcp]",
+    "agsignal[full,dev]",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ylecoyote/agsignal"
+Repository = "https://github.com/ylecoyote/agsignal"
+Issues = "https://github.com/ylecoyote/agsignal/issues"
+Changelog = "https://github.com/ylecoyote/agsignal/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/ylecoyote/agsignal#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["agsignal*", "agsignal_mcp*", "notification*", "mcp_server*", "db*", "ui_client*"]
+
+[tool.setuptools.package-data]
+# Ship PEP 561 type-information markers in every package so downstream
+# type checkers (mypy, pyright) honor inline annotations.
+"*" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/ui/tests"]

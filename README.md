@@ -13,6 +13,15 @@ semantic events, AGSignal routes and persists them by policy, humans acknowledge
 them through normal tools, and downstream governors can consume the resulting
 audit-grade signal.
 
+## Documentation
+
+- [Quick Start](#quick-start) — install and send your first signal in under a minute
+- [Deployment Guide](docs/DEPLOYMENT.md) — production hardening, env-var reference, operator runbook
+- [Security Model](docs/SECURITY-MODEL.md) — threat model, trust boundaries, mitigations
+- [Security Policy](SECURITY.md) — supported versions and vulnerability reporting
+- [Contributing](CONTRIBUTING.md) — how to propose changes
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+
 ## Product Boundary
 
 AGSignal is control-plane infrastructure. It does:
@@ -96,19 +105,29 @@ was acknowledged, and how that awareness can feed future autonomy decisions.
 
 ### Installation
 
+AGSignal ships a tiered install so producers consuming only the SDK do not
+pull in the FastAPI / SQL / Redis runtime stack.
+
 ```bash
-# Install with development dependencies
-pip install -e ".[dev]"
+# Producer SDK only (pydantic + pyyaml).
+pip install agsignal
 
-# Install with adapter dependencies
-pip install -e ".[adapters]"
+# Self-host both AGSignal Core and Console (HTTP server + persistence + Redis + MCP + adapters).
+pip install 'agsignal[full]'
 
-# Install with local MCP server dependencies
-pip install -e ".[mcp]"
+# Pick-and-mix individual extras.
+pip install 'agsignal[server]'    # FastAPI + uvicorn + slowapi + prometheus-client
+pip install 'agsignal[redis]'     # Redis-backed idempotency / dedup / DLQ / rate limit
+pip install 'agsignal[sql]'       # SQLAlchemy-backed audit and policy stores
+pip install 'agsignal[mcp]'       # MCP stdio server transport
+pip install 'agsignal[adapters]'  # HTTP-based channel adapters (httpx)
 
-# Install everything
-pip install -e ".[all]"
+# Local development (test infra + every runtime extra).
+pip install -e '.[dev]'
 ```
+
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for which extras a given
+deployment posture requires.
 
 ### MCP Server
 

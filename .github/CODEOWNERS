@@ -1,0 +1,8 @@
+# AGSignal codeowners.
+#
+# Lines starting with `#` are comments. Patterns are matched in order; the
+# last matching pattern wins. See:
+# https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: every file requires review from a maintainer.
+*                               @ylecoyote

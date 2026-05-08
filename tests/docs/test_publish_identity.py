@@ -16,7 +16,10 @@ def test_pyproject_uses_agsignal_publish_identity() -> None:
     assert "Unified Notification Service" not in content
     assert 'license = {text = "Apache-2.0"}' in content
     assert '{name = "AGSignal Maintainers"}' in content
-    assert '"agsignal[adapters,dev,mcp]"' in content
+    # A self-referencing meta-extra exists so operators can opt into the
+    # full server stack with one install line.
+    assert '"agsignal[server,redis,sql,mcp,adapters]"' in content
+    assert '"agsignal[full,dev]"' in content
 
 
 def test_license_file_uses_apache_2_0() -> None:

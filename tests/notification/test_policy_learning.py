@@ -89,6 +89,39 @@ def test_delta_transition_returns_new_copy_and_preserves_history() -> None:
     assert applied.transition_history[0].guard_stage == GuardStage.PROMOTE_SHADOW
 
 
+def test_transition_history_caps_to_configured_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When AGSIGNAL_TRANSITION_HISTORY_LIMIT is set, oldest entries are dropped."""
+    monkeypatch.setenv("AGSIGNAL_TRANSITION_HISTORY_LIMIT", "2")
+
+    delta = _delta()
+    delta = delta.transition_to(DeltaState.SHADOW, actor="learner")
+    delta = delta.transition_to(DeltaState.APPROVED, actor="reviewer")
+    delta = delta.transition_to(DeltaState.APPLIED, actor="applier")
+
+    # Three real transitions occurred but the cap retained only the newest two.
+    assert len(delta.transition_history) == 2
+    assert [entry.to_state for entry in delta.transition_history] == [
+        DeltaState.APPROVED,
+        DeltaState.APPLIED,
+    ]
+
+
+def test_transition_history_uncapped_when_limit_is_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setting the limit to 0 explicitly disables capping (operator opt-out)."""
+    monkeypatch.setenv("AGSIGNAL_TRANSITION_HISTORY_LIMIT", "0")
+
+    delta = _delta()
+    delta = delta.transition_to(DeltaState.SHADOW, actor="learner")
+    delta = delta.transition_to(DeltaState.APPROVED, actor="reviewer")
+    delta = delta.transition_to(DeltaState.APPLIED, actor="applier")
+
+    assert len(delta.transition_history) == 3
+
+
 def test_delta_rejection_records_reviewer_reason_and_becomes_terminal() -> None:
     delta = _delta()
 

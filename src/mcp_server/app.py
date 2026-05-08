@@ -20,6 +20,17 @@ from mcp_server.routes_ui import router as ui_router
 logger = logging.getLogger(__name__)
 
 
+def _docs_url(suffix: str) -> str | None:
+    """Return ``suffix`` only when interactive API docs are explicitly enabled.
+
+    Disabled by default so production deployments do not leak the full API
+    surface to anonymous callers. Set ``AGSIGNAL_ENABLE_DOCS=true`` to expose
+    ``/docs``, ``/redoc``, and ``/openapi.json``.
+    """
+    enabled = os.environ.get("AGSIGNAL_ENABLE_DOCS", "false").strip().lower()
+    return suffix if enabled in ("1", "true", "yes", "on") else None
+
+
 def _policy_dir_from_env() -> Path | None:
     raw_path = os.environ.get("AGSIGNAL_POLICY_DIR") or os.environ.get("UNS_POLICY_DIR")
     return Path(raw_path) if raw_path else None
@@ -36,7 +47,8 @@ def configure_persistence() -> None:
 
     - AGSIGNAL_CREATE_TABLES: If "true", creates database tables on startup.
       UNS_CREATE_TABLES remains supported as a compatibility alias.
-      Default is "true" for local development convenience.
+      Defaults to "false" so production deployments do not auto-mutate
+      schema; set to "true" for local demos or first-run bootstrap.
 
     For local demo/development:
         - Uses shared InMemoryAuditStore for both writes (audit logger) and reads
@@ -46,7 +58,8 @@ def configure_persistence() -> None:
     For production:
         - Set DATABASE_URL to a PostgreSQL/MySQL connection string
         - Uses SQLAlchemy-backed stores with proper persistence
-        - Tables are created on first run if AGSIGNAL_CREATE_TABLES=true
+        - Schema management is operator-driven; opt in with AGSIGNAL_CREATE_TABLES=true
+          only on first-run bootstrap, then unset
     """
     from mcp_server.read_models import (
         InMemoryReadModelAdapter,
@@ -62,7 +75,7 @@ def configure_persistence() -> None:
     create_tables = (
         os.environ.get("AGSIGNAL_CREATE_TABLES")
         or os.environ.get("UNS_CREATE_TABLES")
-        or "true"
+        or "false"
     ).lower() == "true"
 
     if database_url:
@@ -149,8 +162,9 @@ def create_app(skip_persistence_config: bool = False) -> FastAPI:
         title="AGSignal Console API",
         description="Read-first console API for AGSignal governance signals",
         version="0.1.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=_docs_url("/docs"),
+        redoc_url=_docs_url("/redoc"),
+        openapi_url=_docs_url("/openapi.json"),
     )
 
     configure_cors(app)
@@ -158,6 +172,16 @@ def create_app(skip_persistence_config: bool = False) -> FastAPI:
     # Add observability middleware for UI endpoints
     # This provides request ID generation, metrics, and structured logging
     app.add_middleware(ObservabilityMiddleware, ui_prefix="/ui")
+
+    # Add Prometheus instrumentation: /metrics endpoint + request middleware.
+    from notification.metrics import install_metrics
+
+    install_metrics(app)
+
+    # Install API rate limiting (default 1000/minute per principal/IP).
+    from notification.rate_limiter import install_rate_limiter
+
+    install_rate_limiter(app)
 
     # Include notification routes
     app.include_router(notification_router)
@@ -167,8 +191,46 @@ def create_app(skip_persistence_config: bool = False) -> FastAPI:
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
-        """Health check endpoint."""
+        """Liveness probe (legacy path). Returns 200 once the process is up."""
         return {"status": "healthy"}
+
+    @app.get("/healthz", tags=["system"])
+    async def healthz() -> dict[str, str]:
+        """Liveness probe (Kubernetes convention)."""
+        return {
+            "status": "alive",
+            "service": "agsignal-console",
+            "version": "0.1.0",
+        }
+
+    @app.get("/ready", tags=["system"])
+    async def ready() -> dict[str, object]:
+        """Readiness probe — confirms persistence layer is reachable."""
+        from mcp_server.read_models import get_read_model_adapter
+        from notification.audit import get_audit_logger
+
+        try:
+            adapter = get_read_model_adapter()
+            audit_logger = get_audit_logger()
+        except Exception as exc:  # noqa: BLE001 - readiness probe needs to surface any failure
+            return {
+                "status": "not_ready",
+                "service": "agsignal-console",
+                "version": "0.1.0",
+                "error": str(exc),
+            }
+        return {
+            "status": "ready",
+            "service": "agsignal-console",
+            "version": "0.1.0",
+            "read_model_adapter": type(adapter).__name__,
+            "audit_logger": type(audit_logger).__name__,
+        }
+
+    @app.get("/readyz", tags=["system"])
+    async def readyz() -> dict[str, object]:
+        """Readiness probe (Kubernetes convention). Same payload as /ready."""
+        return await ready()
 
     logger.info("UNS API application created")
     return app

@@ -303,6 +303,13 @@ async def send_notification(
                 return existing_response.model_copy(update={"idempotent_replay": True})
 
     result, notification = _resolve_notification(request)
+    from notification.metrics import record_signal_received
+
+    record_signal_received(
+        intent=notification.intent.value,
+        autonomy_mode=notification.autonomy_context.autonomy_mode.value,
+        transport="http",
+    )
     ack_status: AckStatus | None = None
     if notification.require_ack:
         engine = get_ack_engine()
