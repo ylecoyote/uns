@@ -186,7 +186,7 @@ async def get_delivery_timeline(
 
     try:
         return await _query_delivery_timeline(notification_id=notification_id)
-    except NotFoundError:
+    except NotFoundError as exc:
         message = f"Delivery timeline not found for notification {notification_id}"
         error_response = create_error_response_with_request_id(
             code="not_found",
@@ -198,10 +198,12 @@ async def get_delivery_timeline(
             error_message=message,
             status_code=404,
         )
+        # Preserve traceback chain (matches routes_notification.py convention
+        # for typed-domain-error → HTTP-status translation).
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_response,
-        ) from None
+        ) from exc
 
 
 @router.get(
