@@ -3,19 +3,13 @@
 # Build:
 #   docker build -t agsignal:dev .
 #
-# Run AGSignal Core (default):
+# Run AGSignal (unified Core + Console):
 #   docker run --rm -p 127.0.0.1:8000:8000 \
 #     -e AGSIGNAL_API_KEY=<secret> \
 #     -e AGSIGNAL_API_PRINCIPAL=ops-rotation \
 #     -e DATABASE_URL=postgresql+psycopg2://... \
 #     -e AGSIGNAL_REDIS_URL=redis://... \
 #     agsignal:dev
-#
-# Run AGSignal Console (override CMD):
-#   docker run --rm -p 127.0.0.1:8001:8001 \
-#     -e AGSIGNAL_API_KEY=<secret> \
-#     agsignal:dev \
-#     uvicorn mcp_server.app:app --host 0.0.0.0 --port 8001
 #
 # Production:
 #   - Front with a reverse proxy that terminates TLS and restricts /metrics,
@@ -84,6 +78,6 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)" \
         || exit 1
 
-# Default to AGSignal Core. Override CMD for the Console:
-#   docker run agsignal:dev uvicorn mcp_server.app:app --host 0.0.0.0 --port 8001
-CMD ["python", "-m", "notification.main"]
+# Unified AGSignal HTTP service. Both Core (write) and Console (read)
+# surfaces live in one process post-Phase-3.
+CMD ["uvicorn", "agsignal.app:app", "--host", "0.0.0.0", "--port", "8000"]

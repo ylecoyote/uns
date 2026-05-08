@@ -18,15 +18,14 @@ common runbook tasks.
 
 ## Architecture at a glance
 
-AGSignal ships two HTTP applications and one MCP server:
+AGSignal ships one HTTP application and one MCP server:
 
 | Surface | Module | Purpose |
 |---|---|---|
-| **AGSignal Core** | `notification.main:app` | Notification + acknowledgment HTTP API for producers and adapters. |
-| **AGSignal Console API** | `mcp_server.app:app` | Read-first console API for the UI (audit, deliveries, invariants, policies). |
+| **AGSignal HTTP** | `agsignal.app:app` | Unified Core (write) + Console (read) HTTP API. |
 | **AGSignal MCP** | `agsignal_mcp.transports.stdio:main` | MCP stdio server for embedding inside an agent host. |
 
-A typical deployment runs the **two FastAPI apps as separate processes** behind
+A typical deployment runs the **single FastAPI app as one process** behind
 a reverse proxy that terminates TLS, plus a Postgres for durable state and a
 Redis for idempotency / dedup / DLQ / WebSocket fanout. The MCP server runs as
 a subprocess of the agent host (Claude Desktop, Cline, internal MCP runner).
@@ -35,17 +34,16 @@ a subprocess of the agent host (Claude Desktop, Cline, internal MCP runner).
                                  ┌──────────────────────────┐
         Browsers / SDK clients   │  Reverse proxy (TLS)     │
         ─────────────────────► │  e.g. nginx / Caddy      │
-                                 └──────┬─────────────┬─────┘
-                                        │             │
-                          ┌─────────────▼──┐     ┌────▼──────────────┐
-                          │ AGSignal Core  │     │ AGSignal Console  │
-                          │ notification.  │     │ mcp_server.app    │
-                          │ main:app       │     │                   │
-                          └──┬─────────────┘     └────┬──────────────┘
-                             │  read+write            │  read-only
-                             └────────────┬───────────┘
-                                          │
-                              ┌───────────▼──────────┐
+                                 └──────────┬───────────────┘
+                                            │
+                                ┌───────────▼──────────────┐
+                                │ AGSignal HTTP            │
+                                │ agsignal.app:app         │
+                                │ (Core write + Console    │
+                                │  read in one process)    │
+                                └───────────┬──────────────┘
+                                            │
+                              ┌─────────────▼────────┐
                               │  Postgres + Redis    │
                               └──────────────────────┘
 
@@ -74,7 +72,7 @@ export AGSIGNAL_API_KEY='dev-only-key'
 export AGSIGNAL_API_PRINCIPAL='dev-operator'
 
 # Bind to loopback (default) for local testing.
-python -m notification.main
+uvicorn agsignal.app:app
 ```
 
 In another terminal:
@@ -89,7 +87,7 @@ set it again outside of a controlled bootstrap.
 ### Option B: docker compose
 
 The repo ships a `Dockerfile` and `docker-compose.yml` that spin up Postgres,
-Redis, AGSignal Core, and AGSignal Console with sane local-dev defaults. All
+Redis, and the unified AGSignal HTTP service with sane local-dev defaults. All
 services bind to `127.0.0.1` on the host.
 
 ```bash
@@ -102,8 +100,6 @@ Access:
 ```bash
 curl -H 'Authorization: Bearer dev-only-key-rotate-before-real-use' \
      http://127.0.0.1:8000/healthz
-curl -H 'Authorization: Bearer dev-only-key-rotate-before-real-use' \
-     http://127.0.0.1:8001/healthz
 ```
 
 After the first successful start, edit `docker-compose.yml` and flip
@@ -123,10 +119,9 @@ The minimum production-grade deployment is:
    `notification_policies`, `policy_learning`, `websocket_replay`.
 2. **Redis** (v7+) for idempotency, deduplication, DLQ, rate limiting, and
    optional WebSocket fanout.
-3. **One process** of `notification.main:app` (Core: write API).
-4. **One process** of `mcp_server.app:app` (Console: read-only API for UI).
-5. **A reverse proxy** (nginx, Caddy, Traefik, ALB, etc.) terminating TLS and
-   forwarding to both processes on private interfaces.
+3. **One process** of `agsignal.app:app` (unified Core write + Console read API).
+4. **A reverse proxy** (nginx, Caddy, Traefik, ALB, etc.) terminating TLS and
+   forwarding to the AGSignal process on a private interface.
 
 AGSignal does **not** terminate TLS itself.
 
@@ -186,8 +181,7 @@ AGSIGNAL_DLQ_KEY='agsignal:dlq'
 
 ```nginx
 # /etc/nginx/sites-enabled/agsignal.conf
-upstream agsignal_core    { server 127.0.0.1:8000; }
-upstream agsignal_console { server 127.0.0.1:8001; }
+upstream agsignal { server 127.0.0.1:8000; }
 
 server {
     listen 443 ssl http2;
@@ -196,13 +190,10 @@ server {
     ssl_certificate /etc/letsencrypt/live/.../fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/.../privkey.pem;
 
-    # Core write API (under /api/v1/...)
-    location /api/ { proxy_pass http://agsignal_core; }
-    location /ws/  { proxy_pass http://agsignal_core; proxy_http_version 1.1;
-                     proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; }
-
-    # Console read-only API
-    location /ui/  { proxy_pass http://agsignal_console; }
+    # Unified AGSignal HTTP (Core write + Console read + WebSockets).
+    location / { proxy_pass http://agsignal; }
+    location /ws/ { proxy_pass http://agsignal; proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; }
 
     # Block /docs, /redoc, /openapi.json explicitly even if AGSIGNAL_ENABLE_DOCS
     # was accidentally set on the upstream.
@@ -210,8 +201,7 @@ server {
 }
 ```
 
-Run AGSignal Core on `:8000` and AGSignal Console on `:8001`. Bind both to
-`127.0.0.1` (the default).
+Run the unified AGSignal app on `:8000`, bound to `127.0.0.1` (the default).
 
 ### Rate limiting
 
@@ -248,7 +238,7 @@ layer rules at your reverse proxy:
 limit_req_zone $http_authorization zone=agsignal_writes:10m rate=10r/s;
 location /api/v1/notifications/ {
     limit_req zone=agsignal_writes burst=20 nodelay;
-    proxy_pass http://agsignal_core;
+    proxy_pass http://agsignal;
 }
 ```
 
@@ -310,7 +300,7 @@ credentials). Restrict it at the reverse proxy to your internal scrape network:
 location = /metrics {
     allow 10.0.0.0/8;
     deny all;
-    proxy_pass http://agsignal_core;
+    proxy_pass http://agsignal;
 }
 ```
 
@@ -318,16 +308,11 @@ Sample Prometheus scrape config (`prometheus.yml`):
 
 ```yaml
 scrape_configs:
-  - job_name: agsignal-core
+  - job_name: agsignal
     metrics_path: /metrics
     scrape_interval: 15s
     static_configs:
-      - targets: ["agsignal-core.internal:8000"]
-  - job_name: agsignal-console
-    metrics_path: /metrics
-    scrape_interval: 15s
-    static_configs:
-      - targets: ["agsignal-console.internal:8001"]
+      - targets: ["agsignal.internal:8000"]
 ```
 
 More metric families (DLQ depth, ack latency, policy reload rate) ship in
@@ -335,13 +320,13 @@ More metric families (DLQ depth, ack latency, policy reload rate) ship in
 
 ### Liveness and readiness probes
 
-Both apps expose Kubernetes-convention endpoints alongside legacy paths.
+The unified app exposes Kubernetes-convention endpoints alongside legacy paths.
 
 | Endpoint | Purpose | Returns |
 |---|---|---|
 | `/healthz` | Liveness probe — process is up. | 200 with `{status: "alive", service, version}` |
 | `/readyz` | Readiness probe — dependencies wired. | 200 with status + dependency info; surfaces errors if persistence is not configured |
-| `/health` | Legacy alias for `/healthz`. | Same payload (with one historical exception: `mcp_server`'s `/health` returns the older `{status: "healthy"}` shape). |
+| `/health` | Legacy alias for `/healthz`. | Same payload. |
 | `/ready` | Legacy alias for `/readyz`. | Same payload. |
 
 All four are unauthenticated by design (probes from a load balancer cannot
@@ -353,7 +338,7 @@ expose them through the public reverse proxy:
 location ~ ^/(healthz|readyz)$ {
     allow 10.0.0.0/8;
     deny all;
-    proxy_pass http://agsignal_core;
+    proxy_pass http://agsignal;
 }
 ```
 
@@ -370,7 +355,7 @@ All environment variables. `UNS_*` aliases work for one release; prefer the
 | `AGSIGNAL_API_PRINCIPAL` | `agsignal-api-key` | The audit subject attributed to API-key writes. |
 | `AGSIGNAL_ALLOW_PRINCIPAL_OVERRIDE` | `false` | If true, callers may set `acked_by`/`dismissed_by` to a different value. Leave false for hardest audit guarantees. |
 | `AGSIGNAL_ALLOWED_ORIGINS` | `http://localhost:5173, http://127.0.0.1:5173` | Comma-separated CORS allowlist. |
-| `AGSIGNAL_HOST` | `127.0.0.1` | Bind address for the standalone `notification.main` server. Override only behind a reverse proxy. |
+| `AGSIGNAL_HOST` | `127.0.0.1` | Bind address for the standalone `agsignal.app` server. Override only behind a reverse proxy. |
 | `DATABASE_URL` | unset | SQLAlchemy URL. Without it, in-memory storage (no durability). Postgres recommended. |
 | `AGSIGNAL_CREATE_TABLES` | `false` | If `true`, creates DB schema on startup. **Bootstrap only.** Unset after first run. |
 | `AGSIGNAL_ENABLE_DOCS` | `false` | If `true`, exposes `/docs`, `/redoc`, `/openapi.json`. **Leave off in production.** |
@@ -397,7 +382,7 @@ operator-driven. The bootstrap recipe:
 
 1. Create the database and user; grant CREATE/USAGE on the public schema.
 2. Set `DATABASE_URL`, `AGSIGNAL_CREATE_TABLES=true`, and the rest of the env.
-3. Start `notification.main` once, watch the log for `Configuring SQLAlchemy
+3. Start `agsignal.app` once, watch the log for `Configuring SQLAlchemy
    persistence`. Confirm the expected tables exist.
 4. **Stop the process. Unset `AGSIGNAL_CREATE_TABLES`.** Restart for steady-state.
 5. Take a backup of the empty schema.
