@@ -21,13 +21,13 @@ The read model adapters provide an abstraction layer between the HTTP endpoints 
 **For local demo (no database required):**
 ```bash
 # In-memory storage, data lost on restart
-uvicorn mcp_server.app:app --reload
+uvicorn agsignal.app:app --reload
 ```
 
 **For production (with database persistence):**
 ```bash
 export DATABASE_URL="postgresql://user:pass@localhost/uns"
-uvicorn mcp_server.app:app
+uvicorn agsignal.app:app
 ```
 
 The application automatically configures the appropriate storage backend at startup based on the `DATABASE_URL` environment variable. See [Configuration](#configuration) for details.
@@ -179,7 +179,7 @@ The application automatically configures persistence at startup via `configure_p
 ```bash
 # Uses shared in-memory storage
 # Data is NOT persisted across restarts
-uvicorn mcp_server.app:app --reload
+uvicorn agsignal.app:app --reload
 ```
 
 **Production Mode (DATABASE_URL set):**
@@ -187,7 +187,7 @@ uvicorn mcp_server.app:app --reload
 # Uses SQLAlchemy with PostgreSQL
 export DATABASE_URL="postgresql://user:pass@localhost/uns"
 export AGSIGNAL_CREATE_TABLES="true"
-uvicorn mcp_server.app:app
+uvicorn agsignal.app:app
 ```
 
 ### Manual Configuration
@@ -196,7 +196,7 @@ For custom setups or testing, you can configure adapters manually:
 
 ```python
 # Create app without automatic persistence config
-from mcp_server.app import create_app
+from agsignal.app import create_app
 app = create_app(skip_persistence_config=True)
 
 # Then configure manually

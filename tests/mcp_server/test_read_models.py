@@ -521,7 +521,7 @@ class TestUIEndpointIntegration:
         """Test /ui/deliveries endpoint uses configured adapter."""
         from fastapi.testclient import TestClient
 
-        from mcp_server.app import create_app
+        from agsignal.app import create_app
 
         # Add test data
         record = create_test_audit_record()
@@ -547,7 +547,7 @@ class TestUIEndpointIntegration:
         """Test /ui/deliveries/{id} endpoint uses configured adapter."""
         from fastapi.testclient import TestClient
 
-        from mcp_server.app import create_app
+        from agsignal.app import create_app
 
         # Add test data
         record = create_test_audit_record()
@@ -577,7 +577,7 @@ class TestUIEndpointIntegration:
         """Test /ui/audit endpoint uses configured adapter."""
         from fastapi.testclient import TestClient
 
-        from mcp_server.app import create_app
+        from agsignal.app import create_app
 
         # Add test data
         record = create_test_audit_record()

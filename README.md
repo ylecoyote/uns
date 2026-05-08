@@ -508,7 +508,7 @@ AGSignal Core provides an HTTP API via FastAPI:
 
 ```bash
 # Start the server
-uvicorn mcp_server.app:app --host 0.0.0.0 --port 8000
+uvicorn agsignal.app:app --host 0.0.0.0 --port 8000
 ```
 
 ### Health Check
@@ -517,10 +517,10 @@ The service exposes a `/health` endpoint for load balancer and orchestration hea
 
 ```bash
 curl http://localhost:8000/health
-# Response: {"status": "healthy"}
+# Response: {"status": "alive", "service": "agsignal", "version": "..."}
 ```
 
-> **Note:** The `/health` endpoint returns a static healthy status for basic liveness checks. For detailed adapter and channel health information, see [Observability](docs/sections/observability.md).
+> **Note:** The `/health` endpoint returns a liveness payload (status, service, version) for basic liveness checks. For detailed adapter and channel readiness information, see [Observability](docs/sections/observability.md).
 
 ## Testing
 

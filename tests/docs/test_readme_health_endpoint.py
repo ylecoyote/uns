@@ -40,9 +40,9 @@ class TestRootReadmeHealthEndpoint:
 
     def test_readme_shows_health_endpoint_response(self, root_readme: str) -> None:
         """Verify README shows the /health endpoint response format."""
-        # Should show the response format
+        # Should show the response format (post-Phase-3 unified shape)
         assert '"status"' in root_readme
-        assert '"healthy"' in root_readme
+        assert '"alive"' in root_readme
 
     def test_readme_shows_curl_example(self, root_readme: str) -> None:
         """Verify README includes a curl example for health check."""
@@ -56,4 +56,4 @@ class TestRootReadmeHealthEndpoint:
     def test_readme_mentions_uvicorn_command(self, root_readme: str) -> None:
         """Verify README shows how to start the server."""
         assert "uvicorn" in root_readme
-        assert "mcp_server.app" in root_readme
+        assert "agsignal.app" in root_readme

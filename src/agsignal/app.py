@@ -2,13 +2,13 @@
 
 This is the canonical entry point for the AGSignal HTTP service. It
 combines what were previously two separate FastAPI apps (one for the
-write/Core surface at ``notification.main:create_app``, one for the
-read/Console surface at ``mcp_server.app:create_app``) into a single app
+write/Core surface, one for the read/Console surface) into a single app
 that exposes both surfaces.
 
-The two predecessor factories are deleted in Task 6 of Phase 3 (this
-plan). AGSignal is pre-release, so there are no external consumers to
-preserve compat for; internal consumers cascade-update in the same
+The two predecessor factories (``notification.main:create_app`` and
+``mcp_server.app:create_app``) were deleted in Task 6 of Phase 3.
+AGSignal is pre-release, so there were no external consumers to
+preserve compat for; internal consumers cascade-updated in the same
 commit.
 
 Mounted route surfaces:
@@ -192,6 +192,11 @@ def _configure_persistence() -> None:
     # had its own in-memory-branch policy_dir load, but in the unified factory
     # that block would fire twice for the same env var, so it is intentionally
     # NOT carried over here.
+
+
+# Public alias. Tests and external callers reach for this name; the
+# underscore-prefixed ``_configure_persistence`` is the internal symbol.
+configure_persistence = _configure_persistence
 
 
 def create_app(

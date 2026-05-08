@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-from mcp_server.app import configure_persistence, create_app
+from agsignal.app import configure_persistence, create_app
 
 
 class TestConfigurePersistence:
@@ -242,7 +242,7 @@ class TestCreateApp:
         assert isinstance(adapter, InMemoryReadModelAdapter)
 
         assert app is not None
-        assert app.title == "AGSignal Console API"
+        assert app.title == "AGSignal"
 
     def test_create_app_skip_persistence_config(self):
         """Test create_app skips persistence config when requested."""
@@ -260,7 +260,7 @@ class TestCreateApp:
         assert rm._read_model_adapter is None
 
         assert app is not None
-        assert app.title == "AGSignal Console API"
+        assert app.title == "AGSignal"
 
     def test_create_app_includes_ui_routes(self):
         """Test create_app includes UI routes."""
@@ -285,7 +285,10 @@ class TestCreateApp:
 
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "healthy"}
+        body = response.json()
+        assert body["status"] == "alive"
+        assert body["service"] == "agsignal"
+        assert "version" in body
 
     def test_healthz_returns_kubernetes_convention_payload(self):
         """`/healthz` is the Kubernetes-convention liveness probe."""
@@ -299,7 +302,7 @@ class TestCreateApp:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "alive"
-        assert body["service"] == "agsignal-console"
+        assert body["service"] == "agsignal"
         assert "version" in body
 
     def test_ready_reports_persistence_dependencies(self):
@@ -314,7 +317,7 @@ class TestCreateApp:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "ready"
-        assert body["service"] == "agsignal-console"
+        assert body["service"] == "agsignal"
         assert "read_model_adapter" in body
         assert "audit_logger" in body
 
@@ -474,7 +477,7 @@ class TestCreateApp:
             response = client.get("/openapi.json")
 
         assert response.status_code == 200
-        assert response.json()["info"]["title"] == "AGSignal Console API"
+        assert response.json()["info"]["title"] == "AGSignal"
 
     def test_create_app_rejects_unknown_cors_origin(self):
         """CORS stays closed by default for non-console origins."""

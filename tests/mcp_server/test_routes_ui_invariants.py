@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_server.app import create_app
+from agsignal.app import create_app
 
 
 @pytest.fixture

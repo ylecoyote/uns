@@ -97,7 +97,7 @@ def _client(
 ) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     app = create_app(
         dlq_service=dlq_service,
@@ -143,13 +143,13 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native(
 ) -> None:
     monkeypatch.setenv("AGSIGNAL_ENABLE_DOCS", "true")
     client = _client()
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
     openapi = response.json()
-    assert openapi["info"]["title"] == "AGSignal Core"
+    assert openapi["info"]["title"] == "AGSignal"
     assert "/health" in openapi["paths"]
     assert "/ready" in openapi["paths"]
     assert "/api/v1/notifications" in openapi["paths"]
@@ -167,7 +167,7 @@ def test_healthz_aliases_health() -> None:
     healthz_body = client.get("/healthz").json()
     assert healthz_body == health_body
     assert healthz_body["status"] == "alive"
-    assert healthz_body["service"] == "agsignal-core"
+    assert healthz_body["service"] == "agsignal"
 
 
 def test_readyz_aliases_ready() -> None:
@@ -219,7 +219,7 @@ def test_ready_does_not_require_market_insights_dependencies() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ready"
-    assert data["service"] == "agsignal-core"
+    assert data["service"] == "agsignal"
     assert "market" not in str(data).lower()
     assert "atp" not in str(data).lower()
 
@@ -242,7 +242,7 @@ def test_channel_health_summary_is_separate_from_ready_status() -> None:
 def test_app_does_not_create_redis_fanout_by_default(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv("UNS_WEBSOCKET_REDIS_ENABLED", raising=False)
 
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     app = create_app(redis_client_factory=ExplodingRedisFactory())
 
@@ -262,7 +262,7 @@ def test_app_creates_redis_fanout_when_enabled(monkeypatch: MonkeyPatch) -> None
     monkeypatch.setenv("UNS_REDIS_URL", "redis://example/0")
     factory = RedisFactory()
 
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     app = create_app(redis_client_factory=factory)
 
@@ -412,7 +412,7 @@ def test_send_signal_delivers_to_connected_websocket_agent() -> None:
 def test_send_signal_publishes_optional_websocket_fanout() -> None:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     app = create_app()
     fanout = CapturingFanout()
@@ -438,7 +438,7 @@ def test_send_signal_publishes_optional_websocket_fanout() -> None:
 def test_send_signal_records_websocket_replay_payload() -> None:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     app = create_app()
     client = TestClient(app)

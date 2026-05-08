@@ -367,7 +367,7 @@ print(f"404 errors: {collector.get_error_count('/ui/deliveries/{id}', status_cod
 
 ```bash
 # Run with debug logging enabled
-LOG_LEVEL=DEBUG python -m uvicorn mcp_server.app:app
+LOG_LEVEL=DEBUG python -m uvicorn agsignal.app:app
 
 # Make a request and observe logs
 curl http://localhost:8000/ui/deliveries
