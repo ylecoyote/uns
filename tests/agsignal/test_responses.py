@@ -2,7 +2,7 @@
 
 These tests guard against signature drift introduced during the Phase 3
 relocation. The route-level behavioral tests
-(``tests/notification/test_*.py``, ``tests/mcp_server/test_routes_*.py``)
+(``tests/notification/test_*.py``, ``tests/agsignal/api/test_routes_*.py``)
 are the primary regression cover; these tests just confirm round-trip
 serialization is intact for one representative class per family.
 """

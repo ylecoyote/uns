@@ -817,7 +817,7 @@ except DeliveryError as e:
 
 ## UI Endpoints
 
-The UI module (`mcp_server.routes_ui`) provides read-only HTTP endpoints for the dashboard UI.
+The UI module (`agsignal.api.routes_ui`) provides read-only HTTP endpoints for the dashboard UI.
 
 > **See Also:** [UI Data Contracts](ui/ui-data-contracts.md) for complete response shapes and filter specifications.
 

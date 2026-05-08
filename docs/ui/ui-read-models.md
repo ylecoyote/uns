@@ -53,7 +53,7 @@ The application automatically configures the appropriate storage backend at star
 
 ### InMemoryReadModelAdapter
 
-**Location:** `src/mcp_server/read_models.py`
+**Location:** `src/agsignal/api/read_models.py`
 
 In-memory adapter suitable for local development and demos.
 
@@ -71,7 +71,7 @@ In-memory adapter suitable for local development and demos.
 
 **Example:**
 ```python
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
@@ -87,7 +87,7 @@ configure_read_model_adapter(adapter)
 
 ### SQLAlchemyReadModelAdapter
 
-**Location:** `src/mcp_server/read_models.py`
+**Location:** `src/agsignal/api/read_models.py`
 
 Database-backed adapter for production deployments.
 
@@ -104,7 +104,7 @@ Database-backed adapter for production deployments.
 
 **Example:**
 ```python
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     create_sqlalchemy_adapter,
     configure_read_model_adapter,
 )
@@ -200,7 +200,7 @@ from agsignal.app import create_app
 app = create_app(skip_persistence_config=True)
 
 # Then configure manually
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     create_sqlalchemy_adapter,
     configure_read_model_adapter,
 )
@@ -233,7 +233,7 @@ from notification.audit import (
     InMemoryAuditStore,
     configure_audit_logger,
 )
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
@@ -289,7 +289,7 @@ from notification.models import (
     DeliveryMode,
     AutonomyMode,
 )
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     InMemoryReadModelAdapter,
     DeliveryFilter,
 )
