@@ -6,8 +6,8 @@ caller (HTTP route handlers, MCP tools, future CLI). Routes become thin
 adapters that parse `Request`, delegate here, and return the response.
 
 Each function in this module is the canonical implementation of its
-operation. `mcp_server.routes_ui` and `agsignal_mcp.tools` both call into
-these — there is no other source of truth.
+operation. `agsignal.api.routes_ui` and `agsignal_mcp.tools` both call
+into these — there is no other source of truth.
 
 Service-layer error handling: these functions raise typed domain errors
 from :mod:`agsignal.errors` (e.g. :class:`~agsignal.errors.NotFoundError`)
