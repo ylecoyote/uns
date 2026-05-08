@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from agsignal.responses import SendNotificationResponse
 from notification.audit import AuditStore, InMemoryAuditStore
 from notification.channel_health import ChannelHealthTracker
 from notification.dlq import DLQService
-from notification.routes import SendNotificationResponse
 
 RuntimeMode = Literal["stdio-local", "stdio-persistent", "read-only"]
 

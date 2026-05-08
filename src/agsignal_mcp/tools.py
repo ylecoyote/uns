@@ -32,9 +32,9 @@ from agsignal.queries import (
 from agsignal.queries import (
     list_invariants as query_list_invariants,
 )
+from agsignal.responses import SendNotificationRequest
 from agsignal_mcp.runtime import MCPRuntimeConfig, RuntimeState
 from notification.models import AutonomyMode, NotificationIntent
-from notification.routes import SendNotificationRequest
 
 
 class SendSignalInput(BaseModel):

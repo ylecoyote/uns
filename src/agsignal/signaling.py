@@ -13,12 +13,12 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-# NOTE: response models (`AckResponse`) currently live in
-# `mcp_server.routes_notification` alongside the legacy route handlers.
-# Phase 5 of the v0.2 refactor relocates them to a dedicated module (likely
-# `mcp_server.read_models` or a new `agsignal.responses` module). Until then
-# we import from their current home.
-from mcp_server.routes_notification import AckResponse  # legacy location; Phase 5 relocates
+from agsignal.responses import (
+    AckResponse,
+    SendNotificationRequest,
+    SendNotificationResponse,
+    SimulateNotificationResponse,
+)
 from notification.acknowledgment import configure_ack_engine, get_ack_engine
 from notification.audit import (
     AuditPersistenceError,
@@ -33,11 +33,6 @@ from notification.models import (
     NotificationResult,
 )
 from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
-from notification.routes import (
-    SendNotificationRequest,
-    SendNotificationResponse,
-    SimulateNotificationResponse,
-)
 from notification.sdk import NotificationSDK
 
 logger = logging.getLogger(__name__)

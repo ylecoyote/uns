@@ -35,7 +35,7 @@ sys.path.insert(0, str(src_path))
 
 def get_enum_definitions() -> dict[str, list[str]]:
     """Extract enum definitions from notification.models and routes_ui."""
-    from mcp_server.routes_ui import (
+    from agsignal.responses import (
         AuditEventType,
         EnforcementType,
         InvariantSeverity,
@@ -73,7 +73,7 @@ def get_enum_definitions() -> dict[str, list[str]]:
 
 def get_response_schemas() -> dict[str, dict[str, Any]]:
     """Extract JSON schemas from Pydantic response models."""
-    from mcp_server.routes_ui import (
+    from agsignal.responses import (
         AuditEvent,
         AuditEventListResponse,
         AutonomyContextResponse,
@@ -84,7 +84,6 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         EffectivePolicyResponse,
         EffectivePolicyValues,
         ErrorDetail,
-        ErrorResponse,
         EvidenceLink,
         InvariantEnforcement,
         InvariantEntry,
@@ -93,6 +92,7 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         PaginationInfo,
         ResolutionContext,
         ResolutionStep,
+        UIErrorResponse as ErrorResponse,
     )
 
     # List of all response models to include
