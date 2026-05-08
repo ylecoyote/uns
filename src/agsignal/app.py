@@ -117,10 +117,7 @@ def _configure_persistence() -> None:
         configure_read_model_adapter,
         create_sqlalchemy_adapter,
     )
-    from notification.audit import (
-        InMemoryAuditStore,
-        configure_audit_logger,
-    )
+    from notification.audit import configure_audit_logger
 
     database_url = os.environ.get("DATABASE_URL")
     agsignal_create_tables = os.environ.get("AGSIGNAL_CREATE_TABLES")
@@ -150,10 +147,11 @@ def _configure_persistence() -> None:
         )
         configure_read_model_adapter(adapter)
 
-        # Configure audit logger with SQLAlchemy store
+        # Configure audit logger with SQLAlchemy store. The db.* imports stay
+        # in-function so the optional `db` extra isn't pulled in at import time
+        # for clients that only need the SDK surface.
         from db.audit_store import create_sqlalchemy_audit_store
         from db.policy_store import create_sqlalchemy_policy_store
-        from notification.policies import configure_policy_registry
 
         audit_store = create_sqlalchemy_audit_store(
             database_url=database_url,
@@ -188,17 +186,12 @@ def _configure_persistence() -> None:
 
         logger.info("In-memory persistence configured (shared store for reads and writes)")
 
-        policy_dir = _policy_dir_from_env()
-        if policy_dir is not None:
-            from notification.policies import configure_policy_registry
-            from notification.policy_loader import load_runtime_registry_from_directory
-
-            loaded_count, registry = load_runtime_registry_from_directory(policy_dir)
-            configure_policy_registry(registry=registry)
-            logger.info(
-                "Loaded ACTIVE runtime policies from AGSIGNAL_POLICY_DIR",
-                extra={"loaded_count": loaded_count, "policy_count": len(registry)},
-            )
+    # NOTE: AGSIGNAL_POLICY_DIR loading is handled UNCONDITIONALLY in
+    # ``create_app`` after this function returns (see the precedence-rule
+    # comment there). The pre-Phase-3 ``mcp_server.app.configure_persistence``
+    # had its own in-memory-branch policy_dir load, but in the unified factory
+    # that block would fire twice for the same env var, so it is intentionally
+    # NOT carried over here.
 
 
 def create_app(
@@ -356,11 +349,11 @@ def main() -> None:
 #
 # Note: this triggers `_configure_persistence()` on first import (unless
 # `skip_persistence_config=True` is somehow threaded in — at the module level
-# it is not). This matches the predecessor factories' behavior
-# (`notification.main:205` and `mcp_server.app:258` both also instantiate at
-# module level). Tests that need to run without persistence configuration
-# import `create_app` directly and pass `skip_persistence_config=True`,
-# bypassing this module-level instance.
+# it is not). This matches the predecessor factories' behavior (both
+# `notification.main` and `mcp_server.app` also instantiate `app` at module
+# level). Tests that need to run without persistence configuration import
+# `create_app` directly and pass `skip_persistence_config=True`, bypassing
+# this module-level instance.
 app = create_app()
 
 
