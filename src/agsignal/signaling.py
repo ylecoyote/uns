@@ -26,7 +26,6 @@ from notification.audit import (
     create_ack_audit_record,
     create_audit_record,
 )
-from notification.dlq import DLQService
 from notification.models import (
     AckStatus,
     Notification,
@@ -176,14 +175,12 @@ async def send_signal(
     audit_store: AuditStore,
     idempotency_store: Any,
     transport_metadata: dict[str, Any] | None = None,
-    dlq_service: DLQService | None = None,
 ) -> SendNotificationResponse:
     """Accept and persist an AGSignal governance signal.
 
-    Canonical write path that consolidates the previously duplicated logic
-    in ``notification.routes.send_notification`` (HTTP) and
-    ``notification.runtime.send_signal`` (MCP). Tasks 7 and 8 retire the
-    legacy paths after their callers redirect here.
+    Canonical accept path that consolidates the previously duplicated
+    accept-side logic. The legacy HTTP and MCP send paths now both delegate
+    here.
 
     Idempotency is preserved via the caller-supplied ``idempotency_store``.
     Each transport keeps its own store (in-process dict on ``RuntimeState``
@@ -198,12 +195,21 @@ async def send_signal(
     ``{"runtime": "agsignal_mcp"}`` — the function does not unify the tags,
     only round-trips what the caller supplies.
 
-    Note: the route-layer ``send_notification`` additionally performs
-    websocket fanout (replay store, connection manager, fanout publisher).
-    That dispatch stays in the route layer because the websocket runtime
-    state is FastAPI-app-scoped; the route adapter (Task 7) calls this
-    function then performs the websocket dispatch on the returned
-    notification.
+    Note: this function ACCEPTS the signal (resolves the notification,
+    registers with the ack engine if ``require_ack``, persists the audit
+    row, returns the response). It does NOT perform actual channel
+    delivery — Slack/PagerDuty/email dispatch lives in
+    ``notification.service.dispatch_notification``, and DLQ-on-failure is
+    wired there for ``GUARANTEED``-mode failures. Unifying the accept-only
+    path with the dispatch+DLQ path is tracked in
+    ``docs/post-v0.2-followups.md`` item F-1, deferred until after
+    v0.2 Phase 5 ships.
+
+    The route-layer ``send_notification`` additionally performs websocket
+    fanout (replay store, connection manager, fanout publisher). That
+    dispatch stays in the route layer because the websocket runtime state
+    is FastAPI-app-scoped; the route adapter calls this function then
+    performs the websocket dispatch on the returned notification.
 
     Args:
         request: Validated send-notification request from the producer.
@@ -214,19 +220,18 @@ async def send_signal(
         transport_metadata: Optional audit metadata round-tripped onto the
             delivery audit record. Each transport supplies its own
             ``{"runtime": ...}`` tag.
-        dlq_service: Reserved for forward compatibility; the legacy
-            ``send_notification`` route does not push to DLQ on accept,
-            so this parameter is currently unused. Retained in the
-            signature so transports can begin passing it.
 
     Returns:
-        :class:`SendNotificationResponse` summarizing the delivery outcome.
+        :class:`SendNotificationResponse` summarizing the accepted signal.
 
     Raises:
         ValidationError: If the SDK rejects the resolved notification.
         AuditPersistenceError: If the delivery audit cannot be persisted.
     """
-    del dlq_service  # reserved; legacy send path does not push to DLQ on accept
+    # TODO(post-v0.2): channel delivery + DLQ-on-failure live in
+    # notification.service.dispatch_notification. Unifying the two send
+    # paths and re-introducing a dlq_service parameter with real behavior
+    # is tracked in docs/plans/post-v0.2-followups.md item F-1.
 
     # Idempotency replay: if a prior response is recorded, return it with
     # idempotent_replay flipped on. Keyed on (source, idempotency_key) to
