@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate a machine-readable contract snapshot for /ui endpoints.
 
-This script extracts JSON schemas from the Pydantic models in routes_ui.py
-and generates a deterministic contract snapshot file at:
+This script extracts JSON schemas from the Pydantic models in
+``agsignal.responses`` and generates a deterministic contract snapshot
+file at:
     docs/ui/contracts/ui-contracts.json
 
 The snapshot includes:
@@ -34,7 +35,7 @@ sys.path.insert(0, str(src_path))
 
 
 def get_enum_definitions() -> dict[str, list[str]]:
-    """Extract enum definitions from notification.models and routes_ui."""
+    """Extract enum definitions from notification.models and agsignal.responses."""
     from agsignal.responses import (
         AuditEventType,
         EnforcementType,
@@ -92,6 +93,8 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         PaginationInfo,
         ResolutionContext,
         ResolutionStep,
+    )
+    from agsignal.responses import (
         UIErrorResponse as ErrorResponse,
     )
 
