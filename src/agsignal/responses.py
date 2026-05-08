@@ -344,13 +344,11 @@ class NotificationStatusResponse(BaseModel):
     found: bool = Field(description="Whether the notification was found")
 
 
+# Note (internal): renamed during Phase 3 from ``ErrorResponse`` (in
+# ``mcp_server.routes_notification``) to disambiguate from
+# :class:`UIErrorResponse`, which has a structurally incompatible field set.
 class NotificationErrorResponse(BaseModel):
-    """Standard error response.
-
-    Renamed from ``ErrorResponse`` (in ``mcp_server.routes_notification``) to
-    disambiguate from the structurally incompatible :class:`UIErrorResponse`.
-    Field set: ``error: str``, ``message: str``, ``notification_id: UUID | None``.
-    """
+    """Standard error response for notification-write endpoints."""
 
     error: str = Field(description="Error type")
     message: str = Field(description="Error message")
@@ -382,14 +380,12 @@ class ErrorDetail(BaseModel):
     details: dict[str, Any] | None = Field(default=None, description="Additional context")
 
 
+# Note (internal): renamed during Phase 3 from ``ErrorResponse`` (in
+# ``mcp_server.routes_ui``) to disambiguate from
+# :class:`NotificationErrorResponse`, which has a structurally incompatible
+# field set.
 class UIErrorResponse(BaseModel):
-    """Standard error response.
-
-    Renamed from ``ErrorResponse`` (in ``mcp_server.routes_ui``) to
-    disambiguate from the structurally incompatible
-    :class:`NotificationErrorResponse`. Field set: ``error: ErrorDetail``,
-    ``request_id: str``.
-    """
+    """Standard error response for console / read endpoints."""
 
     error: ErrorDetail
     request_id: str = Field(description="Request ID for correlation/support")
@@ -547,13 +543,11 @@ class InvariantSummaryResponse(BaseModel):
     last_updated: str
 
 
+# Note (internal): this is the Pydantic version of ``AuditEvent``.
+# ``mcp_server.read_models.AuditEvent`` is a different ``@dataclass`` that
+# shares the name; the two are NOT interchangeable.
 class AuditEvent(BaseModel):
-    """Single audit event.
-
-    Note: this is the Pydantic version. ``mcp_server.read_models.AuditEvent``
-    is a different ``@dataclass`` that shares the name; the two are NOT
-    interchangeable.
-    """
+    """Single audit event."""
 
     audit_id: UUID
     event_type: AuditEventType

@@ -3,7 +3,7 @@
   "title": "AGSignal Console Contracts",
   "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-05-08T19:59:49.600081+00:00",
+  "generated_at": "2026-05-08T20:26:51.232149+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
@@ -192,7 +192,7 @@
           "type": "string"
         }
       },
-      "description": "Single audit event.\n\nNote: this is the Pydantic version. ``mcp_server.read_models.AuditEvent``\nis a different ``@dataclass`` that shares the name; the two are NOT\ninterchangeable.",
+      "description": "Single audit event.",
       "properties": {
         "audit_id": {
           "format": "uuid",
@@ -251,7 +251,7 @@
     "AuditEventListResponse": {
       "$defs": {
         "AuditEvent": {
-          "description": "Single audit event.\n\nNote: this is the Pydantic version. ``mcp_server.read_models.AuditEvent``\nis a different ``@dataclass`` that shares the name; the two are NOT\ninterchangeable.",
+          "description": "Single audit event.",
           "properties": {
             "audit_id": {
               "format": "uuid",
@@ -2221,7 +2221,7 @@
           "type": "object"
         }
       },
-      "description": "Standard error response.\n\nRenamed from ``ErrorResponse`` (in ``mcp_server.routes_ui``) to\ndisambiguate from the structurally incompatible\n:class:`NotificationErrorResponse`. Field set: ``error: ErrorDetail``,\n``request_id: str``.",
+      "description": "Standard error response for console / read endpoints.",
       "properties": {
         "error": {
           "$ref": "#/$defs/ErrorDetail"
