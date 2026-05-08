@@ -1,30 +1,598 @@
 """AGSignal read-side service layer.
 
 Stateless async query functions that read state from the configured stores
-and return typed Pydantic responses. No FastAPI imports — these functions
-can be called from any caller (HTTP route handlers, MCP tools, future CLI).
-Routes become thin adapters that parse `Request`, delegate here, and return
-the response.
+and return typed Pydantic responses. These functions can be called from any
+caller (HTTP route handlers, MCP tools, future CLI). Routes become thin
+adapters that parse `Request`, delegate here, and return the response.
 
 Each function in this module is the canonical implementation of its
 operation. `mcp_server.routes_ui` and `agsignal_mcp.tools` both call into
 these — there is no other source of truth.
+
+Note: a thin FastAPI `HTTPException` import is currently retained so the
+verbatim-extracted route bodies (e.g. `get_delivery_timeline`'s 404) keep
+their behavior. Phase 5 of the v0.2 refactor relocates HTTP-shaped error
+handling back into the route adapter layer.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
-# NOTE: response models (`InvariantSummaryResponse`) and the supporting
-# `EnforcementType` enum currently live in `mcp_server.routes_ui` alongside
-# the legacy route handlers. Phase 5 of the v0.2 refactor relocates them to
-# a dedicated module (likely `mcp_server.read_models` or a new
-# `agsignal.responses` module). Until then we import from their current home.
-from mcp_server.routes_ui import (  # legacy location; Phase 5 relocates
-    EnforcementType,
-    InvariantSummaryResponse,
-    list_invariants,
+from fastapi import HTTPException, status
+
+# NOTE: response models (`InvariantSummaryResponse`, `DeliveryTimelineListResponse`,
+# `DeliveryTimelineResponse`, `EffectivePolicyResponse`, `InvariantListResponse`,
+# `AuditEventListResponse`) and the supporting enums (`EnforcementType`,
+# `InvariantSeverity`, `InvariantStatus`, `AuditEventType`, `ResolutionSource`)
+# currently live in `mcp_server.routes_ui` alongside the legacy route handlers.
+# Phase 5 of the v0.2 refactor relocates them to a dedicated module (likely
+# `mcp_server.read_models` or a new `agsignal.responses` module). Until then we
+# import from their current home.
+from mcp_server.observability import (
+    create_error_response_with_request_id,
+    get_structured_logger,
+    record_endpoint_error,
 )
+from mcp_server.read_models import (  # legacy location; Phase 5 relocates
+    AuditEventFilter,
+    DeliveryFilter,
+    get_read_model_adapter,
+)
+
+# NOTE: response models for notification status (`NotificationStatusResponse`,
+# `AckStatusResponse`) currently live in `mcp_server.routes_notification`.
+# Phase 5 of the v0.2 refactor relocates them. Until then we import from their
+# current home.
+from mcp_server.routes_notification import (  # legacy location; Phase 5 relocates
+    AckStatusResponse,
+    NotificationStatusResponse,
+    get_engine,
+)
+from mcp_server.routes_ui import (  # legacy location; Phase 5 relocates
+    AuditEvent,
+    AuditEventListResponse,
+    AuditEventType,
+    AutonomyContextResponse,
+    DeliveryAttempt,
+    DeliveryTimelineListResponse,
+    DeliveryTimelineResponse,
+    DeliveryTimelineSummary,
+    EffectivePolicyResponse,
+    EffectivePolicyValues,
+    EnforcementType,
+    EvidenceLink,
+    InvariantEnforcement,
+    InvariantEntry,
+    InvariantListResponse,
+    InvariantSeverity,
+    InvariantStatus,
+    InvariantSummaryResponse,
+    PaginationInfo,
+    ResolutionContext,
+    ResolutionSource,
+    ResolutionStep,
+)
+from notification.models import (  # legacy location; Phase 5 relocates
+    AckStatus,
+    AutonomyMode,
+    Channel,
+    DeliveryMode,
+    DeliveryStatus,
+    NotificationIntent,
+)
+from notification.policies import (
+    DEFAULT_DEDUP_WINDOW_SECONDS,
+    get_default_ack_timeout,
+    get_default_channels,
+    get_default_delivery_mode,
+    get_default_require_ack,
+    get_policy_registry,
+)
+
+logger = get_structured_logger(__name__)
+
+__all__ = [
+    "get_ack_status",
+    "get_delivery_timeline",
+    "get_effective_policy",
+    "get_invariants_summary",
+    "get_notification_status",
+    "list_audit_events",
+    "list_deliveries",
+    "list_invariants",
+]
+
+
+async def list_deliveries(
+    cursor: str | None = None,
+    limit: int = 25,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    status: DeliveryStatus | None = None,  # noqa: A002 — preserves route signature
+    intent: NotificationIntent | None = None,
+    delivery_mode: DeliveryMode | None = None,
+    agent_id: UUID | None = None,
+    autonomy_mode: AutonomyMode | None = None,
+    notification_type: str | None = None,
+    channel: Channel | None = None,
+) -> DeliveryTimelineListResponse:
+    """List delivery timelines with filtering.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Queries the read model adapter for delivery summaries matching the
+    provided filter criteria. Returns paginated results.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
+    """
+    # Body extracted verbatim from mcp_server.routes_ui.list_deliveries
+    # (minus the @router.get decorator and the log_endpoint_call observability
+    # call, which is a route-handler concern).
+
+    # Build filter criteria
+    filter_criteria = DeliveryFilter(
+        start_time=start_time,
+        end_time=end_time,
+        status=status,
+        intent=intent,
+        delivery_mode=delivery_mode,
+        agent_id=agent_id,
+        autonomy_mode=autonomy_mode,
+        notification_type=notification_type,
+        channel=channel,
+    )
+
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    result = adapter.get_deliveries(filter_criteria, cursor, limit)
+
+    # Convert to response model
+    items = [
+        DeliveryTimelineSummary(
+            notification_id=item.notification_id,
+            notification_type=item.notification_type,
+            intent=item.intent,
+            delivery_mode=item.delivery_mode,
+            status=item.status,
+            created_at=item.created_at,
+            delivered_at=item.delivered_at,
+            channels_attempted=item.channels_attempted,
+            channels_succeeded=item.channels_succeeded,
+            autonomy_mode=item.autonomy_mode,
+            agent_id=item.agent_id,
+        )
+        for item in result.items
+    ]
+
+    return DeliveryTimelineListResponse(
+        items=items,
+        pagination=PaginationInfo(
+            next_cursor=result.next_cursor,
+            has_more=result.has_more,
+            total_count=result.total_count,
+        ),
+    )
+
+
+async def get_delivery_timeline(
+    notification_id: UUID,
+) -> DeliveryTimelineResponse:
+    """Get delivery timeline for a specific notification.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Queries the read model adapter for the full delivery timeline
+    of a specific notification, including all channel attempts.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
+    """
+    # Body extracted verbatim from mcp_server.routes_ui.get_delivery_timeline
+    # (minus the @router.get decorator and the log_endpoint_call observability
+    # call, which is a route-handler concern).
+
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    timeline = adapter.get_delivery_timeline(notification_id)
+
+    if timeline is None:
+        error_response = create_error_response_with_request_id(
+            code="not_found",
+            message=f"Notification not found: {notification_id}",
+        )
+        record_endpoint_error(
+            endpoint="/ui/deliveries/{id}",
+            error_code="not_found",
+            error_message=f"Notification not found: {notification_id}",
+            status_code=404,
+        )
+        logger.warning(
+            "Delivery timeline not found",
+            extra={"notification_id": str(notification_id)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_response,
+        )
+
+    # Convert attempts to response model
+    attempts = [
+        DeliveryAttempt(
+            attempt_id=attempt.attempt_id,
+            channel=attempt.channel,
+            status=attempt.status,
+            started_at=attempt.started_at,
+            completed_at=attempt.completed_at,
+            duration_ms=attempt.duration_ms,
+            error_message=attempt.error_message,
+            error_code=attempt.error_code,
+            metadata=attempt.metadata,
+        )
+        for attempt in timeline.attempts
+    ]
+
+    return DeliveryTimelineResponse(
+        notification_id=timeline.notification_id,
+        notification_type=timeline.notification_type,
+        intent=timeline.intent,
+        delivery_mode=timeline.delivery_mode,
+        status=timeline.status,
+        created_at=timeline.created_at,
+        delivered_at=timeline.delivered_at,
+        attempts=attempts,
+        channels_attempted=timeline.channels_attempted,
+        channels_succeeded=timeline.channels_succeeded,
+        channels_failed=timeline.channels_failed,
+        autonomy_context=AutonomyContextResponse(
+            autonomy_mode=timeline.autonomy_mode,
+            agent_id=timeline.agent_id,
+            plan_id=timeline.plan_id,
+            decision_snapshot_id=timeline.decision_snapshot_id,
+            execution_snapshot_id=timeline.execution_snapshot_id,
+            skip_snapshot_id=timeline.skip_snapshot_id,
+        ),
+    )
+
+
+async def get_effective_policy(
+    notification_type: str,
+    intent: NotificationIntent,
+    autonomy_mode: AutonomyMode,
+    irreversible: bool = False,
+) -> EffectivePolicyResponse:
+    """Get effective policy resolution for a notification type.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Shows how policy values are resolved through the resolution chain:
+    1. explicit_override - Values passed directly (not applicable here)
+    2. mode_override - Policy mode-specific override
+    3. policy_base - Policy base value
+    4. sdk_default - SDK default derived from intent + autonomy_mode
+    """
+    # Body extracted verbatim from mcp_server.routes_ui.get_effective_policy
+    # (minus the @router.get decorator and the log_endpoint_call observability
+    # call, which is a route-handler concern).
+
+    registry = get_policy_registry()
+    policy = registry.get_sync(notification_type)
+
+    # Determine effective values
+    effective_channels = get_default_channels(intent, autonomy_mode, irreversible)
+    effective_delivery_mode = get_default_delivery_mode(intent)
+    effective_require_ack = get_default_require_ack(intent, autonomy_mode)
+    effective_ack_timeout = get_default_ack_timeout(intent)
+    effective_dedup_window = DEFAULT_DEDUP_WINDOW_SECONDS
+
+    # Build resolution traces
+    resolution: dict[str, list[ResolutionStep]] = {
+        "delivery_mode": [],
+        "channels": [],
+        "require_ack": [],
+        "ack_timeout_minutes": [],
+        "dedup_window_seconds": [],
+    }
+
+    policy_found = policy is not None
+
+    if policy:
+        # Check policy base values
+        if policy.delivery_mode is not None:
+            effective_delivery_mode = policy.delivery_mode
+            resolution["delivery_mode"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=policy.delivery_mode.value,
+                    applied=True,
+                )
+            )
+        else:
+            resolution["delivery_mode"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="Not configured in policy",
+                )
+            )
+
+        policy_channels = policy.get_channels_for_mode(autonomy_mode, intent)
+        if policy_channels:
+            effective_channels = policy_channels
+            resolution["channels"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=[c.value for c in policy_channels],
+                    applied=True,
+                )
+            )
+        else:
+            resolution["channels"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="Not configured in policy",
+                )
+            )
+
+        policy_require_ack = policy.get_require_ack_for_mode(autonomy_mode, intent)
+        if policy_require_ack is not None:
+            effective_require_ack = policy_require_ack
+            resolution["require_ack"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=policy_require_ack,
+                    applied=True,
+                )
+            )
+        else:
+            resolution["require_ack"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="Not configured in policy",
+                )
+            )
+
+        if policy.ack_timeout_minutes is not None:
+            effective_ack_timeout = policy.ack_timeout_minutes
+            resolution["ack_timeout_minutes"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=policy.ack_timeout_minutes,
+                    applied=True,
+                )
+            )
+        else:
+            resolution["ack_timeout_minutes"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="Not configured in policy",
+                )
+            )
+
+        if policy.dedup_window_seconds is not None:
+            effective_dedup_window = policy.dedup_window_seconds
+            resolution["dedup_window_seconds"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=policy.dedup_window_seconds,
+                    applied=True,
+                )
+            )
+        else:
+            resolution["dedup_window_seconds"].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="Not configured in policy",
+                )
+            )
+    else:
+        # No policy found - all use SDK defaults
+        for field in resolution:
+            resolution[field].append(
+                ResolutionStep(
+                    source=ResolutionSource.POLICY_BASE,
+                    value=None,
+                    applied=False,
+                    reason="No policy registered for notification_type",
+                )
+            )
+
+    # Add SDK default steps
+    resolution["delivery_mode"].append(
+        ResolutionStep(
+            source=ResolutionSource.SDK_DEFAULT,
+            value=get_default_delivery_mode(intent).value,
+            applied=not policy_found or policy.delivery_mode is None,
+        )
+    )
+    resolution["channels"].append(
+        ResolutionStep(
+            source=ResolutionSource.SDK_DEFAULT,
+            value=[c.value for c in get_default_channels(intent, autonomy_mode, irreversible)],
+            applied=not policy_found or not policy.get_channels_for_mode(autonomy_mode, intent),
+        )
+    )
+    resolution["require_ack"].append(
+        ResolutionStep(
+            source=ResolutionSource.SDK_DEFAULT,
+            value=get_default_require_ack(intent, autonomy_mode),
+            applied=not policy_found
+            or policy.get_require_ack_for_mode(autonomy_mode, intent) is None,
+        )
+    )
+    resolution["ack_timeout_minutes"].append(
+        ResolutionStep(
+            source=ResolutionSource.SDK_DEFAULT,
+            value=get_default_ack_timeout(intent),
+            applied=not policy_found or policy.ack_timeout_minutes is None,
+        )
+    )
+    resolution["dedup_window_seconds"].append(
+        ResolutionStep(
+            source=ResolutionSource.SDK_DEFAULT,
+            value=DEFAULT_DEDUP_WINDOW_SECONDS,
+            applied=not policy_found or policy.dedup_window_seconds is None,
+        )
+    )
+
+    return EffectivePolicyResponse(
+        notification_type=notification_type,
+        effective=EffectivePolicyValues(
+            delivery_mode=effective_delivery_mode,
+            channels=effective_channels,
+            require_ack=effective_require_ack,
+            ack_timeout_minutes=effective_ack_timeout,
+            dedup_window_seconds=effective_dedup_window,
+        ),
+        resolution=resolution,
+        resolution_context=ResolutionContext(
+            intent=intent,
+            autonomy_mode=autonomy_mode,
+            irreversible=irreversible,
+            policy_found=policy_found,
+            policy_notification_type=notification_type if policy_found else None,
+        ),
+    )
+
+
+async def list_invariants(
+    cursor: str | None = None,
+    limit: int = 25,
+    severity: InvariantSeverity | None = None,
+    enforcement_type: EnforcementType | None = None,
+    invariant_status: InvariantStatus | None = None,
+    search: str | None = None,
+) -> InvariantListResponse:
+    """List system invariants from the registry.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Returns invariants from docs/verification/invariants.yml.
+    Filters can be applied to narrow results.
+    """
+    # Body extracted verbatim from mcp_server.routes_ui.list_invariants
+    # (minus the @router.get decorator and the log_endpoint_call observability
+    # call, which is a route-handler concern).
+
+    # Load invariants from YAML file
+    # This is a simplified implementation - in production you might
+    # cache this or use a proper data store
+    try:
+        from pathlib import Path
+
+        import yaml
+
+        invariants_path = (
+            Path(__file__).parent.parent.parent / "docs" / "verification" / "invariants.yml"
+        )
+        if invariants_path.exists():
+            with open(invariants_path) as f:
+                data = yaml.safe_load(f)
+
+            items: list[InvariantEntry] = []
+            for inv in data.get("invariants", []):
+                # Parse enforcement
+                enforcement_data = inv.get("enforcement", {})
+                enforcement = InvariantEnforcement(
+                    type=EnforcementType(enforcement_data.get("type", "test")),
+                    description=enforcement_data.get("description", ""),
+                )
+
+                # Parse evidence
+                evidence = [
+                    EvidenceLink(
+                        path=e.get("path", ""),
+                        note=e.get("note", ""),
+                        line_ref=e.get("line_ref"),
+                    )
+                    for e in inv.get("evidence", [])
+                ]
+
+                entry = InvariantEntry(
+                    id=inv.get("id", ""),
+                    statement=inv.get("statement", "").strip(),
+                    severity=InvariantSeverity(inv.get("severity", "MEDIUM")),
+                    status=InvariantStatus(inv.get("status", "active")),
+                    enforcement=enforcement,
+                    evidence=evidence,
+                    owner=inv.get("owner", ""),
+                    last_reviewed=inv.get("last_reviewed", ""),
+                    mitigation=inv.get("mitigation"),
+                )
+
+                # Apply filters (check hasattr in case called internally without FastAPI resolution)
+                if severity and hasattr(severity, "value") and entry.severity != severity:
+                    continue
+                if (
+                    enforcement_type
+                    and hasattr(enforcement_type, "value")
+                    and entry.enforcement.type != enforcement_type
+                ):
+                    continue
+                if (
+                    invariant_status
+                    and hasattr(invariant_status, "value")
+                    and entry.status != invariant_status
+                ):
+                    continue
+                if (
+                    search
+                    and isinstance(search, str)
+                    and search.lower() not in entry.statement.lower()
+                ):
+                    continue
+
+                items.append(entry)
+
+            # Apply pagination (simple offset-based for stub)
+            total = len(items)
+            items = items[:limit]
+
+            return InvariantListResponse(
+                items=items,
+                pagination=PaginationInfo(
+                    next_cursor=None if len(items) < limit else "stub-cursor",
+                    has_more=total > limit,
+                    total_count=total,
+                ),
+            )
+        else:
+            logger.warning(
+                "Invariants file not found",
+                extra={"path": str(invariants_path)},
+            )
+    except Exception as e:
+        logger.error(
+            "Error loading invariants",
+            extra={"error": str(e)},
+        )
+        record_endpoint_error(
+            endpoint="/ui/invariants",
+            error_code="invariants_load_error",
+            error_message=str(e),
+            status_code=200,  # Still returns empty response, not a 500
+        )
+
+    # Fallback empty response
+    return InvariantListResponse(
+        items=[],
+        pagination=PaginationInfo(
+            next_cursor=None,
+            has_more=False,
+            total_count=0,
+        ),
+    )
 
 
 async def get_invariants_summary() -> InvariantSummaryResponse:
@@ -35,10 +603,6 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
     # Body extracted verbatim from mcp_server.routes_ui.get_invariants_summary
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
-    #
-    # Note: this currently calls back into `mcp_server.routes_ui.list_invariants`.
-    # Task 2 of Phase 2 migrates `list_invariants` into this module, at which
-    # point this call site naturally becomes an in-module call.
     result = await list_invariants(limit=100)
 
     by_severity: dict[str, int] = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -62,4 +626,133 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
         by_status=by_status,
         exceptions_requiring_review=exceptions_count,
         last_updated=datetime.now().isoformat(),
+    )
+
+
+async def list_audit_events(
+    cursor: str | None = None,
+    limit: int = 25,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    event_type: AuditEventType | None = None,
+    notification_id: UUID | None = None,
+    agent_id: UUID | None = None,
+    autonomy_mode: AutonomyMode | None = None,
+    correlation_id: str | None = None,
+) -> AuditEventListResponse:
+    """List audit events with filtering.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Queries the read model adapter for audit events matching the
+    provided filter criteria. Returns paginated results.
+
+    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
+    Configure SQLAlchemyReadModelAdapter for production persistence.
+    """
+    # Body extracted verbatim from mcp_server.routes_ui.list_audit_events
+    # (minus the @router.get decorator and the log_endpoint_call observability
+    # call, which is a route-handler concern).
+
+    # Build filter criteria
+    filter_criteria = AuditEventFilter(
+        start_time=start_time,
+        end_time=end_time,
+        event_type=event_type.value if event_type else None,
+        notification_id=notification_id,
+        agent_id=agent_id,
+        autonomy_mode=autonomy_mode,
+        correlation_id=correlation_id,
+    )
+
+    # Query read model adapter
+    adapter = get_read_model_adapter()
+    result = adapter.get_audit_events(filter_criteria, cursor, limit)
+
+    # Convert to response model
+    items = [
+        AuditEvent(
+            audit_id=item.audit_id,
+            event_type=AuditEventType(item.event_type),
+            event_time=item.event_time,
+            notification_id=item.notification_id,
+            notification_type=item.notification_type,
+            autonomy_context=AutonomyContextResponse(
+                autonomy_mode=item.autonomy_mode,
+                agent_id=item.agent_id,
+                plan_id=item.plan_id,
+                decision_snapshot_id=item.decision_snapshot_id,
+                execution_snapshot_id=item.execution_snapshot_id,
+                skip_snapshot_id=item.skip_snapshot_id,
+            ),
+            payload=item.payload,
+            correlation_id=item.correlation_id,
+        )
+        for item in result.items
+    ]
+
+    return AuditEventListResponse(
+        items=items,
+        pagination=PaginationInfo(
+            next_cursor=result.next_cursor,
+            has_more=result.has_more,
+            total_count=result.total_count,
+        ),
+    )
+
+
+async def get_notification_status(
+    notification_id: UUID,
+) -> NotificationStatusResponse:
+    """Get the status of a notification.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Returns notification details including the current acknowledgment status.
+    If the notification is not found, returns a response with found=False.
+
+    Note: The engine only stores ack state, not full notification details.
+    So this endpoint returns ack state info only.
+    """
+    # Body extracted verbatim from mcp_server.routes_notification.get_notification_status
+    # (minus the @router.get decorator).
+    engine = get_engine()
+
+    state = engine.get_state(notification_id)
+
+    if state is None:
+        return NotificationStatusResponse(
+            notification_id=notification_id,
+            found=False,
+            ack_status=None,
+        )
+
+    return NotificationStatusResponse(
+        notification_id=notification_id,
+        intent=state.intent.value if state.intent else None,
+        ack_status=state.status,
+        created_at=state.created_at,
+        found=True,
+    )
+
+
+async def get_ack_status(
+    notification_id: UUID,
+) -> AckStatusResponse:
+    """Get the acknowledgment status of a notification.
+
+    Canonical implementation: HTTP routes and MCP tools both delegate here.
+
+    Returns just the ack status for a notification.
+    Returns null ack_status if the notification is not being tracked.
+    """
+    # Body extracted verbatim from mcp_server.routes_notification.get_ack_status
+    # (minus the @router.get decorator; an explicit `AckStatus | None` type
+    # annotation has been added on the local for clarity — behavior-equivalent).
+    engine = get_engine()
+    ack_status: AckStatus | None = engine.get_status(notification_id)
+
+    return AckStatusResponse(
+        notification_id=notification_id,
+        ack_status=ack_status,
     )
