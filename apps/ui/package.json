@@ -16,6 +16,7 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "type-check": "tsc --noEmit",
+    "generate-types": "tsx scripts/generate-types.ts",
     "ci": "npm run type-check && npm run lint && npm run test:run && npm run build"
   },
   "dependencies": {
@@ -39,6 +40,8 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "jsdom": "^23.0.1",
     "msw": "^2.0.11",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
     "vitest": "^1.1.0"
