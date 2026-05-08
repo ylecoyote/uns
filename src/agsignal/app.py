@@ -1,0 +1,368 @@
+"""Unified FastAPI factory for AGSignal.
+
+This is the canonical entry point for the AGSignal HTTP service. It
+combines what were previously two separate FastAPI apps (one for the
+write/Core surface at ``notification.main:create_app``, one for the
+read/Console surface at ``mcp_server.app:create_app``) into a single app
+that exposes both surfaces.
+
+The two predecessor factories are deleted in Task 6 of Phase 3 (this
+plan). AGSignal is pre-release, so there are no external consumers to
+preserve compat for; internal consumers cascade-update in the same
+commit.
+
+Mounted route surfaces:
+    - ``/api/v1/notifications/*``   send, simulate, status   (write)
+    - ``/api/v1/dlq``, ``/policies/*``, ``/ops/*``           (ops)
+    - ``/api/v1/notifications/{id}/ack`` and ``/dismiss``    (ack/dismiss)
+    - ``/ui/*``                     read-side console        (read)
+    - ``/ws/agents/{agent_id}``     websocket fanout
+    - ``/health``, ``/healthz``     liveness
+    - ``/ready``, ``/readyz``       unified readiness
+    - ``/metrics``                  Prometheus
+
+Unified readiness semantics: ``/ready`` and ``/readyz`` check BOTH the
+Core-side concerns (DLQ depth, channel-readiness summary, policy count)
+AND the Console-side concerns (read-model adapter reachable, audit
+logger configured). If any check fails, the probe returns
+``status: not_ready`` with the failing component named. This is stricter
+than either predecessor factory's readiness probe.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import warnings
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import uvicorn
+from fastapi import FastAPI
+
+from agsignal._in_memory import InMemoryRedisList
+from db.policy_store import SQLAlchemyPolicyStore
+from mcp_server.auth import configure_cors
+from mcp_server.observability import ObservabilityMiddleware
+from mcp_server.routes_notification import router as ack_router
+from mcp_server.routes_ui import router as ui_router
+from notification import __version__
+from notification.audit import AuditStore, InMemoryAuditStore
+from notification.channel_health import ChannelHealthTracker
+from notification.config import get_notification_config
+from notification.dlq import DLQService
+from notification.policies import configure_policy_registry, get_policy_registry
+from notification.policy_loader import load_runtime_registry_from_directory
+from notification.routes import ops_router
+from notification.routes import router as notification_router
+from notification.websocket_runtime import (
+    InMemoryWebSocketReplayStore,
+    RedisWebSocketClient,
+    RedisWebSocketFanout,
+    RedisWebSocketSubscriber,
+    WebSocketConnectionManager,
+    WebSocketReplayStore,
+    websocket_endpoint,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _docs_url(suffix: str) -> str | None:
+    """Return ``suffix`` only when interactive API docs are explicitly enabled."""
+    enabled = os.environ.get("AGSIGNAL_ENABLE_DOCS", "false").strip().lower()
+    return suffix if enabled in ("1", "true", "yes", "on") else None
+
+
+def _policy_dir_from_env() -> Path | None:
+    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR")
+    if raw_path is None:
+        legacy = os.environ.get("UNS_POLICY_DIR")
+        if legacy is not None:
+            warnings.warn(
+                "UNS_POLICY_DIR is deprecated. Use AGSIGNAL_POLICY_DIR instead. "
+                "UNS_* aliases will be removed in v1.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            raw_path = legacy
+    return Path(raw_path) if raw_path else None
+
+
+def _channel_readiness() -> dict[str, bool]:
+    config = get_notification_config()
+    return {
+        "slack": config.slack_webhook_url is not None,
+        "pagerduty": config.pagerduty_routing_key is not None,
+        "email": config.smtp_host is not None,
+    }
+
+
+def _create_redis_client(redis_url: str) -> RedisWebSocketClient:
+    from redis import Redis
+    return Redis.from_url(redis_url)
+
+
+def _configure_persistence() -> None:
+    """Wire up audit stores and read-model adapters from environment.
+
+    Behavior matches the Console-side ``configure_persistence`` from the
+    pre-Phase-3 ``mcp_server.app`` factory: SQLAlchemy when DATABASE_URL
+    is set, in-memory otherwise. ``AGSIGNAL_CREATE_TABLES=true`` enables
+    schema creation for first-run bootstrap.
+    """
+    from mcp_server.read_models import (
+        InMemoryReadModelAdapter,
+        configure_read_model_adapter,
+        create_sqlalchemy_adapter,
+    )
+    from notification.audit import (
+        InMemoryAuditStore,
+        configure_audit_logger,
+    )
+
+    database_url = os.environ.get("DATABASE_URL")
+    agsignal_create_tables = os.environ.get("AGSIGNAL_CREATE_TABLES")
+    if agsignal_create_tables is None:
+        legacy_create_tables = os.environ.get("UNS_CREATE_TABLES")
+        if legacy_create_tables is not None:
+            warnings.warn(
+                "UNS_CREATE_TABLES is deprecated. Use AGSIGNAL_CREATE_TABLES instead. "
+                "UNS_* aliases will be removed in v1.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            agsignal_create_tables = legacy_create_tables
+    create_tables = (agsignal_create_tables or "false").lower() == "true"
+
+    if database_url:
+        # Production mode: use SQLAlchemy-backed storage
+        logger.info(
+            "Configuring SQLAlchemy persistence (DATABASE_URL set)",
+            extra={"create_tables": create_tables},
+        )
+
+        # Configure read model adapter
+        adapter = create_sqlalchemy_adapter(
+            database_url=database_url,
+            create_tables=create_tables,
+        )
+        configure_read_model_adapter(adapter)
+
+        # Configure audit logger with SQLAlchemy store
+        from db.audit_store import create_sqlalchemy_audit_store
+        from db.policy_store import create_sqlalchemy_policy_store
+        from notification.policies import configure_policy_registry
+
+        audit_store = create_sqlalchemy_audit_store(
+            database_url=database_url,
+            create_tables=create_tables,
+        )
+        configure_audit_logger(store=audit_store)
+
+        policy_store = create_sqlalchemy_policy_store(
+            database_url=database_url,
+            create_tables=create_tables,
+        )
+        configure_policy_registry(registry=policy_store.load_runtime_registry())
+
+        logger.info("SQLAlchemy persistence configured successfully")
+    else:
+        # Demo/development mode: use shared in-memory storage
+        logger.warning(
+            "DATABASE_URL not set. Using in-memory storage. "
+            "Data will NOT persist across restarts. "
+            "Set DATABASE_URL for production use."
+        )
+
+        # Create shared audit store for both reads and writes
+        shared_audit_store = InMemoryAuditStore()
+
+        # Configure audit logger (writes)
+        configure_audit_logger(store=shared_audit_store)
+
+        # Configure read adapter (reads) - shares the same store
+        adapter = InMemoryReadModelAdapter(audit_store=shared_audit_store)
+        configure_read_model_adapter(adapter)
+
+        logger.info("In-memory persistence configured (shared store for reads and writes)")
+
+        policy_dir = _policy_dir_from_env()
+        if policy_dir is not None:
+            from notification.policies import configure_policy_registry
+            from notification.policy_loader import load_runtime_registry_from_directory
+
+            loaded_count, registry = load_runtime_registry_from_directory(policy_dir)
+            configure_policy_registry(registry=registry)
+            logger.info(
+                "Loaded ACTIVE runtime policies from AGSIGNAL_POLICY_DIR",
+                extra={"loaded_count": loaded_count, "policy_count": len(registry)},
+            )
+
+
+def create_app(
+    dlq_service: DLQService | None = None,
+    policy_store: SQLAlchemyPolicyStore | None = None,
+    channel_health_tracker: ChannelHealthTracker | None = None,
+    audit_store: AuditStore | None = None,
+    redis_client_factory: Callable[[str], RedisWebSocketClient] | None = None,
+    websocket_replay_store: WebSocketReplayStore | None = None,
+    skip_persistence_config: bool = False,
+) -> FastAPI:
+    """Create the unified AGSignal HTTP application."""
+    if not skip_persistence_config:
+        _configure_persistence()
+
+    app = FastAPI(
+        title="AGSignal",
+        description=(
+            "Control-plane governance signaling for autonomous agents. "
+            "Unified Core (write) and Console (read) HTTP surfaces."
+        ),
+        version=__version__,
+        docs_url=_docs_url("/docs"),
+        redoc_url=_docs_url("/redoc"),
+        openapi_url=_docs_url("/openapi.json"),
+    )
+
+    configure_cors(app)
+    app.add_middleware(ObservabilityMiddleware, ui_prefix="/ui")
+
+    from notification.metrics import install_metrics
+    install_metrics(app)
+
+    from notification.rate_limiter import install_rate_limiter
+    install_rate_limiter(app)
+
+    config = get_notification_config()
+    app.state.dlq_service = dlq_service or DLQService(redis_client=InMemoryRedisList())
+    app.state.policy_store = policy_store
+    app.state.audit_store = audit_store or InMemoryAuditStore()
+    tracker = channel_health_tracker or ChannelHealthTracker()
+    app.state.channel_health_tracker = tracker
+    app.state.http_idempotency_records = {}
+
+    # Policy directory loading.
+    #
+    # Precedence rule (CORRECTED FROM PLAN V1): if AGSIGNAL_POLICY_DIR is set,
+    # the directory-loaded registry takes precedence over any registry
+    # configured by `_configure_persistence()` (whether the SQLAlchemy branch
+    # or the in-memory branch). This matches `notification.main`'s pre-Phase-3
+    # behavior (it always loaded from policy_dir regardless of persistence
+    # config) but DIVERGES from `mcp_server.app`'s pre-Phase-3 behavior
+    # (which only loaded policy_dir in the in-memory branch).
+    #
+    # The unified factory picks notification.main's behavior because: (a) it
+    # is the more permissive of the two — operators can override SQLAlchemy
+    # policies with a directory snapshot during testing/migration; (b) the
+    # console-side (mcp_server.app) tests do not assert that policy_dir is
+    # IGNORED in DB mode, so the broader behavior is safe; (c) the SQLAlchemy
+    # registry remains the system-of-record — operators who do not set
+    # AGSIGNAL_POLICY_DIR get the DB registry exclusively.
+    #
+    # If a future operator scenario needs DB-mode policy_dir to be IGNORED
+    # rather than overridden, gate this block on `if not database_url`.
+    policy_dir = _policy_dir_from_env()
+    if policy_dir is not None:
+        loaded_count, registry = load_runtime_registry_from_directory(policy_dir)
+        configure_policy_registry(registry=registry)
+        logger.info(
+            "Loaded ACTIVE runtime policies from AGSIGNAL_POLICY_DIR (overrides persistence-config registry if any)",
+            extra={"loaded_count": loaded_count, "policy_count": len(registry)},
+        )
+
+    # Websocket runtime setup
+    websocket_manager = WebSocketConnectionManager()
+    app.state.websocket_manager = websocket_manager
+    app.state.websocket_replay_store = websocket_replay_store or InMemoryWebSocketReplayStore()
+    app.state.websocket_fanout = None
+    app.state.websocket_subscriber = None
+    if config.websocket_redis_enabled:
+        factory = redis_client_factory or _create_redis_client
+        redis_client = factory(config.redis_url)
+        websocket_fanout = RedisWebSocketFanout(
+            redis_client=redis_client,
+            channel_prefix=config.websocket_redis_channel,
+            channel_health_tracker=tracker,
+        )
+        app.state.websocket_fanout = websocket_fanout
+        websocket_subscriber = RedisWebSocketSubscriber(
+            redis_client=redis_client,
+            channel_prefix=config.websocket_redis_channel,
+            manager=websocket_manager,
+            origin_id=websocket_fanout.instance_id,
+            channel_health_tracker=tracker,
+        )
+        websocket_manager.set_subscriber(websocket_subscriber)
+        app.state.websocket_subscriber = websocket_subscriber
+
+    # Mount routers
+    app.include_router(notification_router)              # /api/v1/notifications/*
+    app.include_router(ops_router)                       # /api/v1/dlq, /policies/*, /ops/*
+    app.include_router(ack_router, prefix="/api")        # /api/v1/notifications/{id}/ack, /dismiss
+    app.include_router(ui_router)                        # /ui/*
+
+    # Websocket
+    app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
+
+    # Unified probes
+    @app.get("/health", tags=["system"])
+    @app.get("/healthz", tags=["system"])
+    async def health() -> dict[str, str]:
+        return {
+            "status": "alive",
+            "service": "agsignal",
+            "version": __version__,
+        }
+
+    @app.get("/ready", tags=["system"])
+    @app.get("/readyz", tags=["system"])
+    async def ready() -> dict[str, Any]:
+        from mcp_server.read_models import get_read_model_adapter
+        from notification.audit import get_audit_logger
+        try:
+            read_model_adapter = type(get_read_model_adapter()).__name__
+            audit_logger_type = type(get_audit_logger()).__name__
+        except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
+            return {
+                "status": "not_ready",
+                "service": "agsignal",
+                "version": __version__,
+                "error": str(exc),
+            }
+        return {
+            "status": "ready",
+            "service": "agsignal",
+            "version": __version__,
+            "channels_configured": _channel_readiness(),
+            "policy_count": len(get_policy_registry()),
+            "dlq_depth": app.state.dlq_service.depth(),
+            "read_model_adapter": read_model_adapter,
+            "audit_logger": audit_logger_type,
+        }
+
+    return app
+
+
+def main() -> None:
+    """Run the unified AGSignal HTTP server."""
+    host = os.environ.get("AGSIGNAL_HOST", "127.0.0.1")
+    port = int(os.environ.get("AGSIGNAL_PORT", "8000"))
+    uvicorn.run("agsignal.app:app", host=host, port=port, reload=False)
+
+
+# ASGI module-level instance for direct uvicorn invocation.
+#
+# Note: this triggers `_configure_persistence()` on first import (unless
+# `skip_persistence_config=True` is somehow threaded in — at the module level
+# it is not). This matches the predecessor factories' behavior
+# (`notification.main:205` and `mcp_server.app:258` both also instantiate at
+# module level). Tests that need to run without persistence configuration
+# import `create_app` directly and pass `skip_persistence_config=True`,
+# bypassing this module-level instance.
+app = create_app()
+
+
+if __name__ == "__main__":
+    main()
