@@ -22,7 +22,7 @@ class RecordingAppAdapter:
 
 
 def test_approval_required_builds_governance_signal_with_evidence() -> None:
-    from notification.integrations.mip_adapter import MIPSignalAdapter
+    from examples.integrations.mip.adapter import MIPSignalAdapter
 
     recorder = RecordingAppAdapter()
     adapter = MIPSignalAdapter(app_adapter=recorder)
@@ -54,7 +54,7 @@ def test_approval_required_builds_governance_signal_with_evidence() -> None:
 
 
 def test_circuit_breaker_engaged_builds_safety_signal_with_dedup_key() -> None:
-    from notification.integrations.mip_adapter import MIPSignalAdapter
+    from examples.integrations.mip.adapter import MIPSignalAdapter
 
     recorder = RecordingAppAdapter()
     adapter = MIPSignalAdapter(app_adapter=recorder)
@@ -81,7 +81,7 @@ def test_circuit_breaker_engaged_builds_safety_signal_with_dedup_key() -> None:
 
 
 def test_execution_alert_maps_critical_slippage_to_safety_signal() -> None:
-    from notification.integrations.mip_adapter import MIPExecutionAlert, MIPSignalAdapter
+    from examples.integrations.mip.adapter import MIPExecutionAlert, MIPSignalAdapter
 
     recorder = RecordingAppAdapter()
     adapter = MIPSignalAdapter(app_adapter=recorder)
@@ -110,15 +110,16 @@ def test_execution_alert_maps_critical_slippage_to_safety_signal() -> None:
 
 
 def test_agsignal_public_integration_alias_excludes_mip_adapter() -> None:
+    from examples.integrations.mip.adapter import (
+        MIPExecutionAlert as ExampleMIPExecutionAlert,
+    )
+    from examples.integrations.mip.adapter import (
+        MIPSignalAdapter as ExampleMIPSignalAdapter,
+    )
+
     import agsignal.integrations as agsignal_integrations
-    from notification.integrations.mip_adapter import (
-        MIPExecutionAlert as NotificationMIPExecutionAlert,
-    )
-    from notification.integrations.mip_adapter import (
-        MIPSignalAdapter as NotificationMIPSignalAdapter,
-    )
 
     assert not hasattr(agsignal_integrations, "MIPSignalAdapter")
     assert not hasattr(agsignal_integrations, "MIPExecutionAlert")
-    assert NotificationMIPSignalAdapter.__name__ == "MIPSignalAdapter"
-    assert NotificationMIPExecutionAlert.__name__ == "MIPExecutionAlert"
+    assert ExampleMIPSignalAdapter.__name__ == "MIPSignalAdapter"
+    assert ExampleMIPExecutionAlert.__name__ == "MIPExecutionAlert"

@@ -33,8 +33,9 @@ def test_license_file_uses_apache_2_0() -> None:
 
 
 def test_agsignal_integrations_exposes_generic_boundary_only() -> None:
+    from examples.integrations.mip.adapter import MIPSignalAdapter
+
     import agsignal.integrations as integrations
-    from notification.integrations.mip_adapter import MIPSignalAdapter
 
     assert hasattr(integrations, "AppSignalAdapter")
     assert not hasattr(integrations, "MIPSignalAdapter")

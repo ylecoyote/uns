@@ -58,9 +58,10 @@ from agsignal.integrations import AppEvidenceContext, AppSignalAdapter, AppSigna
 This boundary carries app-owned evidence references into AGSignal without making
 AGSignal own the host application's domain models.
 
-MIP-shaped adapters remain available from `notification.integrations.mip_adapter`
-as optional sample/proving code. They are intentionally not exported from the
-AGSignal-branded public integration facade.
+MIP-shaped adapters remain available as sample/proving code at
+`examples/integrations/mip/adapter.py`. They are intentionally not shipped in
+the AGSignal wheel and not exported from the AGSignal-branded public
+integration facade.
 
 ---
 
