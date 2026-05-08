@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -63,7 +64,17 @@ class _InMemoryRedisList:
 
 
 def _policy_dir_from_env() -> Path | None:
-    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR") or os.environ.get("UNS_POLICY_DIR")
+    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR")
+    if raw_path is None:
+        legacy = os.environ.get("UNS_POLICY_DIR")
+        if legacy is not None:
+            warnings.warn(
+                "UNS_POLICY_DIR is deprecated. Use AGSIGNAL_POLICY_DIR instead. "
+                "UNS_* aliases will be removed in v1.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            raw_path = legacy
     return Path(raw_path) if raw_path else None
 
 

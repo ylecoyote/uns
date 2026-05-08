@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import warnings
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, status
@@ -22,7 +23,19 @@ def _state_or_env(request: Request, state_name: str, env_name: str, legacy_env: 
     value = getattr(request.app.state, state_name, None)
     if value:
         return str(value)
-    return os.environ.get(env_name) or os.environ.get(legacy_env)
+    primary = os.environ.get(env_name)
+    if primary is not None:
+        return primary
+    legacy = os.environ.get(legacy_env)
+    if legacy is not None:
+        warnings.warn(
+            f"{legacy_env} is deprecated. Use {env_name} instead. "
+            f"UNS_* aliases will be removed in v1.0.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return legacy
+    return None
 
 
 def _state_or_env_bool(request: Request, state_name: str, env_name: str) -> bool:

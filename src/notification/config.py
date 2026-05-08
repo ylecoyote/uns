@@ -3,22 +3,43 @@
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass
 
 
-def _env(name: str, legacy_name: str, default: str | None = None) -> str | None:
-    return os.environ.get(name) or os.environ.get(legacy_name) or default
+def _legacy_warn(legacy_name: str, modern_name: str, *, stacklevel: int = 3) -> None:
+    warnings.warn(
+        f"{legacy_name} is deprecated. Use {modern_name} instead. "
+        f"UNS_* aliases will be removed in v1.0.",
+        DeprecationWarning,
+        stacklevel=stacklevel,
+    )
+
+
+def _env(
+    name: str,
+    legacy_name: str,
+    default: str | None = None,
+    *,
+    stacklevel: int = 3,
+) -> str | None:
+    value = os.environ.get(name)
+    if value is not None:
+        return value
+    legacy = os.environ.get(legacy_name)
+    if legacy is not None:
+        _legacy_warn(legacy_name, name, stacklevel=stacklevel + 1)
+        return legacy
+    return default
 
 
 def _env_int_pair(name: str, legacy_name: str, default: int) -> int:
-    raw = os.environ.get(name) or os.environ.get(legacy_name)
-    if raw is None:
-        return default
-    return int(raw)
+    raw = _env(name, legacy_name, stacklevel=4)
+    return int(raw) if raw is not None else default
 
 
 def _env_bool_pair(name: str, legacy_name: str, default: bool) -> bool:
-    raw = os.environ.get(name) or os.environ.get(legacy_name)
+    raw = _env(name, legacy_name, stacklevel=4)
     if raw is None:
         return default
     return raw.lower() in {"1", "true", "yes", "on"}
