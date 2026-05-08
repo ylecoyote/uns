@@ -10,8 +10,7 @@ Instrumentation is intentionally narrow:
   (the route's ``path`` attribute, not the raw URL — preventing cardinality
   explosion on path parameters like notification UUIDs).
 - Domain layer: signals and deliveries are counted at their canonical entry
-  points (see ``notification.routes``, ``notification.runtime``,
-  ``notification.service``).
+  points (see ``notification.routes`` and ``agsignal.signaling``).
 
 The ``/metrics`` endpoint is exposed unauthenticated by design — Prometheus
 scrapers do not present credentials. Operators MUST place AGSignal behind a

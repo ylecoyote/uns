@@ -1,22 +1,17 @@
 """Standalone HTTP routes for producing AGSignal notifications.
 
-Per Phase 2 Tasks 6/7, the write routes (``send_notification`` and
+Per Phase 2 Tasks 6/7/8, the write routes (``send_notification`` and
 ``simulate_notification``) are thin HTTP adapters that delegate to
 ``agsignal.signaling.*``. The route handlers contain only parameter
 parsing + observability + delegation + error translation. The websocket
 dispatch (replay store, connection manager, fanout publisher) remains in
 the route layer because the websocket runtime state is FastAPI-app-scoped
 and is a transport-layer concern.
-
-The ``_resolve_notification`` helper is retained at module scope for the
-legacy ``notification.runtime`` MCP runtime (the route handlers no longer
-use it). Task 8 retires ``notification.runtime`` and removes this helper.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -35,9 +30,7 @@ from notification.models import (
     Channel,
     DeliveryMode,
     DeliveryStatus,
-    Notification,
     NotificationIntent,
-    NotificationResult,
     Priority,
 )
 from notification.policies import (
@@ -48,7 +41,7 @@ from notification.policy_loader import (
     load_policies_from_directory,
     load_runtime_registry_from_directory,
 )
-from notification.sdk import NotificationSDK, ValidationError
+from notification.sdk import ValidationError
 from notification.websocket_runtime import (
     WebSocketConnectionManager,
     WebSocketFanoutEnvelope,
@@ -248,66 +241,6 @@ class PolicyReloadResponse(BaseModel):
     persisted_count: int = Field(description="Number of policies newly persisted")
     policy_count: int = Field(description="Number of policies active after reload")
     notification_types: list[str] = Field(description="Registered notification types")
-
-
-def _capture_delivery(
-    captured: dict[str, Notification],
-) -> Callable[[Notification], NotificationResult]:
-    """Build a delivery handler that captures the resolved notification.
-
-    Retained for the legacy ``notification.runtime`` MCP runtime; Task 8
-    retires that module and removes this helper alongside it.
-    """
-
-    def deliver(notification: Notification) -> NotificationResult:
-        captured["notification"] = notification
-        return NotificationResult(
-            notification_id=notification.notification_id,
-            status=DeliveryStatus.SUCCESS,
-            channels_attempted=notification.channels,
-            channels_succeeded=[],
-            channels_failed=[],
-        )
-
-    return deliver
-
-
-def _resolve_notification(
-    request: SendNotificationRequest,
-) -> tuple[NotificationResult, Notification]:
-    """Resolve a send-notification request via the SDK.
-
-    Retained for the legacy ``notification.runtime`` MCP runtime; the HTTP
-    write routes now delegate to :func:`agsignal.signaling.send_signal`
-    which carries its own resolver. Task 8 retires
-    ``notification.runtime`` and removes this helper.
-    """
-    captured: dict[str, Notification] = {}
-    sdk = NotificationSDK(delivery_handler=_capture_delivery(captured))
-
-    try:
-        result = sdk.send(
-            notification_type=request.notification_type,
-            intent=request.intent,
-            title=request.title,
-            message=request.message,
-            source=request.source,
-            autonomy_context=request.autonomy_context.to_domain(),
-            irreversible=request.irreversible,
-            metadata=request.metadata,
-            correlation_id=request.correlation_id,
-            delivery_mode_override=request.delivery_mode,
-            require_ack_override=request.require_ack,
-            priority_override=request.priority,
-            dedup_key=request.dedup_key,
-        )
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error": "validation_error", "message": str(exc)},
-        ) from exc
-
-    return result, captured["notification"]
 
 
 @router.post(

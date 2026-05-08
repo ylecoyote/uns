@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agsignal import signaling as agsignal_signaling
 from agsignal.queries import (
     get_ack_status as query_get_ack_status,
 )
@@ -31,13 +32,9 @@ from agsignal.queries import (
 from agsignal.queries import (
     list_invariants as query_list_invariants,
 )
-from agsignal_mcp.runtime import MCPRuntimeConfig
-from notification.acknowledgment import configure_ack_engine, get_ack_engine
-from notification.audit import create_ack_audit_record
-from notification.models import AckStatus, AutonomyMode, NotificationIntent
-from notification.runtime import RuntimeState
-from notification.runtime import send_signal as send_runtime_signal
-from notification.runtime import simulate_signal as simulate_runtime_signal
+from agsignal_mcp.runtime import MCPRuntimeConfig, RuntimeState
+from notification.models import AutonomyMode, NotificationIntent
+from notification.routes import SendNotificationRequest
 
 
 class SendSignalInput(BaseModel):
@@ -74,19 +71,22 @@ class AckNotificationInput(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-def _runtime_payload(payload: SendSignalInput) -> dict[str, Any]:
+def _signaling_request(payload: SendSignalInput) -> SendNotificationRequest:
+    """Build a :class:`SendNotificationRequest` from MCP tool input.
+
+    Drops MCP-transport-specific fields (``deliver``, ``operator_intent``,
+    ``operator_confirmation_token``) that gate delivery in the MCP layer
+    rather than belonging in the canonical service-layer request model.
+    """
+    # Note: keep this set in sync with MCP-only fields on SendSignalInput.
+    # SendNotificationRequest forbids extras, so any new MCP-only field that
+    # isn't excluded here will raise pydantic.ValidationError at request build
+    # time. Add the field to this set when you add it to SendSignalInput.
     data = payload.model_dump(
         exclude={"deliver", "operator_intent", "operator_confirmation_token"},
         exclude_none=True,
     )
-    return dict(data)
-
-
-def _get_ack_engine():
-    try:
-        return get_ack_engine()
-    except RuntimeError:
-        return configure_ack_engine()
+    return SendNotificationRequest.model_validate(data)
 
 
 def _json_safe(value: Any) -> Any:
@@ -105,25 +105,26 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-def simulate_signal(
+async def simulate_signal(
     payload: SendSignalInput,
     runtime_state: RuntimeState | None = None,
 ) -> dict[str, Any]:
     """Preview routing and policy behavior without delivery side effects."""
-    response = simulate_runtime_signal(runtime_state or RuntimeState(), _runtime_payload(payload))
+    del runtime_state  # simulate has no state-mutating side effects
+    response = await agsignal_signaling.simulate_signal(request=_signaling_request(payload))
     data = response.model_dump(mode="json")
     data["delivered"] = False
     return data
 
 
-def send_signal(
+async def send_signal(
     payload: SendSignalInput,
     runtime_state: RuntimeState | None = None,
     config: MCPRuntimeConfig | None = None,
 ) -> dict[str, Any]:
     """Preview or send an AGSignal signal through MCP."""
     if not payload.deliver:
-        return simulate_signal(payload, runtime_state=runtime_state)
+        return await simulate_signal(payload, runtime_state=runtime_state)
 
     active_config = config or MCPRuntimeConfig()
     if active_config.read_only:
@@ -136,13 +137,19 @@ def send_signal(
         if payload.operator_confirmation_token != active_config.delivery_confirmation_token:
             raise ValueError("send_signal delivery confirmation token is invalid")
 
-    response = send_runtime_signal(runtime_state or RuntimeState(), _runtime_payload(payload))
+    state = runtime_state or RuntimeState()
+    response = await agsignal_signaling.send_signal(
+        request=_signaling_request(payload),
+        audit_store=state.audit_store,
+        idempotency_store=state.idempotency_records,
+        transport_metadata={"runtime": "agsignal_mcp"},
+    )
     data = response.model_dump(mode="json")
     data["delivered"] = True
     return data
 
 
-def ack_notification(
+async def ack_notification(
     payload: AckNotificationInput,
     runtime_state: RuntimeState | None = None,
     config: MCPRuntimeConfig | None = None,
@@ -155,38 +162,24 @@ def ack_notification(
         raise ValueError("ack_notification requires an operator principal")
     if payload.acked_by is not None and payload.acked_by != active_config.operator_principal:
         raise ValueError("ack_notification acked_by must match the operator principal")
-    engine = _get_ack_engine()
-    before_commit = None
-    if runtime_state is not None:
-        def before_commit(old_status: AckStatus | None, ack_event) -> None:
-            runtime_state.audit_store.save_ack_audit(
-                create_ack_audit_record(
-                    notification_id=ack_event.notification_id,
-                    old_status=old_status,
-                    new_status=ack_event.ack_status,
-                    acked_by=ack_event.acked_by,
-                    acked_at=ack_event.acked_at,
-                    metadata=ack_event.metadata,
-                )
-            )
 
-    event = engine.ack(
+    state = runtime_state or RuntimeState()
+    response = await agsignal_signaling.acknowledge(
         notification_id=payload.notification_id,
-        ack_status=AckStatus.ACKED,
         acked_by=active_config.operator_principal,
         metadata=payload.metadata,
-        before_commit=before_commit,
+        audit_store=state.audit_store,
     )
     return {
-        "notification_id": str(event.notification_id),
-        "ack_status": event.ack_status.value,
-        "acked_by": event.acked_by,
-        "acked_at": event.acked_at.isoformat(),
-        "metadata": event.metadata,
+        "notification_id": str(response.notification_id),
+        "ack_status": response.ack_status.value,
+        "acked_by": response.acked_by,
+        "acked_at": response.acked_at.isoformat(),
+        "metadata": response.metadata,
     }
 
 
-def dismiss_notification(
+async def dismiss_notification(
     payload: AckNotificationInput,
     runtime_state: RuntimeState | None = None,
     config: MCPRuntimeConfig | None = None,
@@ -199,34 +192,20 @@ def dismiss_notification(
         raise ValueError("dismiss_notification requires an operator principal")
     if payload.acked_by is not None and payload.acked_by != active_config.operator_principal:
         raise ValueError("dismiss_notification acked_by must match the operator principal")
-    engine = _get_ack_engine()
-    before_commit = None
-    if runtime_state is not None:
-        def before_commit(old_status: AckStatus | None, ack_event) -> None:
-            runtime_state.audit_store.save_ack_audit(
-                create_ack_audit_record(
-                    notification_id=ack_event.notification_id,
-                    old_status=old_status,
-                    new_status=ack_event.ack_status,
-                    acked_by=ack_event.acked_by,
-                    acked_at=ack_event.acked_at,
-                    metadata=ack_event.metadata,
-                )
-            )
 
-    event = engine.ack(
+    state = runtime_state or RuntimeState()
+    response = await agsignal_signaling.dismiss(
         notification_id=payload.notification_id,
-        ack_status=AckStatus.DISMISSED,
-        acked_by=active_config.operator_principal,
+        dismissed_by=active_config.operator_principal,
         metadata=payload.metadata,
-        before_commit=before_commit,
+        audit_store=state.audit_store,
     )
     return {
-        "notification_id": str(event.notification_id),
-        "ack_status": event.ack_status.value,
-        "acked_by": event.acked_by,
-        "acked_at": event.acked_at.isoformat(),
-        "metadata": event.metadata,
+        "notification_id": str(response.notification_id),
+        "ack_status": response.ack_status.value,
+        "acked_by": response.acked_by,
+        "acked_at": response.acked_at.isoformat(),
+        "metadata": response.metadata,
     }
 
 
