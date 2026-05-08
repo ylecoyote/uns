@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from agsignal._in_memory import InMemoryRedisList
 from agsignal.responses import SendNotificationResponse
 from notification.audit import AuditStore, InMemoryAuditStore
 from notification.channel_health import ChannelHealthTracker
@@ -22,35 +23,6 @@ class MCPRuntimeConfig:
     require_delivery_confirmation: bool = True
     operator_principal: str | None = None
     delivery_confirmation_token: str | None = None
-
-
-class InMemoryRedisList:
-    """Minimal Redis-list compatible store for local runtime helpers."""
-
-    def __init__(self) -> None:
-        self.values: list[str] = []
-
-    def lpush(self, key: str, value: str) -> int:
-        self.values.insert(0, value)
-        return len(self.values)
-
-    def lrange(self, key: str, start: int, end: int) -> list[str]:
-        stop = None if end == -1 else end + 1
-        return self.values[start:stop]
-
-    def lrem(self, key: str, count: int, value: str) -> int:
-        removed = 0
-        next_values = []
-        for item in self.values:
-            if item == value and (count == 0 or removed < count):
-                removed += 1
-                continue
-            next_values.append(item)
-        self.values = next_values
-        return removed
-
-    def llen(self, key: str) -> int:
-        return len(self.values)
 
 
 @dataclass
