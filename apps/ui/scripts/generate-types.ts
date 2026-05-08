@@ -18,9 +18,9 @@ const REPO_ROOT = join(ROOT, "..", "..");
 const OUT_FILE = join(ROOT, "src", "types", "generated.ts");
 
 async function main(): Promise<void> {
-  console.log("Exporting OpenAPI spec from mcp_server.app via uv run python...");
+  console.log("Exporting OpenAPI spec from agsignal.app via uv run python...");
   const specJson = execSync(
-    `uv run python -c "import os, json; os.environ['AGSIGNAL_ENABLE_DOCS']='true'; from mcp_server.app import create_app; print(json.dumps(create_app(skip_persistence_config=True).openapi()))"`,
+    `uv run python -c "import os, json; os.environ['AGSIGNAL_ENABLE_DOCS']='true'; from agsignal.app import create_app; print(json.dumps(create_app(skip_persistence_config=True).openapi()))"`,
     { cwd: REPO_ROOT, stdio: ["ignore", "pipe", "inherit"], maxBuffer: 32 * 1024 * 1024 },
   ).toString();
 

@@ -1,10 +1,10 @@
 """Tests for notification API routes.
 
 Tests the ack/status endpoints per PRD Task 10:
-- POST /v1/notifications/{id}/ack
-- POST /v1/notifications/{id}/dismiss
-- GET /v1/notifications/{id}
-- GET /v1/notifications/{id}/ack-status
+- POST /api/v1/notifications/{id}/ack
+- POST /api/v1/notifications/{id}/dismiss
+- GET /api/v1/notifications/{id}
+- GET /api/v1/notifications/{id}/ack-status
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_server.app import create_app
+from agsignal.app import create_app
 from notification.acknowledgment import (
     InMemoryAckStorage,
     configure_ack_engine,
@@ -94,7 +94,7 @@ def register_notification_with_engine(engine, notification: Notification) -> Non
 
 
 class TestAckEndpoint:
-    """Tests for POST /v1/notifications/{id}/ack"""
+    """Tests for POST /api/v1/notifications/{id}/ack"""
 
     def test_ack_notification_success(
         self,
@@ -106,7 +106,7 @@ class TestAckEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user", "metadata": {"reason": "reviewed"}},
         )
 
@@ -128,7 +128,7 @@ class TestAckEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
         )
 
         assert response.status_code == 200
@@ -147,14 +147,14 @@ class TestAckEndpoint:
 
         # First ack
         response1 = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user"},
         )
         assert response1.status_code == 200
 
         # Second ack (idempotent)
         response2 = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user"},
         )
         assert response2.status_code == 200
@@ -169,7 +169,7 @@ class TestAckEndpoint:
         fake_id = uuid4()
 
         response = client.post(
-            f"/v1/notifications/{fake_id}/ack",
+            f"/api/v1/notifications/{fake_id}/ack",
             json={"acked_by": "test_user"},
         )
 
@@ -193,7 +193,7 @@ class TestAckEndpoint:
         )
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user"},
         )
 
@@ -204,7 +204,7 @@ class TestAckEndpoint:
 
 
 class TestDismissEndpoint:
-    """Tests for POST /v1/notifications/{id}/dismiss"""
+    """Tests for POST /api/v1/notifications/{id}/dismiss"""
 
     def test_dismiss_notification_success(
         self,
@@ -216,7 +216,7 @@ class TestDismissEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/dismiss",
+            f"/api/v1/notifications/{sample_notification.notification_id}/dismiss",
             json={"dismissed_by": "test_user", "metadata": {"reason": "not relevant"}},
         )
 
@@ -236,7 +236,7 @@ class TestDismissEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/dismiss",
+            f"/api/v1/notifications/{sample_notification.notification_id}/dismiss",
         )
 
         assert response.status_code == 200
@@ -256,7 +256,7 @@ class TestDismissEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = unauthenticated_client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user"},
         )
 
@@ -272,7 +272,7 @@ class TestDismissEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "other_user"},
         )
 
@@ -289,7 +289,7 @@ class TestDismissEndpoint:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/ack",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack",
             json={"acked_by": "test_user"},
         )
 
@@ -311,7 +311,7 @@ class TestDismissEndpoint:
         )
 
         response = client.post(
-            f"/v1/notifications/{sample_notification.notification_id}/dismiss",
+            f"/api/v1/notifications/{sample_notification.notification_id}/dismiss",
             json={"dismissed_by": "test_user"},
         )
 
@@ -322,7 +322,7 @@ class TestDismissEndpoint:
 
 
 class TestGetNotificationStatus:
-    """Tests for GET /v1/notifications/{id}"""
+    """Tests for GET /api/v1/notifications/{id}"""
 
     def test_get_status_found(
         self,
@@ -334,7 +334,7 @@ class TestGetNotificationStatus:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.get(
-            f"/v1/notifications/{sample_notification.notification_id}",
+            f"/api/v1/notifications/{sample_notification.notification_id}",
         )
 
         assert response.status_code == 200
@@ -357,7 +357,7 @@ class TestGetNotificationStatus:
         )
 
         response = client.get(
-            f"/v1/notifications/{sample_notification.notification_id}",
+            f"/api/v1/notifications/{sample_notification.notification_id}",
         )
 
         assert response.status_code == 200
@@ -372,7 +372,7 @@ class TestGetNotificationStatus:
         """Test getting status of non-existent notification."""
         fake_id = uuid4()
 
-        response = client.get(f"/v1/notifications/{fake_id}")
+        response = client.get(f"/api/v1/notifications/{fake_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -382,7 +382,7 @@ class TestGetNotificationStatus:
 
 
 class TestGetAckStatus:
-    """Tests for GET /v1/notifications/{id}/ack-status"""
+    """Tests for GET /api/v1/notifications/{id}/ack-status"""
 
     def test_get_ack_status_pending(
         self,
@@ -394,7 +394,7 @@ class TestGetAckStatus:
         register_notification_with_engine(engine, sample_notification)
 
         response = client.get(
-            f"/v1/notifications/{sample_notification.notification_id}/ack-status",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack-status",
         )
 
         assert response.status_code == 200
@@ -416,7 +416,7 @@ class TestGetAckStatus:
         )
 
         response = client.get(
-            f"/v1/notifications/{sample_notification.notification_id}/ack-status",
+            f"/api/v1/notifications/{sample_notification.notification_id}/ack-status",
         )
 
         assert response.status_code == 200
@@ -431,7 +431,7 @@ class TestGetAckStatus:
         """Test getting ack status for untracked notification."""
         fake_id = uuid4()
 
-        response = client.get(f"/v1/notifications/{fake_id}/ack-status")
+        response = client.get(f"/api/v1/notifications/{fake_id}/ack-status")
 
         assert response.status_code == 200
         data = response.json()
@@ -447,4 +447,7 @@ class TestHealthEndpoint:
         response = client.get("/health")
 
         assert response.status_code == 200
-        assert response.json() == {"status": "healthy"}
+        body = response.json()
+        assert body["status"] == "alive"
+        assert body["service"] == "agsignal"
+        assert "version" in body

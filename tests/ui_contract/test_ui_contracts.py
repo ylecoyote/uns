@@ -21,6 +21,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from agsignal.app import create_app
 from agsignal.responses import (
     AuditEvent,
     AuditEventType,
@@ -43,7 +44,6 @@ from agsignal.responses import (
 from agsignal.responses import (
     UIErrorResponse as ErrorResponse,
 )
-from mcp_server.app import create_app
 from mcp_server.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,

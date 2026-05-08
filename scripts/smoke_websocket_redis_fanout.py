@@ -106,7 +106,7 @@ def run_smoke(
     }
     with _patched_env(env):
         from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
-        from notification.main import create_app
+        from agsignal.app import create_app
 
         configure_ack_engine(storage=InMemoryAckStorage())
         consumer_app = create_app()

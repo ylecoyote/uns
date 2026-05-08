@@ -264,7 +264,7 @@ class TestHealthEndpointDocumented:
     def test_documents_response_format(self, observability_doc: str) -> None:
         """Verify response format is documented."""
         assert '"status"' in observability_doc
-        assert '"healthy"' in observability_doc
+        assert '"alive"' in observability_doc
 
     def test_documents_implementation_limitations(self, observability_doc: str) -> None:
         """Verify that limitations are documented."""

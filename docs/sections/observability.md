@@ -92,33 +92,41 @@ results = await registry.health_check_all()
 
 ### Current Implementation
 
-The HTTP health endpoint is located at `GET /health`:
+The HTTP health endpoint is located at `GET /health` (also aliased to `/healthz`):
 
 ```python
-# src/mcp_server/app.py
+# src/agsignal/app.py
 @app.get("/health")
-async def health_check() -> dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "healthy"}
+@app.get("/healthz")
+async def health() -> dict[str, str]:
+    return {
+        "status": "alive",
+        "service": "agsignal",
+        "version": __version__,
+    }
 ```
 
 ### Endpoint Semantics
 
-**Current behavior**: The `/health` endpoint returns a static `{"status": "healthy"}` response. It does NOT currently:
-- Invoke adapter health checks
-- Check DLQ depth
+Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}`. Post-Phase-3 it returns `{"status": "alive", "service": "agsignal", "version": ...}` with both liveness and identity. The endpoint does NOT invoke adapter health checks — those live at `/readyz`.
+
+It does NOT currently:
+- Invoke adapter health checks (use `/readyz` instead)
+- Check DLQ depth (surfaced in `/readyz`)
 - Verify pending acknowledgment timeouts
-- Report per-channel status
+- Report per-channel status (use `/readyz` for `channels_configured`)
 
 **Response format**:
 
 ```json
 {
-  "status": "healthy"
+  "status": "alive",
+  "service": "agsignal",
+  "version": "..."
 }
 ```
 
-**Important**: The current `/health` endpoint is a minimal stub for load balancer health checks. For comprehensive system health, use the adapter registry's `health_check_all()` method programmatically.
+**Important**: The `/health` endpoint is a minimal liveness probe for load balancer health checks. For comprehensive system readiness (adapter reachability, DLQ depth, channel configuration), call `/readyz`.
 
 ### Future Considerations
 
@@ -411,7 +419,7 @@ Every delivery (success or failure) MUST generate an audit record containing:
 | Aspect | Description | Implementation Status |
 |--------|-------------|----------------------|
 | **Adapter health** | Per-channel HEALTHY/DEGRADED/UNHEALTHY | Implemented |
-| **/health endpoint** | Returns static `{"status": "healthy"}` | Minimal stub |
+| **/health endpoint** | Returns liveness payload `{"status": "alive", "service": "agsignal", "version": ...}` | Minimal stub (liveness only) |
 | **DLQ visibility** | Via escalation callback | Operator-implemented |
 | **Delivery metrics** | Via logging and audit callbacks | Implemented |
 | **Ack timeout tracking** | Via AcknowledgmentEngine | Implemented |

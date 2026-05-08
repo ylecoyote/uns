@@ -42,7 +42,7 @@ def build_notification_payload(agent_id: UUID) -> dict[str, object]:
 def run_smoke() -> dict[str, Any]:
     """Run the reconnect replay smoke and return a compact result."""
     from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
-    from notification.main import create_app
+    from agsignal.app import create_app
 
     configure_ack_engine(storage=InMemoryAckStorage())
     app = create_app()
