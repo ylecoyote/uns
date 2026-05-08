@@ -1,10 +1,21 @@
-"""AGSignal public API aliases.
+"""AGSignal public API.
 
-The implementation currently lives in the historical ``notification`` package.
-These aliases provide AGSignal-branded imports without breaking existing users.
+The implementation lives across ``agsignal.signaling`` (write),
+``agsignal.queries`` (read), ``agsignal.sdk`` (high-level client), and
+``agsignal.policies`` / ``agsignal.models`` / ``agsignal.interfaces``. Some
+domain types still live under ``notification.*``; those are re-exported
+here so SDK consumers and operators can import exclusively from
+``agsignal.*``.
 
-Every public symbol exposed by ``notification.__all__`` is re-exported here so
-SDK consumers and operators can import exclusively from ``agsignal.*``.
+This module re-exports the symbols intended for direct ``from agsignal
+import …`` consumption. Service-layer write functions (``send_signal``,
+``simulate_signal``, ``acknowledge``, ``dismiss``) are exported because
+they parallel the ``SignalClient`` SDK affordance — callers reach for the
+canonical implementation without dropping into ``agsignal.signaling.X``.
+Service-layer read functions (``get_invariants_summary``, ``list_deliveries``,
+etc.) are NOT exported at the top level — reach for them as
+``agsignal.queries.X``. The console/operational nature of read access is
+intentional in the import path.
 """
 
 # Re-exports forwarded through the agsignal-branded shim modules.
@@ -54,6 +65,16 @@ from agsignal.sdk import (
     configure_signal_client,
     create_signal_client,
     get_signal_client,
+)
+
+# Service-layer write functions (canonical implementations behind the SDK).
+# Read functions stay scoped to agsignal.queries by design — see module
+# docstring for the rationale.
+from agsignal.signaling import (
+    acknowledge,
+    dismiss,
+    send_signal,
+    simulate_signal,
 )
 
 # Direct re-exports from notification.* (no agsignal-side shim yet).
@@ -171,6 +192,7 @@ __all__ = [
     "SignalIntent",
     "SignalPolicy",
     "ValidationError",
+    "acknowledge",
     "apply_policy_delta",
     "canonical_config_json",
     "compute_config_hash",
@@ -182,6 +204,7 @@ __all__ = [
     "create_audit_record",
     "create_sdk",
     "create_signal_client",
+    "dismiss",
     "get_audit_logger",
     "get_default_ack_timeout",
     "get_default_ack_timeout_minutes",
@@ -196,5 +219,7 @@ __all__ = [
     "resolve_channels",
     "resolve_delivery_mode",
     "resolve_require_ack",
+    "send_signal",
     "set_default_registry",
+    "simulate_signal",
 ]
