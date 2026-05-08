@@ -18,7 +18,8 @@ etc.) are NOT exported at the top level — reach for them as
 intentional in the import path.
 """
 
-# Re-exports forwarded through the agsignal-branded shim modules.
+# Sub-module access for the canonical service layer
+# (agsignal.queries.foo / agsignal.signaling.foo).
 from agsignal import (
     queries,  # noqa: F401  (sub-module access via agsignal.queries.foo)
     signaling,  # noqa: F401  (sub-module access via agsignal.signaling.foo)

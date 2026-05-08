@@ -385,17 +385,18 @@ def _persist_ack_audit(
 ) -> None:
     """Persist an ack audit row before the engine commits the state transition.
 
-    Mirrors the route-layer ``_persist_ack_audit`` helper at
-    ``mcp_server/routes_notification.py:343-382`` but raises the typed
-    :class:`AuditPersistenceError` instead of a FastAPI ``HTTPException`` —
-    the route layer translates the typed error to a 503. Task 7 deletes
-    the duplicate route-side helper once both write routes delegate here.
+    Service-layer twin of the route-layer ``_persist_ack_audit`` helper in
+    ``mcp_server.routes_notification``: this raises the typed
+    :class:`AuditPersistenceError` while the route-layer helper translates
+    that error to HTTP 503. The route-layer helper continues to exist
+    because it owns the HTTP-status translation responsibility; this one
+    is the canonical service-layer call for both transports.
 
     The ``audit_store`` parameter is typed ``AuditStore | None`` and the
     isinstance guard preserved for parity with the route-layer helper that
     sources the store via ``getattr(request.app.state, ...)`` (which can
-    return ``None``). All Phase 2 callers pass a non-``None`` store, so the
-    guard is effectively dead but kept to ease verbatim Task 7 deletion.
+    return ``None``). All current callers pass a non-``None`` store, so the
+    guard is effectively dead but kept for defense-in-depth.
     """
     # Idempotent re-ack: no transition, no audit row written.
     if old_status == new_status:
@@ -428,11 +429,10 @@ def _resolve_notification(
 ) -> tuple[NotificationResult, Notification]:
     """Resolve a send-notification request into a (result, notification) pair.
 
-    Mirrors :func:`notification.routes._resolve_notification` but raises the
-    typed :class:`notification.sdk.ValidationError` directly instead of a
-    FastAPI ``HTTPException``. The route layer catches the typed error and
-    translates to 422. Task 7 deletes the route-side duplicate after the
-    route adapter delegates to this module.
+    Canonical service-layer resolver. Raises the typed
+    :class:`notification.sdk.ValidationError` directly instead of a FastAPI
+    ``HTTPException``; the route layer catches the typed error and
+    translates to HTTP 422.
     """
     captured: dict[str, Notification] = {}
 
