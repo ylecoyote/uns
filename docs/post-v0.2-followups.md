@@ -65,6 +65,59 @@ delivery code into a stable home, making this unification land cleanly.
 
 ---
 
+### F-2. `list_invariants` swallows broad `Exception` and silently returns empty; transport-coupled error reporting
+
+**Surfaced during:** Phase 3 final review (2026-05-08).
+
+**Observation:** `agsignal.queries.list_invariants` at
+`src/agsignal/queries.py:571-591` catches `Exception` and falls through
+to an empty `InvariantListResponse(items=[], ...)` response with HTTP
+status 200, after recording an error metric against the
+`/ui/invariants` endpoint string.
+
+Two problems:
+
+1. **Silent failure on malformed input.** A malformed `invariants.yml`,
+   a `pydantic.ValidationError`, or any other exception during invariant
+   loading returns an empty dashboard with no operator-visible signal.
+   Pre-Phase-3 the legacy route had the same behavior (Phase 3 verbatim-
+   relocated the function), so this is not a Phase 3 regression — but
+   Phase 3 made `list_invariants` the canonical implementation that the
+   MCP tool also calls. Silent failure on the MCP transport is worse
+   than on HTTP because there's no observability middleware to record
+   the failure.
+
+2. **Transport coupling.** The hard-coded `endpoint="/ui/invariants"`
+   string in the service layer leaks HTTP-route detail into a function
+   that two transports call. The MCP tool's `list_invariants` records
+   errors against the `/ui/invariants` HTTP endpoint string, which is
+   misleading.
+
+**Fix shape (when picked up):**
+
+1. Decide on the failure-mode contract: should `list_invariants` raise
+   a typed domain error (e.g., `InvariantsLoadError`) that the route
+   layer translates to a 5xx, or continue to return empty with a
+   structured warning the caller can detect?
+2. If raising a typed error, drop the `record_endpoint_error` call
+   from the service layer and let the route adapter record the metric
+   with its actual endpoint string. The MCP transport records its own
+   way.
+3. If keeping the empty fallback, surface a structured warning in the
+   response (e.g., a `loader_status` field) so consumers can
+   distinguish "no invariants configured" from "loader failed."
+4. The trailing `else: logger.warning("Invariants file not found")`
+   branch (`queries.py:566-591`) flows past the `try`/`except` and
+   hits the empty fallback — the logic flow is non-obvious. Either
+   return from the `else` branch directly or hoist the empty response
+   above the `if`.
+
+**Estimated effort:** half a day. **Risk:** low — this is an
+error-path behavior change. **Pre-req:** none; can land any time
+post-v0.2.
+
+---
+
 ## Done
 
 (none yet)
