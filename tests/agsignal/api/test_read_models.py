@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     AuditEventFilter,
     DeliveryFilter,
     DeliverySummary,
@@ -461,7 +461,7 @@ class TestGlobalConfiguration:
     def test_get_read_model_adapter_default(self):
         """Test default adapter is InMemoryReadModelAdapter."""
         # Reset global state
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
 
         rm._read_model_adapter = None
 
@@ -700,9 +700,9 @@ class TestSQLAlchemyAdapter:
         from sqlalchemy import create_engine, event
         from sqlalchemy.orm import sessionmaker
 
+        from agsignal.api.read_models import SQLAlchemyReadModelAdapter
         from db.models import AckAuditRecord as AckAuditRecordDB
         from db.models import Base, NotificationAuditRecord
-        from mcp_server.read_models import SQLAlchemyReadModelAdapter
 
         engine = create_engine(f"sqlite:///{tmp_path / 'audit-pagination.db'}")
         Base.metadata.create_all(engine)

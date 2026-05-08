@@ -148,10 +148,10 @@ jobs:
         run: |
           /tmp/full-install/bin/python <<'PYEOF'
           import agsignal
+          import agsignal.api
           import agsignal_mcp
           import notification
           import db
-          import mcp_server
           import ui_client
           from agsignal.app import create_app
           from agsignal_mcp import create_mcp_server

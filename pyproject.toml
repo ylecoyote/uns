@@ -98,7 +98,7 @@ Documentation = "https://github.com/ylecoyote/agsignal#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["agsignal*", "agsignal_mcp*", "notification*", "mcp_server*", "db*", "ui_client*"]
+include = ["agsignal*", "agsignal_mcp*", "notification*", "db*", "ui_client*"]
 
 [tool.setuptools.package-data]
 # Ship PEP 561 type-information markers in every package so downstream
@@ -146,7 +146,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agsignal", "notification", "mcp_server", "db", "apps"]
+known-first-party = ["agsignal", "notification", "db", "apps"]
 
 [tool.mypy]
 python_version = "3.10"

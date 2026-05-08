@@ -25,6 +25,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from agsignal.api.auth import WritePrincipal, require_write_principal, resolve_requested_actor
 from agsignal.queries import get_ack_status as _query_ack_status
 from agsignal.queries import get_engine
 from agsignal.queries import get_notification_status as _query_notification_status
@@ -39,7 +40,6 @@ from agsignal.responses import (
     NotificationErrorResponse as ErrorResponse,
 )
 from agsignal.signaling import acknowledge, dismiss
-from mcp_server.auth import WritePrincipal, require_write_principal, resolve_requested_actor
 from notification.acknowledgment import InvalidAckTransitionError
 from notification.audit import AuditPersistenceError
 
@@ -249,7 +249,7 @@ def create_notification_router() -> APIRouter:
 
 
 # Re-export for backward compatibility. External callers that did
-# ``from mcp_server.routes_notification import AckRequest`` (etc.) continue
+# ``from agsignal.api.routes_notification import AckRequest`` (etc.) continue
 # to work; the canonical home is now ``agsignal.responses``.
 __all__ = [
     "AckRequest",

@@ -42,11 +42,11 @@ import uvicorn
 from fastapi import FastAPI
 
 from agsignal._in_memory import InMemoryRedisList
+from agsignal.api.auth import configure_cors
+from agsignal.api.observability import ObservabilityMiddleware
+from agsignal.api.routes_notification import router as ack_router
+from agsignal.api.routes_ui import router as ui_router
 from db.policy_store import SQLAlchemyPolicyStore
-from mcp_server.auth import configure_cors
-from mcp_server.observability import ObservabilityMiddleware
-from mcp_server.routes_notification import router as ack_router
-from mcp_server.routes_ui import router as ui_router
 from notification import __version__
 from notification.audit import AuditStore, InMemoryAuditStore
 from notification.channel_health import ChannelHealthTracker
@@ -112,7 +112,7 @@ def _configure_persistence() -> None:
     is set, in-memory otherwise. ``AGSIGNAL_CREATE_TABLES=true`` enables
     schema creation for first-run bootstrap.
     """
-    from mcp_server.read_models import (
+    from agsignal.api.read_models import (
         InMemoryReadModelAdapter,
         configure_read_model_adapter,
         create_sqlalchemy_adapter,
@@ -317,7 +317,7 @@ def create_app(
     @app.get("/ready", tags=["system"])
     @app.get("/readyz", tags=["system"])
     async def ready() -> dict[str, Any]:
-        from mcp_server.read_models import get_read_model_adapter
+        from agsignal.api.read_models import get_read_model_adapter
         from notification.audit import get_audit_logger
         try:
             read_model_adapter = type(get_read_model_adapter()).__name__

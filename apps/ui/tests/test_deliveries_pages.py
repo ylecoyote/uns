@@ -19,7 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.ui.app import create_ui_app
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )

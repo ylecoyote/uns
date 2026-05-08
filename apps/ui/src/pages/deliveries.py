@@ -20,7 +20,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from mcp_server.read_models import DeliveryFilter, get_read_model_adapter
+from agsignal.api.read_models import DeliveryFilter, get_read_model_adapter
 from notification.models import (
     AutonomyMode,
     Channel,

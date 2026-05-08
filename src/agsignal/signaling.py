@@ -386,7 +386,7 @@ def _persist_ack_audit(
     """Persist an ack audit row before the engine commits the state transition.
 
     Service-layer twin of the route-layer ``_persist_ack_audit`` helper in
-    ``mcp_server.routes_notification``: this raises the typed
+    ``agsignal.api.routes_notification``: this raises the typed
     :class:`AuditPersistenceError` while the route-layer helper translates
     that error to HTTP 503. The route-layer helper continues to exist
     because it owns the HTTP-status translation responsibility; this one
