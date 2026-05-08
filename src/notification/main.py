@@ -11,6 +11,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from agsignal._in_memory import InMemoryRedisList
 from db.policy_store import SQLAlchemyPolicyStore
 from mcp_server.auth import configure_cors
 from mcp_server.routes_notification import router as acknowledgment_router
@@ -32,35 +33,6 @@ from notification.websocket_runtime import (
     WebSocketReplayStore,
     websocket_endpoint,
 )
-
-
-class _InMemoryRedisList:
-    """Minimal Redis-list compatible store for standalone local operation."""
-
-    def __init__(self) -> None:
-        self.values: list[str] = []
-
-    def lpush(self, key: str, value: str) -> int:
-        self.values.insert(0, value)
-        return len(self.values)
-
-    def lrange(self, key: str, start: int, end: int) -> list[str]:
-        stop = None if end == -1 else end + 1
-        return self.values[start:stop]
-
-    def lrem(self, key: str, count: int, value: str) -> int:
-        removed = 0
-        next_values = []
-        for item in self.values:
-            if item == value and (count == 0 or removed < count):
-                removed += 1
-                continue
-            next_values.append(item)
-        self.values = next_values
-        return removed
-
-    def llen(self, key: str) -> int:
-        return len(self.values)
 
 
 def _policy_dir_from_env() -> Path | None:
@@ -127,7 +99,7 @@ def create_app(
 
     install_rate_limiter(app)
     config = get_notification_config()
-    app.state.dlq_service = dlq_service or DLQService(redis_client=_InMemoryRedisList())
+    app.state.dlq_service = dlq_service or DLQService(redis_client=InMemoryRedisList())
     app.state.policy_store = policy_store
     app.state.audit_store = audit_store or InMemoryAuditStore()
     tracker = channel_health_tracker or ChannelHealthTracker()
