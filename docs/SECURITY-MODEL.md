@@ -74,7 +74,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   Without `AGSIGNAL_API_KEY` configured, every write returns 503. With it
   configured, callers must supply `Authorization: Bearer <key>` (or
   `X-AGSignal-API-Key` / `X-UNS-API-Key` headers); HMAC-compared with timing
-  safety. Source: `src/mcp_server/auth.py`.
+  safety. Source: `src/agsignal/api/auth.py`.
 - **Status:** ✅ Mitigated.
 
 ### T2 — Audit identity forgery
@@ -113,7 +113,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   (`AGSIGNAL_ALLOWED_ORIGINS`, defaulting to dev-server origins). Methods are
   restricted to `GET, POST, OPTIONS`; `allow_credentials=False`. Combined with
   Bearer-token auth (which is not automatically attached by browsers cross-
-  origin), CSRF surface is minimal. Source: `src/mcp_server/auth.py:configure_cors`.
+  origin), CSRF surface is minimal. Source: `src/agsignal/api/auth.py:configure_cors`.
 - **Status:** ✅ Mitigated.
 
 ### T5 — Replay attack
@@ -138,7 +138,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   endpoint — the audit row is persisted before the engine state mutates;
   audit failure surfaces as 503 and the state is not advanced. DB credentials
   for AGSignal should be scoped to INSERT/SELECT on audit tables only (no
-  UPDATE/DELETE). Source: `src/mcp_server/routes_notification.py`.
+  UPDATE/DELETE). Source: `src/agsignal/api/routes_notification.py`.
 - **Status:** ⚠ Partially mitigated. **Roadmap:** tamper-evident audit
   chain (Merkle log or signed audit trail) is not implemented in v0.1. An
   attacker with direct DB write privileges can rewrite history — AGSignal
@@ -150,7 +150,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   filters and an inflated cursor, forcing the process to load and sort the
   full audit history in memory.
 - **Mitigation:** All read queries push `LIMIT` and `ORDER BY` into SQL
-  (`mcp_server/read_models.py`); no in-memory full-table sort. Pagination
+  (`agsignal/api/read_models.py`); no in-memory full-table sort. Pagination
   cursor offset is capped and validated. Combined with auth (T1), only
   authenticated callers can issue these queries. **Plus** an API-level
   rate limiter (slowapi-backed; default 1000/minute per principal or IP)
@@ -167,7 +167,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   to plan an attack.
 - **Mitigation:** All three endpoints are gated behind `AGSIGNAL_ENABLE_DOCS`,
   which defaults to **off**. `DEPLOYMENT.md` also recommends an explicit
-  reverse-proxy block as defense in depth. Source: `src/mcp_server/app.py`,
+  reverse-proxy block as defense in depth. Source: `src/agsignal/api/app.py`,
   `src/notification/main.py`.
 - **Status:** ✅ Mitigated by default.
 
@@ -178,7 +178,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   and propagates to log aggregation.
 - **Mitigation (partial):** Structured logging with field allowlists for
   most paths. **Gap:** raw `request.query_params` is logged at INFO in
-  `mcp_server/observability.py`. Operator must configure log-aggregator
+  `agsignal/api/observability.py`. Operator must configure log-aggregator
   redaction rules (denylist any field containing `token`, `key`, `secret`,
   `auth`) until the source-side fix lands.
 - **Status:** ⚠ Partially mitigated. **Roadmap:** source-side query-string

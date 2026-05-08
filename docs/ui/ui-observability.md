@@ -153,7 +153,7 @@ INFO - UI request completed [request_id=req-abc123 endpoint=/ui/deliveries metho
 ### Using Structured Logger
 
 ```python
-from mcp_server.observability import get_structured_logger, log_endpoint_call
+from agsignal.api.observability import get_structured_logger, log_endpoint_call
 
 logger = get_structured_logger(__name__)
 
@@ -266,7 +266,7 @@ For log aggregation systems (e.g., Loki, Elasticsearch):
 The default in-memory collector is suitable for testing:
 
 ```python
-from mcp_server.observability import configure_metrics_collector, MetricsCollector
+from agsignal.api.observability import configure_metrics_collector, MetricsCollector
 
 # Use default in-memory collector
 collector = configure_metrics_collector()
@@ -347,7 +347,7 @@ curl -i -H "X-Request-ID: test-123" http://localhost:8000/ui/deliveries | grep X
 ### Testing Metrics Collection
 
 ```python
-from mcp_server.observability import get_metrics_collector
+from agsignal.api.observability import get_metrics_collector
 
 # After making requests, inspect collected metrics
 collector = get_metrics_collector()
@@ -381,10 +381,10 @@ curl http://localhost:8000/ui/deliveries
 
 ```bash
 # Run all observability tests
-pytest tests/mcp_server/test_observability.py -v
+pytest tests/agsignal/api/test_observability.py -v
 
 # Run specific test class
-pytest tests/mcp_server/test_observability.py::TestMetricsForAllEndpoints -v
+pytest tests/agsignal/api/test_observability.py::TestMetricsForAllEndpoints -v
 ```
 
 ## Related Documentation

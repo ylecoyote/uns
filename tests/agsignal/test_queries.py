@@ -15,7 +15,7 @@ async def test_get_invariants_summary_returns_invariant_response_shape() -> None
     result = await get_invariants_summary()
 
     # Mirror the assertions of the existing route smoke test for parity.
-    # See tests/mcp_server/test_routes_ui_smoke_critical.py::test_smoke_invariants_summary_endpoint
+    # See tests/agsignal/api/test_routes_ui_smoke_critical.py::test_smoke_invariants_summary_endpoint
     # and tests/ui_contract/test_ui_contracts.py::TestInvariantsSummaryContract.
     assert hasattr(result, "total_count")
     assert hasattr(result, "by_status")

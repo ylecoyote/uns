@@ -319,7 +319,7 @@ Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md)
 ## Boundary Rules
 
 The intended canonical UI boundary is a **React SPA** served by Vite, with
-backend JSON APIs in `src/mcp_server/`. The current tree still contains Python
+backend JSON APIs in `src/agsignal/api/`. The current tree still contains Python
 UI compatibility artifacts under `apps/ui/`; treat them as migration debt until
 they are moved or explicitly exempted.
 
@@ -335,7 +335,7 @@ they are moved or explicitly exempted.
 
 Python files currently remain under `apps/ui/` for compatibility tests and
 migration support. New public UI work should use the React/TypeScript stack and
-keep backend logic in `src/mcp_server/`.
+keep backend logic in `src/agsignal/api/`.
 
 ### Migration Guidance
 
@@ -343,8 +343,8 @@ If you have Python files that need to be migrated:
 
 | What | Move To |
 |------|---------|
-| Backend API Routes | `src/mcp_server/routes_ui.py` |
-| Pydantic Models/Types | `src/notification/models.py` or `src/mcp_server/read_models.py` |
+| Backend API Routes | `src/agsignal/api/routes_ui.py` |
+| Pydantic Models/Types | `src/notification/models.py` or `src/agsignal/api/read_models.py` |
 | Test Files | `tests/ui_client/` or `tests/docs/` |
 | Reference Code (temporary) | `apps/ui/legacy_flask_reference/` |
 

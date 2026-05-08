@@ -557,7 +557,18 @@ AGSignal documentation is task-routed from [docs/README.md](docs/README.md):
 
 ```
 src/
-├── agsignal/                  # AGSignal-branded public aliases
+├── agsignal/                  # AGSignal canonical public + service-layer surface
+│   ├── app.py                 # Unified FastAPI factory (write + read surfaces)
+│   ├── responses.py           # Pydantic Request/Response DTOs
+│   ├── queries.py             # Read-side service layer
+│   ├── signaling.py           # Write-side service layer
+│   ├── errors.py              # Typed domain errors
+│   └── api/                   # HTTP route adapters (formerly `mcp_server/`)
+│       ├── routes_notification.py
+│       ├── routes_ui.py
+│       ├── read_models.py     # Read-model adapter (in-memory + SQLAlchemy)
+│       ├── auth.py            # Auth / CORS configuration
+│       └── observability.py   # Request middleware, metrics, structured logging
 ├── notification/              # Historical runtime package, still supported
 │   ├── models.py              # Core data contracts
 │   ├── interfaces.py          # Integration protocols
@@ -579,9 +590,6 @@ src/
 │   ├── policy_store.py        # Policy persistence
 │   ├── policy_learning_store.py
 │   └── migrations/            # SQL migrations
-├── mcp_server/
-│   ├── app.py                 # AGSignal Console API app
-│   └── routes_ui.py           # Read-only console endpoints
 apps/ui/                       # AGSignal Console frontend
 docs/                          # Task-routed docs, decisions, reports
 examples/policies/mip-uns/     # Canonical MIP-derived sample policy pack

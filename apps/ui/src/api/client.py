@@ -1,7 +1,7 @@
 """Typed API client for AGSignal Console endpoints.
 
 This client provides typed access to the /ui/* endpoints defined in
-src/mcp_server/routes_ui.py. It supports:
+src/agsignal/api/routes_ui.py. It supports:
 
 - Request ID propagation via X-Request-ID header
 - Consistent error handling per ErrorResponse contract

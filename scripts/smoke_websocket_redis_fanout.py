@@ -105,8 +105,8 @@ def run_smoke(
         "UNS_WEBSOCKET_REDIS_CHANNEL": channel_prefix,
     }
     with _patched_env(env):
-        from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
         from agsignal.app import create_app
+        from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
 
         configure_ack_engine(storage=InMemoryAckStorage())
         consumer_app = create_app()

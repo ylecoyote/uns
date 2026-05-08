@@ -39,7 +39,7 @@ from notification.models import (
 )
 
 # ────────────────────────────────────────────────────────────────────────────
-# Console / read enums (relocated from mcp_server/routes_ui.py)
+# Console / read enums (relocated from agsignal/api/routes_ui.py)
 # Defined first so Response classes that reference them resolve top-down.
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -289,7 +289,7 @@ class PolicyReloadResponse(BaseModel):
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# Acknowledgment DTOs (relocated from mcp_server/routes_notification.py)
+# Acknowledgment DTOs (relocated from agsignal/api/routes_notification.py)
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -356,7 +356,7 @@ class NotificationErrorResponse(BaseModel):
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# Console / read sub-DTOs (relocated from mcp_server/routes_ui.py)
+# Console / read sub-DTOs (relocated from agsignal/api/routes_ui.py)
 # ────────────────────────────────────────────────────────────────────────────
 
 
