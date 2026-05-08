@@ -1,7 +1,7 @@
 """Pydantic Request/Response DTOs for the AGSignal service layer.
 
 This module is the single canonical home for the HTTP-shape DTOs that both
-the route adapters (``mcp_server.routes_*``, ``notification.routes``) and
+the route adapters (``agsignal.api.routes_*``, ``notification.routes``) and
 the service layer (``agsignal.queries``, ``agsignal.signaling``) consume.
 
 It exists primarily to break the circular import that Phase 2 created
@@ -345,7 +345,7 @@ class NotificationStatusResponse(BaseModel):
 
 
 # Note (internal): renamed during Phase 3 from ``ErrorResponse`` (in
-# ``mcp_server.routes_notification``) to disambiguate from
+# ``agsignal.api.routes_notification``) to disambiguate from
 # :class:`UIErrorResponse`, which has a structurally incompatible field set.
 class NotificationErrorResponse(BaseModel):
     """Standard error response for notification-write endpoints."""
@@ -381,7 +381,7 @@ class ErrorDetail(BaseModel):
 
 
 # Note (internal): renamed during Phase 3 from ``ErrorResponse`` (in
-# ``mcp_server.routes_ui``) to disambiguate from
+# ``agsignal.api.routes_ui``) to disambiguate from
 # :class:`NotificationErrorResponse`, which has a structurally incompatible
 # field set.
 class UIErrorResponse(BaseModel):
@@ -544,7 +544,7 @@ class InvariantSummaryResponse(BaseModel):
 
 
 # Note (internal): this is the Pydantic version of ``AuditEvent``.
-# ``mcp_server.read_models.AuditEvent`` is a different ``@dataclass`` that
+# ``agsignal.api.read_models.AuditEvent`` is a different ``@dataclass`` that
 # shares the name; the two are NOT interchangeable.
 class AuditEvent(BaseModel):
     """Single audit event."""

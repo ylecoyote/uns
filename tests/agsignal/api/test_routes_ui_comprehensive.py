@@ -17,11 +17,11 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from agsignal.app import create_app
-from mcp_server.read_models import (
+from agsignal.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
+from agsignal.app import create_app
 from notification.audit import (
     AckAuditRecord,
     AuditRecord,

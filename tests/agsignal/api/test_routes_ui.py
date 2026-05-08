@@ -34,7 +34,7 @@ from notification.policies import (
 def client() -> TestClient:
     """Create a test client with fresh read model adapter."""
     # Reset the global read model adapter to ensure clean state
-    from mcp_server.read_models import InMemoryReadModelAdapter, configure_read_model_adapter
+    from agsignal.api.read_models import InMemoryReadModelAdapter, configure_read_model_adapter
     from notification.audit import InMemoryAuditStore
 
     fresh_store = InMemoryAuditStore()

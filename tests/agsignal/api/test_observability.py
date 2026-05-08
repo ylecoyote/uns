@@ -14,8 +14,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from agsignal.app import create_app
-from mcp_server.observability import (
+from agsignal.api.observability import (
     MetricsCollector,
     StructuredLogger,
     configure_metrics_collector,
@@ -24,6 +23,7 @@ from mcp_server.observability import (
     get_structured_logger,
     set_request_id,
 )
+from agsignal.app import create_app
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def client() -> TestClient:
     configure_metrics_collector(MetricsCollector())
 
     # Reset read model adapter
-    from mcp_server.read_models import InMemoryReadModelAdapter, configure_read_model_adapter
+    from agsignal.api.read_models import InMemoryReadModelAdapter, configure_read_model_adapter
     from notification.audit import InMemoryAuditStore
 
     fresh_store = InMemoryAuditStore()

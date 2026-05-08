@@ -18,7 +18,7 @@ class TestConfigurePersistence:
     def test_in_memory_mode_when_no_database_url(self):
         """Test in-memory mode is used when DATABASE_URL is not set."""
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -29,7 +29,7 @@ class TestConfigurePersistence:
             configure_persistence()
 
         # Verify in-memory adapter is configured
-        from mcp_server.read_models import InMemoryReadModelAdapter, get_read_model_adapter
+        from agsignal.api.read_models import InMemoryReadModelAdapter, get_read_model_adapter
 
         adapter = get_read_model_adapter()
         assert isinstance(adapter, InMemoryReadModelAdapter)
@@ -43,7 +43,7 @@ class TestConfigurePersistence:
     def test_shared_store_in_memory_mode(self):
         """Test audit store is shared between reads and writes in in-memory mode."""
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -54,7 +54,7 @@ class TestConfigurePersistence:
             configure_persistence()
 
         # Get configured components
-        from mcp_server.read_models import get_read_model_adapter
+        from agsignal.api.read_models import get_read_model_adapter
         from notification.audit import get_audit_logger
 
         adapter = get_read_model_adapter()
@@ -69,7 +69,7 @@ class TestConfigurePersistence:
         from uuid import uuid4
 
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -115,7 +115,7 @@ class TestConfigurePersistence:
         audit_logger.store.save_delivery_audit(record)
 
         # Read via read model adapter
-        from mcp_server.read_models import DeliveryFilter, get_read_model_adapter
+        from agsignal.api.read_models import DeliveryFilter, get_read_model_adapter
 
         adapter = get_read_model_adapter()
         result = adapter.get_deliveries(DeliveryFilter(), limit=10)
@@ -127,7 +127,7 @@ class TestConfigurePersistence:
     def test_sqlalchemy_mode_when_database_url_set(self, tmp_path):
         """Test SQLAlchemy mode is used when DATABASE_URL is set."""
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -141,7 +141,7 @@ class TestConfigurePersistence:
             configure_persistence()
 
         # Verify SQLAlchemy adapter is configured
-        from mcp_server.read_models import SQLAlchemyReadModelAdapter, get_read_model_adapter
+        from agsignal.api.read_models import SQLAlchemyReadModelAdapter, get_read_model_adapter
 
         adapter = get_read_model_adapter()
         assert isinstance(adapter, SQLAlchemyReadModelAdapter)
@@ -225,7 +225,7 @@ class TestCreateApp:
     def test_create_app_configures_persistence_by_default(self):
         """Test create_app calls configure_persistence by default."""
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -236,7 +236,7 @@ class TestCreateApp:
             app = create_app()
 
         # Verify persistence was configured
-        from mcp_server.read_models import InMemoryReadModelAdapter, get_read_model_adapter
+        from agsignal.api.read_models import InMemoryReadModelAdapter, get_read_model_adapter
 
         adapter = get_read_model_adapter()
         assert isinstance(adapter, InMemoryReadModelAdapter)
@@ -247,7 +247,7 @@ class TestCreateApp:
     def test_create_app_skip_persistence_config(self):
         """Test create_app skips persistence config when requested."""
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -510,7 +510,7 @@ class TestEndToEndIntegration:
         from fastapi.testclient import TestClient
 
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None
@@ -571,7 +571,7 @@ class TestEndToEndIntegration:
         from fastapi.testclient import TestClient
 
         # Clear any existing configuration
-        import mcp_server.read_models as rm
+        import agsignal.api.read_models as rm
         import notification.audit as audit
 
         rm._read_model_adapter = None

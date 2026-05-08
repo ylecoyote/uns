@@ -37,6 +37,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from agsignal.api.observability import (
+    create_error_response_with_request_id,
+    get_structured_logger,
+    log_endpoint_call,
+    record_endpoint_error,
+)
 from agsignal.errors import NotFoundError
 from agsignal.queries import (
     get_delivery_timeline as _query_delivery_timeline,
@@ -83,12 +89,6 @@ from agsignal.responses import (
 )
 from agsignal.responses import (
     UIErrorResponse as ErrorResponse,
-)
-from mcp_server.observability import (
-    create_error_response_with_request_id,
-    get_structured_logger,
-    log_endpoint_call,
-    record_endpoint_error,
 )
 from notification.models import (
     AutonomyMode,

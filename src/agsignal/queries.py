@@ -21,12 +21,21 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
+from agsignal.api.observability import (
+    get_structured_logger,
+    record_endpoint_error,
+)
+from agsignal.api.read_models import (  # internal adapter types; Phase 5 relocates
+    AuditEventFilter,
+    DeliveryFilter,
+    get_read_model_adapter,
+)
 from agsignal.errors import NotFoundError
 
 # CAUTION: agsignal.responses.AuditEvent is the Pydantic class (relocated from
-# routes_ui); mcp_server.read_models.AuditEvent is a different @dataclass. They
+# routes_ui); agsignal.api.read_models.AuditEvent is a different @dataclass. They
 # are not interchangeable. The import below is the Pydantic version; if your
-# code needs the dataclass, import it explicitly from mcp_server.read_models.
+# code needs the dataclass, import it explicitly from agsignal.api.read_models.
 from agsignal.responses import (
     AckStatusResponse,
     AuditEvent,
@@ -52,15 +61,6 @@ from agsignal.responses import (
     ResolutionContext,
     ResolutionSource,
     ResolutionStep,
-)
-from mcp_server.observability import (
-    get_structured_logger,
-    record_endpoint_error,
-)
-from mcp_server.read_models import (  # internal adapter types; Phase 5 relocates
-    AuditEventFilter,
-    DeliveryFilter,
-    get_read_model_adapter,
 )
 from notification.acknowledgment import (
     AcknowledgmentEngine,
@@ -103,7 +103,7 @@ def get_engine() -> AcknowledgmentEngine:
     """Get the acknowledgment engine, initializing if needed.
 
     Phase 3 Task 1 relocated this factory from
-    ``mcp_server.routes_notification`` into the service layer to break a
+    ``agsignal.api.routes_notification`` into the service layer to break a
     circular import (the routes module now imports the queries that use
     this factory; previously the queries module imported the factory from
     the routes module). Behavior is unchanged.
@@ -138,7 +138,7 @@ async def list_deliveries(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    # Body extracted verbatim from mcp_server.routes_ui.list_deliveries
+    # Body extracted verbatim from agsignal.api.routes_ui.list_deliveries
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
@@ -200,7 +200,7 @@ async def get_delivery_timeline(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    # Body extracted verbatim from mcp_server.routes_ui.get_delivery_timeline
+    # Body extracted verbatim from agsignal.api.routes_ui.get_delivery_timeline
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
@@ -269,7 +269,7 @@ async def get_effective_policy(
     3. policy_base - Policy base value
     4. sdk_default - SDK default derived from intent + autonomy_mode
     """
-    # Body extracted verbatim from mcp_server.routes_ui.get_effective_policy
+    # Body extracted verbatim from agsignal.api.routes_ui.get_effective_policy
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
@@ -477,7 +477,7 @@ async def list_invariants(
     Returns invariants from docs/verification/invariants.yml.
     Filters can be applied to narrow results.
     """
-    # Body extracted verbatim from mcp_server.routes_ui.list_invariants
+    # Body extracted verbatim from agsignal.api.routes_ui.list_invariants
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
@@ -596,7 +596,7 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
 
     Canonical implementation: HTTP routes and MCP tools both delegate here.
     """
-    # Body extracted verbatim from mcp_server.routes_ui.get_invariants_summary
+    # Body extracted verbatim from agsignal.api.routes_ui.get_invariants_summary
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
     result = await list_invariants(limit=100)
@@ -646,7 +646,7 @@ async def list_audit_events(
     Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
     Configure SQLAlchemyReadModelAdapter for production persistence.
     """
-    # Body extracted verbatim from mcp_server.routes_ui.list_audit_events
+    # Body extracted verbatim from agsignal.api.routes_ui.list_audit_events
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
@@ -710,7 +710,7 @@ async def get_notification_status(
     Note: The engine only stores ack state, not full notification details.
     So this endpoint returns ack state info only.
     """
-    # Body extracted verbatim from mcp_server.routes_notification.get_notification_status
+    # Body extracted verbatim from agsignal.api.routes_notification.get_notification_status
     # (minus the @router.get decorator).
     engine = get_engine()
 
@@ -742,7 +742,7 @@ async def get_ack_status(
     Returns just the ack status for a notification.
     Returns null ack_status if the notification is not being tracked.
     """
-    # Body extracted verbatim from mcp_server.routes_notification.get_ack_status
+    # Body extracted verbatim from agsignal.api.routes_notification.get_ack_status
     # (minus the @router.get decorator; an explicit `AckStatus | None` type
     # annotation has been added on the local for clarity — behavior-equivalent).
     engine = get_engine()
