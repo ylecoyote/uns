@@ -80,3 +80,12 @@ def test_historical_notification_imports_still_work() -> None:
     assert Notification.__name__ == "Notification"
     assert NotificationIntent.SAFETY.value == "SAFETY"
     assert NotificationSDK.__name__ == "NotificationSDK"
+
+
+def test_agsignal_reexports_every_public_notification_symbol() -> None:
+    """Every name in notification.__all__ must be importable from agsignal."""
+    import agsignal
+    import notification
+
+    missing = [name for name in notification.__all__ if not hasattr(agsignal, name)]
+    assert not missing, f"Missing from agsignal: {missing}"

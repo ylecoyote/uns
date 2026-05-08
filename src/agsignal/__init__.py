@@ -2,13 +2,19 @@
 
 The implementation currently lives in the historical ``notification`` package.
 These aliases provide AGSignal-branded imports without breaking existing users.
+
+Every public symbol exposed by ``notification.__all__`` is re-exported here so
+SDK consumers and operators can import exclusively from ``agsignal.*``.
 """
 
+# Re-exports forwarded through the agsignal-branded shim modules.
 from agsignal.interfaces import (
     AcknowledgmentCallback,
+    CompositeAcknowledgmentCallback,
     DefaultContextProvider,
     LoggingAcknowledgmentCallback,
     NoOpAcknowledgmentCallback,
+    NotificationContextProvider,
     SignalContextProvider,
 )
 from agsignal.models import (
@@ -20,15 +26,24 @@ from agsignal.models import (
     DeliveryMode,
     DeliveryStatus,
     GovernanceSignal,
+    Notification,
+    NotificationIntent,
+    NotificationResult,
     Priority,
     SignalIntent,
 )
 from agsignal.policies import (
     ModeOverride,
+    NotificationPolicy,
     PolicyRegistry,
     SignalPolicy,
     configure_policy_registry,
+    get_default_ack_timeout,
+    get_default_channels,
     get_policy_registry,
+    resolve_channels,
+    resolve_delivery_mode,
+    resolve_require_ack,
 )
 from agsignal.sdk import (
     SignalClient,
@@ -37,29 +52,145 @@ from agsignal.sdk import (
     get_signal_client,
 )
 
+# Direct re-exports from notification.* (no agsignal-side shim yet).
+# Move imports up into the shim block as new agsignal/<module>.py files land.
+from notification.acknowledgment import (
+    AcknowledgmentEngine,
+    AckState,
+    AckStorageProtocol,
+    EscalationHandler,
+    InMemoryAckStorage,
+    LoggingEscalationHandler,
+)
+from notification.audit import (
+    AckAuditRecord,
+    AuditPersistenceError,
+    AuditRecord,
+    AuditStore,
+    FileAuditStore,
+    InMemoryAuditStore,
+    PersistentAcknowledgmentAuditCallback,
+    PersistentAuditLogger,
+    configure_audit_logger,
+    create_ack_audit_record,
+    create_audit_record,
+    get_audit_logger,
+)
+from notification.models import (
+    get_default_ack_timeout_minutes,
+    get_default_delivery_mode,
+    get_default_priority,
+    get_default_require_ack,
+)
+from notification.policies import (
+    get_default_registry,
+    set_default_registry,
+)
+from notification.policy_config import (
+    PolicyConfigEnvelope,
+    PolicyEvaluationRecord,
+    apply_policy_delta,
+    canonical_config_json,
+    compute_config_hash,
+)
+from notification.policy_learning import (
+    DeltaRejectionReason,
+    DeltaState,
+    FieldBound,
+    GuardResult,
+    GuardStage,
+    PolicyDelta,
+    PolicyDeltaTransition,
+    ShadowEvaluationAggregate,
+    ShadowEvaluationResult,
+    ShadowStatus,
+)
+from notification.sdk import (
+    NotificationSDK,
+    ValidationError,
+    configure_sdk,
+    create_sdk,
+    get_sdk,
+)
+
 __all__ = [
-    "AcknowledgmentCallback",
+    "AckAuditRecord",
     "AckEvent",
+    "AckState",
     "AckStatus",
+    "AckStorageProtocol",
+    "AcknowledgmentCallback",
+    "AcknowledgmentEngine",
+    "AuditPersistenceError",
+    "AuditRecord",
+    "AuditStore",
     "AutonomyContext",
     "AutonomyMode",
     "Channel",
+    "CompositeAcknowledgmentCallback",
     "DefaultContextProvider",
     "DeliveryMode",
     "DeliveryStatus",
+    "DeltaRejectionReason",
+    "DeltaState",
+    "EscalationHandler",
+    "FieldBound",
+    "FileAuditStore",
     "GovernanceSignal",
+    "GuardResult",
+    "GuardStage",
+    "InMemoryAckStorage",
+    "InMemoryAuditStore",
     "LoggingAcknowledgmentCallback",
+    "LoggingEscalationHandler",
     "ModeOverride",
     "NoOpAcknowledgmentCallback",
+    "Notification",
+    "NotificationContextProvider",
+    "NotificationIntent",
+    "NotificationPolicy",
+    "NotificationResult",
+    "NotificationSDK",
+    "PersistentAcknowledgmentAuditCallback",
+    "PersistentAuditLogger",
+    "PolicyConfigEnvelope",
+    "PolicyDelta",
+    "PolicyDeltaTransition",
+    "PolicyEvaluationRecord",
     "PolicyRegistry",
     "Priority",
-    "SignalContextProvider",
+    "ShadowEvaluationAggregate",
+    "ShadowEvaluationResult",
+    "ShadowStatus",
     "SignalClient",
+    "SignalContextProvider",
     "SignalIntent",
     "SignalPolicy",
-    "configure_signal_client",
+    "ValidationError",
+    "apply_policy_delta",
+    "canonical_config_json",
+    "compute_config_hash",
+    "configure_audit_logger",
     "configure_policy_registry",
+    "configure_sdk",
+    "configure_signal_client",
+    "create_ack_audit_record",
+    "create_audit_record",
+    "create_sdk",
     "create_signal_client",
+    "get_audit_logger",
+    "get_default_ack_timeout",
+    "get_default_ack_timeout_minutes",
+    "get_default_channels",
+    "get_default_delivery_mode",
+    "get_default_priority",
+    "get_default_registry",
+    "get_default_require_ack",
     "get_policy_registry",
+    "get_sdk",
     "get_signal_client",
+    "resolve_channels",
+    "resolve_delivery_mode",
+    "resolve_require_ack",
+    "set_default_registry",
 ]
