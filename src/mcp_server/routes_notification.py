@@ -6,9 +6,9 @@ This module provides HTTP endpoints for:
 - GET /v1/notifications/{id} - Get notification status
 - GET /v1/notifications/{id}/ack-status - Get acknowledgment status
 
-Per PRD Task 10:
-- Ack endpoint writes audit and triggers callback
-- Status endpoint returns notification details and ack state
+Per Phase 2 Task 7, the write routes (ack/dismiss) are thin HTTP adapters
+that delegate to ``agsignal.signaling.*``. The route handlers contain only
+parameter parsing + auth + observability + delegation + error translation.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from notification.acknowledgment import (
     configure_ack_engine,
     get_ack_engine,
 )
-from notification.audit import AuditPersistenceError, AuditStore, create_ack_audit_record
+from notification.audit import AuditPersistenceError
 from notification.models import AckStatus
 
 logger = logging.getLogger(__name__)
@@ -128,58 +128,33 @@ async def acknowledge_notification(
     principal: WritePrincipal = Depends(require_write_principal),
     request: AckRequest | None = None,
 ) -> AckResponse:
-    """Acknowledge a notification.
+    """HTTP adapter — delegates to agsignal.signaling.acknowledge.
 
-    This endpoint allows users to acknowledge receipt of a notification.
-    The operation is idempotent - acknowledging an already-acked notification
-    returns success without error.
-
-    Args:
-        notification_id: UUID of the notification to acknowledge
-        request: Optional ack request body with acked_by and metadata
-
-    Returns:
-        AckResponse with the acknowledgment details
-
-    Raises:
-        HTTPException 404: If notification is not found
-        HTTPException 409: If the status transition is invalid
+    Translates typed signaling errors to HTTP responses:
+    - ``KeyError`` -> 404 not_found
+    - :class:`InvalidAckTransitionError` -> 409 invalid_transition
+    - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
     """
-    engine = get_engine()
+    # Local import avoids circular dependency: agsignal.signaling imports
+    # response models from this module.
+    from agsignal import signaling
+
+    # Ensure the ack engine is initialized before delegation; the route
+    # historically auto-configured it via :func:`get_engine` for convenience.
+    get_engine()
+
     request = request or AckRequest()
     acked_by = resolve_requested_actor(principal, request.acked_by)
+    audit_store = getattr(http_request.app.state, "audit_store", None)
 
     try:
-        event = engine.ack(
+        return await signaling.acknowledge(
             notification_id=notification_id,
-            ack_status=AckStatus.ACKED,
             acked_by=acked_by,
             metadata=request.metadata,
-            before_commit=lambda old_status, ack_event: _persist_ack_audit(
-                http_request=http_request,
-                notification_id=notification_id,
-                old_status=old_status,
-                new_status=ack_event.ack_status,
-                acked_by=ack_event.acked_by,
-                acked_at=ack_event.acked_at,
-                metadata=ack_event.metadata,
-            ),
+            audit_store=audit_store,
         )
-
-        logger.info(
-            "Notification acknowledged via API: notification_id=%s acked_by=%s",
-            notification_id,
-            acked_by,
-        )
-        return AckResponse(
-            notification_id=event.notification_id,
-            ack_status=event.ack_status,
-            acked_by=event.acked_by,
-            acked_at=event.acked_at,
-            metadata=event.metadata,
-        )
-
-    except KeyError as e:
+    except KeyError as exc:
         logger.warning("Ack failed - notification not found: %s", notification_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -188,25 +163,38 @@ async def acknowledge_notification(
                 "message": f"Notification not found: {notification_id}",
                 "notification_id": str(notification_id),
             },
-        ) from e
-
-    except InvalidAckTransitionError as e:
+        ) from exc
+    except InvalidAckTransitionError as exc:
         logger.warning(
             "Ack failed - invalid transition: notification_id=%s %s -> %s",
             notification_id,
-            e.current_status.value,
-            e.requested_status.value,
+            exc.current_status.value,
+            exc.requested_status.value,
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "error": "invalid_transition",
-                "message": str(e),
+                "message": str(exc),
                 "notification_id": str(notification_id),
-                "current_status": e.current_status.value,
-                "requested_status": e.requested_status.value,
+                "current_status": exc.current_status.value,
+                "requested_status": exc.requested_status.value,
             },
-        ) from e
+        ) from exc
+    except AuditPersistenceError as exc:
+        logger.error(
+            "Failed to persist ack audit: notification_id=%s error=%s",
+            notification_id,
+            str(exc),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "ack_audit_persistence_failed",
+                "message": "ack state was not committed because audit could not be persisted",
+                "notification_id": str(notification_id),
+            },
+        ) from exc
 
 
 @router.post(
@@ -224,57 +212,33 @@ async def dismiss_notification(
     principal: WritePrincipal = Depends(require_write_principal),
     request: DismissRequest | None = None,
 ) -> AckResponse:
-    """Dismiss a notification.
+    """HTTP adapter — delegates to agsignal.signaling.dismiss.
 
-    Dismissal indicates the operator saw the notification but chose not to
-    formally acknowledge it. This is a terminal state.
-
-    Args:
-        notification_id: UUID of the notification to dismiss
-        request: Optional dismiss request body with dismissed_by and metadata
-
-    Returns:
-        AckResponse with the dismissal details
-
-    Raises:
-        HTTPException 404: If notification is not found
-        HTTPException 409: If the status transition is invalid
+    Translates typed signaling errors to HTTP responses:
+    - ``KeyError`` -> 404 not_found
+    - :class:`InvalidAckTransitionError` -> 409 invalid_transition
+    - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
     """
-    engine = get_engine()
+    # Local import avoids circular dependency: agsignal.signaling imports
+    # response models from this module.
+    from agsignal import signaling
+
+    # Ensure the ack engine is initialized before delegation; the route
+    # historically auto-configured it via :func:`get_engine` for convenience.
+    get_engine()
+
     request = request or DismissRequest()
     dismissed_by = resolve_requested_actor(principal, request.dismissed_by)
+    audit_store = getattr(http_request.app.state, "audit_store", None)
 
     try:
-        event = engine.ack(
+        return await signaling.dismiss(
             notification_id=notification_id,
-            ack_status=AckStatus.DISMISSED,
-            acked_by=dismissed_by,
+            dismissed_by=dismissed_by,
             metadata=request.metadata,
-            before_commit=lambda old_status, ack_event: _persist_ack_audit(
-                http_request=http_request,
-                notification_id=notification_id,
-                old_status=old_status,
-                new_status=ack_event.ack_status,
-                acked_by=ack_event.acked_by,
-                acked_at=ack_event.acked_at,
-                metadata=ack_event.metadata,
-            ),
+            audit_store=audit_store,
         )
-
-        logger.info(
-            "Notification dismissed via API: notification_id=%s dismissed_by=%s",
-            notification_id,
-            dismissed_by,
-        )
-        return AckResponse(
-            notification_id=event.notification_id,
-            ack_status=event.ack_status,
-            acked_by=event.acked_by,
-            acked_at=event.acked_at,
-            metadata=event.metadata,
-        )
-
-    except KeyError as e:
+    except KeyError as exc:
         logger.warning("Dismiss failed - notification not found: %s", notification_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -283,25 +247,38 @@ async def dismiss_notification(
                 "message": f"Notification not found: {notification_id}",
                 "notification_id": str(notification_id),
             },
-        ) from e
-
-    except InvalidAckTransitionError as e:
+        ) from exc
+    except InvalidAckTransitionError as exc:
         logger.warning(
             "Dismiss failed - invalid transition: notification_id=%s %s -> %s",
             notification_id,
-            e.current_status.value,
-            e.requested_status.value,
+            exc.current_status.value,
+            exc.requested_status.value,
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "error": "invalid_transition",
-                "message": str(e),
+                "message": str(exc),
                 "notification_id": str(notification_id),
-                "current_status": e.current_status.value,
-                "requested_status": e.requested_status.value,
+                "current_status": exc.current_status.value,
+                "requested_status": exc.requested_status.value,
             },
-        ) from e
+        ) from exc
+    except AuditPersistenceError as exc:
+        logger.error(
+            "Failed to persist ack audit: notification_id=%s error=%s",
+            notification_id,
+            str(exc),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "ack_audit_persistence_failed",
+                "message": "ack state was not committed because audit could not be persisted",
+                "notification_id": str(notification_id),
+            },
+        ) from exc
 
 
 @router.get(
@@ -338,48 +315,6 @@ async def get_ack_status(
     from agsignal.queries import get_ack_status as _query
 
     return await _query(notification_id=notification_id)
-
-
-def _persist_ack_audit(
-    *,
-    http_request: Request,
-    notification_id: UUID,
-    old_status: AckStatus | None,
-    new_status: AckStatus,
-    acked_by: str | None,
-    acked_at: datetime,
-    metadata: dict[str, Any],
-) -> None:
-    if old_status == new_status:
-        return
-    audit_store = getattr(http_request.app.state, "audit_store", None)
-    if not isinstance(audit_store, AuditStore):
-        return
-    try:
-        audit_store.save_ack_audit(
-            create_ack_audit_record(
-                notification_id=notification_id,
-                old_status=old_status,
-                new_status=new_status,
-                acked_by=acked_by,
-                acked_at=acked_at,
-                metadata=metadata,
-            )
-        )
-    except AuditPersistenceError as exc:
-        logger.error(
-            "Failed to persist ack audit: notification_id=%s error=%s",
-            notification_id,
-            str(exc),
-        )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "error": "ack_audit_persistence_failed",
-                "message": "ack state was not committed because audit could not be persisted",
-                "notification_id": str(notification_id),
-            },
-        ) from exc
 
 
 def create_notification_router() -> APIRouter:

@@ -131,6 +131,7 @@ def send_signal(
         ack_status=ack_status,
         idempotency_key=request.idempotency_key,
         idempotent_replay=False,
+        created_at=notification.created_at,
         message="notification accepted",
     )
     if request.idempotency_key is not None:
