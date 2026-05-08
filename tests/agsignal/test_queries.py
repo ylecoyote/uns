@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
 
@@ -42,3 +44,140 @@ async def test_get_invariants_summary_returns_invariant_response_shape() -> None
     assert sum(result.by_severity.values()) == result.total_count
     assert sum(result.by_enforcement_type.values()) == result.total_count
     assert sum(result.by_status.values()) == result.total_count
+
+
+@pytest.mark.asyncio
+async def test_list_deliveries_returns_paginated_response_shape() -> None:
+    """The list_deliveries query returns a paginated response with items."""
+    from agsignal.queries import list_deliveries
+
+    result = await list_deliveries(limit=25)
+
+    # Shape: response is a DeliveryTimelineListResponse with items + pagination
+    assert hasattr(result, "items")
+    assert hasattr(result, "pagination")
+    assert isinstance(result.items, list)
+    assert hasattr(result.pagination, "next_cursor")
+    assert hasattr(result.pagination, "has_more")
+    # items count should never exceed limit
+    assert len(result.items) <= 25
+
+
+@pytest.mark.asyncio
+async def test_get_delivery_timeline_returns_404_for_missing_notification() -> None:
+    """get_delivery_timeline raises HTTPException for missing notifications."""
+    from fastapi import HTTPException
+
+    from agsignal.queries import get_delivery_timeline
+
+    # Use a randomly generated UUID that should not exist in the in-memory store
+    missing_id = uuid4()
+    with pytest.raises(HTTPException) as excinfo:
+        await get_delivery_timeline(notification_id=missing_id)
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_effective_policy_returns_resolution_response_shape() -> None:
+    """get_effective_policy returns an EffectivePolicyResponse with resolution data."""
+    from agsignal.queries import get_effective_policy
+    from notification.models import AutonomyMode, NotificationIntent
+
+    result = await get_effective_policy(
+        notification_type="test.invariant",
+        intent=NotificationIntent.OPERATIONAL,
+        autonomy_mode=AutonomyMode.LIVE,
+        irreversible=False,
+    )
+
+    # Shape assertions
+    assert hasattr(result, "notification_type")
+    assert hasattr(result, "effective")
+    assert hasattr(result, "resolution")
+    assert hasattr(result, "resolution_context")
+    # Required behavioral invariant: resolution dict has all 5 keys
+    expected_keys = {
+        "delivery_mode",
+        "channels",
+        "require_ack",
+        "ack_timeout_minutes",
+        "dedup_window_seconds",
+    }
+    assert set(result.resolution.keys()) == expected_keys
+    # Each resolution chain must have at least one step
+    for steps in result.resolution.values():
+        assert len(steps) >= 1
+    assert result.notification_type == "test.invariant"
+
+
+@pytest.mark.asyncio
+async def test_list_invariants_returns_paginated_response_shape() -> None:
+    """list_invariants returns paginated response with items respecting limit."""
+    from agsignal.queries import list_invariants
+
+    result = await list_invariants(limit=10)
+
+    # Shape: items + pagination
+    assert hasattr(result, "items")
+    assert hasattr(result, "pagination")
+    assert isinstance(result.items, list)
+    # Behavioral invariant: items count never exceeds limit
+    assert len(result.items) <= 10
+    # Each item should have the documented invariant fields
+    for item in result.items:
+        assert hasattr(item, "id")
+        assert hasattr(item, "statement")
+        assert hasattr(item, "severity")
+        assert hasattr(item, "status")
+        assert hasattr(item, "enforcement")
+
+
+@pytest.mark.asyncio
+async def test_list_audit_events_returns_paginated_response_shape() -> None:
+    """list_audit_events returns paginated response respecting limit."""
+    from agsignal.queries import list_audit_events
+
+    result = await list_audit_events(limit=25)
+
+    # Shape: items + pagination
+    assert hasattr(result, "items")
+    assert hasattr(result, "pagination")
+    assert isinstance(result.items, list)
+    assert hasattr(result.pagination, "next_cursor")
+    assert hasattr(result.pagination, "has_more")
+    # Behavioral invariant: count consistent with limit
+    assert len(result.items) <= 25
+
+
+@pytest.mark.asyncio
+async def test_get_notification_status_for_unknown_returns_not_found() -> None:
+    """get_notification_status returns found=False for unknown notification IDs."""
+    from agsignal.queries import get_notification_status
+
+    missing_id = uuid4()
+    result = await get_notification_status(notification_id=missing_id)
+
+    # Shape assertions: required fields populated
+    assert hasattr(result, "notification_id")
+    assert hasattr(result, "found")
+    assert hasattr(result, "ack_status")
+    assert result.notification_id == missing_id
+    # Behavioral invariant: an unknown notification surfaces found=False
+    assert result.found is False
+    assert result.ack_status is None
+
+
+@pytest.mark.asyncio
+async def test_get_ack_status_for_unknown_returns_null_status() -> None:
+    """get_ack_status returns null ack_status for unknown notifications."""
+    from agsignal.queries import get_ack_status
+
+    missing_id = uuid4()
+    result = await get_ack_status(notification_id=missing_id)
+
+    # Shape assertions: required fields populated
+    assert hasattr(result, "notification_id")
+    assert hasattr(result, "ack_status")
+    assert result.notification_id == missing_id
+    # Behavioral invariant: untracked notification has null ack_status
+    assert result.ack_status is None
