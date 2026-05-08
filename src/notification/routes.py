@@ -1,4 +1,17 @@
-"""Standalone HTTP routes for producing AGSignal notifications."""
+"""Standalone HTTP routes for producing AGSignal notifications.
+
+Per Phase 2 Tasks 6/7, the write routes (``send_notification`` and
+``simulate_notification``) are thin HTTP adapters that delegate to
+``agsignal.signaling.*``. The route handlers contain only parameter
+parsing + observability + delegation + error translation. The websocket
+dispatch (replay store, connection manager, fanout publisher) remains in
+the route layer because the websocket runtime state is FastAPI-app-scoped
+and is a transport-layer concern.
+
+The ``_resolve_notification`` helper is retained at module scope for the
+legacy ``notification.runtime`` MCP runtime (the route handlers no longer
+use it). Task 8 retires ``notification.runtime`` and removes this helper.
+"""
 
 from __future__ import annotations
 
@@ -12,8 +25,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from notification.acknowledgment import get_ack_engine
-from notification.audit import AuditPersistenceError, AuditRecord, AuditStore, create_audit_record
+from notification.audit import AuditPersistenceError, AuditRecord, AuditStore
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
 from notification.dlq import DLQEntry, DLQService
 from notification.models import (
@@ -29,10 +41,8 @@ from notification.models import (
     Priority,
 )
 from notification.policies import (
-    DEFAULT_DEDUP_WINDOW_SECONDS,
     PolicyRegistry,
     configure_policy_registry,
-    get_policy_registry,
 )
 from notification.policy_loader import (
     load_policies_from_directory,
@@ -139,6 +149,9 @@ class SendNotificationResponse(BaseModel):
         default=False,
         description="Whether this response was replayed from a previous producer request",
     )
+    created_at: datetime = Field(
+        description="Timestamp the notification was created (assigned by the SDK at signal acceptance)",
+    )
     message: str = Field(description="Acceptance summary")
 
 
@@ -240,6 +253,12 @@ class PolicyReloadResponse(BaseModel):
 def _capture_delivery(
     captured: dict[str, Notification],
 ) -> Callable[[Notification], NotificationResult]:
+    """Build a delivery handler that captures the resolved notification.
+
+    Retained for the legacy ``notification.runtime`` MCP runtime; Task 8
+    retires that module and removes this helper alongside it.
+    """
+
     def deliver(notification: Notification) -> NotificationResult:
         captured["notification"] = notification
         return NotificationResult(
@@ -256,6 +275,13 @@ def _capture_delivery(
 def _resolve_notification(
     request: SendNotificationRequest,
 ) -> tuple[NotificationResult, Notification]:
+    """Resolve a send-notification request via the SDK.
+
+    Retained for the legacy ``notification.runtime`` MCP runtime; the HTTP
+    write routes now delegate to :func:`agsignal.signaling.send_signal`
+    which carries its own resolver. Task 8 retires
+    ``notification.runtime`` and removes this helper.
+    """
     captured: dict[str, Notification] = {}
     sdk = NotificationSDK(delivery_handler=_capture_delivery(captured))
 
@@ -293,88 +319,83 @@ async def send_notification(
     http_request: Request,
     request: SendNotificationRequest,
 ) -> SendNotificationResponse:
-    """Accept an AGSignal notification from an autonomous producer."""
-    if request.idempotency_key is not None:
-        idempotency_records = getattr(http_request.app.state, "http_idempotency_records", None)
-        if isinstance(idempotency_records, dict):
-            record_key = f"{request.source}:{request.idempotency_key}"
-            existing_response = idempotency_records.get(record_key)
-            if isinstance(existing_response, SendNotificationResponse):
-                return existing_response.model_copy(update={"idempotent_replay": True})
+    """HTTP adapter — delegates to agsignal.signaling.send_signal.
 
-    result, notification = _resolve_notification(request)
-    from notification.metrics import record_signal_received
+    Translates typed signaling errors to HTTP responses:
+    - :class:`ValidationError` -> 422 validation_error
+    - :class:`AuditPersistenceError` -> 503 audit_persistence_failed
 
-    record_signal_received(
-        intent=notification.intent.value,
-        autonomy_mode=notification.autonomy_context.autonomy_mode.value,
-        transport="http",
-    )
-    ack_status: AckStatus | None = None
-    if notification.require_ack:
-        engine = get_ack_engine()
-        engine.register_notification(
-            notification_id=notification.notification_id,
-            intent=notification.intent,
-            autonomy_context=notification.autonomy_context,
-            timeout_minutes=notification.ack_timeout_minutes,
-            created_at=notification.created_at,
+    The websocket dispatch (replay store, connection manager, fanout
+    publisher) is performed in this route layer after the signaling call
+    succeeds because the websocket runtime state is FastAPI-app-scoped
+    transport infrastructure that does not belong in the service layer.
+    """
+    # Local import avoids circular dependency: agsignal.signaling imports
+    # response models from this module.
+    from agsignal import signaling
+
+    audit_store = http_request.app.state.audit_store
+    idempotency_store = http_request.app.state.http_idempotency_records
+
+    try:
+        response = await signaling.send_signal(
+            request=request,
+            audit_store=audit_store,
+            idempotency_store=idempotency_store,
+            transport_metadata={"runtime": "standalone_http"},
         )
-        ack_status = engine.get_status(notification.notification_id)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "validation_error", "message": str(exc)},
+        ) from exc
+    except AuditPersistenceError as exc:
+        record = getattr(exc, "record", None)
+        notification_id = getattr(record, "notification_id", None) if record is not None else None
+        logger.error(
+            "Failed to persist delivery audit: notification_id=%s error=%s",
+            notification_id,
+            str(exc),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "audit_persistence_failed",
+                "message": "notification accepted but delivery audit could not be persisted",
+                "notification_id": str(notification_id) if notification_id else None,
+            },
+        ) from exc
 
-    logger.info(
-        "Accepted AGSignal notification: id=%s type=%s intent=%s",
-        notification.notification_id,
-        notification.notification_type,
-        notification.intent.value,
-    )
-    audit_store = getattr(http_request.app.state, "audit_store", None)
-    if isinstance(audit_store, AuditStore):
-        try:
-            audit_store.save_delivery_audit(
-                create_audit_record(
-                    notification,
-                    result,
-                    metadata={"runtime": "standalone_http"},
-                )
-            )
-        except AuditPersistenceError as exc:
-            logger.error(
-                "Failed to persist delivery audit: notification_id=%s error=%s",
-                notification.notification_id,
-                str(exc),
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={
-                    "error": "audit_persistence_failed",
-                    "message": "notification accepted but delivery audit could not be persisted",
-                    "notification_id": str(notification.notification_id),
-                },
-            ) from exc
+    # Replay shortcut: if signaling returned an idempotent replay, skip the
+    # websocket dispatch (the original send already fanned out).
+    if response.idempotent_replay:
+        return response
 
+    # Websocket dispatch is transport-layer; stays in the route after the
+    # signaling call returns successfully. The websocket payload is
+    # reconstructed from the response + request because signaling no longer
+    # exposes the resolved Notification domain object.
     websocket_payload: dict[str, object] = {
-        "notification_id": str(notification.notification_id),
-        "notification_type": notification.notification_type,
-        "intent": notification.intent.value,
-        "title": notification.title,
-        "message": notification.message,
-        "source": notification.source,
-        "require_ack": bool(notification.require_ack),
-        "ack_status": ack_status.value if ack_status is not None else None,
+        "notification_id": str(response.notification_id),
+        "notification_type": request.notification_type,
+        "intent": request.intent.value,
+        "title": request.title,
+        "message": request.message,
+        "source": request.source,
+        "require_ack": bool(response.require_ack),
+        "ack_status": response.ack_status.value if response.ack_status is not None else None,
     }
+    agent_id = request.autonomy_context.agent_id
     replay_store = getattr(http_request.app.state, "websocket_replay_store", None)
     if isinstance(replay_store, WebSocketReplayStore):
         replay_cursor = replay_store.record(
-            notification.autonomy_context.agent_id,
-            websocket_payload,
-            created_at=notification.created_at,
+            agent_id, websocket_payload, created_at=response.created_at
         )
         websocket_payload["replay_cursor"] = replay_cursor
     manager = getattr(http_request.app.state, "websocket_manager", None)
     if isinstance(manager, WebSocketConnectionManager):
         await manager.send_to_agent(
-            notification.autonomy_context.agent_id,
+            agent_id,
             {"type": "notification", "notification": websocket_payload},
         )
     fanout = getattr(http_request.app.state, "websocket_fanout", None)
@@ -382,64 +403,31 @@ async def send_notification(
         fanout.publish(
             WebSocketFanoutEnvelope(
                 type="notification",
-                agent_id=notification.autonomy_context.agent_id,
+                agent_id=agent_id,
                 notification=websocket_payload,
             )
         )
-
-    response = SendNotificationResponse(
-        notification_id=result.notification_id,
-        status=result.status,
-        channels_attempted=result.channels_attempted,
-        channels_succeeded=result.channels_succeeded,
-        channels_failed=result.channels_failed,
-        require_ack=bool(notification.require_ack),
-        ack_status=ack_status,
-        idempotency_key=request.idempotency_key,
-        idempotent_replay=False,
-        message="notification accepted",
-    )
-    if request.idempotency_key is not None:
-        idempotency_records = getattr(http_request.app.state, "http_idempotency_records", None)
-        if isinstance(idempotency_records, dict):
-            idempotency_records[f"{request.source}:{request.idempotency_key}"] = response
     return response
 
 
 @router.post("/simulate", response_model=SimulateNotificationResponse)
 async def simulate_notification(request: SendNotificationRequest) -> SimulateNotificationResponse:
-    """Preview routing and acknowledgment behavior without delivery side effects."""
-    result, notification = _resolve_notification(request)
-    policy = get_policy_registry().get_sync(notification.notification_type)
-    policy_source = (
-        "policy"
-        if policy is not None
-        else "default"
-    )
-    warnings = [
-        f"resolved via {policy_source} routing; no delivery, replay, or ack side effects were recorded"
-    ]
-    if notification.delivery_mode == DeliveryMode.BEST_EFFORT:
-        warnings.append("best-effort delivery does not raise on channel failure")
+    """HTTP adapter — delegates to agsignal.signaling.simulate_signal.
 
-    return SimulateNotificationResponse(
-        notification_id=result.notification_id,
-        simulated=True,
-        status=result.status,
-        channels_attempted=result.channels_attempted,
-        delivery_mode=notification.delivery_mode,
-        require_ack=bool(notification.require_ack),
-        ack_status=None,
-        dedup_key=notification.dedup_key or "",
-        dedup_window_seconds=(
-            policy.dedup_window_seconds
-            if policy is not None and policy.dedup_window_seconds is not None
-            else DEFAULT_DEDUP_WINDOW_SECONDS
-        ),
-        policy_source=policy_source,
-        warnings=warnings,
-        message="notification simulated",
-    )
+    Translates typed signaling errors to HTTP responses:
+    - :class:`ValidationError` -> 422 validation_error
+    """
+    # Local import avoids circular dependency: agsignal.signaling imports
+    # response models from this module.
+    from agsignal import signaling
+
+    try:
+        return await signaling.simulate_signal(request=request)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "validation_error", "message": str(exc)},
+        ) from exc
 
 
 def _delivery_audit_item(record: AuditRecord) -> DeliveryAuditItem:
