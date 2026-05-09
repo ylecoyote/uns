@@ -4,14 +4,15 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Tests](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](tests/)
 
-Open source governance infrastructure for autonomous agents.
+**The neutral approval control plane for AI agents.**
 
-AGSignal turns notifications, acknowledgments, and silence into durable governance
-signals, so teams can prove who knew, when they knew, and how the system
-responded. It is the missing control plane for accountable autonomy: agents emit
-semantic events, AGSignal routes and persists them by policy, humans acknowledge
-them through normal tools, and downstream governors can consume the resulting
-audit-grade signal.
+AGSignal is the runtime Human-in-the-Loop primitive — `REQUIRE_APPROVAL → notification → human ACK → resume callback` — that cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) and framework-native HITL features don't ship as a first-class, vendor-portable product. AGSignal complements those stacks; it does not compete with them.
+
+Three correlated audit streams (Decision + Approval + Delivery) provide the forensic substrate for *"who knew what, and when"* — the question EU AI Act Article 14, GDPR Article 22, FINRA Rule 3110, and SEC Rule 15c3-5 all require operationalized at runtime, not just documented after the fact.
+
+Apache 2.0 OSS core. Commercial plugins for crypto, identity, durability, and compliance. Cloud-stack bridges (Microsoft / AWS / GCP) integrate AGSignal into existing governance investments without forcing migration.
+
+For full strategic positioning, see [`docs/uns/executive-summary.md`](docs/uns/executive-summary.md), [`docs/uns/walking-deck.md`](docs/uns/walking-deck.md), and the competitive analysis at [`docs/uns/positioning-vs-cloud-stacks.md`](docs/uns/positioning-vs-cloud-stacks.md).
 
 ## Documentation
 
@@ -24,28 +25,35 @@ audit-grade signal.
 
 ## Product Boundary
 
-AGSignal is control-plane infrastructure. It does:
+AGSignal is the **runtime HITL approval control plane**. It sits between agent decision logic and the action's side effects. Pre-execution authorization — not in-execution enforcement, not post-execution review.
 
-- Receive semantic governance events from autonomous systems
-- Route by policy, intent, and autonomy context
-- Persist signal state and delivery outcomes
-- Record `ACKED`, `DISMISSED`, and `TIMED_OUT` as audit events
-- Escalate safety paths and make silence or delivery failure visible
-- Emit governance feedback to an external agent governor
+**AGSignal does:**
 
-AGSignal does not:
+- Evaluate policy: `evaluate(policy, context) → DecisionRecord` returning `ALLOW | REQUIRE_APPROVAL | DENY`
+- Run the durable approval workflow when the engine returns `REQUIRE_APPROVAL`: notification → human ACK → resume callback (async by default; webhook/polling transport)
+- Capture three correlated audit streams (Decision + Approval + Delivery) keyed by `correlation_id` + `decision_id` for forensic completeness
+- Emit governance signals into existing cloud-stack audit infrastructure (Defender / Sentinel / CloudTrail / Cloud Audit Logs via commercial Stack Bridge plugins)
+- Provide MCP governance tools (`check_policy`, `request_approval`, `log_decision_reasoning`) for agent runtimes
+- Plug in to the cloud-vendor governance stacks via Stack Bridge plugins (Microsoft / AWS / GCP)
 
-- Execute trades, actions, or commands
-- Block execution loops or put humans in the execution path
-- Replace Slack, PagerDuty, email, WebSocket, or MCP delivery surfaces
-- Own agent reasoning, strategy, or decision logic
+**AGSignal does not:**
+
+- Execute trades, actions, commands, or any side effect with external impact (caller's responsibility)
+- Sit inline in the data plane / intercept network traffic (that's a separate sibling project, ExecutionGate)
+- Perform post-execution review, reconciliation, or compensation (downstream concern; out of scope)
+- Replace agent identity, policy enforcement, sandboxing, or observability layers cloud vendors provide (AGSignal complements them)
+- Own agent reasoning, LLM safety, or content moderation (that's the agent runtime + Content Safety equivalents)
+- Own framework-specific orchestration (LangGraph interrupts, AutoGen human input modes, etc. — those frameworks call into AGSignal for governance-grade HITL)
+
+For positioning vs Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance, and framework-native HITL, see [`docs/uns/positioning-vs-cloud-stacks.md`](docs/uns/positioning-vs-cloud-stacks.md).
 
 ## Terminology
 
 | Term | Meaning |
 |------|---------|
 | **AGSignal** | The product and repository identity. |
-| **AGS** | Agent Governance Signaling, the product category. |
+| **HITL Approval Control Plane** | The product category AGSignal occupies — neutral, runtime, durable Human-in-the-Loop approval primitive that complements (not replaces) cloud-vendor agent-governance stacks. |
+| **AGS** | Agent Governance Signaling — historical category framing from the UNS extraction phase. AGSignal's current category positioning is **neutral HITL approval control plane** vs the broader "agent governance" territory cloud vendors now occupy. |
 | **Governance signal** | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
 | **AGSignal Core** | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
 | **Signal API** | Public API surface for producers that emit governance events. New integrations should use `agsignal.*`; `notification.*` remains as a compatibility layer. |
