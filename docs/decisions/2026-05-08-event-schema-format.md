@@ -2,13 +2,24 @@
 
 Date: 2026-05-08
 
+Updated: 2026-05-08 — Decision 4 inverted from "CloudEvents projection off
+by default" to "CloudEvents-native by default" per Stage 2 competitive
+analysis. AGSignal's strategic positioning as the "neutral approval control
+plane that complements cloud-vendor stacks" requires envelope-format
+alignment with Microsoft Agent Governance Toolkit (which emits CloudEvents
+native) and the broader CNCF ecosystem (Knative, Eventarc, Event Grid, Dapr).
+The AGSignal-native shape is preserved as opt-out via content negotiation.
+Mapping table is unchanged. v0.2 → v1 was already a major version bump; the
+amendment changes which v1 default makes the break worthwhile, not whether
+the break occurs. See revised §4 + Consequences.
+
 Status: Accepted
 
 Linear: TBD
 
 ## Context
 
-PRD §2.8 locks the wire format as **custom Pydantic with envelope/data
+PRD §2.8 originally locked the wire format as **custom Pydantic with envelope/data
 separation**, with CloudEvents adoption deferred to this ADR. HARD-06 in the
 Stage 1 design-sync report ([2026-05-08-stage1-design-sync-report.md](../internal/superpowers/specs/2026-05-08-stage1-design-sync-report.md))
 identified the original conflict: prior PRD §7.1 mandated CloudEvents while
@@ -17,6 +28,19 @@ CloudEvents envelope; engineers reading either side built incompatible
 consumers. Vision B+ (§2.8, vision-b-plus-design.md) resolved this by locking
 custom Pydantic with envelope/data separation **for low-cost CloudEvents
 retrofit if adopted post-v1**, deferring the projection mechanics to this ADR.
+
+**Stage 2 competitive analysis revision.** Subsequent to the initial commit
+of this ADR, Stage 2 research documented Microsoft Agent Governance Toolkit's
+native CloudEvents emission and the broader CNCF ecosystem's consolidation on
+CloudEvents as the de-facto interop format. AGSignal's repositioning to
+"neutral HITL approval control plane that complements cloud-vendor stacks"
+(per `_AGSignal/docs/uns/positioning-vs-cloud-stacks.md`) makes envelope-
+format alignment load-bearing: a customer running AGSignal alongside AGT,
+Bedrock AgentCore, or Vertex AI Governance should not need a format-
+conversion shim at every integration point. The amendment updates §4 to flip
+the default; everything else (envelope structure, type taxonomy, versioning,
+mapping table, library choice, JSON-only wire, extension fields, idempotency)
+is unchanged.
 
 CloudEvents reached **CNCF Graduated status in January 2024** and is the
 de-facto interop format for cross-platform event consumers (Knative, Azure
@@ -108,24 +132,79 @@ The split mirrors ADR-004's per-Protocol semver decision: envelope and
 payload evolve at different cadences and shouldn't be locked to the same
 version line.
 
-### 4. CloudEvents projection: off by default, opt-in via content negotiation
+### 4. CloudEvents-native by default in v1; AGSignal-native shape via opt-out
 
-AGSignal v1 emits the **custom envelope as the default wire format**.
-CloudEvents-compatible projection is **off by default** and exposed via two
-opt-in mechanisms:
+**Updated 2026-05-08 per Stage 2 competitive analysis.** AGSignal v1 emits the
+**CloudEvents v1.0 envelope as the default wire format**, using the
+structured-mode CloudEvents JSON binding (`application/cloudevents+json`).
+The AGSignal-native envelope (described in §1) is preserved as the in-process
+source of truth in `agsignal.contracts` Pydantic models and is available as
+an **opt-out wire format** for callers without CloudEvents tooling.
 
-- **HTTP content negotiation**: callback POSTs and any HTTP event surface
-  honor `Accept: application/cloudevents+json`; AGSignal returns the
-  CloudEvents-projected event body. Default `application/json` returns the
-  custom envelope. The structured-mode CloudEvents binding is the only
-  projection v1 supports (binary mode deferred).
+**Default behavior:**
+
+- HTTP event surfaces (callback POSTs, any wire-emit endpoint) emit
+  `Content-Type: application/cloudevents+json` by default.
+- The structured-mode CloudEvents binding is the only projection v1
+  supports (binary mode deferred).
+- AGSignal-native Pydantic models in `agsignal.contracts` are the in-process
+  source of truth; the wire-emit layer projects to CloudEvents on egress.
+
+**Opt-out for AGSignal-native shape** (callers without CloudEvents libraries
+or with strong ergonomic preferences):
+
+- **HTTP content negotiation**: HTTP event surfaces honor
+  `Accept: application/agsignal+json`; AGSignal returns the AGSignal-native
+  envelope (§1 shape). Callers may also send `Accept: application/json` for
+  unspecified-format requests; the v1 default in that case is CloudEvents (a
+  v0.x → v1 break documented in operator migration guidance).
 - **Per-callback configuration flag**: `agsignal.yaml` callback registration
-  declares `format: cloudevents | native` (default: `native`); the flag
+  declares `format: cloudevents | native` (default: `cloudevents`); the flag
   pre-negotiates content type without per-request `Accept` headers.
 
-Always-on dual emission is rejected (decision 4 rejected list). Off-by-default
-keeps the v1 wire format stable for the locked v0.2 consumers and avoids
-forcing CloudEvents library dependencies on every consumer.
+**Rationale (revised).** Stage 2 competitive analysis (Microsoft Agent
+Governance Toolkit codebase + Microsoft Cloud Adoption Framework for AI
+Agents + Perplexity Deep Research on AWS / Google / framework HITL)
+documented:
+
+1. AGT emits CloudEvents native (its `to_cloudevent()` method on every audit
+   entry).
+2. The CNCF ecosystem (Knative, Eventarc, Event Grid, Dapr, AWS EventBridge
+   CloudEvents mode) consolidated on CloudEvents as the de-facto interop
+   format for cross-platform agent and workflow events.
+3. AGSignal's repositioning as "neutral HITL approval control plane that
+   complements cloud-vendor stacks" makes envelope-format alignment with AGT
+   and the broader CNCF ecosystem load-bearing — a customer running
+   AGSignal alongside AGT, Bedrock AgentCore, or Vertex AI Governance must
+   not need a format-conversion shim at every integration point.
+
+The pre-amendment "CloudEvents off by default" stance was correct under the
+"AGSignal as standalone Agent Governance Signaling category" framing (PRD
+§2.8 commitment, locked pre-AGT-discovery). Under the revised "complement
+cloud-vendor stacks" positioning, that default is wrong — it imposes a
+shim cost on every integration AGSignal aims to win. Flipping the default
+to CloudEvents costs operators on the AGSignal-native path one Accept
+header (or one `format: native` config flag) and saves every cloud-vendor-
+integration consumer the projection hop.
+
+**Cost of the flip.** v1 → v1.0 was already a major version bump from v0.2
+(per ADR-001 PATCH-1's DecisionRecord schema lock and the broader Vision B+
+rewrite); existing v0.2 consumers face migration regardless of which v1
+default is chosen. The AGSignal-native shape remains accessible to any
+caller who explicitly requests it; consumers porting from v0.2 add one
+configuration flag rather than a format-conversion shim.
+
+**Always-on dual emission is rejected** (decision 4 rejected list, retained
+post-amendment). Doubles wire bytes, doubles audit storage, forces every
+consumer to make a choice rather than using the single-format default. The
+amended default + opt-out gives the same flexibility on demand without the
+per-event cost.
+
+`cloudevents-pydantic` becomes a **required runtime dependency** of
+`agsignal.events` in v1 (was: optional dependency). The library is small,
+Pydantic v2-native, MIT-licensed, ~5x faster than the official SDK for
+serialization (per maintainer benchmarks), and matches the locked stack per
+PRD §9.5.
 
 **Mapping table (locked):**
 
@@ -280,14 +359,18 @@ makes correlation queries naturally range-scannable.
 
 ## Rejected
 
-### CloudEvents-as-mandate from v1 (Vision A position)
+### CloudEvents-as-strict-mandate (no opt-out) — still rejected post-amendment
 
-Rejected. PRD §2.8 explicitly retreats from this position. v0.2 already
-ships custom envelope notifications in production; mandating CloudEvents at
-v1 would break every existing consumer and force the cloudevents-pydantic
-dependency on operators who have no need for cross-platform interop.
-Off-by-default with content negotiation gives the same retrofit option at
-zero cost to the dominant non-CloudEvents path.
+**Updated 2026-05-08.** The original concern stands: a *strict* mandate
+(no opt-out path) would force the cloudevents-pydantic dependency onto every
+consumer including the smallest AGSignal-native callers, and would foreclose
+ergonomic choice for callers without CloudEvents tooling. The 2026-05-08
+amendment to Decision 4 flips the **default** to CloudEvents-native but
+preserves the AGSignal-native shape as opt-out. This is a meaningful
+distinction: the amendment makes CloudEvents the *path of least resistance*
+for cloud-vendor-integration consumers (the strategic majority post-Stage-2-
+positioning) while still serving callers who explicitly want the AGSignal-
+native shape.
 
 ### No CloudEvents projection ever
 
@@ -356,15 +439,27 @@ Plugins set `source` to a plugin-identified URI (e.g.,
 CloudEvents projection is centrally implemented; plugins do not need to
 ship their own projection logic.
 
-**v1 → v1.x retrofit cost if CloudEvents adoption is later required.**
-Low. The envelope/data split (decision 1) and the locked mapping table
-(decision 4) mean a future "always-on CloudEvents" decision is a
-configuration flip, not a schema rewrite. The dominant unknown is whether
-CloudEvents v2 (if/when standardized by CNCF) introduces breaking envelope
-changes; the projection layer absorbs that risk on AGSignal's side, and the
-native envelope is unaffected. If `cloudevents-pydantic` falls behind the
-spec, AGSignal can pin to a known-good version or temporarily roll the
-projection by hand using the official `cloudevents` SDK as a fallback.
+**v1 → v1.x format-default reversal cost (if AGSignal-native default is
+later required).** Low. The amended default (CloudEvents) and the opt-out
+path (AGSignal-native via content negotiation or per-callback config) are
+isomorphic at the field level — the locked mapping table (§4) is
+bidirectional. A future ADR could flip the default back without a schema
+rewrite. The dominant unknown is whether CloudEvents v2 (if/when
+standardized by CNCF) introduces breaking envelope changes; the projection
+layer absorbs that risk on AGSignal's side, and the AGSignal-native envelope
+in `agsignal.contracts` is unaffected. If `cloudevents-pydantic` falls
+behind the spec, AGSignal can pin to a known-good version or temporarily
+roll the projection by hand using the official `cloudevents` SDK as a
+fallback.
+
+**Strategic-positioning fit.** The CloudEvents-native default is the
+load-bearing technical commitment behind AGSignal's "neutral approval
+control plane that complements cloud-vendor stacks" positioning. Cloud-
+vendor-integration consumers (Microsoft Stack Bridge, AWS Stack Bridge, GCP
+Stack Bridge — the P0/P1 commercial plugins per the Vision B+ revision)
+get format alignment for free. Framework-native consumers (LangGraph
+interrupts, AutoGen human-input modes) get the AGSignal-native shape via
+the opt-out path with one configuration flag.
 
 **Operational implications.** OPERATIONAL notifications use the same
 envelope; the existing v0.2 channel adapters (Slack/Email/WebSocket/
