@@ -11,15 +11,21 @@ This document describes the architecture of the AGSignal Core.
 
 ## Overview
 
-AGSignal Core is a control-plane notification and acknowledgment service designed for autonomous agent systems. It provides:
+AGSignal Core is the **runtime HITL Approval Control Plane** for AI agents — a neutral, vendor-portable primitive that runs between agent decision logic and the action's side effects. It provides pre-execution authorization (not in-execution enforcement, not post-execution review) and complements cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) via Stack Bridge plugins.
 
-> **Note:** AGSignal Core is ATP-agnostic (Autonomous Trading Platform agnostic). The core SDK and delivery pipeline function independently of any specific trading platform. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation.
+> **Note:** AGSignal Core is ATP-agnostic, framework-agnostic, and cloud-agnostic. The core SDK, decision engine, approval workflow, and delivery pipeline function independently of any specific trading platform, agent framework (LangGraph / AutoGen / CrewAI), or cloud provider. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation, and [`../uns/positioning-vs-cloud-stacks.md`](../uns/positioning-vs-cloud-stacks.md) for the full competitive positioning.
 
-- Policy-driven, multi-channel notification delivery
-- Intent-based routing with delivery guarantees
-- Mode-aware behavior for different operational contexts
-- Acknowledgment tracking with timeout and escalation
-- Audit trail for compliance
+The control plane provides:
+
+- **Decision Engine** — domain-agnostic `evaluate(policy, context) → DecisionRecord` with `ALLOW | REQUIRE_APPROVAL | DENY` outcomes (two-layer: pure `decide()` + impure `evaluate()` wrapper)
+- **Approval Workflow** — durable async `REQUIRE_APPROVAL → notification → human ACK → resume callback` with webhook delivery + polling fallback
+- **Three correlated audit streams** — Decision Audit (policy evaluation) + Approval Audit (human decision) + Delivery Audit (notification transport), correlated by `correlation_id` + `decision_id`
+- **Policy DSL** — `when` / `then` rules with operator allowlist and ContextSchema-based type-safe domain integration
+- **Plugin extension points** — 3 stable Protocols (`OverrideAuthority`, `AuditHook`, `WorkflowOrchestrator`) + 1 callable hook (`IdentityProvider`)
+- **MCP governance tools** — `check_policy`, `request_approval`, `log_decision_reasoning`
+- **Multi-channel notification delivery** — Slack, Email, WebSocket, PagerDuty (existing v0.2 layer)
+- **Mode-aware behavior** — PREVIEW, SHADOW, LIVE autonomy contexts
+- **Audit trail for compliance** — EU AI Act Article 14, GDPR Article 22, FINRA Rule 3110, SEC Rule 15c3-5 mappings via commercial Compliance Templates plugin
 
 ## Design Principles
 
