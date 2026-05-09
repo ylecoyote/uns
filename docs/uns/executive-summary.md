@@ -1,115 +1,111 @@
-> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+# Executive Summary
 
-# 1️⃣ Executive Summary
-
-**Unified Notification Service (UNS)**
-**A Governance Control Plane for Autonomous Systems**
+**AGSignal — Neutral Approval Control Plane for AI Agents**
 
 ---
 
-## The Problem
+## The Market Moment
 
-Autonomous systems are crossing a critical threshold:
+Autonomous AI agents are crossing the line from *recommend* to *act*. They commit financial transactions, mutate records, call external APIs, send communications — actions with real-world consequences and no easy "undo."
 
-* Agents no longer just *recommend* — they **act**
-* Decisions happen faster than humans can supervise
-* Failures are rare but high-impact
-* After-the-fact questions are inevitable:
+Cloud vendors are responding. As of 2026:
 
-  * *Why did the system act?*
-  * *Who knew?*
-  * *What was acknowledged?*
-  * *Was there an opportunity to intervene?*
+- **Microsoft** has shipped Agent 365, the Agent Governance Toolkit (MIT-licensed), and an Azure Cloud Adoption Framework for AI agent governance. Four-layer stack covering identity, policy, security, observability.
+- **AWS** has Bedrock AgentCore with Cedar-based policy and fine-grained authorization for tool actions.
+- **Google Cloud** has Vertex AI agent governance, an enterprise tool registry, and centralized agent management.
 
-Today’s tooling is insufficient:
+**Every major cloud platform is becoming an agent governance stack.**
 
-* Logs explain *what* happened, not *who knew*
-* Alerts notify humans, but acknowledgments have no durable meaning
-* PagerDuty, Slack, and email are disconnected from agent governance
-* Human-in-the-loop systems slow execution or create false safety
+## The Gap That Persists
 
-**There is no standard control plane for human awareness and accountability in autonomous systems.**
+Across the entire cloud-vendor landscape — and throughout framework-native HITL features (LangGraph interrupts, AutoGen human-input modes, CrewAI patterns) — one capability is consistently *partial, framework-locked, or absent*:
 
----
+> **A neutral, durable, runtime primitive for `REQUIRE_APPROVAL → notification → human ACK → resume`.**
 
-## The Solution: UNS
+This is the human-in-the-loop control plane. It's distinct from policy enforcement (which says yes/no), distinct from observability (which records what happened), and distinct from sandboxing (which constrains execution). It answers: *"Should this specific action proceed, and which human authorized it?"*
 
-**UNS (Unified Notification Service)** is a **governance control plane** for autonomous agents.
+Production teams need this primitive but don't have it as a standalone product. They build it themselves from:
 
-It introduces a new primitive:
+- Slack approval buttons + custom callback handlers
+- Email links + webhook receivers
+- Temporal workflows + custom UIs
+- LangGraph interrupts + manual state management
 
-> **Notifications and acknowledgments as auditable, machine-legible governance signals — without blocking execution.**
+Every team rebuilds it. Every team gets the audit semantics, retry logic, identity verification, and cross-system correlation slightly different. None of these solutions composes cleanly with the cloud-vendor governance stacks emerging around them.
 
-UNS sits *outside* execution and *outside* decision logic, providing:
+## Why It Matters
 
-* Deterministic, policy-driven notification routing
-* Durable notification state machines
-* Explicit acknowledgment semantics
-* Safety-grade delivery guarantees
-* Feedback signals into agent governance
+Three regulatory regimes, all active in 2026, **mandate runtime human-in-the-loop** for high-risk automated decisions — not just documented oversight, but operational mechanisms:
 
-UNS does **not** execute actions.
-UNS does **not** pause agents.
-UNS makes autonomy *governable*.
+| Regulation | Requirement |
+|---|---|
+| **EU AI Act Article 14** (high-risk system effective Aug 2026) | Appropriate human oversight measures *operationalized at runtime* |
+| **GDPR Article 22** | Meaningful human intervention in automated decisions affecting individuals |
+| **FINRA Rule 3110** + **SEC Rule 15c3-5** | Supervision of automated systems with human override capability |
+| **DORA Article 17** | Major ICT incident reporting requires evidence of decision-making chain |
 
----
+The cloud-vendor governance stacks ship the documentation pipelines (e.g., Microsoft AGT's Annex IV evidence pipeline). They don't ship the runtime mechanism. That's the gap.
 
-## What Makes UNS Different
+## The Solution: AGSignal
 
-| Traditional Systems                | UNS                                       |
-| ---------------------------------- | ----------------------------------------- |
-| Notifications are messages         | Notifications are stateful entities       |
-| ACK = “human saw it”               | ACK = governance signal                   |
-| Routing based on severity          | Routing based on autonomy context         |
-| Silent failures possible           | Silent failure forbidden                  |
-| Human-in-the-loop blocks execution | Human-in-the-loop informs future autonomy |
+AGSignal is the **neutral approval control plane** for AI agents. It plugs into the cloud-vendor governance stacks and framework-native runtimes; it doesn't compete with them.
 
-UNS is the missing **control plane** between autonomous agents and humans.
+**Core primitive (Apache 2.0 OSS):**
 
----
+- `evaluate(policy, context) → DecisionRecord` returning `ALLOW | REQUIRE_APPROVAL | DENY`
+- On `REQUIRE_APPROVAL`: notification to human reviewers via durable channels (Slack, Email, WebSocket, PagerDuty), with approval workflow that survives across restart, retry, and timeout
+- On human ACK: callback resume or polling-fetch with cryptographically attestable approval evidence
+- Three correlated audit streams (Decision + Approval + Delivery) — the forensic substrate for "who knew what, and when"
 
-## Who UNS Is For
+**Plugin ecosystem (commercial, à la carte):**
 
-* Teams running **autonomous agents in production**
-* Regulated environments (fintech, infra, healthcare)
-* Platform teams supporting multiple agent workflows
-* Organizations preparing for **higher autonomy without higher risk**
+- Cloud-stack bridges: Microsoft (Entra Agent ID + Defender + Sentinel), AWS (IAM + CloudTrail + GuardDuty), GCP equivalents
+- Identity / non-repudiation: JWS, SPIFFE, hardware-token-based signing
+- Tamper-evident audit: Merkle-tree chained ledger with external attestation
+- Durable workflow: Temporal / Restate adapter
+- Compliance templates: EU AI Act Article 14 + GDPR 22 + FINRA 3110 + SOC 2 + HIPAA
 
-UNS sells **trust, auditability, and operational confidence** — not alerts.
+**No "Enterprise Edition."** Plugins are independently licensed and independently versioned.
 
----
+## Three Buyer Segments
 
-## Strategic Opportunity
+Demand is concentrated in three places, each with budget today:
 
-UNS defines a new category:
+1. **Regulated and high-stakes automation** — financial services, healthcare, legal, infrastructure. Money movement, sensitive-data access, externally visible changes. Risk is obvious; budget exists.
+2. **Agent platform teams** operationalizing tool approval and runtime governance — already deploying Microsoft AGT, AWS AgentCore, or Google Vertex AI. Need the missing HITL layer that composes with their existing platform.
+3. **Custom-agent builder teams** stitching approval flows from frameworks + Slack + webhooks. Need a neutral, durable primitive they can drop in.
 
-> **Agent Governance Signaling (AGS)**
+## Strategic Differentiation
 
-This category does not currently exist as a product or open standard.
+| | Microsoft AGT / Agent 365 | AWS Bedrock AgentCore | Google Vertex AI Governance | LangGraph / AutoGen / CrewAI HITL | **AGSignal** |
+|---|---|---|---|---|---|
+| Cloud-agnostic | No (Azure-coupled) | No (AWS-coupled) | No (GCP-coupled) | N/A | **Yes** |
+| Framework-agnostic | Adapters | AWS-runtime | Vertex-runtime | Framework-locked | **Yes** |
+| First-class HITL approval primitive | Partial (Copilot Studio adjacent) | No | No | Framework-native (developer ergonomics) | **Yes (core primitive)** |
+| Three-stream forensic audit (Decision + Approval + Delivery) | Single audit stream | Single audit stream | Single audit stream | Framework-dependent | **Yes** |
+| OSS core + commercial plugins | All MIT (no commercial layer) | Managed service only | Managed service only | OSS + paid tiers | **Apache 2.0 core; plugins per capability** |
 
-By open-sourcing the UNS core and productizing reliability, scale, and enterprise features, UNS can become:
-
-* The **reference standard** for agent governance
-* A trust anchor for autonomous systems
-* A platform product with long-term defensibility
-
----
+The wedge is precise: **neutral approval primitive, runtime-grade, audit-complete, vendor-portable**. AGSignal sells *the primitive every team is reinventing*, productized.
 
 ## Status
 
-* Core architecture designed and implemented internally
-* Functional and technical specifications locked
-* Production-grade semantics validated in an autonomous trading system
-* Clear path to externalization as a standalone product
-
----
+- v0.2 OSS core in extraction from MIP — notification & signaling layer (Slack/Email/WebSocket/PagerDuty channel adapters), declarative YAML policies, ACK lifecycle, deduplication, rate limiting, DLQ, delivery audit
+- 1823 tests passing; ruff clean; smoke-deployed
+- 9 architecture decision records committed at `_AGSignal/docs/decisions/`
+- Roadmap v0.3 (Phase 5 cleanup) → v0.4 (Decision Engine) → v0.5 (Approval Workflow) → v0.6 (Why Layer / DecisionRecord polish) → v1.0 (OSS GA) → v2.0+ (commercial plugin ecosystem)
+- Trading-domain reference integration via MIP-AG-Trading (illustrative; not load-bearing for AGSignal positioning)
 
 ## The Ask
 
-* Validate whether this problem resonates outside our internal use
-* Pressure-test product positioning and scope
-* Explore whether UNS should be:
+- Validate that the three buyer segments resonate with your network
+- Pressure-test the neutral-approval-control-plane positioning against the cloud-vendor stacks emerging around it
+- Identify candidate design partners — agent platform teams or regulated-domain operators willing to pilot v0.4–v0.5
+- Help prioritize among the seven commercial plugins (Microsoft / AWS / GCP stack bridges, JWS-Identity, SPIFFE-Auth, Merkle-Audit, Break-Glass, DurableWorkflow, Compliance Templates, Enterprise Dashboards)
 
-  * internal-only leverage
-  * open-source infrastructure
-  * or a standalone governance product
+## Brand Disambiguation
+
+AGSignal (Apache 2.0 OSS, runtime agent-action approval) is distinct from **HumanSignal** (commercial data-labeling and LLM-evaluation HITL, formerly Label Studio). Different problem spaces; different audiences; no relationship.
+
+---
+
+*Source artifacts: PRD at `_AGSignal/agent_governance_control_plane_prd.md`; ADRs at `_AGSignal/docs/decisions/`; Vision B+ scope sketch and Stage 2 research at `_AGSignal/docs/internal/superpowers/specs/`.*
