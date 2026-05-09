@@ -2,6 +2,17 @@
 
 Date: 2026-05-08
 
+Updated: 2026-05-08 — DecisionRecord schema referenced throughout this ADR was
+expanded after initial commit per Stage 2 production-audit research (Perplexity Deep
+Research on field completeness vs OPA / Cedar / AVP). The expanded field set is
+authoritative in PRD M2.3; this ADR's contractual semantics (retry, signing, timeout,
+escalation, polling, restart, Protocol behavior diff) are unchanged. The amendment
+adds required `engine_version` + `subject_id` and optional `tenant_id` / `resource_id` /
+`resource_type` / `trace_id` / `span_id` / `parent_span_id` / `parent_decision_id` /
+`request_origin` / `model_id` / `model_version` fields. Callers and commercial plugin
+vendors MUST conform to the expanded schema; the wire-level callback contract is
+unchanged.
+
 Status: Accepted
 
 Linear: TBD
@@ -14,8 +25,12 @@ blocks waiting. PRD M5.6 marks the exact retry / timeout / escalation / sync-wra
 restart-recovery semantics as ADR-pending. Stage 2 production-pattern matrix research
 across Temporal signals, Step Functions callback tokens, Restate awakeables, Airflow
 HITL, and Casbin custom orchestrators yielded the five-method `WorkflowOrchestrator`
-Protocol in M8.3. This ADR ratifies the remaining contractual semantics so domain plugin
-authors and commercial plugin vendors can build against a stable contract.
+Protocol in M8.3. Stage 2 production-audit research subsequently expanded the
+`DecisionRecord` schema referenced by this ADR (PRD M2.3) to include the additional
+fields production OPA / Cedar / AVP audit systems treat as fundamental. This ADR ratifies
+the remaining contractual semantics so domain plugin authors and commercial plugin vendors
+can build against a stable contract; the `DecisionRecord` field list is authoritative
+in PRD M2.3.
 
 ## Decision
 
