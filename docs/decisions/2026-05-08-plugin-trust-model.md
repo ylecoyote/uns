@@ -2,6 +2,19 @@
 
 Date: 2026-05-08
 
+Updated: 2026-05-08 — Inline tightenings per Stage 2 plugin-trust research
+(Perplexity Deep Research on OSS plugin ecosystem precedents). Four
+amendments: (PATCH-L) explicit fail-closed escalation path for undeclared
+capabilities under §2; (PATCH-M) sandboxing reframed as expected maturation
+for sensitive-resource plugins, not reactive-only triggers, under §3;
+(PATCH-N) explicit risk-acceptance language for v1 same-process trust under
+§3; (PATCH-P) tightened framing of PEP 740 + Sigstore as supply-chain
+provenance signal distinct from runtime trust enforcement under §1. Companion
+follow-up ADR (`2026-05-08-plugin-tier-default-capabilities.md`, ADR-005a)
+specifies per-tier default capability matrix that this ADR's §5 commits to
+graded administrative visibility but did not initially lock at the runtime-
+capability level.
+
 Status: Accepted
 
 Linear: TBD
@@ -74,6 +87,25 @@ publishes a curated allowlist of `publisher_identity` strings (e.g., the
 GitHub OIDC identity of a vetted commercial vendor) — not cryptographic.
 Allowlist updates ship via OSS releases; operators can override locally.
 
+**PATCH-P (2026-05-08): supply-chain provenance vs runtime trust framing.**
+PEP 740 + Sigstore is **a supply-chain provenance signal**: it proves a
+distribution artifact came from a specific publisher identity through a
+specific build pipeline at a specific time. **It is not a complete runtime
+trust model.** Trail of Bits explicitly notes that PEP 740 governs the
+*index*'s handling of attestations and does not mandate or define how
+installers verify them at runtime; the consuming toolchain is responsible
+for runtime enforcement. AGSignal's runtime trust enforcement is the
+combination of (a) load-time signature verification (this section), (b)
+manifest-declared capability scoping with runtime enforcement (§2), (c)
+trust-tier-graded default capabilities (§5 + ADR-005a), (d) failure
+isolation per §6, and (e) the v2+ sandboxing maturation path per §3.
+Conflating "the package is Sigstore-attested" with "the plugin is safe to
+load with full host privileges" is the documented failure mode in
+ecosystems with weaker runtime enforcement (e.g., npm supply-chain
+incidents where compromised developer credentials produced legitimately-
+signed but malicious packages). AGSignal treats provenance and runtime
+enforcement as complementary layers, not interchangeable substitutes.
+
 ### 2. Capability scoping (declared, runtime-enforced)
 
 **Plugins declare extension points in the manifest; AGSignal core enforces the
@@ -94,39 +126,109 @@ provides a documented capability surface for administrative enumeration (PRD
 the disk. That class of threat is addressed by signing (§1), trust levels (§5),
 and the v2+ sandboxing direction (§3).
 
-### 3. Sandboxing (v1: none; v2+: process isolation when triggers fire)
+**PATCH-L (2026-05-08): explicit fail-closed escalation path for undeclared
+capabilities.** When a plugin needs a capability it did not declare in its
+manifest at v0.0 — e.g., a `Verified`-tier plugin originally declaring only
+`AuditHook` later wants to implement `WorkflowOrchestrator` — AGSignal core
+**fails closed**. The escalation path is:
 
-**v1 OSS: same-process, same-Python-interpreter plugin loading.** No subprocess
+1. **Plugin author updates the manifest** (`extension_points.implements`),
+   bumps the plugin's SemVer, re-signs the distribution (Sigstore +
+   attestation), and republishes through the same channel.
+2. **Operator updates the registered version** in `agsignal.yaml` to the new
+   plugin version. AGSignal core re-validates manifest + signature on next
+   load.
+3. **AGSignal core records** the capability change in the PluginAudit stream
+   (`plugin_capability_changed` event) so administrators see the diff.
+
+**Silent escalation is forbidden.** AGSignal core MUST NOT auto-grant a
+plugin a capability beyond its declared scope, even if (a) the plugin's
+underlying class exposes the method, (b) the operator has the plugin
+loaded at the appropriate trust tier, or (c) other plugins of the same
+trust tier have the capability elevated. The principle: every capability
+is a documented operator decision, not a side effect of class
+introspection or trust-tier inheritance.
+
+**Dev-only override.** A development-mode flag (`AGSIGNAL_DEV_PLUGIN_ESCALATION=1`,
+documented as **never to be set in production**) allows an operator to
+elevate a plugin's runtime capabilities without manifest update + re-sign.
+The flag emits a startup-time critical-severity warning, writes a
+`dev_escalation_active` event to the PluginAudit stream, and rejects any
+SAFETY-intent decision flowing through an escalated extension point. The
+flag is intended for plugin author iteration cycles; production deployments
+that detect the flag in their config MUST treat it as a deployment
+configuration error.
+
+### 3. Sandboxing (v1: none for capability-constrained plugins; v2+ maturation for sensitive-resource plugins)
+
+**v1 OSS: same-process, same-Python-interpreter plugin loading for plugins
+operating within tightly-bounded capability scopes** (e.g., AuditHook
+write-only-to-audit, IdentityProvider deterministic-resolution). No subprocess
 isolation, no capability-restricted interpreter, no seccomp/restricted-import.
-This is the **minimum viable trust assumption**: operators load plugins they
-explicitly trust, signing + trust levels surface that trust to administrators,
-and the contractual M9.A design principles plus capability scoping (§2) are the
-enforcement layer. Documented as a non-isolated trust assumption in operator-
-facing docs.
+Operators load plugins they explicitly trust; signing + trust levels surface
+that trust to administrators; the contractual M9.A design principles plus
+capability scoping (§2 + §2 PATCH-L) are the runtime enforcement layer.
+
+**PATCH-N (2026-05-08): explicit risk-acceptance language for v1 same-process
+trust.** v1 same-process loading is a **deliberate risk acceptance** suitable
+for OSS development and non-regulated deployments. Production deployments
+that handle sensitive data, secrets, or network egress through plugins
+should treat sandboxing as a **roadmap requirement, not optional hardening**.
+The Stage 2 plugin-trust research is unambiguous on this point: capability
++ distribution + provenance controls are not sufficient once code is in-
+process and extensible — a compromised plugin with same-process privileges
+can still exfiltrate secrets or tamper with decisions. AGSignal v1 operators
+running in regulated environments should plan for v2 sandboxing migration
+as a deployment requirement, not a future luxury.
 
 **Rationale for v1 non-isolation:** Stage 2 research validates that pre-
 execution governance succeeds when the control plane is simple and reliable;
 forcing subprocess IPC into every plugin call would amplify the
 governance-as-data-plane-dependency anti-pattern by adding a process boundary
-on the hot path of `evaluate()`. The OSS core's target audience (non-regulated
-deployments) does not justify the latency and operational cost of v1
-sandboxing.
+on the hot path of `evaluate()`. The OSS core's target audience (non-
+regulated deployments and capability-constrained plugins like AuditHook)
+does not justify the latency and operational cost of v1 sandboxing.
 
-**v2+ sandboxing triggers:** stronger isolation moves from "deferred" to
-"required" when **any** of the following occurs:
+**PATCH-M (2026-05-08): sandboxing reframed as expected maturation for
+sensitive-resource plugin classes.** v2+ sandboxing is **not a reactive-only
+trigger** (waiting for a security incident or regulated customer demand to
+force the question). It is the **expected maturation path for any plugin
+class that touches network, file system, or secrets** as a normal part of
+its operation. Specifically:
 
-- A regulated customer (FINRA / DORA / equivalent) contractually requires
-  plugin-level fault isolation as part of their compliance attestation.
+- **Plugins that handle secrets or identity material** (e.g., commercial
+  JWS-Identity, SPIFFE-Auth, Break-Glass) — sandboxing migration is on the
+  v2+ roadmap by design, not pending an incident. Same-process loading of
+  these plugin classes is acceptable in v1 because the OSS-default
+  IdentityProvider hook is HMAC-with-shared-secret (low blast radius if
+  compromised); when commercial identity plugins ship, the v2+ subprocess-
+  per-plugin model is the documented production stance.
+- **Plugins that make network calls** (e.g., commercial Compliance Templates
+  emitting to external regulators, Enterprise Dashboards exporting to multi-
+  tenant SaaS, Stack Bridge plugins emitting to Defender / CloudTrail /
+  Cloud Audit Logs) — sandboxing migration is similarly v2+ by design.
+- **Plugins that touch local file system beyond audit-stream writes** —
+  same.
+
+**v2+ sandboxing triggers (any one accelerates the migration):** stronger
+isolation moves from "v2+ planned" to "v2+ required" when **any** of the
+following occurs:
+
+- A regulated customer (FINRA / DORA / EU AI Act high-risk system / equivalent)
+  contractually requires plugin-level fault isolation as part of their
+  compliance attestation.
 - AGSignal opens a third-party plugin marketplace (loading plugins from
   publishers outside the operator's trust boundary becomes the default
   workflow rather than an exception).
 - A documented security incident traces to an in-process plugin compromising
   the host.
 
-The likely v2+ shape is subprocess-per-plugin with structured IPC (msgpack or
-gRPC), modeled on the OPA bundle / engine separation. This ADR does not
-pre-specify v2+ further; the trigger conditions are sufficient to ensure the
-question is reopened at the right time.
+The likely v2+ shape is **subprocess-per-plugin with structured IPC** (msgpack
+or gRPC), modeled on OPA's bundle / engine separation pattern. This ADR does
+not pre-specify v2+ further; the maturation framing + trigger conditions are
+sufficient to ensure (a) the question is reopened at the right time and (b)
+plugin authors targeting sensitive-resource use cases plan for the migration
+from v0.0 rather than treating it as an unanticipated requirement.
 
 ### 4. Plugin manifest
 
