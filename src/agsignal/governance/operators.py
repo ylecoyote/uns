@@ -55,7 +55,8 @@ def parse_operator(name: str) -> Operator:
 def evaluate_operator(op: Operator, lhs: Any, rhs: Any) -> bool:
     """Evaluate a binary operator against (lhs, rhs).
 
-    For EXISTS / NOT_EXISTS, lhs=None means "missing" and rhs is unused.
+    For EXISTS / NOT_EXISTS, lhs=None means "missing"; rhs is ignored entirely
+    (the YAML loader in Task 5 may omit it or pass null, both work).
     For MATCHES, rhs is the regex pattern (compiled fullmatch).
     """
     try:
@@ -113,7 +114,13 @@ def _check_orderable(lhs: Any, rhs: Any, op: Operator) -> None:
 
 
 def _check_iterable(rhs: Any, op: Operator) -> None:
-    """The rhs of IN / NOT_IN must be a list/tuple/set, not a string (string-in-string is a frequent bug)."""
+    """The rhs of IN / NOT_IN must be iterable (list/tuple/set/dict/range/etc.), not a string or bytes.
+
+    Strings and bytes are rejected explicitly because `"a" in "ab"` is a frequent
+    YAML-author footgun where they meant `IN ["ab"]`. The `__contains__` fallback
+    accepts any container (including dict, where `in` checks keys) — YAML loaders
+    typically produce list, so this only matters in programmatic construction.
+    """
     if isinstance(rhs, (str, bytes)) or not hasattr(rhs, "__contains__"):
         raise PolicyEvaluationError(
             message=f"Operator {op.value} requires a list/set/tuple on the right-hand side, got {type(rhs).__name__}"
@@ -136,7 +143,7 @@ def _evaluate_matches(lhs: Any, pattern: Any) -> bool:
         )
     try:
         compiled = re2.compile(pattern)
-    except Exception as e:
+    except re2.error as e:
         raise PolicyEvaluationError(
             message=f"Operator MATCHES regex compile failed: {e}"
         ) from e
