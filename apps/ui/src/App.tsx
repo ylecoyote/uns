@@ -5,13 +5,19 @@
  * All pages are READ-ONLY per ui-scope.md.
  */
 
+import { useSyncExternalStore } from 'react';
 import { BrowserRouter, NavLink } from 'react-router-dom';
 import { AppRoutes } from './router';
 import { getNavRoutes } from './types/routes';
+import { clearConsoleSession, getConsoleSession, subscribeConsoleSession } from './auth/session';
+import { ConsoleSignIn } from './components/ConsoleSignIn';
 import './App.css';
 
 function App() {
+  const session = useSyncExternalStore(subscribeConsoleSession, getConsoleSession);
   const navRoutes = getNavRoutes();
+
+  if (!session.credential) return <ConsoleSignIn expired={session.expired} />;
 
   return (
     <BrowserRouter>
@@ -27,7 +33,10 @@ function App() {
               </li>
             ))}
           </ul>
-          <div className="nav-badge">READ-ONLY</div>
+          <div className="nav-session">
+            <div className="nav-badge">READ-ONLY</div>
+            <button type="button" className="btn btn-secondary" onClick={clearConsoleSession}>Sign out</button>
+          </div>
         </nav>
 
         <main className="app-main">
