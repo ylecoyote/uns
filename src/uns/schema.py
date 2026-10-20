@@ -43,7 +43,9 @@ def migrate_runtime_schema(engine: Engine, *, create_tables: bool = False) -> No
             for name, sql_type in columns.items():
                 if name not in existing:
                     # Identifiers and types are exclusively static migration constants.
-                    connection.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {name} {sql_type}")
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {table_name} ADD COLUMN {name} {sql_type}"
+                    )
                     if name == "cycle_attempts":
                         connection.exec_driver_sql(
                             "UPDATE uns_notifications SET cycle_attempts = attempts"
