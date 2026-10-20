@@ -660,12 +660,11 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                     NotificationAuditRecord.notification_type == filter_criteria.notification_type
                 )
             if filter_criteria.channel:
-                # JSON contains check - syntax depends on database
-                stmt = stmt.where(
-                    NotificationAuditRecord.channels_attempted.contains(
-                        [filter_criteria.channel.value]
-                    )
-                )
+                stmt = stmt.where(_channel_membership(
+                    NotificationAuditRecord.channels_attempted,
+                    filter_criteria.channel,
+                    session.get_bind().dialect.name,
+                ))
 
             # Count total
             count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -1018,3 +1017,18 @@ def create_sqlalchemy_adapter(
     session_factory = sessionmaker(bind=engine)
 
     return SQLAlchemyReadModelAdapter(session_factory=session_factory)
+
+
+def _channel_membership(column: Any, channel: Channel, dialect: str) -> Any:
+    """Match an enum element, not a serialized JSON-array substring."""
+    from sqlalchemy import cast, func, select
+
+    if dialect == "sqlite":
+        members = func.json_each(column).table_valued("value")
+        return select(1).select_from(members).where(members.c.value == channel.value).exists()
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import JSONB
+        return cast(column, JSONB).contains([channel.value])
+    if dialect in {"mysql", "mariadb"}:
+        return func.json_contains(column, json.dumps(channel.value)) == 1
+    raise ValueError(f"Channel membership is not implemented for SQL dialect {dialect!r}")
