@@ -70,6 +70,12 @@ def is_in_legacy_reference(path: Path, ui_root: Path) -> bool:
         return False
 
 
+def is_generated_or_vendor(path: Path, ui_root: Path) -> bool:
+    """Dependencies and build outputs are not application source."""
+    return any(part in {"node_modules", "dist", "coverage", "test-results"}
+               for part in path.relative_to(ui_root).parts)
+
+
 def check_python_files(ui_root: Path) -> list[BoundaryViolation]:
     """Check for Python files outside the legacy reference folder.
 
@@ -86,7 +92,7 @@ def check_python_files(ui_root: Path) -> list[BoundaryViolation]:
 
     for py_file in ui_root.rglob("*.py"):
         # Skip if in legacy_flask_reference
-        if is_in_legacy_reference(py_file, ui_root):
+        if is_in_legacy_reference(py_file, ui_root) or is_generated_or_vendor(py_file, ui_root):
             continue
 
         # This is a violation
@@ -124,7 +130,7 @@ def check_templates_directory(ui_root: Path) -> list[BoundaryViolation]:
             continue
 
         # Skip if in legacy_flask_reference
-        if is_in_legacy_reference(item, ui_root):
+        if is_in_legacy_reference(item, ui_root) or is_generated_or_vendor(item, ui_root):
             continue
 
         violations.append(
@@ -161,7 +167,7 @@ def check_flask_app_patterns(ui_root: Path) -> list[BoundaryViolation]:
 
     for app_file in ui_root.rglob("app.py"):
         # Skip if in legacy_flask_reference
-        if is_in_legacy_reference(app_file, ui_root):
+        if is_in_legacy_reference(app_file, ui_root) or is_generated_or_vendor(app_file, ui_root):
             continue
 
         # Check file contents for Flask indicators

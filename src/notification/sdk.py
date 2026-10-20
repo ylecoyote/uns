@@ -228,8 +228,8 @@ class NotificationSDK:
         # Return a pending result if no delivery handler
         return NotificationResult(
             notification_id=notification.notification_id,
-            status=DeliveryStatus.SUCCESS,
-            channels_attempted=channels,
+            status=DeliveryStatus.PENDING,
+            channels_attempted=[],
             channels_succeeded=[],
             channels_failed=[],
         )
@@ -552,7 +552,9 @@ class NotificationSDK:
             return override
 
         if policy is not None:
-            return policy.get_require_ack_for_mode(autonomy_mode, intent)
+            resolved = policy.get_require_ack_for_mode(autonomy_mode, intent)
+            if resolved is not None:
+                return resolved
 
         return get_default_require_ack(intent, autonomy_mode)
 

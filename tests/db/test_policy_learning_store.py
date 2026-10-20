@@ -40,6 +40,8 @@ def _delta(policy_type: str = "notification.routing") -> PolicyDelta:
         current_value=["SLACK", "WEBSOCKET"],
         proposed_value=["SLACK", "WEBSOCKET", "PAGERDUTY"],
         reasoning="Safety escalations should include PagerDuty in LIVE mode.",
+        baseline_hash="baseline-v1",
+        baseline_version=1,
         confidence=0.82,
         evidence_count=3,
     )
@@ -139,6 +141,7 @@ def test_approval_requires_passed_shadow_aggregate() -> None:
     store.persist_shadow_aggregate(
         ShadowEvaluationAggregate(
             delta_id=shadow.delta_id,
+            baseline_hash=shadow.baseline_hash, candidate_hash=shadow.candidate_hash, evaluated_by="reviewer",
             total_decisions=10,
             improved_decisions=7,
             degraded_decisions=1,
@@ -235,6 +238,7 @@ def test_get_pending_deltas_returns_approved_oldest_first() -> None:
         store.persist_shadow_aggregate(
             ShadowEvaluationAggregate(
                 delta_id=shadow.delta_id,
+            baseline_hash=shadow.baseline_hash, candidate_hash=shadow.candidate_hash, evaluated_by="reviewer",
                 total_decisions=10,
                 improved_decisions=7,
                 degraded_decisions=1,

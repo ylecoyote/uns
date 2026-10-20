@@ -8,7 +8,7 @@ and supports the full query interface.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -45,7 +45,7 @@ class SQLAlchemyAuditStore(AuditStore):
 
     def _get_session(self) -> Session:
         """Get a new session from the factory."""
-        return self._session_factory()
+        return cast(Session, self._session_factory())
 
     def save_delivery_audit(self, record: AuditRecord) -> None:
         """Save a delivery audit record to the database.
@@ -58,35 +58,7 @@ class SQLAlchemyAuditStore(AuditStore):
         """
         session = self._get_session()
         try:
-            db_record = NotificationAuditRecord(
-                id=record.audit_id,
-                notification_id=record.notification_id,
-                notification_type=record.notification_type,
-                status=record.status.value,
-                channels_attempted=[c.value for c in record.channels_attempted],
-                channels_succeeded=[c.value for c in record.channels_succeeded],
-                channels_failed=[c.value for c in record.channels_failed],
-                error_message=record.error_message,
-                intent=record.intent,
-                delivery_mode=record.delivery_mode,
-                autonomy_mode=record.autonomy_mode,
-                agent_id=record.agent_id,
-                plan_id=record.plan_id,
-                decision_snapshot_id=record.decision_snapshot_id,
-                execution_snapshot_id=record.execution_snapshot_id,
-                skip_snapshot_id=record.skip_snapshot_id,
-                policy_config_id=record.policy_config_id,
-                policy_config_hash=record.policy_config_hash,
-                policy_evaluation_id=record.policy_evaluation_id,
-                title=record.title,
-                source=record.source,
-                correlation_id=record.correlation_id,
-                notification_metadata=record.metadata,
-                audit_metadata=record.audit_metadata,
-                notification_created_at=record.notification_created_at,
-                delivered_at=record.delivered_at,
-                created_at=record.audit_created_at,
-            )
+            db_record = delivery_audit_row(record)
             session.add(db_record)
             session.commit()
             logger.debug(
@@ -260,3 +232,36 @@ def create_sqlalchemy_audit_store(
     session_factory = sessionmaker(bind=engine)
 
     return SQLAlchemyAuditStore(session_factory=session_factory)
+
+
+def delivery_audit_row(record: AuditRecord) -> NotificationAuditRecord:
+    """Build an audit row for a caller-owned transaction."""
+    return NotificationAuditRecord(
+        id=record.audit_id,
+        notification_id=record.notification_id,
+        notification_type=record.notification_type,
+        status=record.status.value,
+        channels_attempted=[c.value for c in record.channels_attempted],
+        channels_succeeded=[c.value for c in record.channels_succeeded],
+        channels_failed=[c.value for c in record.channels_failed],
+        error_message=record.error_message,
+        intent=record.intent,
+        delivery_mode=record.delivery_mode,
+        autonomy_mode=record.autonomy_mode,
+        agent_id=record.agent_id,
+        plan_id=record.plan_id,
+        decision_snapshot_id=record.decision_snapshot_id,
+        execution_snapshot_id=record.execution_snapshot_id,
+        skip_snapshot_id=record.skip_snapshot_id,
+        policy_config_id=record.policy_config_id,
+        policy_config_hash=record.policy_config_hash,
+        policy_evaluation_id=record.policy_evaluation_id,
+        title=record.title,
+        source=record.source,
+        correlation_id=record.correlation_id,
+        notification_metadata=record.metadata,
+        audit_metadata=record.audit_metadata,
+        notification_created_at=record.notification_created_at,
+        delivered_at=record.delivered_at,
+        created_at=record.audit_created_at,
+    )

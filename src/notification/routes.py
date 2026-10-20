@@ -17,8 +17,14 @@ to work without code changes.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from uns.runtime import Runtime
+
 import logging
 from pathlib import Path
+from threading import RLock
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -46,7 +52,6 @@ from notification.policies import (
 )
 from notification.policy_loader import (
     load_policies_from_directory,
-    load_runtime_registry_from_directory,
 )
 from notification.sdk import ValidationError
 from notification.websocket_runtime import (
@@ -56,6 +61,7 @@ from notification.websocket_runtime import (
 )
 
 logger = logging.getLogger(__name__)
+_policy_reload_lock = RLock()
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["signals"])
 ops_router = APIRouter(prefix="/api/v1", tags=["operations"])
@@ -81,6 +87,17 @@ async def send_notification(
     succeeds because the websocket runtime state is FastAPI-app-scoped
     transport infrastructure that does not belong in the service layer.
     """
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if runtime is not None:
+        from agsignal.api.auth import require_write_principal
+        from uns.runtime import Conflict
+        principal = require_write_principal(http_request)
+        try:
+            return await runtime.send(request, principal=principal.subject)
+        except Conflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     audit_store = http_request.app.state.audit_store
     idempotency_store = http_request.app.state.http_idempotency_records
 
@@ -243,6 +260,14 @@ async def list_dlq(request: Request) -> DLQListResponse:
 @ops_router.delete("/dlq/{entry_id}", response_model=DLQRemoveResponse)
 async def remove_dlq_entry(request: Request, entry_id: UUID) -> DLQRemoveResponse:
     """Remove a visible DLQ entry after external remediation."""
+    runtime = getattr(request.app.state, "runtime", None)
+    if runtime is not None:
+        from agsignal.api.auth import require_write_principal
+        principal = require_write_principal(request)
+        removed = runtime.resolve_failure(entry_id, actor=principal.subject)
+        if not removed:
+            raise HTTPException(status_code=404, detail="Dead-letter entry not found")
+        return DLQRemoveResponse(entry_id=entry_id, removed=True, depth=len(runtime.dead_letters()))
     dlq_service: DLQService = request.app.state.dlq_service
     if not dlq_service.remove(entry_id):
         raise HTTPException(
@@ -273,44 +298,31 @@ async def reload_policies(
     http_request: Request,
 ) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
+    from agsignal.api.auth import require_write_principal
+    if getattr(http_request.app.state, "runtime", None) is not None:
+        require_write_principal(http_request)
     policy_dir = Path(reload_request.policy_dir)
-    registry = PolicyRegistry(runtime_only=False)
-    try:
-        loaded_count = load_policies_from_directory(policy_dir, registry=registry)
-    except FileNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "not_found", "message": str(exc)},
-        ) from exc
-    except NotADirectoryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error": "not_a_directory", "message": str(exc)},
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error": "invalid_policy", "message": str(exc)},
-        ) from exc
-
-    _, runtime_registry = load_runtime_registry_from_directory(policy_dir)
-
-    persisted_count = 0
-    policy_store = getattr(http_request.app.state, "policy_store", None)
-    if policy_store is not None:
+    with _policy_reload_lock:
+        registry = PolicyRegistry(runtime_only=False)
+        try:
+            loaded_count = load_policies_from_directory(policy_dir, registry=registry)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, NotADirectoryError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        from notification.policies import PolicyStatus
+        runtime_registry = PolicyRegistry()
         for policy in registry.get_all().values():
-            result = policy_store.save_policy(policy)
-            if result.created:
-                persisted_count += 1
-
-    configure_policy_registry(registry=runtime_registry)
-    notification_types = sorted(runtime_registry.list_notification_types())
-    return PolicyReloadResponse(
-        loaded_count=loaded_count,
-        persisted_count=persisted_count,
-        policy_count=len(runtime_registry),
-        notification_types=notification_types,
-    )
+            if policy.status == PolicyStatus.ACTIVE:
+                runtime_registry.register(policy)
+        policy_store = getattr(http_request.app.state, "policy_store", None)
+        try:
+            persisted_count = policy_store.save_snapshot(list(registry.get_all().values())) if policy_store else 0
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        configure_policy_registry(registry=runtime_registry)
+        return PolicyReloadResponse(loaded_count=loaded_count, persisted_count=persisted_count,
+            policy_count=len(runtime_registry), notification_types=sorted(runtime_registry.list_notification_types()))
 
 
 # Re-export for backward compatibility. agsignal_mcp.tools and any other

@@ -100,6 +100,7 @@ def _client(
     from agsignal.app import create_app
 
     app = create_app(
+        skip_persistence_config=True,
         dlq_service=dlq_service,
         policy_store=policy_store,
         channel_health_tracker=channel_health_tracker,
@@ -149,7 +150,7 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native(
 
     assert response.status_code == 200
     openapi = response.json()
-    assert openapi["info"]["title"] == "AGSignal"
+    assert openapi["info"]["title"] == "UNS"
     assert "/health" in openapi["paths"]
     assert "/ready" in openapi["paths"]
     assert "/api/v1/notifications" in openapi["paths"]
@@ -167,7 +168,7 @@ def test_healthz_aliases_health() -> None:
     healthz_body = client.get("/healthz").json()
     assert healthz_body == health_body
     assert healthz_body["status"] == "alive"
-    assert healthz_body["service"] == "agsignal"
+    assert healthz_body["service"] == "uns"
 
 
 def test_readyz_aliases_ready() -> None:
@@ -219,7 +220,7 @@ def test_ready_does_not_require_market_insights_dependencies() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ready"
-    assert data["service"] == "agsignal"
+    assert data["service"] == "uns"
     assert "market" not in str(data).lower()
     assert "atp" not in str(data).lower()
 
@@ -414,7 +415,7 @@ def test_send_signal_publishes_optional_websocket_fanout() -> None:
 
     from agsignal.app import create_app
 
-    app = create_app()
+    app = create_app(skip_persistence_config=True)
     fanout = CapturingFanout()
     app.state.websocket_fanout = fanout
     client = TestClient(app)
@@ -440,7 +441,7 @@ def test_send_signal_records_websocket_replay_payload() -> None:
 
     from agsignal.app import create_app
 
-    app = create_app()
+    app = create_app(skip_persistence_config=True)
     client = TestClient(app)
     payload = _payload()
     agent_id = uuid4()

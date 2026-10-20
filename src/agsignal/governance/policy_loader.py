@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from agsignal.governance.errors import PolicyLoadError

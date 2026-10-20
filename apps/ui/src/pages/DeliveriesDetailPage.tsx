@@ -216,6 +216,19 @@ export function DeliveriesDetailPage() {
         </nav>
         <h1>Delivery Timeline</h1>
       </header>
+      {timeline.runtime_state && (
+        <section aria-labelledby="runtime-state-heading">
+          <h2 id="runtime-state-heading">Delivery and human response</h2>
+          <dl>
+            <dt>Delivery</dt><dd>{timeline.runtime_state.delivery_status}</dd>
+            <dt>Human response</dt><dd>{timeline.runtime_state.ack_status ?? 'No response deadline started'}</dd>
+            <dt>Response deadline</dt><dd>{timeline.runtime_state.deadline ? new Date(timeline.runtime_state.deadline * 1000).toLocaleString() : 'Not started'}</dd>
+            <dt>Recovery</dt><dd>{timeline.runtime_state.dead_letter ? 'Delivery exhausted. Operator review required.' : 'No exhausted delivery'}</dd>
+            <dt>Policy configuration</dt><dd style={{ overflowWrap: 'anywhere' }}>{timeline.runtime_state.policy_config_hash}</dd>
+            <dt>Evaluation</dt><dd>{timeline.runtime_state.policy_evaluation_id}</dd>
+          </dl>
+        </section>
+      )}
 
       <div className="detail-grid">
         <section className="detail-section summary-section" data-testid="summary-section">

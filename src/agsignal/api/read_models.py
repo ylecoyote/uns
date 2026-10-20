@@ -532,22 +532,22 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
 
         # Add ack audit events (if no event_type filter or it's an ack type)
         if filter_criteria.event_type is None or filter_criteria.event_type.startswith("ack."):
-            for record in self._audit_store.ack_audits:
+            for ack_record in self._audit_store.ack_audits:
                 # Filter by notification_id if specified
                 if (
                     filter_criteria.notification_id
-                    and record.notification_id != filter_criteria.notification_id
+                    and ack_record.notification_id != filter_criteria.notification_id
                 ):
                     continue
                 # Filter by time range
                 if (
                     filter_criteria.start_time
-                    and record.audit_created_at < filter_criteria.start_time
+                    and ack_record.audit_created_at < filter_criteria.start_time
                 ):
                     continue
-                if filter_criteria.end_time and record.audit_created_at >= filter_criteria.end_time:
+                if filter_criteria.end_time and ack_record.audit_created_at >= filter_criteria.end_time:
                     continue
-                event = self._ack_record_to_event(record)
+                event = self._ack_record_to_event(ack_record)
                 if filter_criteria.event_type and event.event_type != filter_criteria.event_type:
                     continue
                 all_events.append(event)
@@ -592,6 +592,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             session_factory: Callable that returns a SQLAlchemy Session
                             (e.g., sessionmaker or scoped_session)
         """
+        self.runtime: Any = None
         self._session_factory = session_factory
         logger.info("SQLAlchemyReadModelAdapter initialized")
 

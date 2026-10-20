@@ -23,14 +23,10 @@ def _env(
     *,
     stacklevel: int = 3,
 ) -> str | None:
-    value = os.environ.get(name)
+    value = os.environ.get(legacy_name)  # UNS is the canonical product namespace.
     if value is not None:
         return value
-    legacy = os.environ.get(legacy_name)
-    if legacy is not None:
-        _legacy_warn(legacy_name, name, stacklevel=stacklevel + 1)
-        return legacy
-    return default
+    return os.environ.get(name, default)
 
 
 def _env_int_pair(name: str, legacy_name: str, default: int) -> int:

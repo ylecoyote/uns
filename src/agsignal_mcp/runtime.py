@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from uns.runtime import Runtime
 
 from agsignal._in_memory import InMemoryRedisList
 from agsignal.responses import SendNotificationResponse
@@ -36,6 +39,7 @@ class RuntimeState:
     consolidate this with a Redis-backed idempotency service.
     """
 
+    runtime: Runtime | None = None
     audit_store: AuditStore = field(default_factory=InMemoryAuditStore)
     dlq_service: DLQService = field(
         default_factory=lambda: DLQService(redis_client=InMemoryRedisList())

@@ -376,3 +376,14 @@ class TestIntegration:
         assert python_violations == []
         assert templates_violations == []
         assert flask_violations == []
+
+
+def test_vendor_python_is_not_application_code(tmp_path):
+    ui=tmp_path/'apps'/'ui'
+    vendor=ui/'node_modules'/'dependency'
+    vendor.mkdir(parents=True)
+    (vendor/'helper.py').write_text('pass')
+    from scripts.ci.check_ui_boundary import check_python_files
+    assert not check_python_files(ui)
+    (ui/'application.py').write_text('pass')
+    assert len(check_python_files(ui))==1

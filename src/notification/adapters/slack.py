@@ -10,7 +10,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from notification.adapters.base import (
     AdapterConfigurationError,
@@ -156,7 +156,7 @@ class SlackClient:
                     retryable=error in ("rate_limited", "service_unavailable"),
                 )
 
-            return data
+            return cast(dict[str, Any], data)
 
         except httpx.TimeoutException as e:
             raise AdapterTimeoutError(
@@ -202,7 +202,7 @@ class SlackClient:
                     f"Slack auth failed: {data.get('error', 'unknown')}",
                     channel=Channel.SLACK,
                 )
-            return data
+            return cast(dict[str, Any], data)
 
         except httpx.HTTPStatusError as e:
             raise AdapterConfigurationError(
@@ -376,7 +376,7 @@ class SlackAdapter(BaseAdapter):
         """
         # Check for channel override in metadata
         if "slack_channel" in notification.metadata:
-            return notification.metadata["slack_channel"]
+            return str(notification.metadata["slack_channel"])
         return self.config.default_channel
 
     def _build_blocks(self, notification: Notification) -> list[dict[str, Any]]:

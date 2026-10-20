@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -55,10 +54,10 @@ class RequestOrigin(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    ip: Optional[str] = None
-    hostname: Optional[str] = None
-    region: Optional[str] = None
-    jurisdiction: Optional[str] = None
+    ip: str | None = None
+    hostname: str | None = None
+    region: str | None = None
+    jurisdiction: str | None = None
 
 
 class DecisionRecord(BaseModel):
@@ -91,14 +90,14 @@ class DecisionRecord(BaseModel):
 
     # === Optional ===
 
-    correlation_id: Optional[str] = Field(None, description="Cross-AGSignal-stream forensic linkage")
-    trace_id: Optional[str] = Field(None, description="Distributed-trace integration (W3C Trace Context); distinct from correlation_id")
-    span_id: Optional[str] = Field(None, description="Sub-trace causal node")
-    parent_span_id: Optional[str] = Field(None, description="Trace tree reconstruction")
-    tenant_id: Optional[str] = Field(None, description="Multi-tenant scoping (org_id / account_id alias acceptable)")
-    resource_id: Optional[str] = Field(None, description="What the decision was about (model / tool / file / account / transaction)")
-    resource_type: Optional[str] = Field(None, description="Taxonomy of resource_id")
-    parent_decision_id: Optional[str] = Field(None, description="Replay/re-evaluation chain (NOT correlation_id; semantically distinct)")
-    request_origin: Optional[RequestOrigin] = Field(None, description="Structured: ip, hostname, region, jurisdiction")
-    model_id: Optional[str] = Field(None, description="AI provenance — model identifier (when agent provenance is recorded)")
-    model_version: Optional[str] = Field(None, description="Paired with model_id")
+    correlation_id: str | None = Field(None, description="Cross-AGSignal-stream forensic linkage")
+    trace_id: str | None = Field(None, description="Distributed-trace integration (W3C Trace Context); distinct from correlation_id")
+    span_id: str | None = Field(None, description="Sub-trace causal node")
+    parent_span_id: str | None = Field(None, description="Trace tree reconstruction")
+    tenant_id: str | None = Field(None, description="Multi-tenant scoping (org_id / account_id alias acceptable)")
+    resource_id: str | None = Field(None, description="What the decision was about (model / tool / file / account / transaction)")
+    resource_type: str | None = Field(None, description="Taxonomy of resource_id")
+    parent_decision_id: str | None = Field(None, description="Replay/re-evaluation chain (NOT correlation_id; semantically distinct)")
+    request_origin: RequestOrigin | None = Field(None, description="Structured: ip, hostname, region, jurisdiction")
+    model_id: str | None = Field(None, description="AI provenance — model identifier (when agent provenance is recorded)")
+    model_version: str | None = Field(None, description="Paired with model_id")

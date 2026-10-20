@@ -1,11 +1,11 @@
-# AGSignal Console Data Contracts
+# UNS Console Data Contracts
 
 This document defines the response shapes, filters, pagination, and error
-semantics for AGSignal Console data endpoints.
+semantics for UNS Console data endpoints.
 
 ## Endpoint Path Convention
 
-AGSignal Console read endpoints are mounted under `/ui/*` (for example,
+UNS Console read endpoints are mounted under `/ui/*` (for example,
 `/ui/deliveries` and `/ui/audit`). Producer/admin API endpoints use `/api/v1/*`;
 do not document Console read endpoints as `/api/v1/*` unless the implementation
 adds that public proxy.
@@ -798,7 +798,7 @@ interface BatchTimelineResponse {
 
 ## Rate Limiting
 
-AGSignal Console endpoints do not currently add HTTP rate-limit headers. Channel
+UNS Console endpoints do not currently add HTTP rate-limit headers. Channel
 delivery rate limiting is documented separately in
 [Delivery Semantics](../sections/delivery-semantics.md) and [API Reference](../API.md#rate-limiting).
 

@@ -11,8 +11,6 @@ code MUST NOT raise bare `Exception` or `ValueError` from the governance path.
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class GovernanceError(Exception):
     """Base class for all governance engine errors.
@@ -41,8 +39,8 @@ class PolicyEvaluationError(GovernanceError):
     def __init__(
         self,
         message: str,
-        rule_id: Optional[str] = None,
-        predicate: Optional[str] = None,
+        rule_id: str | None = None,
+        predicate: str | None = None,
     ) -> None:
         super().__init__(message)
         self.rule_id = rule_id
@@ -57,7 +55,7 @@ class PolicyEvaluationError(GovernanceError):
         return " | ".join(parts)
 
 
-class ContextSchemaViolation(GovernanceError):
+class ContextSchemaViolation(GovernanceError):  # noqa: N818 - retained public exception name
     """Raised when a context capsule fails ContextSchema validation at
     evaluate-time, or when a policy field reference is not in the registered
     ContextSchema at policy-load time.
@@ -66,8 +64,8 @@ class ContextSchemaViolation(GovernanceError):
     def __init__(
         self,
         message: str,
-        field_path: Optional[str] = None,
-        schema_name: Optional[str] = None,
+        field_path: str | None = None,
+        schema_name: str | None = None,
     ) -> None:
         super().__init__(message)
         self.field_path = field_path
@@ -83,7 +81,7 @@ class MissingFieldError(ContextSchemaViolation):
     evaluate-time).
     """
 
-    def __init__(self, field_path: str, schema_name: Optional[str] = None) -> None:
+    def __init__(self, field_path: str, schema_name: str | None = None) -> None:
         super().__init__(
             message=f"Required field {field_path!r} missing from context capsule",
             field_path=field_path,
@@ -91,7 +89,7 @@ class MissingFieldError(ContextSchemaViolation):
         )
 
 
-class EngineFailure(GovernanceError):
+class EngineFailure(GovernanceError):  # noqa: N818 - retained public exception name
     """Catch-all for engine-internal failures not classified above
     (e.g., evaluation timeout, attribute-source plugin error, unexpected
     exception inside decide()). Triggers fail-mode per ADR Fail-mode Semantics.

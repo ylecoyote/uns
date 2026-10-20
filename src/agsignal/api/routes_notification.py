@@ -20,6 +20,11 @@ name for handler signatures and for any external caller importing
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from uns.runtime import Runtime
+
 import logging
 from uuid import UUID
 
@@ -41,7 +46,7 @@ from agsignal.responses import (
 )
 from agsignal.signaling import acknowledge, dismiss
 from notification.acknowledgment import InvalidAckTransitionError
-from notification.audit import AuditPersistenceError
+from notification.audit import AuditPersistenceError, AuditStore
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +83,17 @@ async def acknowledge_notification(
     get_engine()
 
     request = request or AckRequest()
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if runtime is not None:
+        from uns.runtime import Conflict
+        actor = resolve_requested_actor(principal, request.acked_by)
+        try:
+            return runtime.acknowledge(notification_id, actor=actor, dismiss=False, metadata=request.metadata)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Notification not found") from exc
+        except Conflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     acked_by = resolve_requested_actor(principal, request.acked_by)
     audit_store = getattr(http_request.app.state, "audit_store", None)
 
@@ -86,7 +102,7 @@ async def acknowledge_notification(
             notification_id=notification_id,
             acked_by=acked_by,
             metadata=request.metadata,
-            audit_store=audit_store,
+            audit_store=cast(AuditStore, audit_store),
         )
     except KeyError as exc:
         logger.warning("Ack failed - notification not found: %s", notification_id)
@@ -158,6 +174,17 @@ async def dismiss_notification(
     get_engine()
 
     request = request or DismissRequest()
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if runtime is not None:
+        from uns.runtime import Conflict
+        actor = resolve_requested_actor(principal, request.dismissed_by)
+        try:
+            return runtime.acknowledge(notification_id, actor=actor, dismiss=True, metadata=request.metadata)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Notification not found") from exc
+        except Conflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     dismissed_by = resolve_requested_actor(principal, request.dismissed_by)
     audit_store = getattr(http_request.app.state, "audit_store", None)
 
@@ -166,7 +193,7 @@ async def dismiss_notification(
             notification_id=notification_id,
             dismissed_by=dismissed_by,
             metadata=request.metadata,
-            audit_store=audit_store,
+            audit_store=cast(AuditStore, audit_store),
         )
     except KeyError as exc:
         logger.warning("Dismiss failed - notification not found: %s", notification_id)
@@ -220,8 +247,19 @@ async def dismiss_notification(
 )
 async def get_notification_status(
     notification_id: UUID,
+    http_request: Request,
 ) -> NotificationStatusResponse:
     """HTTP adapter — delegates to agsignal.queries.get_notification_status."""
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if runtime is not None:
+        try:
+            row = runtime.get(notification_id)
+        except KeyError:
+            return NotificationStatusResponse(notification_id=notification_id, found=False)
+        n = row["notification"]
+        return NotificationStatusResponse(notification_id=notification_id, found=True,
+            notification_type=n["notification_type"], intent=n["intent"], title=n["title"],
+            message=n["message"], require_ack=n["require_ack"], created_at=n["created_at"], ack_status=row["ack_status"])
     return await _query_notification_status(notification_id=notification_id)
 
 
@@ -234,8 +272,15 @@ async def get_notification_status(
 )
 async def get_ack_status(
     notification_id: UUID,
+    http_request: Request,
 ) -> AckStatusResponse:
     """HTTP adapter — delegates to agsignal.queries.get_ack_status."""
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if runtime is not None:
+        try:
+            return AckStatusResponse(notification_id=notification_id, ack_status=runtime.get(notification_id)["ack_status"])
+        except KeyError:
+            return AckStatusResponse(notification_id=notification_id, ack_status=None)
     return await _query_ack_status(notification_id=notification_id)
 
 

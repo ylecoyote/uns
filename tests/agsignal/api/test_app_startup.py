@@ -236,13 +236,13 @@ class TestCreateApp:
             app = create_app()
 
         # Verify persistence was configured
-        from agsignal.api.read_models import InMemoryReadModelAdapter, get_read_model_adapter
+        from agsignal.api.read_models import get_read_model_adapter
 
         adapter = get_read_model_adapter()
-        assert isinstance(adapter, InMemoryReadModelAdapter)
+        assert type(adapter).__name__ == "SQLAlchemyReadModelAdapter"
 
         assert app is not None
-        assert app.title == "AGSignal"
+        assert app.title == "UNS"
 
     def test_create_app_skip_persistence_config(self):
         """Test create_app skips persistence config when requested."""
@@ -260,7 +260,7 @@ class TestCreateApp:
         assert rm._read_model_adapter is None
 
         assert app is not None
-        assert app.title == "AGSignal"
+        assert app.title == "UNS"
 
     def test_create_app_includes_ui_routes(self):
         """Test create_app includes UI routes."""
@@ -268,7 +268,7 @@ class TestCreateApp:
             app = create_app()
 
         # Check that UI routes are registered
-        route_paths = [route.path for route in app.routes]
+        route_paths = list(app.openapi()["paths"])
         assert "/ui/deliveries" in route_paths
         assert "/ui/deliveries/{notification_id}" in route_paths
         assert "/ui/audit" in route_paths
@@ -287,7 +287,7 @@ class TestCreateApp:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "alive"
-        assert body["service"] == "agsignal"
+        assert body["service"] == "uns"
         assert "version" in body
 
     def test_healthz_returns_kubernetes_convention_payload(self):
@@ -302,7 +302,7 @@ class TestCreateApp:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "alive"
-        assert body["service"] == "agsignal"
+        assert body["service"] == "uns"
         assert "version" in body
 
     def test_ready_reports_persistence_dependencies(self):
@@ -317,7 +317,7 @@ class TestCreateApp:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "ready"
-        assert body["service"] == "agsignal"
+        assert body["service"] == "uns"
         assert "read_model_adapter" in body
         assert "audit_logger" in body
 
@@ -477,7 +477,7 @@ class TestCreateApp:
             response = client.get("/openapi.json")
 
         assert response.status_code == 200
-        assert response.json()["info"]["title"] == "AGSignal"
+        assert response.json()["info"]["title"] == "UNS"
 
     def test_create_app_rejects_unknown_cors_origin(self):
         """CORS stays closed by default for non-console origins."""
@@ -518,7 +518,8 @@ class TestEndToEndIntegration:
 
         # Create app with in-memory storage
         with patch.dict(os.environ, {}, clear=True):
-            app = create_app()
+            configure_persistence()
+            app = create_app(skip_persistence_config=True)
 
         # Simulate a notification delivery by writing to the audit store
         from notification.audit import AuditRecord, get_audit_logger
@@ -579,7 +580,8 @@ class TestEndToEndIntegration:
 
         # Create app with in-memory storage
         with patch.dict(os.environ, {}, clear=True):
-            app = create_app()
+            configure_persistence()
+            app = create_app(skip_persistence_config=True)
 
         # Write an audit record
         from notification.audit import AuditRecord, get_audit_logger

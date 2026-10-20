@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from notification.policies import (
     NotificationPolicy,
@@ -28,7 +28,10 @@ def load_policy_from_yaml(
     if not policy_path.exists():
         raise FileNotFoundError(str(policy_path))
 
-    data = yaml.safe_load(policy_path.read_text())
+    try:
+        data = yaml.safe_load(policy_path.read_text())
+    except yaml.YAMLError as exc:
+        raise ValueError("Invalid policy YAML") from exc
     if data is None:
         raise ValueError(f"Empty or null policy YAML: {policy_path}")
     if not isinstance(data, dict):

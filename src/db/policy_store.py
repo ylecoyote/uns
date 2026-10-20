@@ -41,58 +41,69 @@ class SQLAlchemyPolicyStore:
         return self._session_factory()
 
     def save_policy(self, policy: NotificationPolicy) -> PolicySaveResult:
-        """Persist a policy, skipping duplicate semantic content."""
+        """Persist one policy atomically."""
+        with self._session_factory.begin() as session:
+            return self._save_policy(session, policy)
+
+    def save_snapshot(self, policies: list[NotificationPolicy]) -> int:
+        """Persist an entire validated snapshot or leave storage unchanged."""
+        with self._session_factory.begin() as session:
+            results = [self._save_policy(session, policy) for policy in policies]
+            active_types = [p.notification_type for p in policies if p.status == PolicyStatus.ACTIVE]
+            from sqlalchemy import update
+            session.execute(update(PersistedNotificationPolicy).where(
+                PersistedNotificationPolicy.status == PolicyStatus.ACTIVE.value,
+                PersistedNotificationPolicy.notification_type.not_in(active_types)
+            ).values(status=PolicyStatus.RETIRED.value, is_active=False))
+            return sum(result.created for result in results)
+
+    def _save_policy(self, session: Session, policy: NotificationPolicy) -> PolicySaveResult:
         content = _policy_to_persisted_content(policy)
         content_hash = compute_policy_content_hash(content)
-        session = self._get_session()
-        try:
-            duplicate = session.execute(
-                select(PersistedNotificationPolicy).where(
-                    PersistedNotificationPolicy.content_hash == content_hash
-                )
-            ).scalar_one_or_none()
-            if duplicate is not None:
-                return PolicySaveResult(
-                    policy_id=duplicate.policy_id,
-                    content_hash=content_hash,
-                    created=False,
-                    previous_version_id=duplicate.previous_version_id,
-                )
-
-            now = datetime.now(UTC)
-            previous_version_id = self._retire_current_policy(session, policy, now)
-            row = PersistedNotificationPolicy(
-                notification_type=policy.notification_type,
-                version=policy.version,
-                status=policy.status.value,
-                content_hash=content_hash,
-                previous_version_id=previous_version_id,
-                delivery_mode=policy.delivery_mode.value if policy.delivery_mode else None,
-                channels=content["channels"],
-                delivery_mode_by_autonomy=content["delivery_mode_by_autonomy"],
-                require_ack=content["require_ack"],
-                channels_escalation=content["channels_escalation"],
-                ack_timeout_minutes=policy.ack_timeout_minutes,
-                dedup_window_seconds=policy.dedup_window_seconds,
-                mode_overrides=content["mode_overrides"],
-                description=None,
-                is_active=policy.status in (PolicyStatus.ACTIVE, PolicyStatus.PREVIEW),
-                activated_at=now if policy.status == PolicyStatus.ACTIVE else None,
-                retired_at=now if policy.status == PolicyStatus.RETIRED else None,
+        duplicate = session.execute(
+            select(PersistedNotificationPolicy).where(
+                PersistedNotificationPolicy.content_hash == content_hash
             )
-            session.add(row)
-            session.commit()
+        ).scalar_one_or_none()
+        if duplicate is not None:
+            if duplicate.status == PolicyStatus.RETIRED.value and policy.status != PolicyStatus.RETIRED:
+                raise ValueError("A retired policy version cannot be reactivated; publish a new version")
             return PolicySaveResult(
-                policy_id=row.policy_id,
+                policy_id=duplicate.policy_id,
                 content_hash=content_hash,
-                created=True,
-                previous_version_id=previous_version_id,
+                created=False,
+                previous_version_id=duplicate.previous_version_id,
             )
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+
+        now = datetime.now(UTC)
+        previous_version_id = self._retire_current_policy(session, policy, now)
+        row = PersistedNotificationPolicy(
+            notification_type=policy.notification_type,
+            version=policy.version,
+            status=policy.status.value,
+            content_hash=content_hash,
+            previous_version_id=previous_version_id,
+            delivery_mode=policy.delivery_mode.value if policy.delivery_mode else None,
+            channels=content["channels"],
+            delivery_mode_by_autonomy=content["delivery_mode_by_autonomy"],
+            require_ack=content["require_ack"],
+            channels_escalation=content["channels_escalation"],
+            ack_timeout_minutes=policy.ack_timeout_minutes,
+            dedup_window_seconds=policy.dedup_window_seconds,
+            mode_overrides=content["mode_overrides"],
+            description=None,
+            is_active=policy.status in (PolicyStatus.ACTIVE, PolicyStatus.PREVIEW),
+            activated_at=now if policy.status == PolicyStatus.ACTIVE else None,
+            retired_at=now if policy.status == PolicyStatus.RETIRED else None,
+        )
+        session.add(row)
+        session.flush()
+        return PolicySaveResult(
+            policy_id=row.policy_id,
+            content_hash=content_hash,
+            created=True,
+            previous_version_id=previous_version_id,
+        )
 
     def load_registry(
         self,

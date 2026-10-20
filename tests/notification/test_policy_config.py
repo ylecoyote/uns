@@ -117,8 +117,9 @@ def test_apply_policy_delta_creates_next_draft_version_with_new_hash() -> None:
         config_json={"routing": {"channels": {"LIVE": ["SLACK", "WEBSOCKET"]}}},
         created_by="operator@example.com",
     )
-    delta = _approved_delta()
+    delta = _approved_delta().model_copy(update={"baseline_hash": envelope.config_hash, "baseline_version": envelope.version})
 
+    delta = delta.model_copy(update={"approval_candidate_hash": delta.candidate_hash})
     updated = apply_policy_delta(envelope, delta, actor="operator@example.com")
 
     assert updated.policy_type == envelope.policy_type

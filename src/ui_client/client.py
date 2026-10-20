@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 import httpx
@@ -263,7 +263,7 @@ class UIApiClient:
         if response.status_code >= 400:
             self._handle_error_response(response)
 
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     # =========================================================================
     # Delivery Endpoints

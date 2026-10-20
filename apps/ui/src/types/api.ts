@@ -115,6 +115,14 @@ export interface AutonomyContextResponse {
 }
 
 export interface DeliveryTimelineResponse {
+  runtime_state?: {
+    delivery_status: string;
+    ack_status: string | null;
+    deadline: number | null;
+    dead_letter: boolean;
+    policy_config_hash: string;
+    policy_evaluation_id: string;
+  } | null;
   notification_id: string;
   notification_type: string;
   intent: NotificationIntent;
