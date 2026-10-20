@@ -39,11 +39,19 @@ class Adapter(BaseAdapter):
 
 
 def request(key="one", **changes):
-    payload = dict(
-        notification_type="test.remediation", intent="SAFETY", title="Alarm", message="Alarm",
-        source="regression", autonomy_context={"agent_id": "00000000-0000-0000-0000-000000000001", "autonomy_mode": "LIVE"},
-        idempotency_key=key, dedup_key="same-alarm",
-    )
+    payload = {
+        "notification_type": "test.remediation",
+        "intent": "SAFETY",
+        "title": "Alarm",
+        "message": "Alarm",
+        "source": "regression",
+        "autonomy_context": {
+            "agent_id": "00000000-0000-0000-0000-000000000001",
+            "autonomy_mode": "LIVE",
+        },
+        "idempotency_key": key,
+        "dedup_key": "same-alarm",
+    }
     payload.update(changes)
     return SendNotificationRequest(**payload)
 
@@ -57,7 +65,9 @@ def state(tmp_path):
     registry = SimpleAdapterRegistry()
     registry.register(adapter)
     url = f"sqlite:///{tmp_path}/delivery.db"
-    runtime = Runtime(url, create_tables=True, adapters=registry, clock=lambda: now[0], max_attempts=1)
+    runtime = Runtime(
+        url, create_tables=True, adapters=registry, clock=lambda: now[0], max_attempts=1
+    )
     return runtime, adapter, registry, now, url
 
 
@@ -94,7 +104,9 @@ async def test_pending_followers_elect_one_successor_after_owner_failure(state):
     await runtime.run_once()
     assert len(adapter.calls) == 2
     assert runtime.get(successor["id"])["status"] == "DELIVERED"
-    assert all(runtime.get(row["id"])["status"] == "DEDUPLICATED" for row in rows if row != successor)
+    assert all(
+        runtime.get(row["id"])["status"] == "DEDUPLICATED" for row in rows if row != successor
+    )
     assert any(e["kind"] == "DEDUP_OWNER_PROMOTED" for e in runtime.events(successor["id"]))
 
 
@@ -125,9 +137,13 @@ async def test_replay_has_fresh_budget_with_immutable_cumulative_history(state):
     row = runtime.get(first.notification_id)
     assert row["status"] == "DELIVERED"
     assert row["attempts"] == 2 and row["cycle"] == 2 and row["cycle_attempts"] == 1
-    assert runtime.events(first.notification_id)[:len(before)] == before
+    assert runtime.events(first.notification_id)[: len(before)] == before
     assert len(adapter.calls) == 2
-    results = [e["payload"] for e in runtime.events(first.notification_id) if e["kind"] == "DELIVERY_RESULT"]
+    results = [
+        e["payload"]
+        for e in runtime.events(first.notification_id)
+        if e["kind"] == "DELIVERY_RESULT"
+    ]
     assert [(r["cycle"], r["cycle_attempt"]) for r in results] == [(1, 1), (2, 1)]
 
 
@@ -152,7 +168,11 @@ async def test_expired_worker_never_calls_external_fallback(state, takeover):
     notification = runtime.get(first.notification_id)["notification"]
     notification["channels"] = ["SLACK", "EMAIL"]
     with runtime.sessions.begin() as session:
-        session.execute(update(work).where(work.c.id == str(first.notification_id)).values(notification=notification))
+        session.execute(
+            update(work)
+            .where(work.c.id == str(first.notification_id))
+            .values(notification=notification)
+        )
     second_registry = SimpleAdapterRegistry()
     second_email = Adapter(Channel.EMAIL)
     second_registry.register(second_email)
@@ -226,7 +246,7 @@ async def test_process_death_after_provider_effect_recovers_with_duplicate_warni
     runtime, adapter, _, now, url = state
     first = runtime.accept(request(), principal="producer")
     marker = tmp_path / "provider-receipt"
-    script = r'''
+    script = r"""
 import asyncio, os, sys
 from notification.adapters.base import BaseAdapter
 from notification.models import Channel
@@ -245,9 +265,19 @@ registry = SimpleAdapterRegistry()
 registry.register(Provider())
 runtime = Runtime(sys.argv[1], adapters=registry, clock=lambda: 1000.0, max_attempts=3)
 asyncio.run(runtime.dispatch(sys.argv[2]))
-'''
-    environment = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src"), "PYTHONDONTWRITEBYTECODE": "1"}
-    process = subprocess.run([sys.executable, "-c", script, url, str(first.notification_id), str(marker)], env=environment, capture_output=True, text=True, timeout=20)
+"""
+    environment = {
+        **os.environ,
+        "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src"),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    process = subprocess.run(
+        [sys.executable, "-c", script, url, str(first.notification_id), str(marker)],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
     assert process.returncode == 73, process.stderr
     assert marker.read_text() == str(first.notification_id)
     claimed = runtime.get(first.notification_id)
@@ -260,3 +290,48 @@ asyncio.run(runtime.dispatch(sys.argv[2]))
     attempts = [e for e in runtime.events(first.notification_id) if e["kind"] == "ATTEMPT_STARTED"]
     assert attempts[-1]["payload"]["recovery_may_repeat_provider_effect"] is True
     assert runtime.get(first.notification_id)["cycle_attempts"] == 2
+
+
+@pytest.mark.asyncio
+async def test_provider_success_after_lease_expiry_is_recorded_as_ambiguous(state):
+    runtime, adapter, _, now, _ = state
+    first = runtime.accept(request(), principal="producer")
+
+    async def pause_after_effect(notification):
+        now[0] += runtime.lease_seconds + 1
+
+    adapter.effect = pause_after_effect
+    assert not await runtime.dispatch(first.notification_id)
+    row = runtime.get(first.notification_id)
+    assert row["status"] == "PENDING" and row["delivered_at"] is None
+    event = runtime.events(first.notification_id)[-1]
+    assert event["kind"] == "LEASE_LOST"
+    assert event["payload"]["provider_effect_may_have_occurred"]
+
+
+@pytest.mark.asyncio
+async def test_successful_owner_suppresses_only_equivalent_obligation(state):
+    runtime, adapter, _, _, _ = state
+    first = await runtime.send(request(), principal="producer")
+    second = await runtime.send(request("two"), principal="producer")
+    assert second.status == DeliveryStatus.DEDUPLICATED
+    assert runtime.get(second.notification_id)["dedup_owner_id"] == str(first.notification_id)
+    assert str(first.notification_id) in second.message
+    assert len(adapter.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_followers_stay_linked_while_owner_has_retry_budget(state):
+    runtime, adapter, _, now, _ = state
+    runtime.max_attempts = 2
+    first = runtime.accept(request(), principal="producer")
+    follower = runtime.accept(request("two"), principal="producer")
+    adapter.success = False
+    await runtime.dispatch(first.notification_id)
+    assert runtime.get(first.notification_id)["status"] == "PENDING"
+    assert runtime.get(follower.notification_id)["dedup_owner_id"] == str(first.notification_id)
+    now[0] += 2
+    adapter.success = True
+    await runtime.run_once()
+    assert runtime.get(follower.notification_id)["status"] == "DEDUPLICATED"
+    assert len(adapter.calls) == 2

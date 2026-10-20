@@ -48,6 +48,10 @@ from notification.rate_limiting import acquire_rate_limit
 logger = logging.getLogger(__name__)
 
 
+class DeliveryLeaseLostError(Exception):
+    """A durable delivery owner lost permission to start another provider call."""
+
+
 class DeliveryError(Exception):
     """Raised when GUARANTEED delivery fails all channels."""
 
@@ -180,7 +184,9 @@ class DeliveryService:
     check_deduplication: bool = True
     adapter_timeout_seconds: float = 10.0
 
-    async def deliver(self, notification: Notification) -> NotificationResult:
+    async def deliver(
+        self, notification: Notification, *, before_attempt: Callable[[Channel], None] | None = None
+    ) -> NotificationResult:
         """Deliver a notification through the configured channels.
 
         This method implements the strict delivery flow:
@@ -206,7 +212,9 @@ class DeliveryService:
 
         # Step 1: Deduplication check
         dedup_window = policy_registry.get_dedup_window(notification.notification_type)
-        if self.check_deduplication and should_deduplicate(notification, window_seconds=dedup_window):
+        if self.check_deduplication and should_deduplicate(
+            notification, window_seconds=dedup_window
+        ):
             result = NotificationResult(
                 notification_id=notification.notification_id,
                 status=DeliveryStatus.DEDUPLICATED,
@@ -248,7 +256,7 @@ class DeliveryService:
 
         # Step 3: WebSocket delivery (fire-and-forget, no rate limit check)
         if Channel.WEBSOCKET in channels:
-            ws_result = await self._deliver_websocket(notification)
+            ws_result = await self._deliver_websocket(notification, before_attempt=before_attempt)
             channels_attempted.append(Channel.WEBSOCKET)
             if ws_result.success:
                 channels_succeeded.append(Channel.WEBSOCKET)
@@ -264,12 +272,12 @@ class DeliveryService:
         if delivery_mode == DeliveryMode.GUARANTEED:
             # Sequential fallback for GUARANTEED
             persistent_result = await self._deliver_guaranteed(
-                notification, persistent_channels
+                notification, persistent_channels, before_attempt=before_attempt
             )
         else:
             # Attempt all channels for BEST_EFFORT
             persistent_result = await self._deliver_best_effort(
-                notification, persistent_channels
+                notification, persistent_channels, before_attempt=before_attempt
             )
 
         channels_attempted.extend(persistent_result["attempted"])
@@ -278,7 +286,11 @@ class DeliveryService:
         channel_errors.update(persistent_result["errors"])
 
         # Determine overall status
-        if (persistent_result["succeeded"] if delivery_mode == DeliveryMode.GUARANTEED else channels_succeeded):
+        if (
+            persistent_result["succeeded"]
+            if delivery_mode == DeliveryMode.GUARANTEED
+            else channels_succeeded
+        ):
             status = DeliveryStatus.SUCCESS
         elif delivery_mode == DeliveryMode.GUARANTEED and not channels_succeeded:
             # GUARANTEED failure: all persistent channels failed
@@ -369,7 +381,21 @@ class DeliveryService:
 
         return result
 
-    async def _deliver_websocket(self, notification: Notification) -> DeliveryResult:
+    async def _attempt_adapter(
+        self,
+        adapter: BaseAdapter,
+        notification: Notification,
+        before_attempt: Callable[[Channel], None] | None,
+    ) -> DeliveryResult:
+        # Run inside the wait_for task, immediately before adapter entry. There
+        # must be no await between the ownership check and starting the effect.
+        if before_attempt is not None:
+            before_attempt(adapter.channel)
+        return await adapter.deliver(notification)
+
+    async def _deliver_websocket(
+        self, notification: Notification, *, before_attempt: Callable[[Channel], None] | None = None
+    ) -> DeliveryResult:
         """Deliver via WebSocket (fire-and-forget).
 
         WebSocket delivery is non-blocking and doesn't affect overall
@@ -385,7 +411,10 @@ class DeliveryService:
             )
 
         try:
-            result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
+            result = await asyncio.wait_for(
+                self._attempt_adapter(adapter, notification, before_attempt),
+                timeout=self.adapter_timeout_seconds,
+            )
             return result
         except (AdapterError, TimeoutError, OSError) as e:
             logger.warning(
@@ -403,6 +432,8 @@ class DeliveryService:
         self,
         notification: Notification,
         channels: list[Channel],
+        *,
+        before_attempt: Callable[[Channel], None] | None = None,
     ) -> dict[str, Any]:
         """Deliver with GUARANTEED semantics.
 
@@ -447,7 +478,10 @@ class DeliveryService:
                 continue
 
             try:
-                result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
+                result = await asyncio.wait_for(
+                    self._attempt_adapter(adapter, notification, before_attempt),
+                    timeout=self.adapter_timeout_seconds,
+                )
                 attempted.append(channel)
 
                 if result.success:
@@ -493,6 +527,8 @@ class DeliveryService:
         self,
         notification: Notification,
         channels: list[Channel],
+        *,
+        before_attempt: Callable[[Channel], None] | None = None,
     ) -> dict[str, Any]:
         """Deliver with BEST_EFFORT semantics.
 
@@ -516,7 +552,10 @@ class DeliveryService:
                 return channel, "No adapter registered"
 
             try:
-                result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
+                result = await asyncio.wait_for(
+                    self._attempt_adapter(adapter, notification, before_attempt),
+                    timeout=self.adapter_timeout_seconds,
+                )
                 return channel, result
             except (AdapterError, TimeoutError, OSError) as e:
                 return channel, str(e)
@@ -526,7 +565,7 @@ class DeliveryService:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
-            if isinstance(result, asyncio.CancelledError):
+            if isinstance(result, (asyncio.CancelledError, DeliveryLeaseLostError)):
                 raise result
             if isinstance(result, BaseException):
                 # Unexpected exception
@@ -630,6 +669,7 @@ async def deliver(notification: Notification) -> NotificationResult:
         DeliveryError: For GUARANTEED mode when all channels fail
     """
     return await get_delivery_service().deliver(notification)
+
 
 def configure_delivery_service_with_audit(
     adapter_registry: AdapterRegistry,

@@ -23,8 +23,8 @@ from sqlalchemy import (
     Boolean,
     Column,
     Float,
-    Integer,
     Index,
+    Integer,
     String,
     Table,
     create_engine,
@@ -51,7 +51,12 @@ from notification.models import (
     NotificationResult,
 )
 from notification.policies import get_policy_registry
-from notification.service import DeliveryError, DeliveryService, SimpleAdapterRegistry
+from notification.service import (
+    DeliveryError,
+    DeliveryLeaseLostError,
+    DeliveryService,
+    SimpleAdapterRegistry,
+)
 from uns.schema import migrate_runtime_schema
 
 log = logging.getLogger(__name__)
@@ -105,10 +110,17 @@ dedup = Table(
     Column("owner_id", String(36)),
     Column("generation", Integer, nullable=False, default=1, server_default="1"),
 )
-Index("ix_uns_dispatch", work.c.status, work.c.dedup_owner_id, work.c.next_attempt, work.c.lease_until)
+Index(
+    "ix_uns_dispatch", work.c.status, work.c.dedup_owner_id, work.c.next_attempt, work.c.lease_until
+)
 Index("ix_uns_deadline", work.c.ack_status, work.c.deadline)
 Index("ix_uns_dedup_followers", work.c.dedup_owner_id, work.c.dedup_generation)
-Index("ix_uns_callbacks", events.c.callback_pending, events.c.callback_until, events.c.callback_attempts)
+Index(
+    "ix_uns_callbacks",
+    events.c.callback_pending,
+    events.c.callback_until,
+    events.c.callback_attempts,
+)
 
 
 class Conflict(ValueError):  # noqa: N818 - retained public exception name
@@ -216,7 +228,11 @@ class Runtime:
             ack_status=AckStatus(row["ack_status"]) if row["ack_status"] else None,
             idempotent_replay=replay,
             created_at=n.created_at,
-            message=row["status"].lower(),
+            message=(
+                f"{row['status'].lower()}: delivery obligation {row['dedup_owner_id']}"
+                if row["dedup_owner_id"]
+                else row["status"].lower()
+            ),
         )
 
     def accept(
@@ -294,38 +310,63 @@ class Runtime:
                         dead_letter=False,
                     )
                 )
-                dedup_key = digest([principal, request.source, n.dedup_key])
+                # Coalescing is scoped to the same effective delivery obligation.
+                dedup_key = digest(
+                    [principal, request.source, n.dedup_key, provenance["effective_hash"]]
+                )
                 current = (
                     session.execute(select(dedup).where(dedup.c.key == dedup_key))
                     .mappings()
                     .first()
                 )
-                suppressed = current is not None and current["until"] > now
-                if not suppressed:
-                    if current:
-                        changed = (
-                            session.connection()
-                            .execute(
-                                update(dedup)
-                                .where(dedup.c.key == dedup_key, dedup.c.until <= now)
-                                .values(until=now + effective["dedup_window_seconds"])
-                            )
-                            .rowcount
-                        )
-                        suppressed = not changed
-                    else:
+                owner = None
+                if current and current["owner_id"] and current["until"] > now:
+                    owner = (
                         session.execute(
-                            insert(dedup).values(
-                                key=dedup_key, until=now + effective["dedup_window_seconds"]
+                            select(work).where(
+                                work.c.id == current["owner_id"],
+                                work.c.dedup_generation == current["generation"],
+                                work.c.dedup_owner_id.is_(None),
+                                work.c.status.in_(("PENDING", "DELIVERED")),
                             )
                         )
-                if suppressed:
-                    result = result.model_copy(update={"status": DeliveryStatus.DEDUPLICATED})
-                    session.connection().execute(
-                        update(work)
-                        .where(work.c.id == identifier)
-                        .values(status="DEDUPLICATED", outcome=result.model_dump(mode="json"))
+                        .mappings()
+                        .first()
                     )
+                generation = (
+                    current["generation"]
+                    if owner
+                    else (current["generation"] + 1 if current else 1)
+                )
+                values = {"dedup_key": dedup_key, "dedup_generation": generation}
+                if owner:
+                    values["dedup_owner_id"] = owner["id"]
+                    if owner["status"] == "DELIVERED":
+                        result = result.model_copy(update={"status": DeliveryStatus.DEDUPLICATED})
+                        values.update(status="DEDUPLICATED", outcome=result.model_dump(mode="json"))
+                    self._event(
+                        session,
+                        identifier,
+                        "DEDUP_LINKED",
+                        {
+                            "owner_id": owner["id"],
+                            "generation": generation,
+                            "owner_status": owner["status"],
+                        },
+                    )
+                else:
+                    claim = {
+                        "owner_id": identifier,
+                        "generation": generation,
+                        "until": now + effective["dedup_window_seconds"],
+                    }
+                    if current:
+                        session.execute(
+                            update(dedup).where(dedup.c.key == dedup_key).values(**claim)
+                        )
+                    else:
+                        session.execute(insert(dedup).values(key=dedup_key, **claim))
+                session.execute(update(work).where(work.c.id == identifier).values(**values))
                 self._audit(session, n, result, event="accepted", principal=principal)
                 self._event(session, identifier, "ACCEPTED", provenance)
         except IntegrityError:
@@ -343,6 +384,111 @@ class Runtime:
             await self.dispatch(response.notification_id)
         return self.response(response.notification_id, replay=response.idempotent_replay)
 
+    def _before_attempt(self, identifier: str, token: str, channel: Channel) -> None:
+        """Fence every new external call; effects already in flight remain uncertain."""
+        now = self.clock()
+        with self.sessions.begin() as session:
+            owned = (
+                session.connection()
+                .execute(
+                    update(work)
+                    .where(
+                        work.c.id == identifier,
+                        work.c.status == "PENDING",
+                        work.c.lease_token == token,
+                        work.c.lease_until > now,
+                    )
+                    .values(lease_until=work.c.lease_until)
+                )
+                .rowcount
+            )
+            if not owned:
+                raise DeliveryLeaseLostError("Delivery lease expired or belongs to another worker")
+            row = session.execute(select(work).where(work.c.id == identifier)).mappings().one()
+            if row["lease_until"] <= self.clock():
+                raise DeliveryLeaseLostError("Delivery lease expired while waiting for storage")
+            self._event(
+                session,
+                identifier,
+                "CHANNEL_ATTEMPT_STARTED",
+                {
+                    "channel": channel.value,
+                    "attempt": row["attempts"],
+                    "cycle": row["cycle"],
+                    "cycle_attempt": row["cycle_attempts"],
+                    "provider_effect_may_have_occurred": True,
+                },
+            )
+        if row["lease_until"] <= self.clock():
+            raise DeliveryLeaseLostError("Delivery lease expired while committing attempt evidence")
+
+    def _record_lease_loss(self, identifier: str, token: str, row: dict[str, Any]) -> None:
+        with self.sessions.begin() as session:
+            self._event(
+                session,
+                identifier,
+                "LEASE_LOST",
+                {
+                    "lease_token": token,
+                    "attempt": row["attempts"],
+                    "provider_effect_may_have_occurred": True,
+                },
+            )
+
+    def _settle_followers(
+        self, session: Session, owner: dict[str, Any], *, succeeded: bool
+    ) -> None:
+        followers = list(
+            session.execute(
+                select(work)
+                .where(
+                    work.c.status == "PENDING",
+                    work.c.dedup_owner_id == owner["id"],
+                    work.c.dedup_generation == owner["dedup_generation"],
+                )
+                .order_by(work.c.id)
+            ).mappings()
+        )
+        if not followers:
+            return
+        successor = followers[0]["id"]
+        generation = (owner["dedup_generation"] or 0) + 1
+        if not succeeded:
+            # An expired window may already have a newer owner. Never steal it.
+            session.execute(
+                update(dedup)
+                .where(
+                    dedup.c.key == owner["dedup_key"],
+                    dedup.c.owner_id == owner["id"],
+                    dedup.c.generation == owner["dedup_generation"],
+                )
+                .values(owner_id=successor, generation=generation)
+            )
+        for follower in followers:
+            n = Notification.model_validate(follower["notification"])
+            result = NotificationResult.model_validate(follower["outcome"])
+            if succeeded:
+                result = result.model_copy(update={"status": DeliveryStatus.DEDUPLICATED})
+                values = {"status": "DEDUPLICATED", "outcome": result.model_dump(mode="json")}
+                kind = "DEDUP_SATISFIED"
+                payload = {"owner_id": owner["id"], "generation": owner["dedup_generation"]}
+            else:
+                promoted = follower["id"] == successor
+                values = {
+                    "dedup_owner_id": None if promoted else successor,
+                    "dedup_generation": generation,
+                    "next_attempt": self.clock(),
+                }
+                kind = "DEDUP_OWNER_PROMOTED" if promoted else "DEDUP_RELINKED"
+                payload = {
+                    "previous_owner_id": owner["id"],
+                    "owner_id": successor,
+                    "generation": generation,
+                }
+            session.execute(update(work).where(work.c.id == follower["id"]).values(**values))
+            self._audit(session, n, result, event=kind, **payload)
+            self._event(session, follower["id"], kind, payload)
+
     async def dispatch(self, notification_id: UUID | str) -> bool:
         identifier, token, now = str(notification_id), str(uuid4()), self.clock()
         with self.sessions.begin() as session:
@@ -353,6 +499,7 @@ class Runtime:
                     .where(
                         work.c.id == identifier,
                         work.c.status == "PENDING",
+                        work.c.dedup_owner_id.is_(None),
                         work.c.lease_until <= now,
                         work.c.next_attempt <= now,
                     )
@@ -360,6 +507,7 @@ class Runtime:
                         lease_token=token,
                         lease_until=now + self.lease_seconds,
                         attempts=work.c.attempts + 1,
+                        cycle_attempts=work.c.cycle_attempts + 1,
                     )
                 )
                 .rowcount
@@ -375,19 +523,27 @@ class Runtime:
                 "ATTEMPT_STARTED",
                 {
                     "attempt": row["attempts"],
+                    "cycle": row["cycle"],
+                    "cycle_attempt": row["cycle_attempts"],
                     "recovery_may_repeat_provider_effect": row["attempts"] > 1,
                 },
             )
         n = Notification.model_validate(row["notification"])
         try:
-            if row["attempts"] > self.max_attempts:
+            if row["cycle_attempts"] > self.max_attempts:
                 result = NotificationResult(
                     notification_id=n.notification_id,
                     status=DeliveryStatus.FAILED,
                     error_message="Provider outcome unknown: recovery exhausted the attempt budget",
                 )
             else:
-                result = await self.delivery.deliver(n)
+                result = await self.delivery.deliver(
+                    n,
+                    before_attempt=lambda channel: self._before_attempt(identifier, token, channel),
+                )
+        except DeliveryLeaseLostError:
+            self._record_lease_loss(identifier, token, row)
+            return False
         except DeliveryError as exc:
             result = exc.result or NotificationResult(
                 notification_id=n.notification_id,
@@ -404,41 +560,57 @@ class Runtime:
             )
         succeeded = result.status in (DeliveryStatus.SUCCESS, DeliveryStatus.DELIVERED)
         exhausted = not succeeded and (
-            row["attempts"] >= self.max_attempts or n.delivery_mode == DeliveryMode.BEST_EFFORT
+            row["cycle_attempts"] >= self.max_attempts
+            or n.delivery_mode == DeliveryMode.BEST_EFFORT
         )
         next_status = "DELIVERED" if succeeded else ("FAILED" if exhausted else "PENDING")
-        now = self.clock()
-        changes: dict[str, Any] = {
-            "status": next_status,
-            "outcome": result.model_dump(mode="json"),
-            "lease_until": 0,
-            "lease_token": None,  # nosec B105
-            "next_attempt": now + self.retry_seconds * 2 ** min(row["attempts"] - 1, 10),
-            "dead_letter": exhausted and n.delivery_mode == DeliveryMode.GUARANTEED,
-        }
-        if succeeded:
-            changes["delivered_at"] = now
-            if n.require_ack:
-                changes.update(
-                    ack_status="PENDING", deadline=now + 60 * (n.ack_timeout_minutes or 15)
-                )
         with self.sessions.begin() as session:
-            changed = (
+            # Acquire the row's write lock before reading the clock; a lock wait
+            # must not make an already-expired lease look valid at commit.
+            owned = (
                 session.connection()
                 .execute(
                     update(work)
                     .where(work.c.id == identifier, work.c.lease_token == token)
-                    .values(**changes)
+                    .values(lease_until=work.c.lease_until)
                 )
                 .rowcount
             )
-            if not changed:
-                return False  # A recovered worker owns the result now.
+            if not owned or row["lease_until"] <= self.clock():
+                self._event(
+                    session,
+                    identifier,
+                    "LEASE_LOST",
+                    {
+                        "lease_token": token,
+                        "attempt": row["attempts"],
+                        "provider_effect_may_have_occurred": True,
+                    },
+                )
+                return False
+            now = self.clock()
+            changes: dict[str, Any] = {
+                "status": next_status,
+                "outcome": result.model_dump(mode="json"),
+                "lease_until": 0,
+                "lease_token": None,  # nosec B105
+                "next_attempt": now + self.retry_seconds * 2 ** min(row["cycle_attempts"] - 1, 10),
+                "dead_letter": exhausted and n.delivery_mode == DeliveryMode.GUARANTEED,
+            }
+            if succeeded:
+                changes["delivered_at"] = now
+                if n.require_ack:
+                    changes.update(
+                        ack_status="PENDING", deadline=now + 60 * (n.ack_timeout_minutes or 15)
+                    )
+            session.execute(update(work).where(work.c.id == identifier).values(**changes))
             self._audit(
                 session,
                 n,
                 result,
                 attempt=row["attempts"],
+                cycle=row["cycle"],
+                cycle_attempt=row["cycle_attempts"],
                 terminal=next_status,
                 effective=n.metadata["uns_resolution"],
             )
@@ -449,10 +621,14 @@ class Runtime:
                 {
                     "status": next_status,
                     "attempt": row["attempts"],
+                    "cycle": row["cycle"],
+                    "cycle_attempt": row["cycle_attempts"],
                     "dead_letter": changes["dead_letter"],
                     "outcome": result.model_dump(mode="json"),
                 },
             )
+            if succeeded or exhausted:
+                self._settle_followers(session, row, succeeded=succeeded)
         return True
 
     async def run_once(self) -> None:
@@ -463,6 +639,7 @@ class Runtime:
                     select(work.c.id)
                     .where(
                         work.c.status == "PENDING",
+                        work.c.dedup_owner_id.is_(None),
                         work.c.next_attempt <= now,
                         work.c.lease_until <= now,
                     )
@@ -472,7 +649,6 @@ class Runtime:
         for identifier in ids:
             await self.dispatch(identifier)
         self.expire()
-        await self.deliver_callbacks()
 
     async def worker(self) -> None:
         async def dispatch_loop() -> None:
@@ -487,14 +663,22 @@ class Runtime:
             while True:
                 try:
                     self.expire()
-                    await self.deliver_callbacks()
                 except Exception:
                     log.exception("UNS response recovery iteration failed")
+                await asyncio.sleep(1)
+
+        async def callback_loop() -> None:
+            while True:
+                try:
+                    await self.deliver_callbacks()
+                except Exception:
+                    log.exception("UNS callback recovery iteration failed")
                 await asyncio.sleep(1)
 
         async with asyncio.TaskGroup() as tasks:
             tasks.create_task(dispatch_loop())
             tasks.create_task(timeout_loop())
+            tasks.create_task(callback_loop())
 
     def acknowledge(
         self,
@@ -540,6 +724,8 @@ class Runtime:
                 raise KeyError(identifier)
             if not changed and row["ack_status"] != target:
                 raise Conflict("Notification is not awaiting this response or its deadline elapsed")
+            if not changed and row["actor"] != actor:
+                raise Conflict("Terminal response belongs to another actor")
             if changed:
                 session.add(
                     AckRow(
@@ -565,7 +751,9 @@ class Runtime:
         with self.sessions() as session:
             ids = list(
                 session.execute(
-                    select(work.c.id).where(work.c.ack_status == "PENDING", work.c.deadline <= now)
+                    select(work.c.id)
+                    .where(work.c.ack_status == "PENDING", work.c.deadline <= now)
+                    .limit(100)
                 ).scalars()
             )
         for identifier in ids:
@@ -589,7 +777,10 @@ class Runtime:
                     .where(work.c.id == str(notification_id), work.c.dead_letter.is_(True))
                     .values(
                         status="PENDING",
+                        cycle=work.c.cycle + 1,
+                        cycle_attempts=0,
                         dead_letter=False,
+                        lease_token=None,
                         next_attempt=self.clock(),
                         lease_until=0,
                     )
@@ -598,7 +789,21 @@ class Runtime:
             )
             if not changed:
                 raise Conflict("Only exhausted dead-letter notifications can be replayed")
-            self._event(session, str(notification_id), "REPLAY_REQUESTED", {"actor": actor})
+            row = (
+                session.execute(select(work).where(work.c.id == str(notification_id)))
+                .mappings()
+                .one()
+            )
+            self._event(
+                session,
+                str(notification_id),
+                "REPLAY_REQUESTED",
+                {
+                    "actor": actor,
+                    "cycle": row["cycle"],
+                    "cumulative_attempts": row["attempts"],
+                },
+            )
 
     def dead_letters(self) -> list[dict[str, Any]]:
         with self.sessions() as session:
@@ -608,6 +813,8 @@ class Runtime:
                     "notification_id": r["id"],
                     "status": r["status"],
                     "attempts": r["attempts"],
+                    "cycle": r["cycle"],
+                    "cycle_attempts": r["cycle_attempts"],
                     "outcome": r["outcome"],
                 }
                 for r in rows
