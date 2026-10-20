@@ -13,6 +13,7 @@ export default mergeConfig(
       exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
       coverage: {
         provider: 'v8',
+        include: ['src/**/*.{ts,tsx}'],
         reporter: ['text', 'json', 'html', 'lcov'],
         reportsDirectory: './coverage',
         exclude: [

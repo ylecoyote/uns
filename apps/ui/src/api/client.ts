@@ -13,6 +13,7 @@
  */
 
 import type { ErrorResponse } from '../types/api';
+import { expireConsoleSession, getConsoleSession } from '../auth/session';
 
 /**
  * Custom error class for API errors with full metadata.
@@ -46,6 +47,8 @@ export interface RequestOptions {
   requestId?: string;
   /** AbortSignal for request cancellation */
   signal?: AbortSignal;
+  /** Transient sign-in probe credential; never establishes a session by itself. */
+  credential?: string;
 }
 
 /**
@@ -116,6 +119,9 @@ export async function apiGet<T>(
   const headers: HeadersInit = {
     Accept: 'application/json',
   };
+  const session = getConsoleSession();
+  const credential = options?.credential ?? session.credential;
+  if (credential) headers.Authorization = `Bearer ${credential}`;
 
   // Propagate request ID for correlation if provided
   if (options?.requestId) {
@@ -126,16 +132,39 @@ export async function apiGet<T>(
     method: 'GET',
     headers,
     signal: options?.signal,
+    cache: 'no-store',
+    redirect: 'error',
   });
 
   if (!response.ok) {
-    const errorData = (await response.json()) as { detail: ErrorResponse } | ErrorResponse;
-    // Handle FastAPI's error wrapping
-    const errorResponse = 'detail' in errorData ? errorData.detail : errorData;
-    throw new ApiError(errorResponse, response.status);
+    if (response.status === 401 && options?.credential === undefined) {
+      expireConsoleSession(session);
+    }
+    throw await responseError(response);
   }
 
   return response.json() as Promise<T>;
+}
+
+async function responseError(response: Response): Promise<ApiError> {
+  // Auth middleware and gateways may return plain FastAPI errors or HTML.
+  // Preserve typed API errors, but never display raw unstructured error bodies.
+  let body: unknown;
+  try { body = await response.json(); } catch { /* Use the safe fallback below. */ }
+  if (typeof body === 'object' && body !== null && 'detail' in body) body = body.detail;
+  if (typeof body === 'object' && body !== null && 'error' in body) {
+    const detail = body.error;
+    if (typeof detail === 'object' && detail !== null &&
+        'code' in detail && typeof detail.code === 'string' &&
+        'message' in detail && typeof detail.message === 'string' &&
+        'request_id' in body && typeof body.request_id === 'string') {
+      return new ApiError(body as ErrorResponse, response.status);
+    }
+  }
+  return new ApiError({
+    error: { code: `http_${response.status}`, message: `The service returned an error (HTTP ${response.status}).` },
+    request_id: response.headers?.get('X-Request-ID') ?? '',
+  }, response.status);
 }
 
 /**
