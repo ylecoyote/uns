@@ -46,7 +46,7 @@ class TestDocumentStructure:
 
     def test_has_title(self, data_contracts_doc: str) -> None:
         """Verify document has correct title."""
-        assert data_contracts_doc.startswith("# AGSignal Console Data Contracts")
+        assert data_contracts_doc.startswith("# UNS Console Data Contracts")
 
     def test_has_design_principles(self, data_contracts_doc: str) -> None:
         """Verify document has design principles section."""

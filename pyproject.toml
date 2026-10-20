@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agsignal"
+name = "uns"
 version = "0.1.0"
-description = "AGSignal - Control-plane governance signaling infrastructure for autonomous agent systems"
+description = "UNS - Unified Notification Service with policy-driven delivery and acknowledgment audit"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 keywords = ["notifications", "alerts", "messaging", "mcp", "governance", "audit", "agents"]
 authors = [
@@ -22,7 +22,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -60,7 +59,7 @@ sql = [
 ]
 # MCP server transports (FastMCP + stdio).
 mcp = [
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.0.0,<2",
 ]
 # HTTP-based channel adapters (Slack, PagerDuty webhooks).
 adapters = [
@@ -68,11 +67,11 @@ adapters = [
 ]
 # Everything an operator needs to self-host both apps end-to-end.
 full = [
-    "agsignal[server,redis,sql,mcp,adapters]",
+    "uns[server,redis,sql,mcp,adapters]",
 ]
 # Test + lint + security tooling. Pulls in [full] so every code path is reachable.
 dev = [
-    "agsignal[full]",
+    "uns[full]",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
@@ -84,10 +83,13 @@ dev = [
 ]
 # Backwards-compatible alias for legacy install instructions.
 all = [
-    "agsignal[full,dev]",
+    "uns[full,dev]",
 ]
 
 [project.scripts]
+uns = "agsignal.app:main"
+uns-migrate = "uns.migrate:main"
+uns-mcp = "agsignal_mcp.transports.stdio:main"
 agsignal = "agsignal.app:main"
 
 [project.urls]
@@ -99,7 +101,7 @@ Documentation = "https://github.com/ylecoyote/agsignal#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["agsignal*", "agsignal_mcp*", "notification*", "db*", "ui_client*"]
+include = ["uns*", "agsignal*", "agsignal_mcp*", "notification*", "db*", "ui_client*"]
 
 [tool.setuptools.package-data]
 # Ship PEP 561 type-information markers in every package so downstream
@@ -150,7 +152,8 @@ ignore = [
 known-first-party = ["agsignal", "notification", "db", "apps"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
+mypy_path = "src"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

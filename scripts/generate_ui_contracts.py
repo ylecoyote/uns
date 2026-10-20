@@ -277,8 +277,8 @@ def generate_contract_snapshot() -> dict[str, Any]:
     """Generate the complete contract snapshot."""
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "AGSignal Console Contracts",
-        "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
+        "title": "UNS Console Contracts",
+        "description": "Machine-readable contract snapshot for UNS Console /ui endpoints",
         "version": "1.0.0",
         "generated_at": datetime.now(UTC).isoformat(),
         "source": "scripts/generate_ui_contracts.py",

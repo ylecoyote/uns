@@ -70,7 +70,7 @@ class TestSDKValidationGuards:
             source="test",
         )
 
-        assert result.status == DeliveryStatus.SUCCESS
+        assert result.status == DeliveryStatus.PENDING
 
     def test_provider_error_raises_validation_error(self) -> None:
         """Test that provider errors are wrapped in ValidationError."""

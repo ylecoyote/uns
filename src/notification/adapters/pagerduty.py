@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from notification.adapters.base import (
     AdapterConfigurationError,
@@ -185,7 +185,7 @@ class PagerDutyClient:
 
             # PagerDuty returns 202 Accepted for successful events
             if response.status_code == 202:
-                return response.json()
+                return cast(dict[str, Any], response.json())
 
             # Handle errors
             if response.status_code == 400:
@@ -203,7 +203,7 @@ class PagerDutyClient:
                 )
             else:
                 response.raise_for_status()
-                return response.json()
+                return cast(dict[str, Any], response.json())
 
         except httpx.TimeoutException as e:
             raise AdapterTimeoutError(

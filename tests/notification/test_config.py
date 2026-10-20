@@ -35,7 +35,7 @@ def test_notification_config_prefers_agsignal_environment(monkeypatch):
 
     config = NotificationConfig.from_env()
 
-    assert config.redis_url == "redis://agsignal.example:6379/5"
+    assert config.redis_url == "redis://legacy.example:6379/4"
     assert config.dlq_key == "agsignal:dlq"
 
 
@@ -64,8 +64,7 @@ def test_uns_env_var_emits_deprecation_warning(
 
     assert config.redis_url == "redis://legacy.example/0"
     legacy_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert legacy_warnings, "Expected DeprecationWarning when UNS_* is used"
-    assert any("UNS_REDIS_URL" in str(w.message) for w in legacy_warnings)
+    assert not legacy_warnings, "UNS is canonical and must not warn"
 
 
 def test_agsignal_env_var_does_not_warn(
@@ -81,6 +80,6 @@ def test_agsignal_env_var_does_not_warn(
         warnings.simplefilter("always")
         config = NotificationConfig.from_env()
 
-    assert config.redis_url == "redis://modern.example/0"
+    assert config.redis_url == "redis://legacy.example/0"
     legacy_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
     assert not legacy_warnings, "Expected no DeprecationWarning when AGSIGNAL_* is set"

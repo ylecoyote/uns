@@ -14,7 +14,7 @@ in v0.4 (would require ADR amendment).
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -38,8 +38,8 @@ class ThenClause(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: Decision
-    reason: Optional[str] = None
-    target_reviewer_role: Optional[str] = Field(
+    reason: str | None = None
+    target_reviewer_role: str | None = Field(
         None, description="When decision is REQUIRE_APPROVAL, the role responsible for ACK"
     )
 
@@ -52,7 +52,7 @@ class Rule(BaseModel):
     id: str = Field(..., description="Stable rule identifier; unique within a Policy")
     when: list[Condition] = Field(..., min_length=1, description="AND-joined conditions; at least one required")
     then: ThenClause
-    priority: Optional[int] = Field(
+    priority: int | None = Field(
         None,
         description="Optional integer priority; lower values evaluated first when present. Source order is the default.",
     )
@@ -67,7 +67,7 @@ class Policy(BaseModel):
     version: str = Field(..., description="Semantic version of the policy")
     context_schema: str = Field(..., description="Name of the registered ContextSchema this policy operates on")
     rules: list[Rule] = Field(default_factory=list)
-    default_decision: Optional[Decision] = Field(
+    default_decision: Decision | None = Field(
         None,
         description="Outcome when no rule matches. None means deny-by-default per ADR.",
     )

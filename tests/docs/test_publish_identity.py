@@ -11,15 +11,15 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_pyproject_uses_agsignal_publish_identity() -> None:
     content = (ROOT / "pyproject.toml").read_text()
 
-    assert 'name = "agsignal"' in content
-    assert "AGSignal - Control-plane governance signaling infrastructure" in content
-    assert "Unified Notification Service" not in content
+    assert 'name = "uns"' in content
+    assert "UNS - Unified Notification Service" in content
+    assert "Unified Notification Service" in content
     assert 'license = {text = "Apache-2.0"}' in content
     assert '{name = "AGSignal Maintainers"}' in content
     # A self-referencing meta-extra exists so operators can opt into the
     # full server stack with one install line.
-    assert '"agsignal[server,redis,sql,mcp,adapters]"' in content
-    assert '"agsignal[full,dev]"' in content
+    assert '"uns[server,redis,sql,mcp,adapters]"' in content
+    assert '"uns[full,dev]"' in content
 
 
 def test_license_file_uses_apache_2_0() -> None:
@@ -48,7 +48,7 @@ def test_readme_labels_current_policy_directory_as_sample_config() -> None:
     assert "examples/policies/mip-uns" in content
     assert "config/notification_policies" in content
     assert "sample" in content.lower()
-    assert "not AGSignal Core defaults" in content
+    assert "not mandatory runtime defaults" in content
     assert "Planned `notification_policy`" not in content
     assert "Planned `POST /api/v1/policies/reload`" not in content
 
@@ -57,12 +57,12 @@ def test_docs_index_routes_publish_readers_by_task() -> None:
     content = (ROOT / "docs" / "README.md").read_text()
 
     for task in (
-        "Evaluate AGSignal",
+        "Evaluate UNS",
         "Quickstart: send a signal",
         "Configure policies",
         "Integrate an app",
         "Operate and audit",
-        "Extend AGSignal",
+        "Extend UNS",
         "Verify implementation",
     ):
         assert task in content
@@ -79,7 +79,7 @@ def test_publish_ui_surface_uses_agsignal_console_name() -> None:
 
     for path in paths:
         content = path.read_text()
-        assert "AGSignal Console" in content
+        assert "UNS Console" in content
         assert "UNS Dashboard" not in content
         assert "UNS UI" not in content
 
@@ -88,8 +88,8 @@ def test_ui_package_manifest_uses_console_identity() -> None:
     package_json = (ROOT / "apps" / "ui" / "package.json").read_text()
     package_lock = (ROOT / "apps" / "ui" / "package-lock.json").read_text()
 
-    assert '"name": "agsignal-console"' in package_json
-    assert '"name": "agsignal-console"' in package_lock
+    assert '"name": "uns-console"' in package_json
+    assert '"name": "uns-console"' in package_lock
     assert '"name": "uns-ui"' not in package_json
     assert '"name": "uns-ui"' not in package_lock
 

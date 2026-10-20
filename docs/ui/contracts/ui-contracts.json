@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AGSignal Console Contracts",
-  "description": "Machine-readable contract snapshot for AGSignal Console /ui endpoints",
+  "title": "UNS Console Contracts",
+  "description": "Machine-readable contract snapshot for UNS Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-05-08T20:26:51.232149+00:00",
+  "generated_at": "2026-10-20T19:00:04.043918+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
@@ -1038,6 +1038,19 @@
       },
       "description": "Full delivery timeline for a notification.",
       "properties": {
+        "runtime_state": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime State"
+        },
         "notification_id": {
           "format": "uuid",
           "title": "Notification Id",

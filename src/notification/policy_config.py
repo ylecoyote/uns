@@ -156,7 +156,22 @@ def apply_policy_delta(
             f"Delta {delta.delta_id} does not target policy type {envelope.policy_type}"
         )
 
+    if delta.baseline_hash != envelope.config_hash or delta.baseline_version != envelope.version:
+        raise ValueError("Policy delta baseline hash/version is stale or missing")
+    if delta.approval_candidate_hash != delta.candidate_hash:
+        raise ValueError("Policy candidate changed after approval or approval identity is missing")
+    if delta.field_bound is not None and not delta.field_bound.allows(
+        current_value=delta.current_value, proposed_value=delta.proposed_value
+    ):
+        raise ValueError("Configured field bound guard failed")
     config = copy.deepcopy(envelope.config_json)
+    current: Any = config
+    for part in delta.field_path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            raise ValueError("Delta baseline field is missing")
+        current = current[part]
+    if current != delta.current_value:
+        raise ValueError("Delta current value does not match the baseline")
     _set_dotted_path(config, delta.field_path, delta.proposed_value)
     return PolicyConfigEnvelope(
         policy_type=envelope.policy_type,

@@ -399,6 +399,7 @@ class EmailAdapter(BaseAdapter):
         to_addresses: list[str],
     ) -> None:
         """Synchronous email sending (runs in executor)."""
+        server: smtplib.SMTP
         if self.config.use_ssl:
             context = ssl.create_default_context()
             server = smtplib.SMTP_SSL(
@@ -430,6 +431,7 @@ class EmailAdapter(BaseAdapter):
 
     def _check_connection_sync(self) -> None:
         """Synchronous connection check (runs in executor)."""
+        server: smtplib.SMTP
         if self.config.use_ssl:
             context = ssl.create_default_context()
             server = smtplib.SMTP_SSL(

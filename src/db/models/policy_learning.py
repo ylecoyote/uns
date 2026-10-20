@@ -183,3 +183,10 @@ class PersistedShadowEvaluationAggregate(Base):
         default=lambda: datetime.now(UTC),
         comment="When aggregate was computed",
     )
+
+
+class PolicyEvidenceBinding(Base):
+    """Additive provenance for existing policy delta and shadow records."""
+    __tablename__ = "uns_policy_evidence_bindings"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)

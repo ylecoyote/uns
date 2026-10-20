@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-20",
+  "source_head": "e084b52d4c02c2b6fcd89fb2813f5d5c94efe924",
+  "status": "local functional acceptance passed; release limitations recorded",
+  "python_tests_passed": 1564,
+  "coverage_percent": 89.45,
+  "console_tests_passed": 289,
+  "ruff": "passed",
+  "mypy": "passed (88 files)",
+  "bandit": "passed; false-positive lease clearing annotated",
+  "ui_boundary": "passed",
+  "wheel_source_identity": "87 Python modules matched",
+  "minimal_and_full_install": "passed",
+  "installed_demo_and_migration": "passed",
+  "python_dependency_advisories": 0,
+  "frontend_lock_advisories": {
+    "info": 0,
+    "low": 1,
+    "moderate": 5,
+    "high": 11,
+    "critical": 4,
+    "total": 21
+  },
+  "frontend_production_advisories": {
+    "info": 0,
+    "low": 0,
+    "moderate": 2,
+    "high": 0,
+    "critical": 0,
+    "total": 2
+  },
+  "limits": [
+    "Real-provider sends and human receipt not exercised",
+    "PostgreSQL-specific acceptance not exercised",
+    "Hosted CI and publication not run",
+    "Frontend major dependency updates remain",
+    "Policy reload broadcast across processes not implemented; reload each process explicitly"
+  ],
+  "receipt_sha256": {
+    "python-tests.log": "4e71a41bd284cbe661b6ee308465683cac56cf642afe501efd4d52ace2e0c94f",
+    "console-checks.log": "9e62725cf1f03183cc96bfb4cab479ed3f1c15a9f9640d9b886cdc1a84f68ae6",
+    "static-checks.log": "4ce9a5df8717558a186708144cbf92a6e711dee64bbc5d023090c7a5c04c6f1f",
+    "fresh-static-checks.log": "a5b57bdd6f66a4150eac91dbed2b5eaffa45b35777d969e81999a050f3f86683",
+    "wheel-build.log": "f3d4a61a6e07739b74a252e60f9c5003dfbf7b9b8668d21fb4502b99a1bdf287",
+    "installed-smoke.log": "e47fb115da368a77fcb833f1a7ac431b57ae12a4943ff81406fcd71452b0e29f",
+    "python-dependency-audit.json": "44472e80bac87a537ab0e78e40e7fbffc296fb01e3180f6471b67fb96219cd43",
+    "frontend-lock-audit.json": "3e8b930d19961544f676fe85fe92958c657c54f307132f5ab8ca600bde595b35",
+    "frontend-production-audit.json": "0b3112a19d5eb06f53ab14e3efe81d426b16ac3e1753e9626a456ace020127c6"
+  },
+  "wheel_sha256": "a8be2f62e7da33b024648edd623f5b3384c6a3f6ec2a5c25dc3a4f18a2851508"
+}

@@ -17,7 +17,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-import re2
+import re2  # type: ignore[import-untyped]
 
 from agsignal.governance.errors import PolicyEvaluationError, PolicyLoadError
 
@@ -61,21 +61,21 @@ def evaluate_operator(op: Operator, lhs: Any, rhs: Any) -> bool:
     """
     try:
         if op == Operator.EQ:
-            return lhs == rhs
+            return bool(lhs == rhs)
         if op == Operator.NEQ:
-            return lhs != rhs
+            return bool(lhs != rhs)
         if op == Operator.GT:
             _check_orderable(lhs, rhs, op)
-            return lhs > rhs
+            return bool(lhs > rhs)
         if op == Operator.GTE:
             _check_orderable(lhs, rhs, op)
-            return lhs >= rhs
+            return bool(lhs >= rhs)
         if op == Operator.LT:
             _check_orderable(lhs, rhs, op)
-            return lhs < rhs
+            return bool(lhs < rhs)
         if op == Operator.LTE:
             _check_orderable(lhs, rhs, op)
-            return lhs <= rhs
+            return bool(lhs <= rhs)
         if op == Operator.IN:
             _check_iterable(rhs, op)
             return lhs in rhs

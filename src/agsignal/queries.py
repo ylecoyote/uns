@@ -230,7 +230,20 @@ async def get_delivery_timeline(
         for attempt in timeline.attempts
     ]
 
+    runtime_state = None
+    runtime = getattr(adapter, "runtime", None)
+    if runtime is not None:
+        try:
+            row = runtime.get(notification_id)
+            runtime_state = {"delivery_status":row["status"], "ack_status":row["ack_status"],
+                "deadline":row["deadline"], "dead_letter":row["dead_letter"],
+                "policy_config_hash":row["notification"]["policy_config_hash"],
+                "policy_evaluation_id":row["notification"]["policy_evaluation_id"]}
+        except KeyError:
+            pass  # Historical audit rows predate durable runtime state.
+
     return DeliveryTimelineResponse(
+        runtime_state=runtime_state,
         notification_id=timeline.notification_id,
         notification_type=timeline.notification_type,
         intent=timeline.intent,
@@ -409,21 +422,21 @@ async def get_effective_policy(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=get_default_delivery_mode(intent).value,
-            applied=not policy_found or policy.delivery_mode is None,
+            applied=policy is None or policy.delivery_mode is None,
         )
     )
     resolution["channels"].append(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=[c.value for c in get_default_channels(intent, autonomy_mode, irreversible)],
-            applied=not policy_found or not policy.get_channels_for_mode(autonomy_mode, intent),
+            applied=policy is None or not policy.get_channels_for_mode(autonomy_mode, intent),
         )
     )
     resolution["require_ack"].append(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=get_default_require_ack(intent, autonomy_mode),
-            applied=not policy_found
+            applied=policy is None
             or policy.get_require_ack_for_mode(autonomy_mode, intent) is None,
         )
     )
@@ -431,14 +444,14 @@ async def get_effective_policy(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=get_default_ack_timeout(intent),
-            applied=not policy_found or policy.ack_timeout_minutes is None,
+            applied=policy is None or policy.ack_timeout_minutes is None,
         )
     )
     resolution["dedup_window_seconds"].append(
         ResolutionStep(
             source=ResolutionSource.SDK_DEFAULT,
             value=DEFAULT_DEDUP_WINDOW_SECONDS,
-            applied=not policy_found or policy.dedup_window_seconds is None,
+            applied=policy is None or policy.dedup_window_seconds is None,
         )
     )
 
@@ -487,7 +500,7 @@ async def list_invariants(
     try:
         from pathlib import Path
 
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         invariants_path = (
             Path(__file__).parent.parent.parent / "docs" / "verification" / "invariants.yml"

@@ -1,6 +1,5 @@
 """Tests for typed governance engine exceptions."""
 
-import pytest
 
 from agsignal.governance.errors import (
     ContextSchemaViolation,

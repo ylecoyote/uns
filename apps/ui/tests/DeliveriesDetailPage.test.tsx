@@ -34,6 +34,22 @@ describe('DeliveriesDetailPage', () => {
     vi.clearAllMocks();
   });
 
+  it('separates delivery, response and policy evidence', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ...mockDeliveryTimeline, runtime_state: {
+        delivery_status: 'DELIVERED', ack_status: 'ACKED', deadline: 1800000000,
+        dead_letter: false, policy_config_hash: 'verified-policy-hash',
+        policy_evaluation_id: 'evaluation-id',
+      }}),
+    });
+    renderWithRouter(mockDeliveryTimeline.notification_id);
+    expect(await screen.findByText('Delivery and human response')).toBeInTheDocument();
+    expect(screen.getByText('ACKED')).toBeInTheDocument();
+    expect(screen.getByText('verified-policy-hash')).toBeInTheDocument();
+    expect(screen.getByText('evaluation-id')).toBeInTheDocument();
+  });
+
   it('shows loading state initially', () => {
     // Never resolve to keep loading
     mockFetch.mockReturnValueOnce(new Promise(() => {}));

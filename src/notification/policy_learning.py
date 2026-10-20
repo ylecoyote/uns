@@ -110,10 +110,7 @@ class FieldBound(BaseModel):
             return False
 
         abs_change = abs(proposed_value - current_value)
-        if (
-            self.max_abs_change_per_delta is not None
-            and abs_change > self.max_abs_change_per_delta
-        ):
+        if self.max_abs_change_per_delta is not None and abs_change > self.max_abs_change_per_delta:
             return False
 
         if self.max_rel_change_per_delta is not None:
@@ -129,6 +126,7 @@ class FieldBound(BaseModel):
 class GuardResult(BaseModel):
     """Auditable result from guard checks for a delta transition."""
 
+    candidate_hash: str | None = None
     stage: GuardStage = Field(description="Stage this guard result applies to")
     allowed: bool = Field(description="Whether the guarded transition may proceed")
     reason: DeltaRejectionReason | None = Field(
@@ -189,6 +187,10 @@ class ShadowEvaluationResult(BaseModel):
 
 class ShadowEvaluationAggregate(BaseModel):
     """Aggregate shadow evaluation result for one policy delta."""
+
+    baseline_hash: str | None = None
+    candidate_hash: str | None = None
+    evaluated_by: str | None = None
 
     aggregate_id: UUID = Field(
         default_factory=uuid4,
@@ -268,6 +270,30 @@ class PolicyDelta(BaseModel):
         DeltaState.REJECTED: (),
         DeltaState.APPLIED: (),
     }
+
+    baseline_hash: str | None = None
+    baseline_version: int | None = None
+    approval_candidate_hash: str | None = None
+    required_guards: tuple[str, ...] = ()
+    guard_results: tuple[GuardResult, ...] = ()
+    field_bound: FieldBound | None = None
+
+    @property
+    def candidate_hash(self) -> str:
+        import hashlib
+        import json
+
+        payload = {
+            "baseline": self.baseline_hash,
+            "version": self.baseline_version,
+            "type": self.policy_type,
+            "field": self.field_path,
+            "current": self.current_value,
+            "proposed": self.proposed_value,
+            "guards": self.required_guards,
+            "bounds": self.field_bound.model_dump(mode="json") if self.field_bound else None,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     delta_id: UUID = Field(
         default_factory=uuid4,
@@ -377,6 +403,7 @@ class PolicyDelta(BaseModel):
             updates["shadow_evaluation_id"] = shadow_evaluation_id
         elif new_state == DeltaState.APPROVED:
             updates["approved_by"] = actor
+            updates["approval_candidate_hash"] = self.candidate_hash
         elif new_state == DeltaState.REJECTED:
             updates["rejected_by"] = actor
             updates["rejection_reason"] = reason

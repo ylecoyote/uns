@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -96,8 +96,8 @@ def _json_safe(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Enum):
         return value.value
-    if is_dataclass(value):
-        return _json_safe(asdict(value))
+    if is_dataclass(value) and not isinstance(value, type):
+        return cast(dict[str, Any], _json_safe(asdict(value)))
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
@@ -138,6 +138,13 @@ async def send_signal(
             raise ValueError("send_signal delivery confirmation token is invalid")
 
     state = runtime_state or RuntimeState()
+    if state.runtime is not None:
+        if not active_config.operator_principal:
+            raise ValueError("send_signal requires an operator principal")
+        response = await state.runtime.send(_signaling_request(payload), principal=active_config.operator_principal)
+        data = response.model_dump(mode="json")
+        data["delivered"] = response.status.value == "DELIVERED"
+        return data
     response = await agsignal_signaling.send_signal(
         request=_signaling_request(payload),
         audit_store=state.audit_store,
@@ -145,7 +152,7 @@ async def send_signal(
         transport_metadata={"runtime": "agsignal_mcp"},
     )
     data = response.model_dump(mode="json")
-    data["delivered"] = True
+    data["delivered"] = response.status.value in ("DELIVERED", "SUCCESS")
     return data
 
 
@@ -164,6 +171,10 @@ async def ack_notification(
         raise ValueError("ack_notification acked_by must match the operator principal")
 
     state = runtime_state or RuntimeState()
+    if state.runtime is not None:
+        response = state.runtime.acknowledge(payload.notification_id,
+            actor=active_config.operator_principal, dismiss=False, metadata=payload.metadata)
+        return response.model_dump(mode="json")
     response = await agsignal_signaling.acknowledge(
         notification_id=payload.notification_id,
         acked_by=active_config.operator_principal,
@@ -194,6 +205,10 @@ async def dismiss_notification(
         raise ValueError("dismiss_notification acked_by must match the operator principal")
 
     state = runtime_state or RuntimeState()
+    if state.runtime is not None:
+        response = state.runtime.acknowledge(payload.notification_id,
+            actor=active_config.operator_principal, dismiss=True, metadata=payload.metadata)
+        return response.model_dump(mode="json")
     response = await agsignal_signaling.dismiss(
         notification_id=payload.notification_id,
         dismissed_by=active_config.operator_principal,
@@ -217,7 +232,7 @@ async def get_ack_status(notification_id: str | UUID) -> dict[str, Any]:
     """
     notification_uuid = UUID(str(notification_id))
     response = await query_get_ack_status(notification_id=notification_uuid)
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 async def get_notification_status(notification_id: str | UUID) -> dict[str, Any]:
@@ -231,7 +246,7 @@ async def get_notification_status(notification_id: str | UUID) -> dict[str, Any]
     """
     notification_uuid = UUID(str(notification_id))
     response = await query_get_notification_status(notification_id=notification_uuid)
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 def get_delivery_status(
@@ -314,7 +329,7 @@ async def get_effective_policy(
         autonomy_mode=AutonomyMode(autonomy_mode),
         irreversible=irreversible,
     )
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 async def list_invariants(limit: int = 25) -> dict[str, Any]:
@@ -323,7 +338,7 @@ async def list_invariants(limit: int = 25) -> dict[str, Any]:
     Delegates to ``agsignal.queries.list_invariants``.
     """
     response = await query_list_invariants(limit=limit)
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 async def get_invariants_summary() -> dict[str, Any]:
@@ -332,7 +347,7 @@ async def get_invariants_summary() -> dict[str, Any]:
     Delegates to ``agsignal.queries.get_invariants_summary``.
     """
     response = await query_get_invariants_summary()
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 async def list_deliveries(limit: int = 25) -> dict[str, Any]:
@@ -353,7 +368,7 @@ async def list_deliveries(limit: int = 25) -> dict[str, Any]:
         notification_type=None,
         channel=None,
     )
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
 async def list_audit_events(limit: int = 25) -> dict[str, Any]:
@@ -372,4 +387,4 @@ async def list_audit_events(limit: int = 25) -> dict[str, Any]:
         autonomy_mode=None,
         correlation_id=None,
     )
-    return _json_safe(response.model_dump())
+    return cast(dict[str, Any], _json_safe(response.model_dump()))

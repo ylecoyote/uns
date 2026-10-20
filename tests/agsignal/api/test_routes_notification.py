@@ -60,7 +60,7 @@ def engine(storage: InMemoryAckStorage):
 @pytest.fixture
 def client(engine) -> TestClient:
     """Create a test client with configured engine."""
-    app = create_app()
+    app = create_app(skip_persistence_config=True)
     app.state.agsignal_api_key = "test-key"
     app.state.agsignal_api_principal = "test_user"
     return TestClient(app, headers={"Authorization": "Bearer test-key"})
@@ -249,7 +249,7 @@ class TestDismissEndpoint:
         sample_notification: Notification,
     ):
         """Mutating ACK routes require a valid AGSignal API key."""
-        app = create_app()
+        app = create_app(skip_persistence_config=True)
         app.state.agsignal_api_key = "test-key"
         app.state.agsignal_api_principal = "test_user"
         unauthenticated_client = TestClient(app)
@@ -449,5 +449,5 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "alive"
-        assert body["service"] == "agsignal"
+        assert body["service"] == "uns"
         assert "version" in body

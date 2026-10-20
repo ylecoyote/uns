@@ -83,6 +83,6 @@ def install_rate_limiter(app: FastAPI) -> None:
 
     limiter = _build_limiter()
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # slowapi narrows its handler exception type
     app.add_middleware(SlowAPIMiddleware)
     app.state.agsignal_rate_limiter_installed = True

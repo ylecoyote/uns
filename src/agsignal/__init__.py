@@ -18,12 +18,11 @@ etc.) are NOT exported at the top level — reach for them as
 intentional in the import path.
 """
 
+from types import ModuleType
+
 # Sub-module access for the canonical service layer
 # (agsignal.queries.foo / agsignal.signaling.foo).
-from agsignal import (
-    queries,  # noqa: F401  (sub-module access via agsignal.queries.foo)
-    signaling,  # noqa: F401  (sub-module access via agsignal.signaling.foo)
-)
+from agsignal import signaling  # noqa: F401 - legacy module access
 from agsignal.interfaces import (
     AcknowledgmentCallback,
     CompositeAcknowledgmentCallback,
@@ -224,3 +223,13 @@ __all__ = [
     "set_default_registry",
     "simulate_signal",
 ]
+
+
+def __getattr__(name: str) -> "ModuleType":
+    """Load optional HTTP/read-model dependencies only when requested."""
+    if name == "queries":
+        from importlib import import_module
+        module = import_module("agsignal.queries")
+        globals()[name] = module
+        return module
+    raise AttributeError(name)

@@ -6,14 +6,15 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, object_session, sessionmaker
 
 from db.models import (
     PersistedPolicyDelta,
     PersistedShadowEvaluationAggregate,
     PersistedShadowEvaluationResult,
 )
+from db.models.policy_learning import PolicyEvidenceBinding
 from notification.policy_learning import (
     DeltaRejectionReason,
     DeltaState,
@@ -38,6 +39,8 @@ class SQLAlchemyPolicyLearningStore:
 
     def create_delta(self, delta: PolicyDelta) -> PolicyDelta:
         """Persist a new delta proposal in its current state."""
+        if delta.state != DeltaState.PROPOSED or delta.transition_history:
+            raise ValueError("New deltas must start as unreviewed PROPOSED records")
         session = self._get_session()
         try:
             row = PersistedPolicyDelta(
@@ -51,8 +54,7 @@ class SQLAlchemyPolicyLearningStore:
                 evidence_count=delta.evidence_count,
                 state=delta.state.value,
                 transition_history=[
-                    _transition_to_payload(transition)
-                    for transition in delta.transition_history
+                    _transition_to_payload(transition) for transition in delta.transition_history
                 ],
                 shadow_evaluation_id=delta.shadow_evaluation_id,
                 proposed_by=delta.proposed_by,
@@ -64,6 +66,19 @@ class SQLAlchemyPolicyLearningStore:
                 updated_at=delta.updated_at,
             )
             session.add(row)
+            session.add(
+                PolicyEvidenceBinding(
+                    id=delta.delta_id,
+                    payload={
+                        "baseline_hash": delta.baseline_hash,
+                        "baseline_version": delta.baseline_version,
+                        "required_guards": list(delta.required_guards),
+                        "field_bound": delta.field_bound.model_dump(mode="json")
+                        if delta.field_bound
+                        else None,
+                    },
+                )
+            )
             session.commit()
             return _row_to_delta(row)
         except Exception:
@@ -119,12 +134,48 @@ class SQLAlchemyPolicyLearningStore:
                 raise ValueError(f"Policy delta {delta_id} not found")
 
             current = _row_to_delta(row)
+            if guard_result is not None and guard_result.is_blocking:
+                raise ValueError("Blocking guard prevents transition")
+            if (
+                new_state != DeltaState.REJECTED
+                and current.required_guards
+                and (
+                    guard_result is None
+                    or any(guard_result.checks.get(g) is not True for g in current.required_guards)
+                )
+            ):
+                raise ValueError("Required guards must pass")
+            if (
+                current.required_guards
+                and new_state != DeltaState.REJECTED
+                and (guard_result is None or guard_result.candidate_hash != current.candidate_hash)
+            ):
+                raise ValueError("Required guard evidence must match the exact candidate")
+            if (
+                new_state != DeltaState.REJECTED
+                and current.field_bound is not None
+                and not current.field_bound.allows(
+                    current_value=current.current_value, proposed_value=current.proposed_value
+                )
+            ):
+                raise ValueError("Configured field bound guard failed")
             if new_state == DeltaState.APPROVED:
                 aggregate = _get_aggregate_row(session, delta_id)
-                if aggregate is None or not _row_to_shadow_aggregate(
-                    aggregate
-                ).can_promote_to_approval:
+                if (
+                    aggregate is None
+                    or not _row_to_shadow_aggregate(aggregate).can_promote_to_approval
+                ):
                     raise ValueError("Shadow evaluation must pass before approval")
+                evidence = _row_to_shadow_aggregate(aggregate)
+                if (
+                    not current.baseline_hash
+                    or not evidence.evaluated_by
+                    or evidence.baseline_hash != current.baseline_hash
+                    or evidence.candidate_hash != current.candidate_hash
+                ):
+                    raise ValueError(
+                        "Shadow candidate and baseline evidence must match the exact proposal"
+                    )
 
             transitioned = current.transition_to(
                 new_state,
@@ -140,6 +191,34 @@ class SQLAlchemyPolicyLearningStore:
                         update={"shadow_evaluation_id": aggregate.aggregate_id}
                     )
 
+            changed = (
+                session.connection()
+                .execute(
+                    update(PersistedPolicyDelta)
+                    .where(
+                        PersistedPolicyDelta.delta_id == delta_id,
+                        PersistedPolicyDelta.state == current.state.value,
+                    )
+                    .values(state=new_state.value),
+                    execution_options={"synchronize_session": False},
+                )
+                .rowcount
+            )
+            if not changed:
+                raise ValueError("Policy delta changed concurrently")
+            if guard_result is not None:
+                transitioned = transitioned.model_copy(
+                    update={"guard_results": (*current.guard_results, guard_result)}
+                )
+            binding = session.get(PolicyEvidenceBinding, delta_id)
+            if binding is not None:
+                binding.payload = {
+                    **binding.payload,
+                    "approval_candidate_hash": transitioned.approval_candidate_hash,
+                    "guard_results": [
+                        guard.model_dump(mode="json") for guard in transitioned.guard_results
+                    ],
+                }
             _apply_delta_to_row(row, transitioned)
             session.commit()
             return _row_to_delta(row)
@@ -224,6 +303,16 @@ class SQLAlchemyPolicyLearningStore:
                 )
                 session.add(row)
             _apply_aggregate_to_row(row, aggregate)
+            session.merge(
+                PolicyEvidenceBinding(
+                    id=aggregate.aggregate_id,
+                    payload={
+                        "baseline_hash": aggregate.baseline_hash,
+                        "candidate_hash": aggregate.candidate_hash,
+                        "evaluated_by": aggregate.evaluated_by,
+                    },
+                )
+            )
 
             delta_row = session.get(PersistedPolicyDelta, aggregate.delta_id)
             if delta_row is not None:
@@ -295,6 +384,7 @@ def _apply_aggregate_to_row(
 
 def _row_to_delta(row: PersistedPolicyDelta) -> PolicyDelta:
     return PolicyDelta(
+        **_binding(row, row.delta_id),
         delta_id=row.delta_id,
         policy_type=row.policy_type,
         field_path=row.field_path,
@@ -335,6 +425,7 @@ def _row_to_shadow_aggregate(
     row: PersistedShadowEvaluationAggregate,
 ) -> ShadowEvaluationAggregate:
     return ShadowEvaluationAggregate(
+        **_binding(row, row.aggregate_id),
         aggregate_id=row.aggregate_id,
         delta_id=row.delta_id,
         total_decisions=row.total_decisions,
@@ -366,9 +457,7 @@ def _payload_to_transition(payload: dict[str, Any]) -> PolicyDeltaTransition:
         to_state=DeltaState(payload["to_state"]),
         actor=payload["actor"],
         reason=_payload_to_reason(payload.get("reason")),
-        guard_stage=(
-            GuardStage(payload["guard_stage"]) if payload.get("guard_stage") else None
-        ),
+        guard_stage=(GuardStage(payload["guard_stage"]) if payload.get("guard_stage") else None),
         transitioned_at=datetime.fromisoformat(payload["transitioned_at"]),
     )
 
@@ -386,3 +475,9 @@ def _payload_to_reason(reason: str | None) -> str | DeltaRejectionReason | None:
         return DeltaRejectionReason(reason)
     except ValueError:
         return reason
+
+
+def _binding(row: Any, identifier: UUID) -> dict[str, Any]:
+    session = object_session(row)
+    binding = session.get(PolicyEvidenceBinding, identifier) if session is not None else None
+    return binding.payload if binding is not None else {}

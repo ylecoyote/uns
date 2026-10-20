@@ -56,10 +56,12 @@ class DeliveryError(Exception):
         message: str,
         notification: Notification,
         channel_errors: dict[Channel, str] | None = None,
+        result: NotificationResult | None = None,
     ) -> None:
         super().__init__(message)
         self.notification = notification
         self.channel_errors = channel_errors or {}
+        self.result = result
 
 
 class AdapterRegistry(Protocol):
@@ -175,6 +177,8 @@ class DeliveryService:
     ack_scheduler: AckScheduler = field(default_factory=NoOpAckScheduler)
     escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None
     dlq_service: DLQService | None = None
+    check_deduplication: bool = True
+    adapter_timeout_seconds: float = 10.0
 
     async def deliver(self, notification: Notification) -> NotificationResult:
         """Deliver a notification through the configured channels.
@@ -202,7 +206,7 @@ class DeliveryService:
 
         # Step 1: Deduplication check
         dedup_window = policy_registry.get_dedup_window(notification.notification_type)
-        if should_deduplicate(notification, window_seconds=dedup_window):
+        if self.check_deduplication and should_deduplicate(notification, window_seconds=dedup_window):
             result = NotificationResult(
                 notification_id=notification.notification_id,
                 status=DeliveryStatus.DEDUPLICATED,
@@ -274,7 +278,7 @@ class DeliveryService:
         channel_errors.update(persistent_result["errors"])
 
         # Determine overall status
-        if channels_succeeded:
+        if (persistent_result["succeeded"] if delivery_mode == DeliveryMode.GUARANTEED else channels_succeeded):
             status = DeliveryStatus.SUCCESS
         elif delivery_mode == DeliveryMode.GUARANTEED and not channels_succeeded:
             # GUARANTEED failure: all persistent channels failed
@@ -324,7 +328,7 @@ class DeliveryService:
                     notification.notification_type, notification.intent
                 )
             )
-            self.ack_scheduler.schedule_timeout(notification, ack_timeout)
+            self.ack_scheduler.schedule_timeout(notification, ack_timeout or 15)
 
         # Step 6: Audit log write
         self.audit_logger.log_delivery(notification, result)
@@ -360,6 +364,7 @@ class DeliveryService:
                 f"all persistent channels failed",
                 notification=notification,
                 channel_errors=channel_errors,
+                result=result,
             )
 
         return result
@@ -380,9 +385,9 @@ class DeliveryService:
             )
 
         try:
-            result = await adapter.deliver(notification)
+            result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
             return result
-        except AdapterError as e:
+        except (AdapterError, TimeoutError, OSError) as e:
             logger.warning(
                 "WebSocket delivery failed (fire-and-forget): notification_id=%s error=%s",
                 notification.notification_id,
@@ -442,7 +447,7 @@ class DeliveryService:
                 continue
 
             try:
-                result = await adapter.deliver(notification)
+                result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
                 attempted.append(channel)
 
                 if result.success:
@@ -465,7 +470,7 @@ class DeliveryService:
                         result.error,
                     )
 
-            except AdapterError as e:
+            except (AdapterError, TimeoutError, OSError) as e:
                 attempted.append(channel)
                 failed.append(channel)
                 errors[channel] = str(e)
@@ -511,9 +516,9 @@ class DeliveryService:
                 return channel, "No adapter registered"
 
             try:
-                result = await adapter.deliver(notification)
+                result = await asyncio.wait_for(adapter.deliver(notification), timeout=self.adapter_timeout_seconds)
                 return channel, result
-            except AdapterError as e:
+            except (AdapterError, TimeoutError, OSError) as e:
                 return channel, str(e)
 
         # Deliver to all channels concurrently
@@ -521,7 +526,9 @@ class DeliveryService:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, BaseException):
                 # Unexpected exception
                 logger.error("Unexpected error in BEST_EFFORT delivery: %s", str(result))
                 continue

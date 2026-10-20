@@ -20,7 +20,7 @@ def client() -> TestClient:
 def test_health_responds(client: TestClient) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json()["service"] == "agsignal"
+    assert response.json()["service"] == "uns"
 
 
 def test_ready_responds_with_unified_payload(client: TestClient) -> None:

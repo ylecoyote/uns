@@ -419,6 +419,8 @@ class AutonomyContextResponse(BaseModel):
 class DeliveryTimelineResponse(BaseModel):
     """Full delivery timeline for a notification."""
 
+    runtime_state: dict[str, Any] | None = None
+
     notification_id: UUID
     notification_type: str
     intent: NotificationIntent

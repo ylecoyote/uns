@@ -31,10 +31,11 @@ than either predecessor factory's readiness probe.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-import warnings
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -76,17 +77,7 @@ def _docs_url(suffix: str) -> str | None:
 
 
 def _policy_dir_from_env() -> Path | None:
-    raw_path = os.environ.get("AGSIGNAL_POLICY_DIR")
-    if raw_path is None:
-        legacy = os.environ.get("UNS_POLICY_DIR")
-        if legacy is not None:
-            warnings.warn(
-                "UNS_POLICY_DIR is deprecated. Use AGSIGNAL_POLICY_DIR instead. "
-                "UNS_* aliases will be removed in v1.0.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            raw_path = legacy
+    raw_path = os.environ.get("UNS_POLICY_DIR", os.environ.get("AGSIGNAL_POLICY_DIR"))
     return Path(raw_path) if raw_path else None
 
 
@@ -120,18 +111,7 @@ def _configure_persistence() -> None:
     from notification.audit import configure_audit_logger
 
     database_url = os.environ.get("DATABASE_URL")
-    agsignal_create_tables = os.environ.get("AGSIGNAL_CREATE_TABLES")
-    if agsignal_create_tables is None:
-        legacy_create_tables = os.environ.get("UNS_CREATE_TABLES")
-        if legacy_create_tables is not None:
-            warnings.warn(
-                "UNS_CREATE_TABLES is deprecated. Use AGSIGNAL_CREATE_TABLES instead. "
-                "UNS_* aliases will be removed in v1.0.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            agsignal_create_tables = legacy_create_tables
-    create_tables = (agsignal_create_tables or "false").lower() == "true"
+    create_tables = os.environ.get("UNS_CREATE_TABLES", os.environ.get("AGSIGNAL_CREATE_TABLES", "false")).lower() == "true"
 
     if database_url:
         # Production mode: use SQLAlchemy-backed storage
@@ -181,8 +161,8 @@ def _configure_persistence() -> None:
         configure_audit_logger(store=shared_audit_store)
 
         # Configure read adapter (reads) - shares the same store
-        adapter = InMemoryReadModelAdapter(audit_store=shared_audit_store)
-        configure_read_model_adapter(adapter)
+        memory_adapter = InMemoryReadModelAdapter(audit_store=shared_audit_store)
+        configure_read_model_adapter(memory_adapter)
 
         logger.info("In-memory persistence configured (shared store for reads and writes)")
 
@@ -207,13 +187,30 @@ def create_app(
     redis_client_factory: Callable[[str], RedisWebSocketClient] | None = None,
     websocket_replay_store: WebSocketReplayStore | None = None,
     skip_persistence_config: bool = False,
+    runtime: Any = None,
 ) -> FastAPI:
     """Create the unified AGSignal HTTP application."""
     if not skip_persistence_config:
         _configure_persistence()
 
+    if runtime is None and not skip_persistence_config:
+        from uns.config import build_runtime
+        runtime = build_runtime()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        task = asyncio.create_task(runtime.worker()) if runtime is not None else None
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+
     app = FastAPI(
-        title="AGSignal",
+        lifespan=lifespan,
+        title="UNS",
         description=(
             "Control-plane governance signaling for autonomous agents. "
             "Unified Core (write) and Console (read) HTTP surfaces."
@@ -236,7 +233,16 @@ def create_app(
     config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=InMemoryRedisList())
     app.state.policy_store = policy_store
-    app.state.audit_store = audit_store or InMemoryAuditStore()
+    app.state.runtime = runtime
+    app.state.audit_store = runtime.audit_store if runtime is not None else (audit_store or InMemoryAuditStore())
+    if runtime is not None:
+        from agsignal.api.read_models import (
+            SQLAlchemyReadModelAdapter,
+            configure_read_model_adapter,
+        )
+        adapter = SQLAlchemyReadModelAdapter(runtime.sessions)
+        adapter.runtime = runtime
+        configure_read_model_adapter(adapter)
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
@@ -295,6 +301,19 @@ def create_app(
         websocket_manager.set_subscriber(websocket_subscriber)
         app.state.websocket_subscriber = websocket_subscriber
 
+    if runtime is not None:
+        from uns.dlq import RuntimeDLQ
+        app.state.dlq_service = RuntimeDLQ(runtime)
+        from uns.routes import router as runtime_router
+        from uns.websocket import WebSocketDeliveryAdapter
+        app.include_router(runtime_router)
+        from notification.models import Channel
+        if runtime.adapters.get_adapter(Channel.WEBSOCKET) is None:
+            runtime.adapters.register(WebSocketDeliveryAdapter(app))
+        app.state.policy_store = policy_store or SQLAlchemyPolicyStore(runtime.sessions)
+        if not skip_persistence_config and policy_dir is None:
+            configure_policy_registry(registry=app.state.policy_store.load_runtime_registry())
+
     # Mount routers
     app.include_router(notification_router)              # /api/v1/notifications/*
     app.include_router(ops_router)                       # /api/v1/dlq, /policies/*, /ops/*
@@ -310,7 +329,7 @@ def create_app(
     async def health() -> dict[str, str]:
         return {
             "status": "alive",
-            "service": "agsignal",
+            "service": "uns",
             "version": __version__,
         }
 
@@ -320,18 +339,22 @@ def create_app(
         from agsignal.api.read_models import get_read_model_adapter
         from notification.audit import get_audit_logger
         try:
+            if runtime is not None:
+                from sqlalchemy import select
+                with runtime.engine.connect() as connection:
+                    connection.execute(select(1))
             read_model_adapter = type(get_read_model_adapter()).__name__
             audit_logger_type = type(get_audit_logger()).__name__
         except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
             return {
                 "status": "not_ready",
-                "service": "agsignal",
+                "service": "uns",
                 "version": __version__,
                 "error": str(exc),
             }
         return {
             "status": "ready",
-            "service": "agsignal",
+            "service": "uns",
             "version": __version__,
             "channels_configured": _channel_readiness(),
             "policy_count": len(get_policy_registry()),
@@ -345,9 +368,15 @@ def create_app(
 
 def main() -> None:
     """Run the unified AGSignal HTTP server."""
-    host = os.environ.get("AGSIGNAL_HOST", "127.0.0.1")
-    port = int(os.environ.get("AGSIGNAL_PORT", "8000"))
-    uvicorn.run("agsignal.app:app", host=host, port=port, reload=False)
+    import argparse
+
+    from uns.config import value
+    parser = argparse.ArgumentParser(description="UNS notification and acknowledgment service")
+    parser.add_argument("--host", default=value("HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(value("PORT", "8000")))
+    args = parser.parse_args()
+    host, port = args.host, args.port
+    uvicorn.run("uns.app:app", host=host, port=port, reload=False)
 
 
 # ASGI module-level instance for direct uvicorn invocation.

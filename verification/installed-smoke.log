@@ -1,0 +1,18 @@
+No WebSocket adapter registered
+Recorded delivery: 0f2de963-d7c2-4cd4-92eb-8c64878d10fa
+PASS: delivered, restarted, acknowledged, and audited
+DATABASE_URL not set. Using in-memory storage. Data will NOT persist across restarts. Set DATABASE_URL for production use.
+InMemoryReadModelAdapter initialized. Data will not persist across restarts. Use SQLAlchemyReadModelAdapter for production.
+usage: uns [-h] [--host HOST] [--port PORT]
+
+UNS notification and acknowledgment service
+
+options:
+  -h, --help   show this help message and exit
+  --host HOST
+  --port PORT
+PASS: minimal wheel imports and optional dependency boundaries
+UNS additive schema migration complete
+UNS additive schema migration complete
+PASS: full wheel imports, HTTP/MCP factories and idempotent migration
+Installed origin: /private/tmp/uns-verification-env/lib/python3.12/site-packages/uns/__init__.py

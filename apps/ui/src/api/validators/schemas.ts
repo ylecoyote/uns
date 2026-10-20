@@ -190,6 +190,11 @@ export const DeliveryAttemptSchema = z.object({
  * Delivery timeline response schema (full detail)
  */
 export const DeliveryTimelineResponseSchema = z.object({
+  runtime_state: z.object({
+    delivery_status: z.string(), ack_status: z.string().nullable(),
+    deadline: z.number().nullable(), dead_letter: z.boolean(),
+    policy_config_hash: z.string(), policy_evaluation_id: z.string(),
+  }).nullable().optional(),
   notification_id: z.string(),
   notification_type: z.string(),
   intent: NotificationIntentSchema,

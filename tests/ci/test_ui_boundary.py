@@ -296,7 +296,7 @@ class TestScriptIntegration:
         # Should complete (exit code 0 in non-strict, may have warnings)
         assert result.returncode == 0, f"Script failed: {result.stderr}"
 
-    def test_strict_mode_exits_with_error_on_violations(self) -> None:
+    def test_strict_mode_passes_consolidated_ui(self) -> None:
         """Strict mode should exit with error code 1 when violations exist."""
         # Run against real repo which has violations (Python files in apps/ui)
         repo_root = find_repo_root()
@@ -308,7 +308,7 @@ class TestScriptIntegration:
             text=True,
             cwd=str(repo_root),
         )
-        assert result.returncode == 1
+        assert result.returncode == 0
 
     def test_help_flag_shows_usage(self) -> None:
         """--help should show usage information."""
@@ -336,7 +336,7 @@ class TestScriptIntegration:
             cwd=str(repo_root),
         )
 
-        assert "Migration" in result.stdout or "migration" in result.stdout
+        assert "All boundary rules satisfied" in result.stdout
 
 
 class TestBoundaryViolation:

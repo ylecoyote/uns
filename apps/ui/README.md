@@ -1,4 +1,4 @@
-# AGSignal Console
+# UNS Console
 
 Read-only dashboard for AGSignal Core.
 
@@ -19,7 +19,7 @@ Read-only dashboard for AGSignal Core.
 
 ### Non-Authoritative UI
 
-AGSignal Console is a **read-first "flight instruments" dashboard** per
+UNS Console is a **read-first "flight instruments" dashboard** per
 [ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the signal
 system's state and health without offering direct manipulation capabilities.
 
@@ -206,7 +206,7 @@ npm run preview
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_UNS_API_BASE_URL` | Base URL for AGSignal Console endpoints | `http://localhost:8000` |
+| `VITE_UNS_API_BASE_URL` | Base URL for UNS Console endpoints | `http://localhost:8000` |
 
 All environment variables must be prefixed with `VITE_` to be exposed to the browser.
 
@@ -281,7 +281,7 @@ All endpoints are **GET-only** per Phase 1 posture. The UI consumes only `/ui/*`
 
 ## Generated types
 
-`src/types/generated.ts` is generated from the AGSignal Console OpenAPI
+`src/types/generated.ts` is generated from the UNS Console OpenAPI
 spec by `scripts/generate-types.ts`. It is committed to the repo so
 day-to-day type-check, lint, build, and test do not require backend
 tooling.
