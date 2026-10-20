@@ -24,6 +24,7 @@ from sqlalchemy import (
     Column,
     Float,
     Integer,
+    Index,
     String,
     Table,
     create_engine,
@@ -51,6 +52,7 @@ from notification.models import (
 )
 from notification.policies import get_policy_registry
 from notification.service import DeliveryError, DeliveryService, SimpleAdapterRegistry
+from uns.schema import migrate_runtime_schema
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +67,11 @@ work = Table(
     Column("status", String(32), nullable=False),
     Column("outcome", JSON, nullable=False),
     Column("attempts", Integer, nullable=False, default=0),
+    Column("cycle", Integer, nullable=False, default=1, server_default="1"),
+    Column("cycle_attempts", Integer, nullable=False, default=0, server_default="0"),
+    Column("dedup_key", String(64)),
+    Column("dedup_owner_id", String(36)),
+    Column("dedup_generation", Integer),
     Column("next_attempt", Float, nullable=False),
     Column("lease_until", Float, nullable=False, default=0),
     Column("lease_token", String(36)),
@@ -95,7 +102,13 @@ dedup = Table(
     Base.metadata,
     Column("key", String(64), primary_key=True),
     Column("until", Float, nullable=False),
+    Column("owner_id", String(36)),
+    Column("generation", Integer, nullable=False, default=1, server_default="1"),
 )
+Index("ix_uns_dispatch", work.c.status, work.c.dedup_owner_id, work.c.next_attempt, work.c.lease_until)
+Index("ix_uns_deadline", work.c.ack_status, work.c.deadline)
+Index("ix_uns_dedup_followers", work.c.dedup_owner_id, work.c.dedup_generation)
+Index("ix_uns_callbacks", events.c.callback_pending, events.c.callback_until, events.c.callback_attempts)
 
 
 class Conflict(ValueError):  # noqa: N818 - retained public exception name
@@ -126,8 +139,7 @@ class Runtime:
         if database_url in ("sqlite://", "sqlite:///:memory:"):
             options = {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
         self.engine = create_engine(database_url, **options)
-        if create_tables:
-            Base.metadata.create_all(self.engine)
+        migrate_runtime_schema(self.engine, create_tables=create_tables)
         self.sessions = sessionmaker(self.engine)
         self.audit_store = SQLAlchemyAuditStore(self.sessions)
         self.adapters = adapters or SimpleAdapterRegistry()
