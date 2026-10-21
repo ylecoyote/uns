@@ -2,6 +2,8 @@
 
 Updated 2026-10-20 (local date). Reviewed implementation target: **`ba46a311d071736a6beca241a6e43a1407f29f3b`**. Iteration 2 base: `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`; original remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Subsequent documentation/receipt commits preserve this application code.
 
+Both iterations are now integrated on **main** through `76fc43e`, with the same reviewed application source. [Consolidated baseline](CONSOLIDATED_BASELINE.md) records the local merge and fresh Python/console/package verification; use main for the current handoff.
+
 This is an author-prepared handoff, not a production certification. An Astra/ultra implementation team addressed the earlier reproduced failures, and separate focused reviewers found additional issues that were repaired. Review the code and failure behavior independently; test totals and line coverage are supporting evidence, not proof of every interleaving.
 
 ## Product boundary

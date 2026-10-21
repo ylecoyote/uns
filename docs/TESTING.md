@@ -87,7 +87,7 @@ Evidence is in [remediation results](../verification/remediation/results.json) a
 Remaining limits: external-provider and human-receipt acceptance, live PostgreSQL operation, hosted CI and representative production load are unverified. Credentials confer operator access, not RBAC. External effects remain at least once. Historical information already lost by earlier versions cannot be reconstructed. Retention is explicit, SQLite-only and row-bounded, not byte/time-bounded or automatic compliance retention. Existing dependency/framework deprecation warnings are recorded in the test log.
 
 
-## Second adversarial remediation result (current)
+## Second adversarial remediation checkpoint
 
 Implementation target: `ba46a311d071736a6beca241a6e43a1407f29f3b`, base `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`. [Contract decisions and dispositions](REMEDIATION_ITERATION2.md) explain the distinction between reproduced behavior and accepted requirements.
 
@@ -106,3 +106,10 @@ Implementation target: `ba46a311d071736a6beca241a6e43a1407f29f3b`, base `3f6005f
 Raw logs, the untouched reviewer reproduction, installed smoke script and SHA-256 manifest are in [iteration 2 receipts](../verification/iteration2/results.json). Validation used Python 3.12.9 and temporary SQLite databases. Two inherited framework deprecation warnings remain; Bandit also prints non-failing unmatched nosec warnings around the existing lease-clear annotation. No production data was modified. External acceptance limitations in the first report still apply.
 
 Reproduce with the development environment and commands above. The reviewer file can be run separately with `python -m pytest verification/iteration2/reviewer_reproductions.py`; its expected residual failures are not the regression gate. Run the installed package smoke from outside the source tree with `python /path/to/repo/verification/iteration2/package_smoke.py /path/to/repo` after building/installing the full wheel.
+
+
+## Consolidated main verification (current)
+
+The canonical main branch fast-forwarded from `b508cc3` through `76fc43e`; application source is unchanged from `ba46a31`. Fresh verification in the canonical checkout passed 1,765 Python tests at 90.70% coverage, 305 console tests plus type/lint/build checks, Ruff, mypy (91 files), Bandit, UI boundary, wheel/source identity (90 modules), installed full-wheel delivery/ACK/repeated migration/no-write retention preview, and the recording demo. The console was freshly installed from its merged lockfile. Existing test/framework warnings are recorded. Advisory databases were not refreshed.
+
+[Consolidated baseline](CONSOLIDATED_BASELINE.md) and [fresh merge receipts](../verification/consolidated/results.json) supersede the iteration checkouts as the current working location. Prior receipts remain unchanged. No remote push, hosted CI, live database migration, real-provider acceptance or deployment occurred.
