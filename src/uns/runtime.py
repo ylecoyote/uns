@@ -16,7 +16,7 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
@@ -37,7 +37,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from agsignal.responses import AckResponse, SendNotificationRequest, SendNotificationResponse
-from agsignal.signaling import _resolve_notification
 from db.audit_store import SQLAlchemyAuditStore, delivery_audit_row
 from db.models import AckAuditRecord as AckRow
 from db.models import Base
@@ -50,13 +49,13 @@ from notification.models import (
     Notification,
     NotificationResult,
 )
-from notification.policies import get_policy_registry
 from notification.service import (
     DeliveryError,
     DeliveryLeaseLostError,
     DeliveryService,
     SimpleAdapterRegistry,
 )
+from uns.policy_runtime import PolicyRuntime
 from uns.schema import migrate_runtime_schema
 
 log = logging.getLogger(__name__)
@@ -155,6 +154,7 @@ class Runtime:
         self.sessions = sessionmaker(self.engine)
         self.audit_store = SQLAlchemyAuditStore(self.sessions)
         self.adapters = adapters or SimpleAdapterRegistry()
+        self.policy_runtime = PolicyRuntime(self.sessions, adapters=self.adapters)
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         self.max_attempts = max_attempts
@@ -248,49 +248,14 @@ class Runtime:
                 if existing["fingerprint"] != fingerprint:
                     raise Conflict("Idempotency key reused with different request content")
                 return self.response(existing["id"], replay=True)
-        _, n = _resolve_notification(request)
-        if not n.channels:
-            raise ValueError("A notification requires at least one delivery channel")
-        if n.delivery_mode == DeliveryMode.GUARANTEED and not any(
-            c != Channel.WEBSOCKET for c in n.channels
-        ):
-            raise ValueError(
-                "GUARANTEED requires a persistent channel; choose BEST_EFFORT for WebSocket-only preview"
-            )
-        policy = get_policy_registry().get_sync(n.notification_type)
-        base_hash = n.policy_config_hash or digest(
-            policy.model_dump(mode="json") if policy else {"defaults_version": 1}
-        )
-        effective = {
-            k: n.model_dump(mode="json")[k]
-            for k in ("channels", "delivery_mode", "require_ack", "ack_timeout_minutes", "priority")
-        }
-        effective["dedup_window_seconds"] = get_policy_registry().get_dedup_window(
-            n.notification_type
-        )
-        provenance = {
-            "policy_hash": base_hash,
-            "defaults_version": 1 if policy is None else None,
-            "effective": effective,
-            "effective_hash": digest(effective),
-            "principal": principal,
-            "overrides": {
-                k: request.model_dump(mode="json").get(k)
-                for k in ("delivery_mode", "require_ack", "priority")
-            },
-        }
-        n = n.model_copy(
-            update={
-                "policy_config_hash": base_hash,
-                "policy_config_id": n.policy_config_id or uuid5(NAMESPACE_URL, base_hash),
-                "policy_evaluation_id": n.policy_evaluation_id or uuid4(),
-                "metadata": {**n.metadata, "uns_resolution": provenance},
-            }
-        )
-        now = self.clock()
-        identifier = str(n.notification_id)
         try:
             with self.sessions.begin() as session:
+                # Policy revision and accepted obligation linearize together.
+                n = self.policy_runtime.resolve(request, session=session, principal=principal)
+                provenance = n.metadata["uns_resolution"]
+                effective = provenance["effective"]
+                now = self.clock()
+                identifier = str(n.notification_id)
                 # Unique claim prevents concurrent intake from creating duplicate work.
                 result = NotificationResult(
                     notification_id=n.notification_id, status=DeliveryStatus.PENDING
@@ -315,10 +280,11 @@ class Runtime:
                     [principal, request.source, n.dedup_key, provenance["effective_hash"]]
                 )
                 current = (
-                    session.execute(select(dedup).where(dedup.c.key == dedup_key))
+                    session.execute(select(dedup).where(dedup.c.key == dedup_key).with_for_update())
                     .mappings()
                     .first()
                 )
+                now = self.clock()
                 owner = None
                 if current and current["owner_id"] and current["until"] > now:
                     owner = (
@@ -565,6 +531,11 @@ class Runtime:
         )
         next_status = "DELIVERED" if succeeded else ("FAILED" if exhausted else "PENDING")
         with self.sessions.begin() as session:
+            # Intake and settlement share dedup -> owner lock order. This also
+            # protects followers on PostgreSQL, which has no SQLite writer lock.
+            session.execute(
+                select(dedup).where(dedup.c.key == row["dedup_key"]).with_for_update()
+            ).first()
             # Acquire the row's write lock before reading the clock; a lock wait
             # must not make an already-expired lease look valid at commit.
             owned = (
