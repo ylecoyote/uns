@@ -163,6 +163,7 @@ def maintain(
     apply: bool = False,
     operator: str | None = None,
     archive: Path | None = None,
+    after_id: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
     """Plan or apply one batch; every removal shares a transaction with its receipt.
@@ -171,6 +172,11 @@ def maintain(
     archive mode. It is a row-count bound, not a byte, scan-time or latency bound.
     The cutoff applies to notification inactivity; ownerless dedup claims can be
     removed after their own expiry. Apply always recomputes a dry-run's plan.
+    At most batch_size eligible notification candidates are examined. To apply
+    a preview, use its input after_id; to continue after applying or deliberately
+    skipping that range, use next_after_id. A null next_after_id ends this pass.
+    Cursors are ordered ids, not snapshots: start a new pass without after_id to
+    revisit oversized, newly eligible, or newly inserted earlier notifications.
     Apply holds SQLite BEGIN IMMEDIATE through selection, archive I/O and commit.
     The archive parent directory must be trusted and already exist. PostgreSQL
     retention is deliberately unsupported until its locking path is validated.
@@ -184,6 +190,10 @@ def maintain(
         raise ValueError("Use a cutoff no later than now and a positive idempotency window")
     if type(batch_size) is not int or not 1 <= batch_size <= MAX_BATCH_SIZE:
         raise ValueError(f"batch_size must be an integer from 1 to {MAX_BATCH_SIZE}")
+    if after_id is not None and (
+        not isinstance(after_id, str) or not after_id or len(after_id) > 36
+    ):
+        raise ValueError("after_id must be a nonempty notification id of at most 36 characters")
     if apply and (not operator or not operator.strip()):
         raise ValueError("Apply requires an attributed operator")
     if archive is not None:
@@ -196,6 +206,8 @@ def maintain(
         "idempotency_seconds": idempotency_seconds,
         "effective_cutoff": effective_cutoff,
         "batch_size": batch_size,
+        "after_id": after_id,
+        "next_after_id": None,
         "notification_ids": [],
         "dedup_keys": [],
         "oversized_notification_ids": [],
@@ -207,25 +219,35 @@ def maintain(
         if apply:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
         _schema_check(connection)
+        conditions = _eligible(effective_cutoff, now)
+        if after_id is not None:
+            conditions.append(work.c.id > after_id)
         candidates = (
             connection.execute(
-                select(work)
-                .where(*_eligible(effective_cutoff, now))
-                .order_by(work.c.id)
-                .limit(batch_size)
+                select(work).where(*conditions).order_by(work.c.id).limit(batch_size)
             )
             .mappings()
             .all()
         )
         selected = []
         remaining = batch_size
+        resume_after = after_id
         for row in candidates:
             cost = _group_count(connection, row["id"]) if archive is not None else 1
             if cost > batch_size:
                 report["oversized_notification_ids"].append(row["id"])
-            if cost <= remaining:
+            elif cost <= remaining:
                 selected.append(dict(row))
                 remaining -= cost
+            else:
+                # This group fits a fresh batch. Resume before it rather than
+                # advancing past a group deferred only by this batch's budget.
+                report["next_after_id"] = resume_after
+                break
+            resume_after = row["id"]
+        else:
+            if len(candidates) == batch_size:
+                report["next_after_id"] = resume_after
         identifiers = [row["id"] for row in selected]
         owner = work.alias("retained_owner")
         # Expired claims are kept while their owner or any follower is retained.
@@ -324,6 +346,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--apply", action="store_true", help="Commit one bounded batch")
     parser.add_argument("--operator", help="Attribution required for --apply")
     parser.add_argument(
+        "--after-id", help="Continue after a returned next_after_id; omit to start a new pass"
+    )
+    parser.add_argument(
         "--archive", type=Path, help="New archive file in a trusted existing directory"
     )
     args = parser.parse_args(argv)
@@ -344,6 +369,7 @@ def main(argv: list[str] | None = None) -> None:
             apply=args.apply,
             operator=args.operator,
             archive=args.archive,
+            after_id=args.after_id,
         )
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
