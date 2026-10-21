@@ -1,6 +1,6 @@
 # Deploy UNS
 
-See the [deployment candidate smoke report](DEPLOYMENT_SMOKE.md) for the latest container, socket/browser checks, and remaining target selection.
+The selected [persistent localhost recording deployment](LOCAL_DEPLOYMENT.md) is running. The [earlier deployment smoke report](DEPLOYMENT_SMOKE.md) preserves container, socket and browser evidence.
 
 ## Supported local profile
 

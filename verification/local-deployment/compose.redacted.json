@@ -1,0 +1,135 @@
+{
+  "name": "uns-local",
+  "services": {
+    "uns": {
+      "image": "sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d",
+      "container_name": "uns-local",
+      "restart": "unless-stopped",
+      "init": true,
+      "user": "1001:1001",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "env_file": [
+        "${UNS_LOCAL_HOME}/service.env"
+      ],
+      "volumes": [
+        "data:/data",
+        "${UNS_LOCAL_HOME}/releases/07ef52a-be2b3c9/profile:/profile:ro",
+        "${UNS_LOCAL_HOME}/releases/07ef52a-be2b3c9/console:/console:ro",
+        "${UNS_LOCAL_HOME}/releases/07ef52a-be2b3c9/release.json:/release.json:ro"
+      ],
+      "networks": [
+        "local-only"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import json,os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz',headers={'Authorization':'Bearer '+os.environ['UNS_API_KEY']}); data=json.load(urllib.request.urlopen(r,timeout=3)); raise SystemExit(0 if data['status']=='ready' else 1)"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "start_period": "10s",
+        "retries": 3
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "stop_grace_period": "15s",
+      "command": [
+        "uvicorn",
+        "local_app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ]
+    },
+    "ingress": {
+      "image": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+      "container_name": "uns-local-ingress",
+      "restart": "unless-stopped",
+      "user": "101:101",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "entrypoint": [
+        "nginx"
+      ],
+      "command": [
+        "-g",
+        "daemon off;"
+      ],
+      "ports": [
+        "127.0.0.1:18080:8080"
+      ],
+      "volumes": [
+        "${UNS_LOCAL_HOME}/nginx.conf:/etc/nginx/nginx.conf:ro"
+      ],
+      "networks": [
+        "local-only",
+        "ingress"
+      ],
+      "depends_on": {
+        "uns": {
+          "condition": "service_healthy"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8080/health"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 3
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    }
+  },
+  "volumes": {
+    "data": {
+      "external": true,
+      "name": "uns-local-data"
+    }
+  },
+  "networks": {
+    "local-only": {
+      "name": "uns-local-network",
+      "internal": true
+    },
+    "ingress": {
+      "name": "uns-local-ingress"
+    }
+  }
+}

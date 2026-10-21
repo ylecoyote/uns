@@ -1,0 +1,88 @@
+PASS GET /local-status 200
+PASS Persistent recording profile identity
+PASS Unauthenticated /ready rejected
+PASS Unauthenticated /local-status rejected
+PASS Unauthenticated /metrics rejected
+PASS Unauthenticated /ui/audit rejected
+PASS Public liveness works
+PASS GET / 200
+PASS Recording banner on /
+PASS GET /deliveries 200
+PASS Recording banner on /deliveries
+PASS GET /policy 200
+PASS Recording banner on /policy
+PASS GET /audit 200
+PASS Recording banner on /audit
+PASS GET /invariants 200
+PASS Recording banner on /invariants
+PASS POST /api/v1/notifications/simulate 200
+PASS Simulation has no durable work
+PASS POST /api/v1/notifications 202
+PASS Slack channel records locally
+PASS Receipt explicitly identifies recording
+PASS POST /api/v1/notifications 202
+PASS Idempotent repeat retains identity
+PASS POST /api/v1/notifications 409
+PASS POST /api/v1/notifications 202
+PASS Semantic duplicate is suppressed
+PASS POST /api/v1/notifications/0261eeeb-b85b-47d3-8c96-a8b25a92b4a4/ack 403
+PASS POST /api/v1/notifications/0261eeeb-b85b-47d3-8c96-a8b25a92b4a4/ack 200
+PASS ACK derives actor from credential
+PASS POST /api/v1/notifications/0261eeeb-b85b-47d3-8c96-a8b25a92b4a4/dismiss 409
+PASS POST /api/v1/notifications 202
+PASS POST /api/v1/notifications/cc513815-1aed-46f7-8561-c68a9cdf500d/dismiss 200
+PASS GET /ui/audit 200
+PASS Audit retains LIVE context and UTC
+PASS POST /api/v1/notifications 202
+PASS EMAIL is recorded, not sent externally
+PASS POST /api/v1/notifications 202
+PASS PAGERDUTY is recorded, not sent externally
+PASS POST /api/v1/notifications 202
+PASS WebSocket through local ingress authenticates
+PASS POST /api/v1/notifications 202
+PASS WebSocket forwards a real network notification
+PASS POST /api/v1/notifications 202
+PASS WebSocket ACK is durable and attributed
+[10/21/26 06:56:27] INFO     Processing request of type            server.py:733
+                             ListToolsRequest                                   
+PASS Read-only MCP exposes 16 tools
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP response succeeds
+PASS MCP sees HTTP ACK
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS Default MCP rejects delivery
+[10/21/26 06:56:27] INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+                    INFO     Sending notification:                    sdk.py:247
+                             type=local.smoke.safety, intent=SAFETY,            
+                             mode=LIVE, channels=['SLACK',                      
+                             'WEBSOCKET']                                       
+                    INFO     Delivering notification:             service.py:259
+                             notification_id=cbdf34e4-8520-4277-9               
+                             494-c6a58a15dbb7 mode=GUARANTEED                   
+                             channels=['SLACK', 'WEBSOCKET']                    
+                    WARNING  No WebSocket adapter registered      service.py:492
+                    INFO     GUARANTEED delivery succeeded:       service.py:581
+                             notification_id=cbdf34e4-8520-4277-9               
+                             494-c6a58a15dbb7 channel=SLACK                     
+                    INFO     Processing request of type            server.py:733
+                             ListToolsRequest                                   
+PASS MCP response succeeds
+PASS Write-enabled MCP records delivery
+PASS POST /api/v1/notifications 202
+PASS MCP/HTTP idempotency shares identity
+[10/21/26 06:56:28] INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP response succeeds
+PASS MCP acknowledgment visible over HTTP
+Waiting for the real one-minute ACK deadline...
+PASS Timeout recovery on persistent profile
+PASS Local callback receipt is durable
+PASS Persisted pending work dispatches after restart
+PASS Earlier ACK survives restart
+PASS POST /api/v1/notifications/8c5c1812-923f-4910-bb02-8945b4982f44/ack 200
+PASS POST /api/v1/notifications 202
+PASS Live profile has no fault injection
+PASS persistent deployment: 62 checks

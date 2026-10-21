@@ -8,7 +8,7 @@ This is an author-prepared handoff, not a production certification. An Astra/ult
 
 ## Subsequent deployment-candidate correction
 
-The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b45128b77715f64c8b0e5f8f91387a9`, which supersedes the earlier application target for current code. Container execution found distribution/probe/WebSocket packaging gaps; browser smoke found ACK context and UTC projection defects. They are fixed with 11 added regressions, 1,776 passing Python tests and 99 passing live checks. The earlier independent review applies to its frozen target; it is not retroactively claimed for these new corrections. A lasting deployment target and real recipients are still pending.
+The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b45128b77715f64c8b0e5f8f91387a9`, which supersedes the earlier application target for current code. Container execution found distribution/probe/WebSocket packaging gaps; browser smoke found ACK context and UTC projection defects. They are fixed with 11 added regressions, 1,776 passing Python tests and 99 passing live checks. The earlier independent review applies to its frozen target; it is not retroactively claimed for these new corrections. The user subsequently chose the [persistent localhost recording deployment](LOCAL_DEPLOYMENT.md), now verified. Real external recipients remain outside that chosen scope.
 
 ## Product boundary
 
