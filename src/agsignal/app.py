@@ -242,16 +242,10 @@ def create_app(
     app.state.policy_store = policy_store
     app.state.runtime = runtime
     app.state.audit_store = runtime.audit_store if runtime is not None else (audit_store or InMemoryAuditStore())
+    app.state.read_model_adapter = None  # Explicit legacy fixture composition only.
     if runtime is not None:
-        from notification.audit import configure_audit_logger
-        configure_audit_logger(store=runtime.audit_store)
-        from agsignal.api.read_models import (
-            SQLAlchemyReadModelAdapter,
-            configure_read_model_adapter,
-        )
-        adapter = SQLAlchemyReadModelAdapter(runtime.sessions)
-        adapter.runtime = runtime
-        configure_read_model_adapter(adapter)
+        from agsignal.api.read_models import SQLAlchemyReadModelAdapter
+        app.state.read_model_adapter = SQLAlchemyReadModelAdapter(runtime.sessions, runtime=runtime)
     tracker = channel_health_tracker or ChannelHealthTracker()
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
@@ -329,8 +323,12 @@ def create_app(
                 from sqlalchemy import select
                 with runtime.engine.connect() as connection:
                     connection.execute(select(1))
-            read_model_adapter = type(get_read_model_adapter()).__name__
-            audit_logger_type = type(get_audit_logger()).__name__
+            if runtime is not None:
+                read_model_adapter = type(app.state.read_model_adapter).__name__
+                audit_logger_type = type(runtime.audit_store).__name__
+            else:
+                read_model_adapter = type(get_read_model_adapter()).__name__
+                audit_logger_type = type(get_audit_logger()).__name__
         except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
             return {
                 "status": "not_ready",

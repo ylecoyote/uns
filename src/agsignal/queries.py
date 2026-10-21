@@ -29,6 +29,7 @@ from agsignal.api.observability import (
 from agsignal.api.read_models import (  # internal adapter types; Phase 5 relocates
     AuditEventFilter,
     DeliveryFilter,
+    ReadModelAdapter,
     get_read_model_adapter,
 )
 from agsignal.errors import NotFoundError
@@ -130,6 +131,8 @@ async def list_deliveries(
     autonomy_mode: AutonomyMode | None = None,
     notification_type: str | None = None,
     channel: Channel | None = None,
+    *,
+    read_adapter: ReadModelAdapter | None = None,
 ) -> DeliveryTimelineListResponse:
     """List delivery timelines with filtering.
 
@@ -138,8 +141,8 @@ async def list_deliveries(
     Queries the read model adapter for delivery summaries matching the
     provided filter criteria. Returns paginated results.
 
-    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
-    Configure SQLAlchemyReadModelAdapter for production persistence.
+    Canonical transports must supply their runtime-bound ``read_adapter``.
+    Omitting it preserves the process-global legacy helper behavior only.
     """
     # Body extracted verbatim from agsignal.api.routes_ui.list_deliveries
     # (minus the @router.get decorator and the log_endpoint_call observability
@@ -159,7 +162,9 @@ async def list_deliveries(
     )
 
     # Query read model adapter
-    adapter = get_read_model_adapter()
+    # Composed transports supply their own adapter. The global fallback is
+    # retained only for legacy direct callers and explicit fixture composition.
+    adapter = read_adapter if read_adapter is not None else get_read_model_adapter()
     result = adapter.get_deliveries(filter_criteria, cursor, limit)
 
     # Convert to response model
@@ -192,6 +197,8 @@ async def list_deliveries(
 
 async def get_delivery_timeline(
     notification_id: UUID,
+    *,
+    read_adapter: ReadModelAdapter | None = None,
 ) -> DeliveryTimelineResponse:
     """Get delivery timeline for a specific notification.
 
@@ -200,15 +207,17 @@ async def get_delivery_timeline(
     Queries the read model adapter for the full delivery timeline
     of a specific notification, including all channel attempts.
 
-    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
-    Configure SQLAlchemyReadModelAdapter for production persistence.
+    Canonical transports must supply their runtime-bound ``read_adapter``.
+    Omitting it preserves the process-global legacy helper behavior only.
     """
     # Body extracted verbatim from agsignal.api.routes_ui.get_delivery_timeline
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
     # Query read model adapter
-    adapter = get_read_model_adapter()
+    # Composed transports supply their own adapter. The global fallback is
+    # retained only for legacy direct callers and explicit fixture composition.
+    adapter = read_adapter if read_adapter is not None else get_read_model_adapter()
     timeline = adapter.get_delivery_timeline(notification_id)
 
     if timeline is None:
@@ -564,6 +573,8 @@ async def list_audit_events(
     agent_id: UUID | None = None,
     autonomy_mode: AutonomyMode | None = None,
     correlation_id: str | None = None,
+    *,
+    read_adapter: ReadModelAdapter | None = None,
 ) -> AuditEventListResponse:
     """List audit events with filtering.
 
@@ -572,8 +583,8 @@ async def list_audit_events(
     Queries the read model adapter for audit events matching the
     provided filter criteria. Returns paginated results.
 
-    Note: Default adapter is InMemoryReadModelAdapter (data not persisted).
-    Configure SQLAlchemyReadModelAdapter for production persistence.
+    Canonical transports must supply their runtime-bound ``read_adapter``.
+    Omitting it preserves the process-global legacy helper behavior only.
     """
     # Body extracted verbatim from agsignal.api.routes_ui.list_audit_events
     # (minus the @router.get decorator and the log_endpoint_call observability
@@ -591,7 +602,9 @@ async def list_audit_events(
     )
 
     # Query read model adapter
-    adapter = get_read_model_adapter()
+    # Composed transports supply their own adapter. The global fallback is
+    # retained only for legacy direct callers and explicit fixture composition.
+    adapter = read_adapter if read_adapter is not None else get_read_model_adapter()
     result = adapter.get_audit_events(filter_criteria, cursor, limit)
 
     # Convert to response model

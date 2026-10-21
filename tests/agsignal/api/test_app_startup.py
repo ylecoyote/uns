@@ -223,7 +223,7 @@ class TestCreateApp:
     """Tests for create_app function."""
 
     def test_create_app_configures_persistence_by_default(self):
-        """Test create_app calls configure_persistence by default."""
+        """Default persistence belongs to the app, without replacing global fixtures."""
         # Clear any existing configuration
         import agsignal.api.read_models as rm
         import notification.audit as audit
@@ -235,11 +235,12 @@ class TestCreateApp:
         with patch.dict(os.environ, {}, clear=True):
             app = create_app()
 
-        # Verify persistence was configured
-        from agsignal.api.read_models import get_read_model_adapter
-
-        adapter = get_read_model_adapter()
+        adapter = app.state.read_model_adapter
         assert type(adapter).__name__ == "SQLAlchemyReadModelAdapter"
+        assert adapter.runtime is app.state.runtime
+        assert app.state.audit_store is app.state.runtime.audit_store
+        assert rm._read_model_adapter is None
+        assert audit._audit_logger is None
 
         assert app is not None
         assert app.title == "UNS"

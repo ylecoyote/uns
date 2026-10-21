@@ -585,14 +585,14 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
     and scalable querying are required.
     """
 
-    def __init__(self, session_factory: Any) -> None:
+    def __init__(self, session_factory: Any, *, runtime: Any = None) -> None:
         """Initialize with SQLAlchemy session factory.
 
         Args:
             session_factory: Callable that returns a SQLAlchemy Session
                             (e.g., sessionmaker or scoped_session)
         """
-        self.runtime: Any = None
+        self.runtime = runtime
         self._session_factory = session_factory
         logger.info("SQLAlchemyReadModelAdapter initialized")
 
