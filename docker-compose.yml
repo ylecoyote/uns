@@ -70,7 +70,7 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"
+        - "import json, os, urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Authorization': 'Bearer ' + os.environ['AGSIGNAL_API_KEY']}); result=json.load(urllib.request.urlopen(r, timeout=2)); raise SystemExit(0 if result['status']=='ready' else 1)"
       interval: 10s
       timeout: 3s
       retries: 30                       # generous so first-run schema creation finishes
