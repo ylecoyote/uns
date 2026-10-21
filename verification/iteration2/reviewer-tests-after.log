@@ -1,0 +1,49 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items
+
+verification/iteration2/reviewer_reproductions.py FFF.F...FF.            [100%]
+
+=================================== FAILURES ===================================
+_ test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered _
+verification/iteration2/reviewer_reproductions.py:105: in test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered
+    assert await runtime.dispatch(owner2.notification_id) is True
+E   assert False is True
+_ test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send __
+verification/iteration2/reviewer_reproductions.py:138: in test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send
+    runtime.replay(n_a.notification_id, actor="operator")
+src/uns/runtime.py:902: in replay
+    raise Conflict(
+E   uns.runtime.Conflict: Obligation already satisfied or lineage unresolved: 0b50cd51-7040-49de-8af0-e06d38ee28a7 (DELIVERED)
+______ test_f03_best_effort_lease_loss_discards_completed_channel_outcome ______
+verification/iteration2/reviewer_reproductions.py:188: in test_f03_best_effort_lease_loss_discards_completed_channel_outcome
+    assert "SLACK" in row["outcome"]["channels_succeeded"]
+E   AssertionError: assert 'SLACK' in []
+_ test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout _
+verification/iteration2/reviewer_reproductions.py:299: in test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout
+    assert sendmail_completed_at == []  # Fails: sendmail completed after dispatch finished!
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert [138217.191046416] == []
+E     
+E     Left contains one more item: 138217.191046416
+E     Use -v to get more diff
+______ test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime ______
+verification/iteration2/reviewer_reproductions.py:441: in test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime
+    assert notif_status["ack_status"] is not None
+E   assert None is not None
+_ test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event _
+verification/iteration2/reviewer_reproductions.py:485: in test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event
+    assert "removed" not in receipt["payload"]
+E   AssertionError: assert 'removed' not in {'applied': True, 'operator': 'ops', 'cutoff': 1792562119.217249, 'idempotency_seconds': 60.0, ...}
+=========================== short test summary info ============================
+FAILED verification/iteration2/reviewer_reproductions.py::test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered
+FAILED verification/iteration2/reviewer_reproductions.py::test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send
+FAILED verification/iteration2/reviewer_reproductions.py::test_f03_best_effort_lease_loss_discards_completed_channel_outcome
+FAILED verification/iteration2/reviewer_reproductions.py::test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout
+FAILED verification/iteration2/reviewer_reproductions.py::test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime
+FAILED verification/iteration2/reviewer_reproductions.py::test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event
+========================= 6 failed, 5 passed in 4.00s ==========================

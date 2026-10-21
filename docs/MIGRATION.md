@@ -46,3 +46,12 @@ Behavior intentionally tightens: ACTIVE policy is authoritative; producer and ad
 Write-enabled MCP owns its recovery lifecycle. Runtime policy and transport read adapters are instance-scoped. A read-only console uses a memory-only operator key. Node requirements changed with vulnerability remediation to `^20.19.0 || ^22.12.0 || >=24.0.0`; React stays on18. The original tests remain, with additional adversarial and migration cases rather than a test-suite reduction.
 
 `uns-maintain` adds explicit dry-run, apply and archive modes. It never runs automatically and does not vacuum or choose a compliance retention duration. Follow the current deployment guide before pruning data.
+
+
+## Second remediation iteration
+
+Pending owners remain exclusive after suppression-window expiry; promotion preserves expiry. Replay now conflicts on pending/satisfied successor obligations or unresolved lineage. Failed histories remain in the dead-letter view with blocker fields until explicit operator resolution. No force-send bypass is added.
+
+The additive `dedup_successor_id` column and index retain recovery/satisfaction references. Upgrade reconstructs promotion-connected groups from retained DEDUP_OWNER_PROMOTED events, including successful replay by a former owner and tied timestamps. Missing evidence blocks unsafe replay instead of assuming delivery failed. All-failed intact groups remain recoverable. Maintenance protects retained successor references. Back up and stop old writers before upgrade; the one-time reconstruction scans retained work and promotion events. Lost historical events cannot be reconstructed.
+
+Old unattempted callbacks with due time zero are normalized to their event timestamp. Runtime delivery and ACK audits now use Runtime.clock. Steady-state policy inspection/simulation no longer reserves a writer; intake and mutations retain revision locking. Direct MCP reads accept an explicit runtime state; omitted runtime keeps legacy fixture behavior. See [iteration report](REMEDIATION_ITERATION2.md) and [delivery semantics](sections/delivery-semantics.md).

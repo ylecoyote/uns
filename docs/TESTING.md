@@ -65,7 +65,7 @@ The test count differs from the predecessor because obsolete documentation-layou
 
 Machine-readable results and raw local receipts are in [verification/results.json](../verification/results.json). This evidence establishes local behavior only, not commercial or production acceptance.
 
-## Adversarial remediation result
+## First adversarial remediation result (historical)
 
 The remediation code target is `902300773d7ad41baefab8e007d0f37981ba6be9`. It preserves the notification-only product boundary and addresses the reproduced reliability, policy and access gaps. Original test files were not removed in this remediation; fixtures/assertions were adapted to explicit authenticated and runtime-scoped contracts.
 
@@ -85,3 +85,24 @@ New cases exercise failed-owner dedup, successor election, replay budgets, stale
 Evidence is in [remediation results](../verification/remediation/results.json) and the [focused review record](../verification/remediation/review-findings.md). Original consolidation receipts remain unchanged under `verification/`; their broader acceptance wording was superseded by adversarial validation.
 
 Remaining limits: external-provider and human-receipt acceptance, live PostgreSQL operation, hosted CI and representative production load are unverified. Credentials confer operator access, not RBAC. External effects remain at least once. Historical information already lost by earlier versions cannot be reconstructed. Retention is explicit, SQLite-only and row-bounded, not byte/time-bounded or automatic compliance retention. Existing dependency/framework deprecation warnings are recorded in the test log.
+
+
+## Second adversarial remediation result (current)
+
+Implementation target: `ba46a311d071736a6beca241a6e43a1407f29f3b`, base `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`. [Contract decisions and dispositions](REMEDIATION_ITERATION2.md) explain the distinction between reproduced behavior and accepted requirements.
+
+| Check | Result |
+|---|---|
+| Full Python suite | 1,765 passed; 90.70% combined coverage, 75% gate |
+| Static/boundaries | Ruff, mypy (91 files), Bandit, UI boundary and whitespace passed |
+| Focused independent runtime/schema/retention review | 86 passed, three real baseline-to-upgrade reproductions and multi-node replay matrix; reviewed file hashes retained |
+| Policy | Warm reads avoid UPDATE; 131 focused tests, including process ordering and cold bootstrap |
+| MCP | 80 focused tests; durable direct reads, explicit injection, factory parity and SUCCESS mapping |
+| Adapter/service/runtime | 182 focused tests; deterministic preparation/cancellation barriers, UNKNOWN outcomes, evidence-store failures and lease-loss results |
+| Packaging | Wheel and sdist; 90 module source identities matched; separate minimal/full installations, local delivery/ACK, repeated migration CLI and no-write maintenance preview passed |
+| Original reviewer file | Baseline 11 failed; final 5 passed / 6 expected contract/setup mismatches individually explained in the iteration report |
+| Frontend/dependencies | No frontend/dependency changes; frontend CI and advisory audits were not rerun. Prior 305 console tests and advisory snapshots remain historical evidence only. |
+
+Raw logs, the untouched reviewer reproduction, installed smoke script and SHA-256 manifest are in [iteration 2 receipts](../verification/iteration2/results.json). Validation used Python 3.12.9 and temporary SQLite databases. Two inherited framework deprecation warnings remain; Bandit also prints non-failing unmatched nosec warnings around the existing lease-clear annotation. No production data was modified. External acceptance limitations in the first report still apply.
+
+Reproduce with the development environment and commands above. The reviewer file can be run separately with `python -m pytest verification/iteration2/reviewer_reproductions.py`; its expected residual failures are not the regression gate. Run the installed package smoke from outside the source tree with `python /path/to/repo/verification/iteration2/package_smoke.py /path/to/repo` after building/installing the full wheel.

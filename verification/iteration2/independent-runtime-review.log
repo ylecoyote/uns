@@ -1,0 +1,62 @@
+Source SHA256 before checks: {'src/uns/runtime.py': 'f531383549b1b8594333386128a4cfef2c638bc447626f8a307cb89609d0046f', 'src/uns/schema.py': '4aa1ec514216f3bb66daf5334dbe3260c7f5975eb5a2db6db150306bb93be213', 'src/uns/maintenance.py': 'ea8e68d09e2b751d722856795fb685ad3ab769e9f9deada47b887bbd4feeee32', 'tests/uns/test_iteration2_runtime.py': '53d88f94829afaffde9869334fd1bfb4213ec9414740beaeaa6b6a55327813a0'}
+
+Reproduction timestamp: /private/tmp/uns-review-final-timestamp-lvi__05r/repro.py
+Phase old; exit 0
+old events: [('REPLAY_REQUESTED', 1001.0)] [('DEDUP_OWNER_PROMOTED', 1001.0)]
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=09589633-7f91-4003-95a2-d66f0e6021fe channel=SLACK error=None
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=09589633-7f91-4003-95a2-d66f0e6021fe channel=SLACK error=None
+No WebSocket adapter registered
+
+Phase new; exit 0
+migrated predecessor: {'status': 'FAILED', 'dead_letter': True, 'dedup_successor_id': '6afe8877-4921-4197-8608-d6a59b337412'}
+correctly blocked: Obligation already satisfied or lineage unresolved: 6afe8877-4921-4197-8608-d6a59b337412 (DELIVERED)
+
+
+Reproduction pruned: /private/tmp/uns-review-final-pruned-h22dot6m/repro.py
+Phase old; exit 0
+old retention: {"applied": true, "operator": "ops", "cutoff": 1792570493.2301152, "idempotency_seconds": 60, "effective_cutoff": 1792570493.2301152, "batch_size": 100, "after_id": null, "next_after_id": null, "notification_ids": ["3320324f-ac0d-443b-8e1d-85c0184d77fb"], "dedup_keys": ["5600717a6e7c9e9f43ccc2623d398818dceb6d4143d04a8872e8f747a3e6b181"], "oversized_notification_ids": [], "deleted_rows": 2, "receipt_id": "2c8ad2be-c59a-43fb-9d23-e085087bae1f", "archive": null}
+promotion evidence retained: ['DEDUP_LINKED', 'ACCEPTED', 'DEDUP_OWNER_PROMOTED', 'ATTEMPT_STARTED', 'CHANNEL_ATTEMPT_STARTED', 'DELIVERY_RESULT', 'ACKED']
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=3846b4c1-c070-4ff7-9d0f-d0cffef75511 channel=SLACK error=None
+No WebSocket adapter registered
+
+Phase new; exit 0
+migrated predecessor: {"status": "FAILED", "dead_letter": true, "dedup_successor_id": "3320324f-ac0d-443b-8e1d-85c0184d77fb"}
+correctly blocked: Obligation already satisfied or lineage unresolved: 3320324f-ac0d-443b-8e1d-85c0184d77fb (UNRESOLVED_LINEAGE)
+
+
+Reproduction recovered-root: /private/tmp/uns-review-final-recovered-root-1dix5cft/repro.py
+Phase old; exit 0
+old status DELIVERED FAILED
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=96946b03-663a-4baa-97d2-a7accb7697cd channel=SLACK error=None
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=0a7877d1-7b02-453a-be6e-e8e85dfa69a8 channel=SLACK error=None
+No WebSocket adapter registered
+
+Phase new; exit 0
+migrated {'a': {'status': 'DELIVERED', 'dedup_successor_id': None}, 'b': {'status': 'FAILED', 'dedup_successor_id': '96946b03-663a-4baa-97d2-a7accb7697cd'}}
+correctly blocked Obligation already satisfied or lineage unresolved: 96946b03-663a-4baa-97d2-a7accb7697cd (DELIVERED)
+
+
+Focused pytest exit 0
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 86 items
+
+tests/uns/test_iteration2_runtime.py ................                    [ 18%]
+tests/uns/test_delivery_remediation.py ...................               [ 40%]
+tests/uns/test_maintenance.py .......................................... [ 89%]
+.........                                                                [100%]
+
+============================== 86 passed in 6.14s ==============================
+
+
+Source SHA256 after checks: {'src/uns/runtime.py': 'f531383549b1b8594333386128a4cfef2c638bc447626f8a307cb89609d0046f', 'src/uns/schema.py': '4aa1ec514216f3bb66daf5334dbe3260c7f5975eb5a2db6db150306bb93be213', 'src/uns/maintenance.py': 'ea8e68d09e2b751d722856795fb685ad3ab769e9f9deada47b887bbd4feeee32', 'tests/uns/test_iteration2_runtime.py': '53d88f94829afaffde9869334fd1bfb4213ec9414740beaeaa6b6a55327813a0'}
+Files stable: True

@@ -1,0 +1,170 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 6 items
+
+tests/uns/test_policy_read_isolation.py FFFFFF                           [100%]
+
+=================================== FAILURES ===================================
+__________ test_steady_state_policy_reads_do_not_issue_dml[snapshot] ___________
+tests/uns/test_policy_read_isolation.py:71: in test_steady_state_policy_reads_do_not_issue_dml
+    assert set(statements) == {"SELECT"}, statements
+E   AssertionError: ['UPDATE', 'SELECT', 'SELECT']
+E   assert {'SELECT', 'UPDATE'} == {'SELECT'}
+E     
+E     Extra items in the left set:
+E     'UPDATE'
+E     Use -v to get more diff
+__________ test_steady_state_policy_reads_do_not_issue_dml[registry] ___________
+tests/uns/test_policy_read_isolation.py:71: in test_steady_state_policy_reads_do_not_issue_dml
+    assert set(statements) == {"SELECT"}, statements
+E   AssertionError: ['UPDATE', 'SELECT', 'SELECT']
+E   assert {'SELECT', 'UPDATE'} == {'SELECT'}
+E     
+E     Extra items in the left set:
+E     'UPDATE'
+E     Use -v to get more diff
+_________ test_steady_state_policy_reads_do_not_issue_dml[simulation] __________
+tests/uns/test_policy_read_isolation.py:71: in test_steady_state_policy_reads_do_not_issue_dml
+    assert set(statements) == {"SELECT"}, statements
+E   AssertionError: ['UPDATE', 'SELECT', 'SELECT']
+E   assert {'SELECT', 'UPDATE'} == {'SELECT'}
+E     
+E     Extra items in the left set:
+E     'UPDATE'
+E     Use -v to get more diff
+______ test_policy_reads_complete_while_another_transaction_holds_writer _______
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1953: in _exec_single_context
+    self.dialect.do_execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:1192: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlite3.OperationalError: database is locked
+
+The above exception was the direct cause of the following exception:
+tests/uns/test_policy_read_isolation.py:80: in test_policy_reads_complete_while_another_transaction_holds_writer
+    snapshot = pool.submit(store.load_snapshot).result(timeout=2)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/miniconda3/lib/python3.12/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/opt/miniconda3/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/opt/miniconda3/lib/python3.12/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/db/policy_store.py:85: in load_snapshot
+    return self.load_snapshot(transaction)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/db/policy_store.py:88: in load_snapshot
+    .execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1458: in execute
+    return meth(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:533: in _execute_on_connection
+    return connection._execute_clauseelement(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1678: in _execute_clauseelement
+    ret = self._execute_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1832: in _execute_context
+    return self._exec_single_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1972: in _exec_single_context
+    self._handle_dbapi_exception(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2342: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1953: in _exec_single_context
+    self.dialect.do_execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:1192: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+E   [SQL: UPDATE notification_policy_revision SET revision=notification_policy_revision.revision WHERE notification_policy_revision.singleton = ?]
+E   [parameters: (1,)]
+E   (Background on this error at: https://sqlalche.me/e/21/e3q8)
+__ test_snapshot_content_hash_and_revision_stay_consistent_during_activation ___
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1953: in _exec_single_context
+    self.dialect.do_execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:1192: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlite3.OperationalError: database is locked
+
+The above exception was the direct cause of the following exception:
+tests/uns/test_policy_read_isolation.py:104: in test_snapshot_content_hash_and_revision_stay_consistent_during_activation
+    snapshot = store.load_snapshot()
+               ^^^^^^^^^^^^^^^^^^^^^
+src/db/policy_store.py:85: in load_snapshot
+    return self.load_snapshot(transaction)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/db/policy_store.py:110: in load_snapshot
+    revision = session.execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2473: in execute
+    return self._execute_internal(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2363: in _execute_internal
+    compile_state_cls.orm_execute_statement(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:316: in orm_execute_statement
+    result = conn.execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1458: in execute
+    return meth(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:533: in _execute_on_connection
+    return connection._execute_clauseelement(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1678: in _execute_clauseelement
+    ret = self._execute_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1832: in _execute_context
+    return self._exec_single_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1972: in _exec_single_context
+    self._handle_dbapi_exception(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2345: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1958: in _exec_single_context
+    self.dispatch.after_cursor_execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/event/attr.py:514: in __call__
+    fn(*args, **kw)
+tests/uns/test_policy_read_isolation.py:100: in activate_after_select
+    other_store.save_snapshot([policy("2", Channel.EMAIL)])
+src/db/policy_store.py:209: in save_snapshot
+    previous = self.load_snapshot(session)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/db/policy_store.py:88: in load_snapshot
+    .execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1458: in execute
+    return meth(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:533: in _execute_on_connection
+    return connection._execute_clauseelement(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1678: in _execute_clauseelement
+    ret = self._execute_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1832: in _execute_context
+    return self._exec_single_context(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1972: in _exec_single_context
+    self._handle_dbapi_exception(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2342: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1953: in _exec_single_context
+    self.dialect.do_execute(
+/Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:1192: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+E   [SQL: UPDATE notification_policy_revision SET revision=notification_policy_revision.revision WHERE notification_policy_revision.singleton = ?]
+E   [parameters: (1,)]
+E   (Background on this error at: https://sqlalche.me/e/21/e3q8)
+_______________ test_readiness_does_not_update_policy_authority ________________
+tests/uns/test_policy_read_isolation.py:143: in test_readiness_does_not_update_policy_authority
+    assert set(statements) == {"SELECT"}, statements
+E   AssertionError: ['SELECT', 'UPDATE', 'SELECT', 'SELECT', 'SELECT']
+E   assert {'SELECT', 'UPDATE'} == {'SELECT'}
+E     
+E     Extra items in the left set:
+E     'UPDATE'
+E     Use -v to get more diff
+=============================== warnings summary ===============================
+tests/uns/test_policy_read_isolation.py::test_readiness_does_not_update_policy_authority
+  /Users/awiley/Code/uns-remediation/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/uns/test_policy_read_isolation.py::test_steady_state_policy_reads_do_not_issue_dml[snapshot]
+FAILED tests/uns/test_policy_read_isolation.py::test_steady_state_policy_reads_do_not_issue_dml[registry]
+FAILED tests/uns/test_policy_read_isolation.py::test_steady_state_policy_reads_do_not_issue_dml[simulation]
+FAILED tests/uns/test_policy_read_isolation.py::test_policy_reads_complete_while_another_transaction_holds_writer
+FAILED tests/uns/test_policy_read_isolation.py::test_snapshot_content_hash_and_revision_stay_consistent_during_activation
+FAILED tests/uns/test_policy_read_isolation.py::test_readiness_does_not_update_policy_authority
+========================= 6 failed, 1 warning in 1.41s =========================

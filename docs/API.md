@@ -11,7 +11,9 @@ Install `uns[full]` from the local wheel or `.[full]` from source. `uns.Runtime(
 - `runtime.acknowledge(id, actor=..., dismiss=False)`: conditional terminal response.
 - `await runtime.run_once()`: recover eligible work and process timeouts without awaiting callbacks.
 - `await runtime.worker()`: owned dispatch, timeout and callback loops with independent progress.
-- `runtime.replay(id, actor=...)`: request attributable replay with a fresh cycle budget and preserved cumulative history.
+- `runtime.replay(id, actor=...)`: recover an unsatisfied exhausted obligation with a fresh cycle budget and preserved history. Raises `Conflict` (HTTP 409) for pending/satisfied successor obligations or unresolved lineage; no force bypass.
+- `runtime.dead_letters()`: retained exhausted histories, including `replay_blocked_by` and `replay_block_reason` when recovery is unsafe or redundant.
+- `runtime.resolve_failure(id, actor=...)`: explicitly resolve a retained failure without erasing its FAILED status or audit.
 
 Requests use the existing `agsignal.responses.SendNotificationRequest` model. Legacy domain types remain import-compatible. The low-level `notification.sdk.NotificationSDK` and `agsignal.SignalClient` are policy/handler adapters. Their no-handler result is PENDING, not a successful send.
 
@@ -37,13 +39,13 @@ Idempotency scope is authenticated principal plus source plus key. Same content 
 
 ## MCP
 
-`uns-mcp` retains existing stdio tools: simulate_signal, send_signal, get_delivery_status, ack_notification, dismiss_notification, get_notification_status, get_ack_status, list_deliveries, list_audit_events, get_effective_policy, list_invariants, get_invariants_summary, list_dlq, get_channel_health, health, ready. The source registry in `agsignal_mcp.factory.AGSIGNAL_MCP_TOOL_NAMES` is authoritative.
+`uns-mcp` retains existing stdio tools: simulate_signal, send_signal, get_delivery_status, ack_notification, dismiss_notification, get_notification_status, get_ack_status, list_deliveries, list_audit_events, get_effective_policy, list_invariants, get_invariants_summary, list_dlq, get_channel_health, health, ready. The source registry in `agsignal_mcp.factory.AGSIGNAL_MCP_TOOL_NAMES` is authoritative. Embedded direct read helpers accept `runtime_state=RuntimeState(runtime=runtime)` and use that runtime's durable stores. Omitted dependencies bind to the runtime; explicit injected audit/read adapters remain supported. Legacy helper calls without a runtime retain fixture behavior.
 
 The factory and CLI default to read-only. `uns-mcp --enable-writes` requires a persistent database, `UNS_API_PRINCIPAL` and `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN`; it owns recovery for the process lifetime. Embedded hosts configure `MCPRuntimeConfig` explicitly. Secrets are supplied through host configuration, not command-line flags. `send_signal` does not label acceptance as delivery. No `check_policy`, `request_approval`, or action-resume tool is implemented.
 
 ## Policy authority and compatibility
 
-Canonical intake and simulation read a runtime-scoped ACTIVE snapshot inside a revision-checked transaction. Producer overrides that differ from resolved ACTIVE policy are rejected, including configured intent. Adapter-control metadata cannot bypass this boundary. No producer-level administrative exception exists. Direct low-level handler/adapter APIs remain trusted integration code, not a substitute for the protected intake API.
+Canonical intake locks the ACTIVE revision in its acceptance transaction; steady-state simulation and inspection read revision plus immutable snapshot in a single SELECT without a write lock. Producer overrides that differ from resolved ACTIVE policy are rejected, including configured intent. Adapter-control metadata cannot bypass this boundary. No producer-level administrative exception exists. Direct low-level handler/adapter APIs remain trusted integration code, not a substitute for the protected intake API.
 
 ## WebSocket authentication
 

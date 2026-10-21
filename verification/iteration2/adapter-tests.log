@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 182 items
+
+tests/notification/test_delivery_attempt_evidence.py ................    [  8%]
+tests/notification/test_adapters.py .................................... [ 28%]
+........................................................................ [ 68%]
+..                                                                       [ 69%]
+tests/notification/test_service.py ......................                [ 81%]
+tests/uns/test_delivery_remediation.py ...................               [ 91%]
+tests/uns/test_iteration2_runtime.py ...............                     [100%]
+
+============================= 182 passed in 9.62s ==============================

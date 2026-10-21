@@ -1,0 +1,89 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 8 items
+
+tests/uns/test_iteration2_runtime.py FFFFFFFF                            [100%]
+
+=================================== FAILURES ===================================
+__________________ test_pending_owner_survives_window_expiry ___________________
+tests/uns/test_iteration2_runtime.py:26: in test_pending_owner_survives_window_expiry
+    assert runtime.get(follower.notification_id)['dedup_owner_id'] == str(owner.notification_id)
+E   AssertionError: assert None == '6a4f1d00-7a85-4d4b-9c74-e072e03213be'
+E    +  where '6a4f1d00-7a85-4d4b-9c74-e072e03213be' = str(UUID('6a4f1d00-7a85-4d4b-9c74-e072e03213be'))
+E    +    where UUID('6a4f1d00-7a85-4d4b-9c74-e072e03213be') = SendNotificationResponse(notification_id=UUID('6a4f1d00-7a85-4d4b-9c74-e072e03213be'), status=<DeliveryStatus.PENDING:...otent_replay=False, created_at=datetime.datetime(2026, 10, 21, 5, 36, 25, 118653, tzinfo=TzInfo(0)), message='pending').notification_id
+________ test_legacy_overlapping_owner_relinks_without_stealing[False] _________
+tests/uns/test_iteration2_runtime.py:56: in test_legacy_overlapping_owner_relinks_without_stealing
+    assert row['dedup_owner_id'] == str(newer.notification_id)
+E   AssertionError: assert None == '2d0195a6-852e-4a36-a416-d7a1393a8bd6'
+E    +  where '2d0195a6-852e-4a36-a416-d7a1393a8bd6' = str(UUID('2d0195a6-852e-4a36-a416-d7a1393a8bd6'))
+E    +    where UUID('2d0195a6-852e-4a36-a416-d7a1393a8bd6') = SendNotificationResponse(notification_id=UUID('2d0195a6-852e-4a36-a416-d7a1393a8bd6'), status=<DeliveryStatus.PENDING:...otent_replay=False, created_at=datetime.datetime(2026, 10, 21, 5, 36, 25, 181457, tzinfo=TzInfo(0)), message='pending').notification_id
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=03ac0f8b-de91-4afa-84be-0bb6790c2beb channel=SLACK error=None
+_________ test_legacy_overlapping_owner_relinks_without_stealing[True] _________
+tests/uns/test_iteration2_runtime.py:56: in test_legacy_overlapping_owner_relinks_without_stealing
+    assert row['dedup_owner_id'] == str(newer.notification_id)
+E   AssertionError: assert None == '778f1e04-df13-4f8b-9352-2c4b9c902707'
+E    +  where '778f1e04-df13-4f8b-9352-2c4b9c902707' = str(UUID('778f1e04-df13-4f8b-9352-2c4b9c902707'))
+E    +    where UUID('778f1e04-df13-4f8b-9352-2c4b9c902707') = SendNotificationResponse(notification_id=UUID('778f1e04-df13-4f8b-9352-2c4b9c902707'), status=<DeliveryStatus.PENDING:...otent_replay=False, created_at=datetime.datetime(2026, 10, 21, 5, 36, 25, 224011, tzinfo=TzInfo(0)), message='pending').notification_id
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=41f62cd9-5e82-42a8-af35-fd134cc3a967 channel=SLACK error=None
+_ test_replay_blocks_pending_and_delivered_successor_after_restart_and_expiry __
+tests/uns/test_iteration2_runtime.py:72: in test_replay_blocks_pending_and_delivered_successor_after_restart_and_expiry
+    with pytest.raises(Conflict, match='pending|Pending'):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE Conflict
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=908f2e9b-c424-43d9-81f9-982fa4b6bbc6 channel=SLACK error=None
+_______ test_replay_claims_key_and_prevents_parallel_predecessor_replays _______
+tests/uns/test_iteration2_runtime.py:103: in test_replay_claims_key_and_prevents_parallel_predecessor_replays
+    assert sum(results) == 1
+E   assert 2 == 1
+E    +  where 2 = sum([True, True])
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=332525e4-953f-47dd-85c8-1b39010490ea channel=SLACK error=None
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=1a322b1a-914e-49fe-9c2b-4966c045fecf channel=SLACK error=None
+________________ test_retention_keeps_replay_successor_evidence ________________
+tests/uns/test_iteration2_runtime.py:119: in test_retention_keeps_replay_successor_evidence
+    with pytest.raises(Conflict):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE Conflict
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+WARNING  notification.service:service.py:562 GUARANTEED delivery failed, trying fallback: notification_id=f164d8da-929e-4bc0-aaf5-53e3c8440e1e channel=SLACK error=None
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+____________ test_runtime_clock_applies_to_delivery_and_ack_audits _____________
+tests/uns/test_iteration2_runtime.py:129: in test_runtime_clock_applies_to_delivery_and_ack_audits
+    assert audit.audit_created_at.timestamp() == now[0]
+E   AssertionError: assert 1792586185.339299 == 1000.0
+E    +  where 1792586185.339299 = <built-in method timestamp of datetime.datetime object at 0x10812d2f0>()
+E    +    where <built-in method timestamp of datetime.datetime object at 0x10812d2f0> = datetime.datetime(2026, 10, 21, 5, 36, 25, 339299).timestamp
+E    +      where datetime.datetime(2026, 10, 21, 5, 36, 25, 339299) = AuditRecord(audit_id=UUID('e52669d2-93fc-440b-95c3-899f362bde5e'), notification_id=UUID('6f25f58b-a3ff-4f70-b6a9-92338...61c881b562f3e25153240439e2d907170ddaa9b4fcc590aebc', policy_evaluation_id=UUID('2f02fe92-0273-4ba1-9e8e-20c15cdbee6d')).audit_created_at
+------------------------------ Captured log call -------------------------------
+WARNING  notification.service:service.py:463 No WebSocket adapter registered
+_______ test_callback_overdue_retry_gets_capacity_before_fresh_arrivals ________
+tests/uns/test_iteration2_runtime.py:157: in test_callback_overdue_retry_gets_capacity_before_fresh_arrivals
+    assert delivered[0] == early
+E   AssertionError: assert '634a924c-184...-198c59249df6' == '21d3e04e-5ef...-12aef7766551'
+E     
+E     - 21d3e04e-5ef3-4a58-a9e6-12aef7766551
+E     + 634a924c-1840-4924-a61b-198c59249df6
+=========================== short test summary info ============================
+FAILED tests/uns/test_iteration2_runtime.py::test_pending_owner_survives_window_expiry
+FAILED tests/uns/test_iteration2_runtime.py::test_legacy_overlapping_owner_relinks_without_stealing[False]
+FAILED tests/uns/test_iteration2_runtime.py::test_legacy_overlapping_owner_relinks_without_stealing[True]
+FAILED tests/uns/test_iteration2_runtime.py::test_replay_blocks_pending_and_delivered_successor_after_restart_and_expiry
+FAILED tests/uns/test_iteration2_runtime.py::test_replay_claims_key_and_prevents_parallel_predecessor_replays
+FAILED tests/uns/test_iteration2_runtime.py::test_retention_keeps_replay_successor_evidence
+FAILED tests/uns/test_iteration2_runtime.py::test_runtime_clock_applies_to_delivery_and_ack_audits
+FAILED tests/uns/test_iteration2_runtime.py::test_callback_overdue_retry_gets_capacity_before_fresh_arrivals
+============================== 8 failed in 0.64s ===============================

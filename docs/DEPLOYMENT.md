@@ -48,7 +48,7 @@ Use `UNS_POLICY_DIR` for an explicit startup YAML snapshot, or the authenticated
 
 ## Migration and recovery
 
-`uns-migrate` performs additive runtime schema migration, new policy-table bootstrap and scheduling-index creation. Repeated and concurrent startup migrations are tested with SQLite. Existing cumulative attempt counts and audit records remain; replay adds a new cycle rather than erasing history.
+`uns-migrate` performs additive runtime schema migration, new policy-table bootstrap and scheduling-index creation. Repeated and concurrent startup migrations are tested with SQLite. Existing cumulative attempt counts and audit records remain; replay adds a new cycle rather than erasing history. Iteration 2 adds indexed successor links and normalizes old unattempted callback due times from zero to event time. Migration reconstructs recorded promotion links, including missing successor targets, from retained events. Missing targets and cyclic lineage block replay until an operator resolves/reissues the obligation; they are not treated as proof of non-delivery. Old tied replay/promotion clocks cannot erase handoff evidence. The one-time backfill scans retained work and promotion events; budget upgrade time for large stores and stop old writers before upgrading. Earlier erased promotion evidence cannot be reconstructed.
 
 Old ownerless dedup claims cannot suppress new work. Previously suppressed historical records and policy fields already lost by old persistence cannot be reconstructed reliably. Preserve original source policies and use explicit operator reissue/replay when evidence cannot establish delivery.
 
@@ -71,7 +71,7 @@ Apply requires `--apply --operator <actor>`. Without `--archive`, existing event
 
 Optional `--archive /absolute/new-file.json` exports an entire eligible settled group, creates a new file exclusively with mode0600, fsyncs the file and parent directory, verifies its SHA256, then prunes the corresponding rows in the same SQLite writer transaction. A no-content database receipt records archive path/hash, ids, counts and operator. Existing files and symlinks are not overwritten. Export or commit failure preserves database state but may leave an archive/partial file; inspect it and choose a new path before retrying.
 
-Pending delivery, unsettled ACK, open dead letters, callback work, live leases, recent activity and retained dedup/follower references are protected. Policy history and retention receipts are not pruned. The command supports SQLite only and requires the current schema.
+Pending delivery, unsettled ACK, open dead letters, callback work, live leases, recent activity and retained dedup/follower/successor references are protected. Policy history and retention receipts are not pruned. The command supports SQLite only and requires the current schema.
 
 A batch limits candidate/deletion rows, not bytes, SQL work or elapsed time. Oversized groups remain. Use `--after-id` with the returned `next_after_id` to advance past examined groups; applying a preview reuses that preview's INPUT cursor, not its returned continuation. A null continuation ends that scan pass. Start a new pass to revisit oversized/newly eligible or earlier-inserted records. Apply always recomputes safety; a cursor is not a snapshot or authorization.
 
