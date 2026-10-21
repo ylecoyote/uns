@@ -27,7 +27,7 @@ def store(tmp_path):
 
 
 def add_notification(store, *, at=OLD, **changes):
-    identifier = str(uuid4())
+    identifier = changes.pop("id", str(uuid4()))
     row = {
         "id": identifier,
         "key": identifier,
@@ -107,6 +107,8 @@ def test_dry_run_is_default_and_does_not_mutate(store):
         {"batch_size": 0},
         {"batch_size": 1001},
         {"batch_size": True},
+        {"after_id": ""},
+        {"after_id": "x" * 37},
     ],
 )
 def test_invalid_requests_cannot_mutate(store, arguments):
@@ -284,6 +286,79 @@ def test_archive_batch_cannot_partially_delete_large_group(store, tmp_path):
     assert len(rows(store, NotificationAuditRecord)) == 1
 
 
+def test_archive_cursor_advances_past_oversized_groups_with_bounded_candidates(store, tmp_path):
+    identifiers = [add_notification(store, id=str(UUID(int=i))) for i in range(1, 5)]
+    with store.engine.begin() as connection:
+        for identifier in identifiers[:3]:
+            connection.execute(
+                insert(events).values(
+                    id=str(uuid4()),
+                    notification_id=identifier,
+                    kind="HISTORICAL",
+                    at=OLD,
+                    payload={},
+                )
+            )
+    archive = tmp_path / "archive.json"
+    first = run(store, apply=True, operator="operator", archive=archive, batch_size=3)
+    assert first["deleted_rows"] == 0
+    assert first["oversized_notification_ids"] == identifiers[:3]
+    assert first["next_after_id"] == identifiers[2]
+    assert not archive.exists()
+    preview = run(store, archive=archive, batch_size=3, after_id=first["next_after_id"])
+    assert preview["notification_ids"] == [identifiers[3]]
+    assert not archive.exists()
+    applied = run(
+        store,
+        apply=True,
+        operator="operator",
+        archive=archive,
+        batch_size=3,
+        after_id=first["next_after_id"],
+    )
+    assert applied["notification_ids"] == preview["notification_ids"]
+    assert applied["deleted_rows"] == 3
+    assert applied["next_after_id"] is None
+    assert {row["id"] for row in rows(store, work)} == set(identifiers[:3])
+
+
+def test_cursor_does_not_skip_group_deferred_by_remaining_row_budget(store, tmp_path):
+    first = add_notification(store, id=str(UUID(int=1)))
+    second = add_notification(store, id=str(UUID(int=2)))
+    report = run(
+        store, apply=True, operator="operator", archive=tmp_path / "first.json", batch_size=3
+    )
+    assert report["notification_ids"] == [first]
+    assert report["next_after_id"] == first
+    resumed = run(
+        store,
+        apply=True,
+        operator="operator",
+        archive=tmp_path / "second.json",
+        batch_size=3,
+        after_id=report["next_after_id"],
+    )
+    assert resumed["notification_ids"] == [second]
+    assert resumed["next_after_id"] is None
+
+
+def test_cursor_rechecks_safety_after_preview_and_reset_visits_earlier_ids(store, tmp_path):
+    cursor = str(UUID(int=2))
+    identifier = add_notification(store, id=str(UUID(int=3)))
+    preview = run(store, after_id=cursor, archive=tmp_path / "archive.json")
+    assert preview["notification_ids"] == [identifier]
+    with store.engine.begin() as connection:
+        connection.execute(update(work).where(work.c.id == identifier).values(status="PENDING"))
+    applied = run(
+        store, apply=True, operator="operator", after_id=cursor, archive=tmp_path / "archive.json"
+    )
+    assert applied["notification_ids"] == []
+    assert not (tmp_path / "archive.json").exists()
+    earlier = add_notification(store, id=str(UUID(int=1)))
+    assert run(store, after_id=cursor)["notification_ids"] == []
+    assert run(store)["notification_ids"] == [earlier]
+
+
 @pytest.mark.parametrize(
     "boundary", ["write", "file-fsync", "directory-fsync", "verify", "receipt"]
 )
@@ -372,6 +447,20 @@ def test_cli_requires_explicit_window_and_defaults_to_dry_run(store, capsys):
         ]
     )
     assert json.loads(capsys.readouterr().out)["notification_ids"] == [identifier]
+    assert len(rows(store, work)) == 1
+    main(
+        [
+            "--database-url",
+            str(store.engine.url),
+            "--cutoff",
+            "1970-02-01T00:00:00Z",
+            "--idempotency-seconds",
+            "100",
+            "--after-id",
+            identifier,
+        ]
+    )
+    assert json.loads(capsys.readouterr().out)["notification_ids"] == []
     assert len(rows(store, work)) == 1
     with pytest.raises(SystemExit):
         main(["--database-url", str(store.engine.url), "--cutoff", "1970-02-01T00:00:00Z"])
