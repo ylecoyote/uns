@@ -57,7 +57,8 @@ def client(adapter: InMemoryReadModelAdapter) -> TestClient:
     """Create a test client with fresh read model adapter."""
     # Skip automatic persistence configuration to use our manually configured adapter
     app = create_app(skip_persistence_config=True)
-    return TestClient(app)
+    app.state.agsignal_api_key = "test-key"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 def create_audit_record(

@@ -12,10 +12,8 @@ Instrumentation is intentionally narrow:
 - Domain layer: signals and deliveries are counted at their canonical entry
   points (see ``notification.routes`` and ``agsignal.signaling``).
 
-The ``/metrics`` endpoint is exposed unauthenticated by design — Prometheus
-scrapers do not present credentials. Operators MUST place AGSignal behind a
-reverse proxy that restricts ``/metrics`` to the internal scrape network.
-See ``docs/DEPLOYMENT.md``.
+The ``/metrics`` endpoint requires the configured API key. Prometheus scrapers
+must send the same bearer credential as other authenticated HTTP clients.
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ from __future__ import annotations
 import time
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     Counter,
@@ -31,6 +29,8 @@ from prometheus_client import (
     generate_latest,
 )
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from agsignal.api.auth import require_write_principal
 
 # ---------------------------------------------------------------------------
 # Metric definitions
@@ -155,7 +155,7 @@ def install_metrics(app: FastAPI) -> None:
     """
     if not any(getattr(route, "path", None) == "/metrics" for route in app.routes):
 
-        @app.get("/metrics", include_in_schema=False)
+        @app.get("/metrics", include_in_schema=False, dependencies=[Depends(require_write_principal)])
         async def metrics() -> Response:  # pragma: no cover - thin shim, exercised in tests
             return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 

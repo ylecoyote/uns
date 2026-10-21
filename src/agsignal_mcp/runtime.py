@@ -30,16 +30,15 @@ class MCPRuntimeConfig:
 
 @dataclass
 class RuntimeState:
-    """Process-scoped runtime services shared by MCP tools.
+    """Services shared by one MCP server lifespan.
 
-    Holds the in-memory audit store, DLQ service, channel-health tracker, and
-    idempotency cache. The MCP write tools (``send_signal``, ``ack_notification``,
-    ``dismiss_notification``) delegate to ``agsignal.signaling.*`` and pass the
-    relevant fields as keyword arguments. Phase 5 of the v0.2 refactor may
-    consolidate this with a Redis-backed idempotency service.
+    Public factory tools always use ``runtime``. The in-memory fields support
+    explicit low-level legacy fixtures only; they cannot silently receive
+    production mutations when a durable runtime is absent.
     """
 
     runtime: Runtime | None = None
+    legacy_fixture_mode: bool = False
     audit_store: AuditStore = field(default_factory=InMemoryAuditStore)
     dlq_service: DLQService = field(
         default_factory=lambda: DLQService(redis_client=InMemoryRedisList())

@@ -27,8 +27,9 @@ from pathlib import Path
 from threading import RLock
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from agsignal.api.auth import WritePrincipal, require_read_principal, require_write_principal
 from agsignal.responses import (
     AutonomyContextRequest,
     DeliveryAuditItem,
@@ -63,8 +64,8 @@ from notification.websocket_runtime import (
 logger = logging.getLogger(__name__)
 _policy_reload_lock = RLock()
 
-router = APIRouter(prefix="/api/v1/notifications", tags=["signals"])
-ops_router = APIRouter(prefix="/api/v1", tags=["operations"])
+router = APIRouter(prefix="/api/v1/notifications", tags=["signals"], dependencies=[Depends(require_read_principal)])
+ops_router = APIRouter(prefix="/api/v1", tags=["operations"], dependencies=[Depends(require_read_principal)])
 
 
 @router.post(
@@ -75,6 +76,7 @@ ops_router = APIRouter(prefix="/api/v1", tags=["operations"])
 async def send_notification(
     http_request: Request,
     request: SendNotificationRequest,
+    principal: WritePrincipal = Depends(require_write_principal),
 ) -> SendNotificationResponse:
     """HTTP adapter — delegates to agsignal.signaling.send_signal.
 
@@ -89,9 +91,7 @@ async def send_notification(
     """
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
-        from agsignal.api.auth import require_write_principal
         from uns.runtime import Conflict
-        principal = require_write_principal(http_request)
         try:
             return await runtime.send(request, principal=principal.subject)
         except Conflict as exc:
@@ -108,7 +108,7 @@ async def send_notification(
             idempotency_store=idempotency_store,
             transport_metadata={"runtime": "standalone_http"},
         )
-    except ValidationError as exc:
+    except (ValidationError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": "validation_error", "message": str(exc)},
@@ -175,15 +175,21 @@ async def send_notification(
 
 
 @router.post("/simulate", response_model=SimulateNotificationResponse)
-async def simulate_notification(request: SendNotificationRequest) -> SimulateNotificationResponse:
+async def simulate_notification(
+    request: SendNotificationRequest, http_request: Request,
+    principal: WritePrincipal = Depends(require_write_principal),
+) -> SimulateNotificationResponse:
     """HTTP adapter — delegates to agsignal.signaling.simulate_signal.
 
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
     """
     try:
-        return await service_simulate_signal(request=request)
-    except ValidationError as exc:
+        runtime = getattr(http_request.app.state, "runtime", None)
+        return await service_simulate_signal(request=request,
+            policy_runtime=runtime.policy_runtime if runtime is not None else None,
+            principal=principal.subject)
+    except (ValidationError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": "validation_error", "message": str(exc)},
@@ -258,12 +264,13 @@ async def list_dlq(request: Request) -> DLQListResponse:
 
 
 @ops_router.delete("/dlq/{entry_id}", response_model=DLQRemoveResponse)
-async def remove_dlq_entry(request: Request, entry_id: UUID) -> DLQRemoveResponse:
+async def remove_dlq_entry(
+    request: Request, entry_id: UUID,
+    principal: WritePrincipal = Depends(require_write_principal),
+) -> DLQRemoveResponse:
     """Remove a visible DLQ entry after external remediation."""
     runtime = getattr(request.app.state, "runtime", None)
     if runtime is not None:
-        from agsignal.api.auth import require_write_principal
-        principal = require_write_principal(request)
         removed = runtime.resolve_failure(entry_id, actor=principal.subject)
         if not removed:
             raise HTTPException(status_code=404, detail="Dead-letter entry not found")
@@ -296,11 +303,9 @@ async def get_channel_health(request: Request) -> ChannelHealthSummary:
 async def reload_policies(
     reload_request: PolicyReloadRequest,
     http_request: Request,
+    _principal: WritePrincipal = Depends(require_write_principal),
 ) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
-    from agsignal.api.auth import require_write_principal
-    if getattr(http_request.app.state, "runtime", None) is not None:
-        require_write_principal(http_request)
     policy_dir = Path(reload_request.policy_dir)
     with _policy_reload_lock:
         registry = PolicyRegistry(runtime_only=False)
@@ -320,7 +325,8 @@ async def reload_policies(
             persisted_count = policy_store.save_snapshot(list(registry.get_all().values())) if policy_store else 0
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        configure_policy_registry(registry=runtime_registry)
+        if getattr(http_request.app.state, "runtime", None) is None:
+            configure_policy_registry(registry=runtime_registry)
         return PolicyReloadResponse(loaded_count=loaded_count, persisted_count=persisted_count,
             policy_count=len(runtime_registry), notification_types=sorted(runtime_registry.list_notification_types()))
 

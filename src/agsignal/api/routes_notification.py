@@ -30,7 +30,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from agsignal.api.auth import WritePrincipal, require_write_principal, resolve_requested_actor
+from agsignal.api.auth import (
+    WritePrincipal,
+    require_read_principal,
+    require_write_principal,
+    resolve_requested_actor,
+)
 from agsignal.queries import get_ack_status as _query_ack_status
 from agsignal.queries import get_engine
 from agsignal.queries import get_notification_status as _query_notification_status
@@ -50,7 +55,7 @@ from notification.audit import AuditPersistenceError, AuditStore
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/notifications", tags=["notifications"])
+router = APIRouter(prefix="/v1/notifications", tags=["notifications"], dependencies=[Depends(require_read_principal)])
 
 
 # Routes
@@ -78,10 +83,6 @@ async def acknowledge_notification(
     - :class:`InvalidAckTransitionError` -> 409 invalid_transition
     - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
     """
-    # Ensure the ack engine is initialized before delegation; the route
-    # historically auto-configured it via :func:`get_engine` for convenience.
-    get_engine()
-
     request = request or AckRequest()
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
@@ -95,6 +96,7 @@ async def acknowledge_notification(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     acked_by = resolve_requested_actor(principal, request.acked_by)
+    get_engine()  # Explicit legacy fixture composition only.
     audit_store = getattr(http_request.app.state, "audit_store", None)
 
     try:
@@ -169,10 +171,6 @@ async def dismiss_notification(
     - :class:`InvalidAckTransitionError` -> 409 invalid_transition
     - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
     """
-    # Ensure the ack engine is initialized before delegation; the route
-    # historically auto-configured it via :func:`get_engine` for convenience.
-    get_engine()
-
     request = request or DismissRequest()
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
@@ -186,6 +184,7 @@ async def dismiss_notification(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     dismissed_by = resolve_requested_actor(principal, request.dismissed_by)
+    get_engine()  # Explicit legacy fixture composition only.
     audit_store = getattr(http_request.app.state, "audit_store", None)
 
     try:

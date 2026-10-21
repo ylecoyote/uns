@@ -533,7 +533,8 @@ class TestUIEndpointIntegration:
 
         # Create app without auto-configuration to use our manually configured adapter
         app = create_app(skip_persistence_config=True)
-        client = TestClient(app)
+        app.state.agsignal_api_key = "test-key"
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/ui/deliveries")
         assert response.status_code == 200
@@ -559,7 +560,8 @@ class TestUIEndpointIntegration:
 
         # Create app without auto-configuration to use our manually configured adapter
         app = create_app(skip_persistence_config=True)
-        client = TestClient(app)
+        app.state.agsignal_api_key = "test-key"
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get(f"/ui/deliveries/{record.notification_id}")
         assert response.status_code == 200
@@ -589,7 +591,8 @@ class TestUIEndpointIntegration:
 
         # Create app without auto-configuration to use our manually configured adapter
         app = create_app(skip_persistence_config=True)
-        client = TestClient(app)
+        app.state.agsignal_api_key = "test-key"
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/ui/audit")
         assert response.status_code == 200

@@ -31,6 +31,8 @@ def _app(
     replay_store: WebSocketReplayStore | None = None,
 ) -> FastAPI:
     app = FastAPI()
+    app.state.agsignal_api_key = "test-key"
+    app.state.agsignal_api_principal = "operator"
     app.state.websocket_manager = manager or WebSocketConnectionManager()
     app.state.websocket_replay_store = replay_store or InMemoryWebSocketReplayStore()
     app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
@@ -93,7 +95,7 @@ def test_websocket_subscribe_reports_missed_notifications_from_replay_store() ->
     )
     client = TestClient(_app(replay_store=store))
 
-    with client.websocket_connect(f"/ws/agents/{agent_id}") as websocket:
+    with client.websocket_connect(f"/ws/agents/{agent_id}", headers={"Authorization": "Bearer test-key"}) as websocket:
         connected = websocket.receive_json()
         assert connected["type"] == "connected"
         assert connected["agent_id"] == str(agent_id)
@@ -108,7 +110,7 @@ def test_websocket_subscribe_reports_missed_notifications_from_replay_store() ->
         assert response["replay_available"] is True
 
 
-def test_websocket_ack_message_updates_ack_engine() -> None:
+def test_websocket_ack_without_durable_runtime_does_not_update_legacy_engine() -> None:
     configure_ack_engine(storage=InMemoryAckStorage())
     engine = configure_ack_engine(storage=InMemoryAckStorage())
     notification_id = uuid4()
@@ -123,7 +125,7 @@ def test_websocket_ack_message_updates_ack_engine() -> None:
     )
     client = TestClient(_app())
 
-    with client.websocket_connect(f"/ws/agents/{agent_id}") as websocket:
+    with client.websocket_connect(f"/ws/agents/{agent_id}", headers={"Authorization": "Bearer test-key"}) as websocket:
         websocket.receive_json()
         websocket.send_json(
             {
@@ -135,16 +137,15 @@ def test_websocket_ack_message_updates_ack_engine() -> None:
         )
         response = websocket.receive_json()
 
-        assert response["type"] == "ack_result"
-        assert response["notification_id"] == str(notification_id)
-        assert response["ack_status"] == "ACKED"
-        assert engine.get_status(notification_id) == AckStatus.ACKED
+        assert response["type"] == "error"
+        assert response["error"] == "runtime_unavailable"
+        assert engine.get_status(notification_id) == AckStatus.PENDING
 
 
 def test_websocket_ping_returns_pong() -> None:
     client = TestClient(_app())
 
-    with client.websocket_connect(f"/ws/agents/{uuid4()}") as websocket:
+    with client.websocket_connect(f"/ws/agents/{uuid4()}", headers={"Authorization": "Bearer test-key"}) as websocket:
         websocket.receive_json()
         websocket.send_json({"type": "ping"})
 

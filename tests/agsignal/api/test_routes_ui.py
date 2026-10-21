@@ -41,8 +41,9 @@ def client() -> TestClient:
     fresh_adapter = InMemoryReadModelAdapter(audit_store=fresh_store)
     configure_read_model_adapter(fresh_adapter)
 
-    app = create_app()
-    return TestClient(app)
+    app = create_app(skip_persistence_config=True)  # Explicit legacy read-model fixture
+    app.state.agsignal_api_key = "test-key"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 @pytest.fixture

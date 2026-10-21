@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from notification.adapters import (
     EmailAdapter,
@@ -54,11 +55,30 @@ def configured_adapters() -> SimpleAdapterRegistry:
 
 def build_runtime() -> Runtime:
     url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://"))
-    return Runtime(
+    runtime = Runtime(
         url,
         adapters=configured_adapters(),
         create_tables=url == "sqlite://" or value("CREATE_TABLES").lower() == "true",
     )
+    try:
+        configure_runtime_policies(runtime)
+    except Exception:
+        runtime.engine.dispose()
+        raise
+    return runtime
+
+
+def configure_runtime_policies(runtime: Runtime) -> None:
+    """Apply an explicitly configured directory through the durable policy authority."""
+    policy_dir = value("POLICY_DIR")
+    if policy_dir:
+        from db.policy_store import SQLAlchemyPolicyStore
+        from notification.policies import PolicyRegistry
+        from notification.policy_loader import load_policies_from_directory
+
+        registry = PolicyRegistry(runtime_only=False)
+        load_policies_from_directory(Path(policy_dir), registry=registry)
+        SQLAlchemyPolicyStore(runtime.sessions).save_snapshot(list(registry.get_all().values()))
 
 
 def get_runtime() -> Runtime:

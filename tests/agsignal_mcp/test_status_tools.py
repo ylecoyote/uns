@@ -77,7 +77,7 @@ async def test_ack_notification_is_disabled_in_read_only_mode() -> None:
 
 @pytest.mark.asyncio
 async def test_ack_notification_updates_tracked_signal() -> None:
-    state = RuntimeState()
+    state = RuntimeState(legacy_fixture_mode=True)
     sent = await send_signal(
         _signal_input(
             deliver=True,
@@ -112,7 +112,7 @@ async def test_dismiss_notification_is_disabled_in_read_only_mode() -> None:
 
 @pytest.mark.asyncio
 async def test_dismiss_notification_marks_signal_dismissed() -> None:
-    state = RuntimeState()
+    state = RuntimeState(legacy_fixture_mode=True)
     sent = await send_signal(
         _signal_input(
             deliver=True,
@@ -143,7 +143,7 @@ async def test_dismiss_notification_marks_signal_dismissed() -> None:
 
 @pytest.mark.asyncio
 async def test_dismiss_notification_requires_acked_by_match_when_provided() -> None:
-    state = RuntimeState()
+    state = RuntimeState(legacy_fixture_mode=True)
     sent = await send_signal(
         _signal_input(
             deliver=True,
@@ -166,7 +166,7 @@ async def test_dismiss_notification_requires_acked_by_match_when_provided() -> N
 
 
 def test_runtime_inspection_tools_are_json_safe() -> None:
-    state = RuntimeState()
+    state = RuntimeState(legacy_fixture_mode=True)
 
     assert list_dlq(state)["depth"] == 0
     channel_health = get_channel_health(state)

@@ -59,7 +59,7 @@ async def test_simulate_signal_is_always_dry_run() -> None:
 
 @pytest.mark.asyncio
 async def test_send_signal_confirmed_delivery_records_audit_and_ack_state() -> None:
-    state = RuntimeState()
+    state = RuntimeState(legacy_fixture_mode=True)
 
     response = await send_signal(
         _input(
