@@ -148,3 +148,18 @@ class NotificationPolicySnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
+
+
+class NotificationPolicyContent(Base):
+    """Immutable full content for a policy version, including non-ACTIVE versions.
+
+    Lifecycle state remains authoritative in notification_policies. The content
+    records the version's original semantics, never permission to reactivate it.
+    """
+
+    __tablename__ = "notification_policy_contents"
+
+    policy_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("notification_policies.policy_id"), primary_key=True
+    )
+    content: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)

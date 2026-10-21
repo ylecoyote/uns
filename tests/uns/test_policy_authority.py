@@ -460,3 +460,163 @@ def test_custom_websocket_target_key_reserved_but_inert_metadata_preserved(datab
         runtime.resolve(request(metadata=allowed), principal="p").metadata["details"]
         == allowed["details"]
     )
+
+
+async def test_effective_policy_query_matches_mode_specific_runtime_resolution(database):
+    from agsignal.queries import get_effective_policy
+    from notification.models import AutonomyMode
+
+    _, sessions = database
+    SQLAlchemyPolicyStore(sessions).save_snapshot(
+        [
+            policy(
+                live_override=ModeOverride(
+                    delivery_mode=DeliveryMode.BEST_EFFORT, ack_timeout_minutes=2
+                )
+            )
+        ]
+    )
+    runtime = service(sessions)
+    actual = runtime.resolve(request(), principal="p")
+    preview = await get_effective_policy(
+        "policy.alarm",
+        NotificationIntent.SAFETY,
+        AutonomyMode.LIVE,
+        policy_registry=runtime.registry(),
+    )
+    assert preview.effective.delivery_mode == actual.delivery_mode
+    assert preview.effective.ack_timeout_minutes == actual.ack_timeout_minutes
+    from agsignal.signaling import simulate_signal
+
+    allowed = await simulate_signal(
+        request=request(delivery_mode="BEST_EFFORT", require_ack=True),
+        policy_runtime=runtime,
+        principal="p",
+    )
+    assert (
+        allowed.delivery_mode == actual.delivery_mode and allowed.require_ack == actual.require_ack
+    )
+    for changes in ({"delivery_mode": "GUARANTEED"}, {"require_ack": False}):
+        with pytest.raises(ValueError, match="ACTIVE policy"):
+            await simulate_signal(request=request(**changes), policy_runtime=runtime, principal="p")
+    assert any(
+        step.source.value == "mode_override" and step.applied
+        for step in preview.resolution["delivery_mode"]
+    )
+
+
+@pytest.mark.parametrize("status", ["PREVIEW", "DRAFT"])
+def test_nonactive_policy_roundtrip_and_intentional_promotion_preserve_complete_content(
+    database, status
+):
+    from notification.policies import PolicyStatus
+
+    _, sessions = database
+    store = SQLAlchemyPolicyStore(sessions)
+    staged = policy(
+        status=PolicyStatus(status),
+        intent=NotificationIntent.SAFETY,
+        priority_override="NORMAL",
+        live_override=ModeOverride(ack_timeout_minutes=2),
+    )
+    saved = store.save_policy(staged)
+    restored = store.load_registry(statuses=(PolicyStatus(status),)).get_sync("policy.alarm")
+    assert restored.intent == staged.intent
+    assert restored.priority_override == staged.priority_override
+    assert restored.config_hash == saved.content_hash and restored.config_id == saved.policy_id
+    assert restored.get_ack_timeout_minutes_for_mode("LIVE", NotificationIntent.SAFETY) == 2
+    assert store.load_runtime_registry().get_sync("policy.alarm") is None
+    active = restored.model_copy(update={"status": PolicyStatus.ACTIVE, "version": "2"})
+    store.save_policy(active)
+    accepted = service(sessions).resolve(request(), principal="p")
+    assert accepted.priority.value == "NORMAL" and accepted.ack_timeout_minutes == 2
+    store.save_snapshot([])
+    retired = store.load_registry(statuses=(PolicyStatus.RETIRED,)).get_sync("policy.alarm")
+    assert retired.status == PolicyStatus.RETIRED
+    assert store.load_runtime_registry().get_sync("policy.alarm") is None
+    with pytest.raises(ValueError, match="retired"):
+        store.save_policy(active)
+
+
+def test_concurrent_cold_schema_upgrade_is_idempotent(tmp_path):
+    url = f"sqlite:///{tmp_path / 'legacy.db'}"
+    engine = create_engine(url)
+    # A deployed legacy database has only pre-snapshot policy tables.
+    PersistedNotificationPolicy.__table__.create(engine)
+    engine.dispose()
+    program = """
+import os, sys
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from db.policy_store import SQLAlchemyPolicyStore
+engine = create_engine(os.environ["UNS_DATABASE_URL"])
+@event.listens_for(engine, "before_cursor_execute")
+def gate(conn, cursor, statement, parameters, context, executemany):
+    if statement.lstrip().startswith("CREATE TABLE") and "notification_policy_revision" in statement:
+        print("ready", flush=True)
+        sys.stdin.readline()
+SQLAlchemyPolicyStore(sessionmaker(engine)).ensure_snapshot_schema()
+print("complete", flush=True)
+"""
+    children = [
+        subprocess.Popen(
+            [sys.executable, "-c", program],
+            env=child_environment(url),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for _ in range(2)
+    ]
+    try:
+        for child in children:
+            assert child.stdout.readline().strip() == "ready"
+        for child in children:
+            child.stdin.write("\n")
+            child.stdin.flush()
+        for child in children:
+            output, error = child.communicate(timeout=10)
+            assert child.returncode == 0, error
+            assert "complete" in output
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+                child.communicate()
+
+
+async def test_effective_policy_unconfigured_channels_and_no_ack_match_runtime(database):
+    from agsignal.queries import get_effective_policy
+    from notification.models import AutonomyMode
+
+    _, sessions = database
+    configured = policy().model_copy(
+        update={
+            "channels": [],
+            "require_ack": False,
+            "ack_timeout_minutes": 10,
+            "intent": NotificationIntent.SAFETY,
+        }
+    )
+    SQLAlchemyPolicyStore(sessions).save_snapshot([configured])
+    runtime = service(sessions)
+    actual = runtime.resolve(request(irreversible=True), principal="p")
+    preview = await get_effective_policy(
+        "policy.alarm",
+        NotificationIntent.SAFETY,
+        AutonomyMode.LIVE,
+        irreversible=True,
+        policy_registry=runtime.registry(),
+    )
+    assert preview.effective.channels == actual.channels
+    assert Channel.PAGERDUTY in actual.channels
+    assert not preview.effective.require_ack and not actual.require_ack
+    assert preview.effective.ack_timeout_minutes == actual.ack_timeout_minutes
+    with pytest.raises(ValueError, match="intent.*ACTIVE policy"):
+        await get_effective_policy(
+            "policy.alarm",
+            NotificationIntent.INFORMATIONAL,
+            AutonomyMode.LIVE,
+            policy_registry=runtime.registry(),
+        )

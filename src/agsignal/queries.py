@@ -19,6 +19,7 @@ exceptions.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from agsignal.api.observability import (
@@ -77,6 +78,7 @@ from notification.models import (
 )
 from notification.policies import (
     DEFAULT_DEDUP_WINDOW_SECONDS,
+    PolicyOverrideError,
     PolicyRegistry,
     get_default_ack_timeout,
     get_default_channels,
@@ -236,10 +238,14 @@ async def get_delivery_timeline(
     if runtime is not None:
         try:
             row = runtime.get(notification_id)
-            runtime_state = {"delivery_status":row["status"], "ack_status":row["ack_status"],
-                "deadline":row["deadline"], "dead_letter":row["dead_letter"],
-                "policy_config_hash":row["notification"]["policy_config_hash"],
-                "policy_evaluation_id":row["notification"]["policy_evaluation_id"]}
+            runtime_state = {
+                "delivery_status": row["status"],
+                "ack_status": row["ack_status"],
+                "deadline": row["deadline"],
+                "dead_letter": row["dead_letter"],
+                "policy_config_hash": row["notification"]["policy_config_hash"],
+                "policy_evaluation_id": row["notification"]["policy_evaluation_id"],
+            }
         except KeyError:
             pass  # Historical audit rows predate durable runtime state.
 
@@ -292,188 +298,95 @@ async def get_effective_policy(
     registry = policy_registry if policy_registry is not None else get_policy_registry()
     policy = registry.get_sync(notification_type)
 
-    # Determine effective values
-    effective_channels = get_default_channels(intent, autonomy_mode, irreversible)
-    effective_delivery_mode = get_default_delivery_mode(intent)
-    effective_require_ack = get_default_require_ack(intent, autonomy_mode)
-    effective_ack_timeout = get_default_ack_timeout(intent)
-    effective_dedup_window = DEFAULT_DEDUP_WINDOW_SECONDS
+    if (
+        policy is not None
+        and policy.is_runtime_enforced
+        and policy.intent is not None
+        and intent != policy.intent
+    ):
+        raise PolicyOverrideError("intent differs from ACTIVE policy")
 
-    # Build resolution traces
-    resolution: dict[str, list[ResolutionStep]] = {
-        "delivery_mode": [],
-        "channels": [],
-        "require_ack": [],
-        "ack_timeout_minutes": [],
-        "dedup_window_seconds": [],
+    # Use the same precedence as the SDK: explicit mode values, policy base,
+    # then intent defaults. Preserve false/empty values rather than truthiness.
+    defaults: dict[str, Any] = {
+        "delivery_mode": get_default_delivery_mode(intent),
+        "channels": get_default_channels(intent, autonomy_mode, irreversible),
+        "require_ack": get_default_require_ack(intent, autonomy_mode),
+        "ack_timeout_minutes": get_default_ack_timeout(intent),
+        "dedup_window_seconds": DEFAULT_DEDUP_WINDOW_SECONDS,
     }
+    base: dict[str, Any] = dict.fromkeys(defaults)
+    mode: dict[str, Any] = dict.fromkeys(defaults)
+    if policy is not None:
+        base = {
+            "delivery_mode": policy.delivery_mode,
+            "channels": policy.channels or None,
+            "require_ack": policy.require_ack,
+            "ack_timeout_minutes": policy.ack_timeout_minutes,
+            "dedup_window_seconds": policy.dedup_window_seconds,
+        }
+        override = policy._get_mode_override(autonomy_mode)
+        if override is not None:
+            mode.update(
+                {
+                    "delivery_mode": override.delivery_mode,
+                    "channels": override.channels,
+                    "require_ack": override.require_ack,
+                    "ack_timeout_minutes": override.ack_timeout_minutes,
+                }
+            )
+        if mode["channels"] is None and policy.channels_by_mode:
+            mode["channels"] = policy.channels_by_mode.get(autonomy_mode)
 
-    policy_found = policy is not None
-
-    if policy:
-        # Check policy base values
-        if policy.delivery_mode is not None:
-            effective_delivery_mode = policy.delivery_mode
-            resolution["delivery_mode"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=policy.delivery_mode.value,
-                    applied=True,
-                )
-            )
-        else:
-            resolution["delivery_mode"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="Not configured in policy",
-                )
-            )
-
-        policy_channels = policy.get_channels_for_mode(autonomy_mode, intent)
-        if policy_channels:
-            effective_channels = policy_channels
-            resolution["channels"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=[c.value for c in policy_channels],
-                    applied=True,
-                )
-            )
-        else:
-            resolution["channels"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="Not configured in policy",
-                )
-            )
-
-        policy_require_ack = policy.get_require_ack_for_mode(autonomy_mode, intent)
-        if policy_require_ack is not None:
-            effective_require_ack = policy_require_ack
-            resolution["require_ack"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=policy_require_ack,
-                    applied=True,
-                )
-            )
-        else:
-            resolution["require_ack"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="Not configured in policy",
-                )
-            )
-
-        if policy.ack_timeout_minutes is not None:
-            effective_ack_timeout = policy.ack_timeout_minutes
-            resolution["ack_timeout_minutes"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=policy.ack_timeout_minutes,
-                    applied=True,
-                )
-            )
-        else:
-            resolution["ack_timeout_minutes"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="Not configured in policy",
-                )
-            )
-
-        if policy.dedup_window_seconds is not None:
-            effective_dedup_window = policy.dedup_window_seconds
-            resolution["dedup_window_seconds"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=policy.dedup_window_seconds,
-                    applied=True,
-                )
-            )
-        else:
-            resolution["dedup_window_seconds"].append(
-                ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="Not configured in policy",
-                )
-            )
-    else:
-        # No policy found - all use SDK defaults
-        for field in resolution:
+    effective: dict[str, Any] = {}
+    resolution: dict[str, list[ResolutionStep]] = {}
+    for field in defaults:
+        selected = False
+        effective[field] = None
+        resolution[field] = []
+        for source, candidate in (
+            (ResolutionSource.MODE_OVERRIDE, mode[field]),
+            (ResolutionSource.POLICY_BASE, base[field]),
+            (ResolutionSource.SDK_DEFAULT, defaults[field]),
+        ):
+            applied = candidate is not None and not selected
+            if applied:
+                effective[field] = candidate
+                selected = True
             resolution[field].append(
                 ResolutionStep(
-                    source=ResolutionSource.POLICY_BASE,
-                    value=None,
-                    applied=False,
-                    reason="No policy registered for notification_type",
+                    source=source,
+                    value=candidate,
+                    applied=applied,
+                    reason="Not configured" if candidate is None else None,
                 )
             )
-
-    # Add SDK default steps
-    resolution["delivery_mode"].append(
-        ResolutionStep(
-            source=ResolutionSource.SDK_DEFAULT,
-            value=get_default_delivery_mode(intent).value,
-            applied=policy is None or policy.delivery_mode is None,
-        )
-    )
-    resolution["channels"].append(
-        ResolutionStep(
-            source=ResolutionSource.SDK_DEFAULT,
-            value=[c.value for c in get_default_channels(intent, autonomy_mode, irreversible)],
-            applied=policy is None or not policy.get_channels_for_mode(autonomy_mode, intent),
-        )
-    )
-    resolution["require_ack"].append(
-        ResolutionStep(
-            source=ResolutionSource.SDK_DEFAULT,
-            value=get_default_require_ack(intent, autonomy_mode),
-            applied=policy is None
-            or policy.get_require_ack_for_mode(autonomy_mode, intent) is None,
-        )
-    )
-    resolution["ack_timeout_minutes"].append(
-        ResolutionStep(
-            source=ResolutionSource.SDK_DEFAULT,
-            value=get_default_ack_timeout(intent),
-            applied=policy is None or policy.ack_timeout_minutes is None,
-        )
-    )
-    resolution["dedup_window_seconds"].append(
-        ResolutionStep(
-            source=ResolutionSource.SDK_DEFAULT,
-            value=DEFAULT_DEDUP_WINDOW_SECONDS,
-            applied=policy is None or policy.dedup_window_seconds is None,
-        )
-    )
+    if not effective["require_ack"]:
+        # Notification's domain validator retains the intent timeout default
+        # even without an ACK obligation. Match the serialized notification;
+        # runtime deadline scheduling still depends on require_ack.
+        effective["ack_timeout_minutes"] = defaults["ack_timeout_minutes"]
+        resolution["ack_timeout_minutes"] = [
+            step.model_copy(
+                update={
+                    "applied": step.source == ResolutionSource.SDK_DEFAULT
+                    and step.value is not None,
+                    "reason": "No acknowledgment deadline is scheduled",
+                }
+            )
+            for step in resolution["ack_timeout_minutes"]
+        ]
 
     return EffectivePolicyResponse(
         notification_type=notification_type,
-        effective=EffectivePolicyValues(
-            delivery_mode=effective_delivery_mode,
-            channels=effective_channels,
-            require_ack=effective_require_ack,
-            ack_timeout_minutes=effective_ack_timeout,
-            dedup_window_seconds=effective_dedup_window,
-        ),
+        effective=EffectivePolicyValues(**effective),
         resolution=resolution,
         resolution_context=ResolutionContext(
             intent=intent,
             autonomy_mode=autonomy_mode,
             irreversible=irreversible,
-            policy_found=policy_found,
-            policy_notification_type=notification_type if policy_found else None,
+            policy_found=policy is not None,
+            policy_notification_type=notification_type if policy is not None else None,
         ),
     )
 

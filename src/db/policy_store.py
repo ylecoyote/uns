@@ -11,8 +11,10 @@ from uuid import UUID
 from sqlalchemy import Table, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.schema import CreateTable
 
 from db.models import (
+    NotificationPolicyContent,
     NotificationPolicyRevision,
     NotificationPolicySnapshot,
     PersistedNotificationPolicy,
@@ -61,8 +63,15 @@ class SQLAlchemyPolicyStore:
     def ensure_snapshot_schema(self) -> None:
         """Add only new policy tables; legacy policy rows remain untouched."""
         engine = self._session_factory.kw["bind"]
-        cast(Table, NotificationPolicyRevision.__table__).create(engine, checkfirst=True)
-        cast(Table, NotificationPolicySnapshot.__table__).create(engine, checkfirst=True)
+        # Database-native IF NOT EXISTS avoids checkfirst's check/CREATE race
+        # when multiple fresh processes upgrade an already deployed database.
+        with engine.begin() as connection:
+            for model in (
+                NotificationPolicyRevision,
+                NotificationPolicySnapshot,
+                NotificationPolicyContent,
+            ):
+                connection.execute(CreateTable(cast(Table, model.__table__), if_not_exists=True))
 
     def load_snapshot(self, session: Session | None = None) -> PolicySnapshot:
         """Lock the revision until caller commit, then read its immutable content.
@@ -112,7 +121,7 @@ class SQLAlchemyPolicyStore:
                     PersistedNotificationPolicy.status == PolicyStatus.ACTIVE.value
                 )
             ).scalars()
-            policies = [_row_to_policy(row) for row in rows]
+            policies = [self._hydrate_policy(session, row) for row in rows]
             if len({policy.notification_type for policy in policies}) != len(policies):
                 raise ValueError("Legacy storage contains multiple ACTIVE policies for one type")
             snapshot = self._write_snapshot(session, 1 if policies else 0, policies)
@@ -160,6 +169,21 @@ class SQLAlchemyPolicyStore:
 
     def _get_session(self) -> Session:
         return self._session_factory()
+
+    @staticmethod
+    def _hydrate_policy(session: Session, row: PersistedNotificationPolicy) -> NotificationPolicy:
+        saved = session.get(NotificationPolicyContent, row.policy_id)
+        if saved is None:
+            return _row_to_policy(row)
+        # Never resurrect serialized ACTIVE status from a subsequently retired
+        # version. The compatibility row owns the version's lifecycle state.
+        return NotificationPolicy.model_validate(saved.content).model_copy(
+            update={
+                "status": PolicyStatus(row.status),
+                "config_id": row.policy_id,
+                "config_hash": row.content_hash,
+            }
+        )
 
     def save_policy(self, policy: NotificationPolicy) -> PolicySaveResult:
         """Persist and activate one policy atomically with its runtime revision."""
@@ -254,6 +278,13 @@ class SQLAlchemyPolicyStore:
         )
         session.add(row)
         session.flush()
+        session.add(
+            NotificationPolicyContent(
+                policy_id=row.policy_id,
+                content=policy.model_dump(mode="json", exclude={"config_id", "config_hash"}),
+            )
+        )
+        session.flush()
         return PolicySaveResult(
             policy_id=row.policy_id,
             content_hash=content_hash,
@@ -266,6 +297,7 @@ class SQLAlchemyPolicyStore:
         statuses: tuple[PolicyStatus, ...] = (PolicyStatus.PREVIEW, PolicyStatus.ACTIVE),
     ) -> PolicyRegistry:
         """Load persisted runtime policies into an in-memory registry."""
+        self.ensure_snapshot_schema()
         session = self._get_session()
         try:
             rows = (
@@ -282,7 +314,7 @@ class SQLAlchemyPolicyStore:
             registry = PolicyRegistry(runtime_only=statuses == (PolicyStatus.ACTIVE,))
             for row in sorted(rows, key=lambda item: _status_sort_key(item.status)):
                 if row.status != PolicyStatus.ACTIVE.value:
-                    registry.register(_row_to_policy(row))
+                    registry.register(self._hydrate_policy(session, row))
             if PolicyStatus.ACTIVE in statuses:
                 for policy in self.load_runtime_registry().get_all().values():
                     registry.register(policy)
