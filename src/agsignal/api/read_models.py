@@ -405,6 +405,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         """Derive the event type from an audit record's status."""
         status_to_event = {
             DeliveryStatus.DELIVERED: "delivery.succeeded",
+            DeliveryStatus.SUCCESS: "delivery.succeeded",
             DeliveryStatus.FAILED: "delivery.failed",
             DeliveryStatus.DEDUPLICATED: "delivery.deduplicated",
             DeliveryStatus.RATE_LIMITED: "delivery.rate_limited",
@@ -819,6 +820,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
             status_to_event = {
                 "DELIVERED": "delivery.succeeded",
+                "SUCCESS": "delivery.succeeded",
                 "FAILED": "delivery.failed",
                 "DEDUPLICATED": "delivery.deduplicated",
                 "RATE_LIMITED": "delivery.rate_limited",

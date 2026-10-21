@@ -73,16 +73,41 @@ class SQLAlchemyPolicyStore:
             ):
                 connection.execute(CreateTable(cast(Table, model.__table__), if_not_exists=True))
 
-    def load_snapshot(self, session: Session | None = None) -> PolicySnapshot:
+    def load_snapshot(self) -> PolicySnapshot:
+        """Read committed authority without joining the intake/activation lock.
+
+        Revision and immutable content come from one statement, so concurrent
+        activation cannot mix them even at READ COMMITTED isolation. Only cold
+        databases need initialization; close the read transaction before taking
+        that write lock to avoid a SQLite read-to-write transaction upgrade.
+        """
+        with self._get_session() as session:
+            row = session.execute(
+                select(
+                    NotificationPolicySnapshot.revision,
+                    NotificationPolicySnapshot.content,
+                    NotificationPolicySnapshot.content_hash,
+                )
+                .join(
+                    NotificationPolicyRevision,
+                    NotificationPolicyRevision.revision == NotificationPolicySnapshot.revision,
+                )
+                .where(NotificationPolicyRevision.singleton == 1)
+            ).one_or_none()
+            if row is not None:
+                return PolicySnapshot(
+                    row.revision, json.dumps(row.content, sort_keys=True), row.content_hash
+                )
+        with self._session_factory.begin() as transaction:
+            return self.lock_snapshot(transaction)
+
+    def lock_snapshot(self, session: Session) -> PolicySnapshot:
         """Lock the revision until caller commit, then read its immutable content.
 
         Activation takes the same row lock. The no-op UPDATE is deliberate: it
         reserves SQLite's writer before any policy read, and row-locks PostgreSQL.
         A cache check outside the acceptance transaction is not sufficient.
         """
-        if session is None:
-            with self._session_factory.begin() as transaction:
-                return self.load_snapshot(transaction)
         changed = (
             session.connection()
             .execute(
@@ -189,7 +214,7 @@ class SQLAlchemyPolicyStore:
         """Persist and activate one policy atomically with its runtime revision."""
         self.ensure_snapshot_schema()
         with self._session_factory.begin() as session:
-            previous = self.load_snapshot(session)
+            previous = self.lock_snapshot(session)
             result = self._save_policy(session, policy)
             if policy.status == PolicyStatus.ACTIVE:
                 current = previous.registry().get_all()
@@ -206,7 +231,7 @@ class SQLAlchemyPolicyStore:
             raise ValueError("Duplicate notification type/status in policy snapshot")
         self.ensure_snapshot_schema()
         with self._session_factory.begin() as session:
-            previous = self.load_snapshot(session)
+            previous = self.lock_snapshot(session)
             results = [self._save_policy(session, policy) for policy in policies]
             active = [
                 policy.model_copy(

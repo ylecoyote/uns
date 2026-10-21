@@ -111,18 +111,20 @@ async def test_pending_followers_elect_one_successor_after_owner_failure(state):
 
 
 @pytest.mark.asyncio
-async def test_old_owner_failure_cannot_replace_new_window_owner(state):
+async def test_window_expiry_does_not_create_parallel_pending_owner(state):
     runtime, adapter, _, now, _ = state
     first = runtime.accept(request(), principal="producer")
     follower = runtime.accept(request("two"), principal="producer")
     now[0] += 100000
     newer = runtime.accept(request("three"), principal="producer")
+    assert runtime.get(newer.notification_id)["dedup_owner_id"] == str(first.notification_id)
     adapter.success = False
     await runtime.dispatch(first.notification_id)
     with runtime.sessions() as session:
         claim = session.execute(select(dedup)).mappings().one()
-    assert claim["owner_id"] == str(newer.notification_id)
-    assert runtime.get(follower.notification_id)["dedup_owner_id"] is None
+    remaining = [runtime.get(follower.notification_id), runtime.get(newer.notification_id)]
+    assert sum(row["dedup_owner_id"] is None for row in remaining) == 1
+    assert claim["owner_id"] in [row["id"] for row in remaining]
 
 
 @pytest.mark.asyncio

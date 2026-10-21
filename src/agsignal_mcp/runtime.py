@@ -33,15 +33,16 @@ class MCPRuntimeConfig:
 class RuntimeState:
     """Services shared by one MCP server lifespan.
 
-    Public factory tools always use ``runtime``. The in-memory fields support
-    explicit low-level legacy fixtures only; they cannot silently receive
-    production mutations when a durable runtime is absent.
+    Public factory tools always use ``runtime``. Omitted audit and read-model
+    dependencies bind to that runtime; explicitly supplied dependencies remain
+    available to embedded hosts and fixtures. The in-memory fields cannot
+    silently receive production mutations when a durable runtime is absent.
     """
 
     runtime: Runtime | None = None
     legacy_fixture_mode: bool = False
-    read_model_adapter: ReadModelAdapter | None = field(default=None, init=False)
-    audit_store: AuditStore = field(default_factory=InMemoryAuditStore)
+    read_model_adapter: ReadModelAdapter | None = field(default=None, kw_only=True)
+    audit_store: AuditStore | None = None
     dlq_service: DLQService = field(
         default_factory=lambda: DLQService(redis_client=InMemoryRedisList())
     )
@@ -49,8 +50,13 @@ class RuntimeState:
     idempotency_records: dict[str, SendNotificationResponse] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.runtime is not None:
+        if self.audit_store is None:
+            self.audit_store = (
+                self.runtime.audit_store if self.runtime is not None else InMemoryAuditStore()
+            )
+        if self.runtime is not None and self.read_model_adapter is None:
             from agsignal.api.read_models import SQLAlchemyReadModelAdapter
+
             self.read_model_adapter = SQLAlchemyReadModelAdapter(
                 self.runtime.sessions, runtime=self.runtime,
             )

@@ -413,6 +413,8 @@ class TestInMemoryAdapterEventTypes:
         """Test delivery status maps to correct event type."""
         status_event_map = {
             DeliveryStatus.DELIVERED: "delivery.succeeded",
+            DeliveryStatus.SUCCESS: "delivery.succeeded",
+            DeliveryStatus.PENDING: "delivery.started",
             DeliveryStatus.FAILED: "delivery.failed",
             DeliveryStatus.DEDUPLICATED: "delivery.deduplicated",
             DeliveryStatus.RATE_LIMITED: "delivery.rate_limited",
@@ -620,6 +622,25 @@ class TestSQLAlchemyAdapter:
             create_tables=True,
         )
         return adapter
+
+    @pytest.mark.parametrize(("status", "event_type"), [
+        (DeliveryStatus.PENDING, "delivery.started"),
+        (DeliveryStatus.DELIVERED, "delivery.succeeded"),
+        (DeliveryStatus.SUCCESS, "delivery.succeeded"),
+        (DeliveryStatus.FAILED, "delivery.failed"),
+        (DeliveryStatus.DEDUPLICATED, "delivery.deduplicated"),
+        (DeliveryStatus.RATE_LIMITED, "delivery.rate_limited"),
+    ])
+    def test_delivery_status_to_event_type(self, db_adapter, status, event_type):
+        from db.audit_store import delivery_audit_row
+
+        with db_adapter._get_session() as session:
+            session.add(delivery_audit_row(create_test_audit_record(status=status)))
+            session.commit()
+
+        result = db_adapter.get_audit_events(AuditEventFilter())
+        assert len(result.items) == 1
+        assert result.items[0].event_type == event_type
 
     @pytest.fixture
     def db_with_data(self, db_adapter, tmp_path):

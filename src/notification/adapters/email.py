@@ -7,9 +7,12 @@ Supports both plain text and HTML formatted emails.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import smtplib
 import ssl
+import threading
+import time
 from contextvars import copy_context
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -27,6 +30,8 @@ from notification.adapters.base import (
     DeliveryResult,
     HealthCheckResult,
     guard_provider_attempt,
+    provider_attempt_deadline,
+    recheck_provider_lease,
 )
 from notification.models import Channel, NotificationIntent, Priority
 
@@ -34,6 +39,35 @@ if TYPE_CHECKING:
     from notification.models import Notification
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _SMTPAttempt:
+    """Shared by the coroutine and its executor job, never by other deliveries."""
+
+    deadline: float
+    stopped: bool = False
+    send_started: bool = False
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def remaining(self) -> float:
+        with self._lock:
+            remaining = self.deadline - time.monotonic()
+            if self.stopped or remaining <= 0:
+                raise TimeoutError("Email delivery timed out before the next SMTP operation")
+            return remaining
+
+    def start_send(self) -> None:
+        # Admission is the cancellation boundary. An admitted send can have an
+        # external effect even if cancellation occurs before the thread resumes.
+        with self._lock:
+            if self.stopped or time.monotonic() >= self.deadline:
+                raise TimeoutError("Email delivery timed out before sending")
+            self.send_started = True
+
+    def stop(self) -> None:
+        with self._lock:
+            self.stopped = True
 
 
 @dataclass
@@ -125,9 +159,15 @@ class EmailAdapter(BaseAdapter):
 
         attempt = 0
         last_error: Exception | None = None
+        provider_outcome = "NOT_STARTED"
 
         while attempt < self.config.retry_attempts:
             attempt += 1
+            deadline = time.monotonic() + self.config.timeout_seconds
+            service_deadline = provider_attempt_deadline.get()
+            if service_deadline is not None:
+                deadline = min(deadline, service_deadline)
+            smtp_attempt = _SMTPAttempt(deadline)
             try:
                 # Run SMTP in executor to avoid blocking
                 loop = asyncio.get_event_loop()
@@ -138,8 +178,9 @@ class EmailAdapter(BaseAdapter):
                         self._send_email_sync,
                         message,
                         to_addresses,
+                        smtp_attempt,
                     ),
-                    timeout=self.config.timeout_seconds,
+                    timeout=max(0, deadline - time.monotonic()),
                 )
 
                 logger.info(
@@ -155,13 +196,23 @@ class EmailAdapter(BaseAdapter):
                     metadata={
                         "recipients": to_addresses,
                         "subject": message["Subject"],
+                        "provider_outcome": "SUCCEEDED",
+                        "provider_effect_may_have_occurred": True,
                     },
                     delivered_at=datetime.now(UTC),
                 )
 
             except DeliveryLeaseLostError:
                 raise
+            except asyncio.CancelledError:
+                # Cancelling an asyncio future cannot stop a running SMTP thread.
+                # Prevent any later send admission and let the service preserve
+                # UNKNOWN evidence for an already-admitted provider operation.
+                smtp_attempt.stop()
+                raise
             except TimeoutError:
+                smtp_attempt.stop()
+                provider_outcome = "UNKNOWN" if smtp_attempt.send_started else "NOT_STARTED"
                 last_error = AdapterTimeoutError(
                     f"Email delivery timed out after {attempt} attempts",
                     channel=Channel.EMAIL,
@@ -172,8 +223,9 @@ class EmailAdapter(BaseAdapter):
                     notification.notification_id,
                     attempt,
                 )
-                if attempt < self.config.retry_attempts:
-                    await asyncio.sleep(1.0 * attempt)
+                # A timed-out executor may still be running. It must never race
+                # an internal retry; outer fallback may proceed with UNKNOWN.
+                break
 
             except smtplib.SMTPAuthenticationError as e:
                 last_error = AdapterConfigurationError(
@@ -187,6 +239,7 @@ class EmailAdapter(BaseAdapter):
                 break  # Don't retry auth errors
 
             except smtplib.SMTPRecipientsRefused as e:
+                provider_outcome = "FAILED"
                 last_error = AdapterDeliveryError(
                     f"Email recipients refused: {e}",
                     channel=Channel.EMAIL,
@@ -200,6 +253,7 @@ class EmailAdapter(BaseAdapter):
                 break
 
             except smtplib.SMTPException as e:
+                provider_outcome = "UNKNOWN" if smtp_attempt.send_started else "NOT_STARTED"
                 last_error = AdapterDeliveryError(
                     f"Email SMTP error: {e}",
                     channel=Channel.EMAIL,
@@ -212,10 +266,13 @@ class EmailAdapter(BaseAdapter):
                     attempt,
                     str(e),
                 )
+                if smtp_attempt.send_started:
+                    break
                 if attempt < self.config.retry_attempts:
                     await asyncio.sleep(1.0 * attempt)
 
             except Exception as e:
+                provider_outcome = "UNKNOWN" if smtp_attempt.send_started else "NOT_STARTED"
                 last_error = e
                 logger.error(
                     "Email delivery unexpected error: notification_id=%s, error=%s",
@@ -223,6 +280,8 @@ class EmailAdapter(BaseAdapter):
                     str(e),
                 )
                 break
+            finally:
+                smtp_attempt.stop()
 
         error_msg = str(last_error) if last_error else "Unknown error"
         logger.error(
@@ -235,6 +294,10 @@ class EmailAdapter(BaseAdapter):
             success=False,
             channel=Channel.EMAIL,
             error=error_msg,
+            metadata={
+                "provider_outcome": provider_outcome,
+                "provider_effect_may_have_occurred": provider_outcome != "NOT_STARTED",
+            },
             delivered_at=datetime.now(UTC),
         )
 
@@ -409,9 +472,19 @@ class EmailAdapter(BaseAdapter):
         self,
         message: MIMEMultipart,
         to_addresses: list[str],
+        smtp_attempt: _SMTPAttempt | None = None,
     ) -> None:
-        """Synchronous email sending (runs in executor with copied lease context)."""
-        guard_provider_attempt(self.channel)
+        """Send with a shared deadline and cooperative cancellation between steps.
+
+        Socket timeouts bound individual blocking operations to the remaining
+        budget. Python cannot cancel DNS resolution or provider effects already
+        in flight. Their timeout result stays UNKNOWN even if the thread later
+        completes; it cannot settle newer delivery work.
+        """
+        smtp_attempt = smtp_attempt or _SMTPAttempt(time.monotonic() + self.config.timeout_seconds)
+        smtp_attempt.remaining()
+        recheck_provider_lease(self.channel)
+        remaining = smtp_attempt.remaining()
         server: smtplib.SMTP
         if self.config.use_ssl:
             context = ssl.create_default_context()
@@ -419,29 +492,44 @@ class EmailAdapter(BaseAdapter):
                 self.config.smtp_host,
                 self.config.smtp_port,
                 context=context,
-                timeout=self.config.timeout_seconds,
+                timeout=remaining,
             )
         else:
             server = smtplib.SMTP(
                 self.config.smtp_host,
                 self.config.smtp_port,
-                timeout=self.config.timeout_seconds,
+                timeout=remaining,
             )
-            if self.config.use_tls:
-                context = ssl.create_default_context()
-                server.starttls(context=context)
+
+        def prepare_operation() -> None:
+            remaining = smtp_attempt.remaining()
+            sock = getattr(server, "sock", None)
+            if sock is not None:
+                sock.settimeout(remaining)
 
         try:
+            if self.config.use_tls and not self.config.use_ssl:
+                prepare_operation()
+                context = ssl.create_default_context()
+                server.starttls(context=context)
             if self.config.username and self.config.password:
+                prepare_operation()
                 server.login(self.config.username, self.config.password)
+            prepare_operation()
             guard_provider_attempt(self.channel)
+            # The durable guard can itself block on storage until after timeout.
+            prepare_operation()
+            smtp_attempt.start_send()
             server.sendmail(
                 self.config.from_address,
                 to_addresses,
                 message.as_string(),
             )
         finally:
-            server.quit()
+            # QUIT is another round trip and cannot change observed acceptance.
+            # Closing also avoids extending an expired deadline for cleanup.
+            with contextlib.suppress(Exception):
+                server.close()
 
     def _check_connection_sync(self) -> None:
         """Synchronous connection check (runs in executor)."""
