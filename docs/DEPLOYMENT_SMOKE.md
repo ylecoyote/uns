@@ -2,7 +2,9 @@
 
 Tested code: `07ef52a87b45128b77715f64c8b0e5f8f91387a9`. Base: `ca43bea`. Image: `uns:07ef52a`, image ID `sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d`. Application code and dependency changes were built into the image; all 90 installed modules matched source.
 
-## Deployment status
+The user subsequently accepted localhost plus recording adapters. See [the completed persistent deployment](LOCAL_DEPLOYMENT.md) for the current service and runbook. The receipt below preserves the earlier rehearsal scope.
+
+## Deployment status at the rehearsal checkpoint
 
 The request did not identify a target server or designated real recipients. Target/provider questions were presented and remained unanswered during this run. Therefore only an isolated localhost recording-profile rehearsal was performed. No production service, real database, external recipient, registry or remote host was modified. A lasting deployment still requires the target selection.
 

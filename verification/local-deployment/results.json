@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-21",
+  "checked_at": "2026-10-21T07:05:49.571109+00:00",
+  "status": "persistent localhost recording deployment verified",
+  "url": "http://127.0.0.1:18080",
+  "user_choice": "localhost plus recording adapters explicitly accepted",
+  "application_commit": "07ef52a87b45128b77715f64c8b0e5f8f91387a9",
+  "application_image_id": "sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d",
+  "profile_commit": "be2b3c95e66cfa8502b694e22f5a07f7739dd1b5",
+  "proxy_config_commit": "9fd53d8",
+  "data_volume": "uns-local-data",
+  "configuration_home": "/Users/awiley/Library/Application Support/UNS",
+  "release_directory": "/Users/awiley/Library/Application Support/UNS/releases/07ef52a-be2b3c9",
+  "persistent_checks_passed": 62,
+  "earlier_full_rehearsal_checks": 99,
+  "application_python_tests": 1776,
+  "application_coverage_percent": 90.76,
+  "containers": [
+    {
+      "name": "/uns-local",
+      "image": "sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d",
+      "status": "running",
+      "health": "healthy",
+      "restart": "unless-stopped",
+      "user": "1001:1001",
+      "read_only": true,
+      "networks": [
+        "uns-local-network"
+      ],
+      "ports": {
+        "8000/tcp": null
+      }
+    },
+    {
+      "name": "/uns-local-ingress",
+      "image": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+      "status": "running",
+      "health": "healthy",
+      "restart": "unless-stopped",
+      "user": "101:101",
+      "read_only": true,
+      "networks": [
+        "uns-local-ingress",
+        "uns-local-network"
+      ],
+      "ports": {
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18080"
+          }
+        ]
+      }
+    }
+  ],
+  "application_default_route": false,
+  "reverse_proxy_checks": [
+    "arbitrary Host remains fixed on UNS",
+    "CONNECT rejected with 400"
+  ],
+  "browser": "Persistent console recording banner and sign-in verified; tab retained for user. Earlier full browser flows use unchanged SPA assets.",
+  "backup": {
+    "backup_path": "/Users/awiley/Library/Application Support/UNS/backups/initial-local-20261021T070302Z.db",
+    "sha256": "45299ff47a07b44ec42e58bca27ab229f5ac636c9f3f2cf8b81901e7a410f826",
+    "sqlite_quick_check": "ok",
+    "operator_key_mode": "0o600",
+    "service_env_mode": "0o600"
+  },
+  "deployment_files_sha256": {
+    "profile/local_mcp.py": "3b0d58318abc347d5c8510dcda5cbd694677b2c4a90ad531ec1f0e066d0af363",
+    "profile/local_app.py": "a99f26cc2bdb6ea187b91f6739a0e8cd7ce54d39230e54d57551f0de71683b4a",
+    "profile/recording_runtime.py": "d345bfe30dbdb1a5d520e7288a1e34bd86b1e0e0c7f925f7fb4488806abfdb0c",
+    "console/index.html": "6806b785fbafb36114f99d103ef658925f77fb23ddf28db07e8910a52494376d",
+    "console/assets/index-NBVP3FiN.js": "ef2ec83cb8ebdfd09befc4748b01e6d6beb3f22739aa1f82f70abc8f21bab47b",
+    "console/assets/index-DiTDruTt.css": "77eba9077a965e212e253d0f7c5020e90a0cbf1921a672cfc03db6f3bfddd26f"
+  },
+  "nginx_config_sha256": "2b4822c9ec92158f593908b90a57d44614ff57503ce05b2e40468ab1bd12b0c1",
+  "limits": [
+    "Recording-only; no real Slack/email/PagerDuty delivery",
+    "Docker Desktop must be running; no OS reboot acceptance claimed",
+    "No public TLS/remote hosting/PostgreSQL/load acceptance",
+    "No new independent review or advisory refresh claimed"
+  ],
+  "receipt_sha256": {
+    "backup.json": "59a98490e8a2a0dc0e35bfa43ce15a7c7fc4cd1cd4ca3dbbf9a7fade406f01a7",
+    "proxy-image.log": "2a335b2623a5502ae37d184052c798d6f5cc8a3c27ff92fc0e298f9f0cf448d4",
+    "persistent-checks.json": "e6a865d36c58b0066613823ae7cf305eb895298c76db6a7e725718611ef1ad87",
+    "compose.redacted.json": "11bf175043155149fb951f054e2b8bb6af67ded51c6bb59553fade0a313cf3e0",
+    "persistent-smoke.log": "c7e5fd785615eaa93d82b2fe7b5d091fd6e662fef251da6500fee7f09558ed5a",
+    "docs-tests.log": "433ef50a3130f5da00dc27be5c1f655a0e33997a5100c6d850ebd5c7d26b49d2",
+    "profile-lint.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+  },
+  "docs_tests_passed": 257
+}

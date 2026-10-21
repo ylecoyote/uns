@@ -118,3 +118,8 @@ The canonical main branch fast-forwarded from `b508cc3` through `76fc43e`; appli
 ## Container deployment-candidate verification (current)
 
 The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/probe/WebSocket support fixes and browser-discovered audit context/UTC corrections after the consolidated baseline. Full Python verification: 1,776 passed at 90.76% coverage. The installed image passed 99 live HTTP/WebSocket/MCP/recovery checks, module identity and dependency consistency checks, authenticated Compose readiness, and copied-data archive verification. Functional browser flows were exercised in Brave. See [deployment smoke](DEPLOYMENT_SMOKE.md) and [receipts](../verification/deployment/results.json). The lasting target and real recipients remain unspecified; this is isolated recording-profile rehearsal evidence, not production deployment acceptance.
+
+
+## Persistent localhost deployment acceptance
+
+The user accepted localhost plus recording adapters. The pinned application image is unchanged from `07ef52a`; the permanent recording composition and fixed ingress are versioned under `deploy/local/`. All 62 persistent-deployment checks passed, including real network transports, local provider recordings, one-minute timeout, callbacks and restart recovery. App isolation, loopback-only ingress and a consistent SQLite backup were checked. [Runbook](LOCAL_DEPLOYMENT.md) and [receipts](../verification/local-deployment/results.json) record the running deployment. No real-provider or remote-production acceptance is implied.
