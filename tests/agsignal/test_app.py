@@ -14,7 +14,8 @@ from agsignal.app import create_app
 @pytest.fixture
 def client() -> TestClient:
     app = create_app(skip_persistence_config=True)  # tests configure their own stores
-    return TestClient(app)
+    app.state.agsignal_api_key = "test-key"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 def test_health_responds(client: TestClient) -> None:

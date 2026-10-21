@@ -35,8 +35,9 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from agsignal.api.auth import require_read_principal
 from agsignal.api.observability import (
     create_error_response_with_request_id,
     get_structured_logger,
@@ -100,7 +101,7 @@ from notification.models import (
 
 logger = get_structured_logger(__name__)
 
-router = APIRouter(prefix="/ui", tags=["ui"])
+router = APIRouter(prefix="/ui", tags=["ui"], dependencies=[Depends(require_read_principal)])
 
 
 # =============================================================================
@@ -217,6 +218,7 @@ async def get_delivery_timeline(
     description="Get effective policy resolution for a notification type. Read-only endpoint.",
 )
 async def get_effective_policy(
+    http_request: Request,
     notification_type: str = Query(..., description="The notification type to resolve"),
     intent: NotificationIntent = Query(..., description="The notification intent"),
     autonomy_mode: AutonomyMode = Query(..., description="The autonomy mode"),
@@ -232,12 +234,17 @@ async def get_effective_policy(
         irreversible=irreversible,
     )
 
-    return await _query_effective_policy(
-        notification_type=notification_type,
-        intent=intent,
-        autonomy_mode=autonomy_mode,
-        irreversible=irreversible,
-    )
+    try:
+        return await _query_effective_policy(
+            notification_type=notification_type,
+            intent=intent,
+            autonomy_mode=autonomy_mode,
+            irreversible=irreversible,
+            policy_registry=(http_request.app.state.runtime.policy_runtime.registry()
+                             if getattr(http_request.app.state, "runtime", None) is not None else None),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get(

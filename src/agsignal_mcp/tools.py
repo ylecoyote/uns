@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -110,8 +111,12 @@ async def simulate_signal(
     runtime_state: RuntimeState | None = None,
 ) -> dict[str, Any]:
     """Preview routing and policy behavior without delivery side effects."""
-    del runtime_state  # simulate has no state-mutating side effects
-    response = await agsignal_signaling.simulate_signal(request=_signaling_request(payload))
+    runtime = runtime_state.runtime if runtime_state is not None else None
+    response = await agsignal_signaling.simulate_signal(
+        request=_signaling_request(payload),
+        policy_runtime=runtime.policy_runtime if runtime is not None else None,
+        principal="mcp-simulation",
+    )
     data = response.model_dump(mode="json")
     data["delivered"] = False
     return data
@@ -127,24 +132,28 @@ async def send_signal(
         return await simulate_signal(payload, runtime_state=runtime_state)
 
     active_config = config or MCPRuntimeConfig()
-    if active_config.read_only:
+    if active_config.read_only or active_config.mode == "read-only":
         raise ValueError("send_signal is disabled in read-only mode")
     if payload.operator_intent != "deliver":
         raise ValueError("send_signal deliver=true requires operator_intent='deliver'")
     if active_config.require_delivery_confirmation:
         if not active_config.delivery_confirmation_token:
             raise ValueError("send_signal delivery requires a configured confirmation token")
-        if payload.operator_confirmation_token != active_config.delivery_confirmation_token:
+        if not payload.operator_confirmation_token or not hmac.compare_digest(
+            payload.operator_confirmation_token.encode(), active_config.delivery_confirmation_token.encode()
+        ):
             raise ValueError("send_signal delivery confirmation token is invalid")
 
+    if not active_config.operator_principal:
+        raise ValueError("send_signal requires an operator principal")
     state = runtime_state or RuntimeState()
     if state.runtime is not None:
-        if not active_config.operator_principal:
-            raise ValueError("send_signal requires an operator principal")
         response = await state.runtime.send(_signaling_request(payload), principal=active_config.operator_principal)
         data = response.model_dump(mode="json")
         data["delivered"] = response.status.value == "DELIVERED"
         return data
+    if not state.legacy_fixture_mode:
+        raise ValueError("A durable runtime is required for MCP mutations")
     response = await agsignal_signaling.send_signal(
         request=_signaling_request(payload),
         audit_store=state.audit_store,
@@ -163,7 +172,7 @@ async def ack_notification(
 ) -> dict[str, Any]:
     """Acknowledge a tracked AGSignal notification."""
     active_config = config or MCPRuntimeConfig()
-    if active_config.read_only:
+    if active_config.read_only or active_config.mode == "read-only":
         raise ValueError("ack_notification is disabled in read-only mode")
     if not active_config.operator_principal:
         raise ValueError("ack_notification requires an operator principal")
@@ -175,6 +184,8 @@ async def ack_notification(
         response = state.runtime.acknowledge(payload.notification_id,
             actor=active_config.operator_principal, dismiss=False, metadata=payload.metadata)
         return response.model_dump(mode="json")
+    if not state.legacy_fixture_mode:
+        raise ValueError("A durable runtime is required for MCP mutations")
     response = await agsignal_signaling.acknowledge(
         notification_id=payload.notification_id,
         acked_by=active_config.operator_principal,
@@ -197,7 +208,7 @@ async def dismiss_notification(
 ) -> dict[str, Any]:
     """Dismiss a tracked AGSignal notification."""
     active_config = config or MCPRuntimeConfig()
-    if active_config.read_only:
+    if active_config.read_only or active_config.mode == "read-only":
         raise ValueError("dismiss_notification is disabled in read-only mode")
     if not active_config.operator_principal:
         raise ValueError("dismiss_notification requires an operator principal")
@@ -209,6 +220,8 @@ async def dismiss_notification(
         response = state.runtime.acknowledge(payload.notification_id,
             actor=active_config.operator_principal, dismiss=True, metadata=payload.metadata)
         return response.model_dump(mode="json")
+    if not state.legacy_fixture_mode:
+        raise ValueError("A durable runtime is required for MCP mutations")
     response = await agsignal_signaling.dismiss(
         notification_id=payload.notification_id,
         dismissed_by=active_config.operator_principal,
@@ -318,6 +331,7 @@ async def get_effective_policy(
     intent: str,
     autonomy_mode: str,
     irreversible: bool = False,
+    runtime_state: RuntimeState | None = None,
 ) -> dict[str, Any]:
     """Return effective policy resolution for a signal shape.
 
@@ -328,6 +342,8 @@ async def get_effective_policy(
         intent=NotificationIntent(intent),
         autonomy_mode=AutonomyMode(autonomy_mode),
         irreversible=irreversible,
+        policy_registry=(runtime_state.runtime.policy_runtime.registry()
+                         if runtime_state is not None and runtime_state.runtime is not None else None),
     )
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 

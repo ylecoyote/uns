@@ -40,10 +40,10 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from agsignal._in_memory import InMemoryRedisList
-from agsignal.api.auth import configure_cors
+from agsignal.api.auth import configure_cors, require_write_principal
 from agsignal.api.observability import ObservabilityMiddleware
 from agsignal.api.routes_notification import router as ack_router
 from agsignal.api.routes_ui import router as ui_router
@@ -109,8 +109,8 @@ def _configure_persistence() -> None:
         create_sqlalchemy_adapter,
     )
     from notification.audit import configure_audit_logger
-
-    database_url = os.environ.get("DATABASE_URL")
+    from uns.config import value
+    database_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
     create_tables = os.environ.get("UNS_CREATE_TABLES", os.environ.get("AGSIGNAL_CREATE_TABLES", "false")).lower() == "true"
 
     if database_url:
@@ -189,13 +189,18 @@ def create_app(
     skip_persistence_config: bool = False,
     runtime: Any = None,
 ) -> FastAPI:
-    """Create the unified AGSignal HTTP application."""
-    if not skip_persistence_config:
-        _configure_persistence()
+    """Create HTTP against one durable Runtime.
 
+    ``skip_persistence_config`` without a runtime is explicit legacy fixture
+    composition. Only that composition accepts an injected legacy policy store.
+    """
+    owns_runtime = runtime is None and not skip_persistence_config
     if runtime is None and not skip_persistence_config:
         from uns.config import build_runtime
         runtime = build_runtime()
+    elif runtime is not None:
+        from uns.config import configure_runtime_policies
+        configure_runtime_policies(runtime)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -207,6 +212,8 @@ def create_app(
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
+            if owns_runtime and runtime is not None:
+                runtime.engine.dispose()
 
     app = FastAPI(
         lifespan=lifespan,
@@ -236,6 +243,8 @@ def create_app(
     app.state.runtime = runtime
     app.state.audit_store = runtime.audit_store if runtime is not None else (audit_store or InMemoryAuditStore())
     if runtime is not None:
+        from notification.audit import configure_audit_logger
+        configure_audit_logger(store=runtime.audit_store)
         from agsignal.api.read_models import (
             SQLAlchemyReadModelAdapter,
             configure_read_model_adapter,
@@ -247,34 +256,13 @@ def create_app(
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
 
-    # Policy directory loading.
-    #
-    # Precedence rule (CORRECTED FROM PLAN V1): if AGSIGNAL_POLICY_DIR is set,
-    # the directory-loaded registry takes precedence over any registry
-    # configured by `_configure_persistence()` (whether the SQLAlchemy branch
-    # or the in-memory branch). This matches `notification.main`'s pre-Phase-3
-    # behavior (it always loaded from policy_dir regardless of persistence
-    # config) but DIVERGES from `mcp_server.app`'s pre-Phase-3 behavior
-    # (which only loaded policy_dir in the in-memory branch).
-    #
-    # The unified factory picks notification.main's behavior because: (a) it
-    # is the more permissive of the two — operators can override SQLAlchemy
-    # policies with a directory snapshot during testing/migration; (b) the
-    # console-side (mcp_server.app) tests do not assert that policy_dir is
-    # IGNORED in DB mode, so the broader behavior is safe; (c) the SQLAlchemy
-    # registry remains the system-of-record — operators who do not set
-    # AGSIGNAL_POLICY_DIR get the DB registry exclusively.
-    #
-    # If a future operator scenario needs DB-mode policy_dir to be IGNORED
-    # rather than overridden, gate this block on `if not database_url`.
+    # Legacy fixture composition may use a process-local registry. Real HTTP,
+    # MCP and SDK intake use the Runtime policy authority in the same database.
     policy_dir = _policy_dir_from_env()
-    if policy_dir is not None:
+    if runtime is None and policy_dir is not None:
         loaded_count, registry = load_runtime_registry_from_directory(policy_dir)
         configure_policy_registry(registry=registry)
-        logger.info(
-            "Loaded ACTIVE runtime policies from AGSIGNAL_POLICY_DIR (overrides persistence-config registry if any)",
-            extra={"loaded_count": loaded_count, "policy_count": len(registry)},
-        )
+        logger.info("Loaded legacy fixture policy directory", extra={"loaded_count": loaded_count})
 
     # Websocket runtime setup
     websocket_manager = WebSocketConnectionManager()
@@ -310,9 +298,7 @@ def create_app(
         from notification.models import Channel
         if runtime.adapters.get_adapter(Channel.WEBSOCKET) is None:
             runtime.adapters.register(WebSocketDeliveryAdapter(app))
-        app.state.policy_store = policy_store or SQLAlchemyPolicyStore(runtime.sessions)
-        if not skip_persistence_config and policy_dir is None:
-            configure_policy_registry(registry=app.state.policy_store.load_runtime_registry())
+        app.state.policy_store = SQLAlchemyPolicyStore(runtime.sessions)
 
     # Mount routers
     app.include_router(notification_router)              # /api/v1/notifications/*
@@ -333,8 +319,8 @@ def create_app(
             "version": __version__,
         }
 
-    @app.get("/ready", tags=["system"])
-    @app.get("/readyz", tags=["system"])
+    @app.get("/ready", tags=["system"], dependencies=[Depends(require_write_principal)])
+    @app.get("/readyz", tags=["system"], dependencies=[Depends(require_write_principal)])
     async def ready() -> dict[str, Any]:
         from agsignal.api.read_models import get_read_model_adapter
         from notification.audit import get_audit_logger
@@ -357,7 +343,7 @@ def create_app(
             "service": "uns",
             "version": __version__,
             "channels_configured": _channel_readiness(),
-            "policy_count": len(get_policy_registry()),
+            "policy_count": len(runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()),
             "dlq_depth": app.state.dlq_service.depth(),
             "read_model_adapter": read_model_adapter,
             "audit_logger": audit_logger_type,
@@ -379,15 +365,7 @@ def main() -> None:
     uvicorn.run("uns.app:app", host=host, port=port, reload=False)
 
 
-# ASGI module-level instance for direct uvicorn invocation.
-#
-# Note: this triggers `_configure_persistence()` on first import (unless
-# `skip_persistence_config=True` is somehow threaded in — at the module level
-# it is not). This matches the predecessor factories' behavior (both
-# `notification.main` and `mcp_server.app` also instantiate `app` at module
-# level). Tests that need to run without persistence configuration import
-# `create_app` directly and pass `skip_persistence_config=True`, bypassing
-# this module-level instance.
+# ASGI entrypoint owns its configured Runtime and closes it on lifespan exit.
 app = create_app()
 
 

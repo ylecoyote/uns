@@ -418,7 +418,8 @@ def test_send_signal_publishes_optional_websocket_fanout() -> None:
     app = create_app(skip_persistence_config=True)
     fanout = CapturingFanout()
     app.state.websocket_fanout = fanout
-    client = TestClient(app)
+    app.state.agsignal_api_key = "test-key"
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
     payload = _payload()
     agent_id = uuid4()
     autonomy_context = payload["autonomy_context"]
@@ -442,7 +443,8 @@ def test_send_signal_records_websocket_replay_payload() -> None:
     from agsignal.app import create_app
 
     app = create_app(skip_persistence_config=True)
-    client = TestClient(app)
+    app.state.agsignal_api_key = "test-key"
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
     payload = _payload()
     agent_id = uuid4()
     autonomy_context = payload["autonomy_context"]

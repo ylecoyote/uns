@@ -281,7 +281,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app()
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/health")
         assert response.status_code == 200
@@ -296,7 +297,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/healthz")
         assert response.status_code == 200
@@ -311,7 +313,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app()
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/ready")
         assert response.status_code == 200
@@ -327,7 +330,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app()
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         ready_body = client.get("/ready").json()
         readyz_body = client.get("/readyz").json()
@@ -339,7 +343,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.get("/metrics")
         assert response.status_code == 200
@@ -365,7 +370,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         # Drive a request through a known route template.
         client.get("/healthz")
@@ -383,7 +389,8 @@ class TestCreateApp:
         env = {"AGSIGNAL_RATE_LIMIT_DEFAULT": "3/minute"}
         with patch.dict(os.environ, env, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
             # Probes all key against the same TestClient remote IP.
             statuses = [client.get("/healthz").status_code for _ in range(4)]
@@ -394,7 +401,8 @@ class TestCreateApp:
         # Confirm the 429 carries Retry-After (any positive integer string).
         with patch.dict(os.environ, env, clear=True):
             app2 = create_app(skip_persistence_config=True)
-            client2 = TestClient(app2)
+            app2.state.agsignal_api_key = "test-key"
+            client2 = TestClient(app2, headers={"Authorization": "Bearer test-key"})
             for _ in range(3):
                 client2.get("/healthz")
             response = client2.get("/healthz")
@@ -413,7 +421,8 @@ class TestCreateApp:
         env = {"AGSIGNAL_RATE_LIMIT_DEFAULT": "2/minute"}
         with patch.dict(os.environ, env, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
             headers_alice = {"Authorization": "Bearer alice-key"}
             headers_bob = {"Authorization": "Bearer bob-key"}
@@ -432,7 +441,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.options(
             "/ui/audit",
@@ -458,7 +468,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         for path in ("/docs", "/redoc", "/openapi.json"):
             response = client.get(path)
@@ -472,7 +483,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {"AGSIGNAL_ENABLE_DOCS": "true"}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
             response = client.get("/openapi.json")
 
@@ -485,7 +497,8 @@ class TestCreateApp:
 
         with patch.dict(os.environ, {}, clear=True):
             app = create_app(skip_persistence_config=True)
-            client = TestClient(app)
+            app.state.agsignal_api_key = "test-key"
+            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
         response = client.options(
             "/ui/audit",
@@ -555,7 +568,8 @@ class TestEndToEndIntegration:
         get_audit_logger().store.save_delivery_audit(record)
 
         # Query via UI endpoint
-        client = TestClient(app)
+        app.state.agsignal_api_key = "test-key"
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
         response = client.get("/ui/deliveries")
         assert response.status_code == 200
 
@@ -617,7 +631,8 @@ class TestEndToEndIntegration:
         get_audit_logger().store.save_delivery_audit(record)
 
         # Query via UI audit endpoint
-        client = TestClient(app)
+        app.state.agsignal_api_key = "test-key"
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
         response = client.get("/ui/audit")
         assert response.status_code == 200
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Mapping
 from contextlib import suppress
@@ -11,10 +12,10 @@ from datetime import UTC, datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from notification.acknowledgment import get_ack_engine
+from agsignal.api.auth import WritePrincipal, require_websocket_principal, resolve_requested_actor
 from notification.channel_health import ChannelHealthTracker
 from notification.models import AckStatus, Channel
 
@@ -394,9 +395,10 @@ def get_missed_notifications(
 
 async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
     """Handle a standalone AGSignal agent WebSocket session."""
+    principal, subprotocol = require_websocket_principal(websocket)
     manager: WebSocketConnectionManager = websocket.app.state.websocket_manager
     connection_id = str(uuid4())
-    await websocket.accept()
+    await websocket.accept(subprotocol=subprotocol)
     manager.register(agent_id, connection_id, websocket)
     await manager.ensure_agent_subscription(agent_id)
     await websocket.send_json(
@@ -409,7 +411,14 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
 
     try:
         while True:
-            message = await websocket.receive_json()
+            try:
+                message = await websocket.receive_json()
+            except (json.JSONDecodeError, UnicodeError):
+                await websocket.send_json({"type": "error", "error": "invalid_message", "message": "Expected JSON"})
+                continue
+            if not isinstance(message, dict):
+                await websocket.send_json({"type": "error", "error": "invalid_message", "message": "Expected an object"})
+                continue
             message_type = message.get("type")
             if message_type == "ping":
                 await websocket.send_json({"type": "pong"})
@@ -429,7 +438,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
                     }
                 )
             elif message_type == "ack":
-                await _handle_ack_message(websocket, message)
+                await _handle_ack_message(websocket, message, principal)
             else:
                 await websocket.send_json(
                     {
@@ -444,33 +453,39 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
         await manager.stop_agent_subscription_if_idle(agent_id)
 
 
-async def _handle_ack_message(websocket: WebSocket, message: dict[str, object]) -> None:
-    notification_id = UUID(str(message["notification_id"]))
-    requested_status = AckStatus(str(message.get("status", AckStatus.ACKED.value)))
-    if requested_status not in (AckStatus.ACKED, AckStatus.DISMISSED):
-        await websocket.send_json(
-            {
-                "type": "error",
-                "message": f"Unsupported ack status: {requested_status.value}",
-            }
+async def _handle_ack_message(
+    websocket: WebSocket, message: dict[str, object], principal: WritePrincipal,
+) -> None:
+    """Commit the same durable response as HTTP; never mutate the legacy engine."""
+    from uns.runtime import Conflict
+
+    try:
+        notification_id = UUID(str(message.get("notification_id", "")))
+        requested_status = AckStatus(str(message.get("status", AckStatus.ACKED.value)))
+        if requested_status not in (AckStatus.ACKED, AckStatus.DISMISSED):
+            raise ValueError("Only ACKED or DISMISSED responses are supported")
+        actor = resolve_requested_actor(
+            principal, str(message["acked_by"]) if message.get("acked_by") is not None else None,
         )
+        runtime = getattr(websocket.app.state, "runtime", None)
+        if runtime is None:
+            await websocket.send_json({"type": "error", "error": "runtime_unavailable", "message": "Durable ACK runtime is not configured"})
+            return
+        event = runtime.acknowledge(
+            notification_id, actor=actor, dismiss=requested_status == AckStatus.DISMISSED,
+            metadata={"transport": "websocket"},
+        )
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {"error": "forbidden", "message": str(exc.detail)}
+        await websocket.send_json({"type": "error", **detail})
         return
-
-    event = get_ack_engine().ack(
-        notification_id=notification_id,
-        ack_status=requested_status,
-        acked_by=str(message["acked_by"]) if message.get("acked_by") is not None else None,
-        metadata={"transport": "websocket"},
-    )
-    ack_status = event.ack_status or event.status
-    if ack_status is None:
-        raise RuntimeError("ack engine returned event without status")
-
-    await websocket.send_json(
-        {
-            "type": "ack_result",
-            "notification_id": str(event.notification_id),
-            "ack_status": ack_status.value,
-            "acked_by": event.acked_by,
-        }
-    )
+    except KeyError:
+        await websocket.send_json({"type": "error", "error": "not_found", "message": "Notification not found"})
+        return
+    except Conflict as exc:
+        await websocket.send_json({"type": "error", "error": "invalid_transition", "message": str(exc)})
+        return
+    except (ValueError, TypeError) as exc:
+        await websocket.send_json({"type": "error", "error": "invalid_message", "message": str(exc)})
+        return
+    await websocket.send_json({"type": "ack_result", **event.model_dump(mode="json")})

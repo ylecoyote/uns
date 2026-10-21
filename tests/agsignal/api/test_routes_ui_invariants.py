@@ -18,8 +18,9 @@ from agsignal.app import create_app
 @pytest.fixture
 def client() -> TestClient:
     """Create a test client."""
-    app = create_app()
-    return TestClient(app)
+    app = create_app(skip_persistence_config=True)  # Explicit legacy read-model fixture
+    app.state.agsignal_api_key = "test-key"
+    return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
 class TestInvariantsList:

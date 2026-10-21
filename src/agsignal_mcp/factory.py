@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+
+import anyio
 from mcp.server.fastmcp import FastMCP
 
 from agsignal_mcp.runtime import MCPRuntimeConfig, RuntimeState
@@ -19,6 +24,7 @@ from agsignal_mcp.tools import list_invariants as list_invariants_impl
 from agsignal_mcp.tools import ready as ready_impl
 from agsignal_mcp.tools import send_signal as send_signal_impl
 from agsignal_mcp.tools import simulate_signal as simulate_signal_impl
+from uns.runtime import Runtime
 
 AGSIGNAL_MCP_TOOL_NAMES = (
     "simulate_signal",
@@ -40,22 +46,54 @@ AGSIGNAL_MCP_TOOL_NAMES = (
 )
 
 
-def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP:
-    """Create an AGSignal MCP server with the v1 tool registry."""
+def create_mcp_server(
+    runtime_config: MCPRuntimeConfig | None = None, *, runtime: Runtime | None = None,
+) -> FastMCP:
+    """Create the trusted local stdio server and own its recovery lifecycle.
+
+    Write authority comes from process-launch configuration, never tool input.
+    Network MCP hosting requires a separate authenticated transport boundary.
+    """
     config = runtime_config or MCPRuntimeConfig()
-    from uns.config import get_runtime
-    runtime = get_runtime()
+    if not config.read_only:
+        if config.mode == "read-only":
+            raise ValueError("read-only mode cannot enable mutations")
+        if not config.operator_principal:
+            raise ValueError("Writable MCP requires an operator principal")
+        if config.require_delivery_confirmation and not config.delivery_confirmation_token:
+            raise ValueError("Writable MCP requires a delivery confirmation token")
+    from uns.config import build_runtime
+    owns_runtime = runtime is None
+    runtime = runtime or build_runtime()
     state = RuntimeState(runtime=runtime, audit_store=runtime.audit_store)
     from agsignal.api.read_models import SQLAlchemyReadModelAdapter, configure_read_model_adapter
     adapter = SQLAlchemyReadModelAdapter(runtime.sessions)
     adapter.runtime = runtime
     configure_read_model_adapter(adapter)
-    mcp = FastMCP("UNS")
+    @asynccontextmanager
+    async def lifespan(_server: FastMCP) -> AsyncIterator[RuntimeState]:
+        worker = None
+        try:
+            if not config.read_only:
+                worker = asyncio.create_task(runtime.worker(), name="uns-mcp-worker")
+            yield state
+        finally:
+            # MCP server shutdown cancels its AnyIO scope. Shield the join so
+            # every Runtime child task has stopped before releasing owned DB resources.
+            with anyio.CancelScope(shield=True):
+                if worker is not None:
+                    worker.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await worker
+                if owns_runtime:
+                    runtime.engine.dispose()
+
+    mcp = FastMCP("UNS", lifespan=lifespan)
 
     @mcp.tool(name="simulate_signal")
     async def simulate_signal_tool(payload: SendSignalInput) -> dict[str, object]:
         """Preview AGSignal routing and policy behavior without side effects."""
-        return await simulate_signal_impl(payload)
+        return await simulate_signal_impl(payload, runtime_state=state)
 
     @mcp.tool(name="send_signal")
     async def send_signal_tool(payload: SendSignalInput) -> dict[str, object]:
@@ -117,6 +155,7 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
             intent=intent,
             autonomy_mode=autonomy_mode,
             irreversible=irreversible,
+            runtime_state=state,
         )
 
     @mcp.tool(name="list_invariants")
@@ -137,7 +176,7 @@ def create_mcp_server(runtime_config: MCPRuntimeConfig | None = None) -> FastMCP
     @mcp.tool(name="get_channel_health")
     def get_channel_health_tool() -> dict[str, object]:
         """Return runtime channel health."""
-        return get_channel_health_impl()
+        return get_channel_health_impl(runtime_state=state)
 
     @mcp.tool(name="health")
     def health_tool() -> dict[str, object]:
