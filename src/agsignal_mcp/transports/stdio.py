@@ -45,7 +45,8 @@ async def _serve(mcp: FastMCP) -> None:
     """Cancel stdio on SIGTERM so the MCP lifespan joins its recovery worker."""
     loop = asyncio.get_running_loop()
     task = asyncio.current_task()
-    assert task is not None
+    if task is None:
+        raise RuntimeError("MCP signal handling requires an active asyncio task")
     loop.add_signal_handler(signal.SIGTERM, task.cancel)
     try:
         await mcp.run_stdio_async()

@@ -40,6 +40,7 @@ from agsignal.responses import AckResponse, SendNotificationRequest, SendNotific
 from db.audit_store import SQLAlchemyAuditStore, delivery_audit_row
 from db.models import AckAuditRecord as AckRow
 from db.models import Base
+from notification.adapters.base import DeliveryLeaseLostError
 from notification.audit import create_audit_record
 from notification.models import (
     AckStatus,
@@ -51,7 +52,6 @@ from notification.models import (
 )
 from notification.service import (
     DeliveryError,
-    DeliveryLeaseLostError,
     DeliveryService,
     SimpleAdapterRegistry,
 )
@@ -301,7 +301,7 @@ class Runtime:
                     )
                 generation = (
                     current["generation"]
-                    if owner
+                    if owner is not None and current is not None
                     else (current["generation"] + 1 if current else 1)
                 )
                 values = {"dedup_key": dedup_key, "dedup_generation": generation}
@@ -433,6 +433,7 @@ class Runtime:
         for follower in followers:
             n = Notification.model_validate(follower["notification"])
             result = NotificationResult.model_validate(follower["outcome"])
+            values: dict[str, Any]
             if succeeded:
                 result = result.model_copy(update={"status": DeliveryStatus.DEDUPLICATED})
                 values = {"status": "DEDUPLICATED", "outcome": result.model_dump(mode="json")}
