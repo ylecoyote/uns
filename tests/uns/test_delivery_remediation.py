@@ -335,3 +335,30 @@ async def test_followers_stay_linked_while_owner_has_retry_budget(state):
     await runtime.run_once()
     assert runtime.get(follower.notification_id)["status"] == "DEDUPLICATED"
     assert len(adapter.calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["GUARANTEED", "BEST_EFFORT"])
+async def test_websocket_lease_loss_blocks_every_persistent_channel(state, mode):
+    runtime, slack, _, now, _ = state
+
+    async def pause_after_websocket(notification):
+        now[0] += runtime.lease_seconds + 1
+
+    websocket = Adapter(Channel.WEBSOCKET, effect=pause_after_websocket)
+    email = Adapter(Channel.EMAIL)
+    runtime.adapters.register(websocket)
+    runtime.adapters.register(email)
+    first = runtime.accept(request(), principal="producer")
+    notification = runtime.get(first.notification_id)["notification"]
+    notification.update(channels=["WEBSOCKET", "SLACK", "EMAIL"], delivery_mode=mode)
+    with runtime.sessions.begin() as session:
+        session.execute(
+            update(work)
+            .where(work.c.id == str(first.notification_id))
+            .values(notification=notification)
+        )
+    assert not await runtime.dispatch(first.notification_id)
+    assert len(websocket.calls) == 1
+    assert not slack.calls and not email.calls
+    assert runtime.get(first.notification_id)["status"] == "PENDING"
