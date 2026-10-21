@@ -4,6 +4,8 @@
 
 UNS delivers policy-driven notifications and records delivery, acknowledgment, dismissal, and timeout evidence. Notification policies have version identity; proposed policy changes can carry shadow evidence and explicit approval before a new draft is activated.
 
+Producer requests cannot weaken an ACTIVE notification policy. HTTP/MCP/WebSocket reads and writes use the configured trust boundary; the console asks for an operator credential at runtime.
+
 UNS does not authorize or execute an agent's business actions. Acknowledgment records a response, not comprehension or permission to act. The unfinished action-authorization models remain experimental.
 
 ## Local quickstart
@@ -34,3 +36,5 @@ Simulation has no side effects. Acceptance means recoverable pending work. Deliv
 `examples/policies/mip-uns` and `config/notification_policies` contain sample policies, not mandatory runtime defaults. Existing `agsignal`, `notification`, and `agsignal_mcp` imports remain available. New integrations use `uns.Client` and `uns.Runtime` with the `full` extra. The legacy low-level `NotificationSDK` resolves policy and needs an explicit delivery handler; without one it returns PENDING and attempts no channels.
 
 Apache License 2.0 - see [LICENSE](LICENSE). Local validation is recorded in docs/TESTING.md; real-channel receipt is a separate opt-in smoke check.
+
+Adversarial remediation adds durable policy revision checks, explicit dedup ownership, replay cycles, per-provider lease guards, independent callback recovery, authenticated transport reads, and bounded archive/retention tooling. See [verification](docs/TESTING.md) for checked behavior and remaining deployment limits.

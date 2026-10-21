@@ -41,9 +41,9 @@ The pre-change Python baseline was 1,867 passed and 1 skipped. Baseline Ruff rep
 
 With separately authorized recipients and configured credentials, send one uniquely identified BEST_EFFORT signal, inspect adapter/provider evidence, then test one SAFETY acknowledgment and record the human actor. Do not label a recording-adapter test as this smoke. No external smoke is run by default.
 
-## Consolidation result on 2026-10-20
+## Historical consolidation result before adversarial remediation
 
-Local functional acceptance passed on Python 3.12 using a fresh wheel environment with current compatible dependencies. The MCP dependency is constrained to major version 1 because version 2 removed the API used by the retained integration.
+The recorded original suite passed on Python 3.12 using a fresh wheel environment. Subsequent adversarial reproductions invalidated a broad local-acceptance conclusion; these results remain historical evidence, not the current reliability verdict. The MCP dependency is constrained to major version 1 because version 2 removed the API used by the retained integration.
 
 | Check | Result |
 |---|---|
@@ -64,3 +64,24 @@ Safe lockfile updates reduced the inherited advisory set. Remaining frontend rem
 The test count differs from the predecessor because obsolete documentation-layout assertions and the superseded Python UI tests were retired. Current runtime tests remain, with additional crash, concurrency, guard, transport, and audit regressions. One inherited SQLAlchemy JSON-operator deprecation warning remains.
 
 Machine-readable results and raw local receipts are in [verification/results.json](../verification/results.json). This evidence establishes local behavior only, not commercial or production acceptance.
+
+## Adversarial remediation result
+
+The remediation code target is `902300773d7ad41baefab8e007d0f37981ba6be9`. It preserves the notification-only product boundary and addresses the reproduced reliability, policy and access gaps. Original test files were not removed in this remediation; fixtures/assertions were adapted to explicit authenticated and runtime-scoped contracts.
+
+| Check | Checked result |
+|---|---|
+| Full Python suite | 1,705 passed, 90.17% coverage against the 75% gate |
+| Console | 305 tests passed, including all prior 289; types, lint and build passed |
+| Frontend full/production lockfile audits | Zero advisories in both current reports |
+| Python installed dependency audit | Zero known advisories; unpublished local package not registry-audited |
+| Static and boundaries | Ruff, mypy across 91 files, Bandit, UI boundary and whitespace checks passed |
+| Packaging | Wheel and sdist built; 90 Python modules matched source; minimal/full installs and CLI entrypoints passed |
+| Installed migration/maintenance | Old pending work preserved through two migrations; retention dry-run left database bytes unchanged |
+| Focused independent re-review | Original 5 read-isolation reproductions now pass; 14 additional scoped isolation/retention checks pass |
+
+New cases exercise failed-owner dedup, successor election, replay budgets, stale lease fallback/provider retries, queued SMTP effects, actual subprocess termination, isolated timeout processing, exact policy revision/activation ordering across processes, cold MCP hydration, override/metadata rejection, durable authenticated WebSocket ACKs, MCP idle recovery and signal shutdown, same/mixed-transport read isolation, and archive failure/cursor safety.
+
+Evidence is in [remediation results](../verification/remediation/results.json) and the [focused review record](../verification/remediation/review-findings.md). Original consolidation receipts remain unchanged under `verification/`; their broader acceptance wording was superseded by adversarial validation.
+
+Remaining limits: external-provider and human-receipt acceptance, live PostgreSQL operation, hosted CI and representative production load are unverified. Credentials confer operator access, not RBAC. External effects remain at least once. Historical information already lost by earlier versions cannot be reconstructed. Retention is explicit, SQLite-only and row-bounded, not byte/time-bounded or automatic compliance retention. Existing dependency/framework deprecation warnings are recorded in the test log.

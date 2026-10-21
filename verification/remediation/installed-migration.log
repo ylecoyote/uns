@@ -1,0 +1,4 @@
+UNS additive schema migration complete
+UNS additive schema migration complete
+PASS: installed migration preserves legacy pending work and replay accounting
+PASS: installed maintenance dry-run returns JSON and leaves database bytes unchanged

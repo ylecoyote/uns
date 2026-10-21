@@ -1,0 +1,58 @@
+minimal: 0
+minimal imports PASS /private/tmp/uns-remediation-minimal/lib/python3.12/site-packages/uns/__init__.py
+
+demo: 0
+Recorded delivery: 93a88c5d-8518-4e8f-bfbc-fe72068d9098
+PASS: delivered, restarted, acknowledged, and audited
+No WebSocket adapter registered
+
+cli: 0
+usage: uns [-h] [--host HOST] [--port PORT]
+
+UNS notification and acknowledgment service
+
+options:
+  -h, --help   show this help message and exit
+  --host HOST
+  --port PORT
+
+mcp_help: 0
+usage: uns-mcp [-h] [--enable-writes]
+
+UNS local MCP server (read-only by default)
+
+options:
+  -h, --help       show this help message and exit
+  --enable-writes  Enable durable writes using required host environment
+                   configuration
+
+maintenance_help: 0
+usage: uns-maintain [-h] [--database-url DATABASE_URL] --cutoff CUTOFF
+                    --idempotency-seconds IDEMPOTENCY_SECONDS
+                    [--batch-size BATCH_SIZE] [--apply] [--operator OPERATOR]
+                    [--after-id AFTER_ID] [--archive ARCHIVE]
+
+Explicit, bounded retention for SQLite notification stores. Nothing runs at
+startup. The operator chooses both the inactivity cutoff and the minimum
+idempotency window. Expiring an outbox row expires its idempotency key; a
+subsequent request with that key may create a new notification. Without an
+archive, events and delivery/ACK audits remain in the database and the removal
+receipt preserves the removed operational rows. With an archive, whole settled
+notification groups are exported, fsynced, hash-verified, then pruned in one
+SQLite writer transaction. Policy history and retention receipts are never
+pruned. This reuses database pages; it does not shrink the SQLite file or
+establish an audit/compliance retention policy. Oversized groups are kept.
+
+options:
+  -h, --help            show this help message and exit
+  --database-url DATABASE_URL
+  --cutoff CUTOFF
+  --idempotency-seconds IDEMPOTENCY_SECONDS
+  --batch-size BATCH_SIZE
+  --apply               Commit one bounded batch
+  --operator OPERATOR   Attribution required for --apply
+  --after-id AFTER_ID   Continue after a returned next_after_id; omit to start
+                        a new pass
+  --archive ARCHIVE     New archive file in a trusted existing directory
+
+Wheel identity: 90 Python modules match source

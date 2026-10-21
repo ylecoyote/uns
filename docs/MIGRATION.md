@@ -36,3 +36,13 @@ The supported Python minimum is corrected to 3.11 because the inherited runtime 
 The superseded Python UI files and their layout-only tests are preserved in `apps/ui/legacy_flask_reference`. The canonical console contains React/TypeScript only. The boundary scanner excludes dependency/build output directories, while still rejecting Python application files.
 
 Minimal imports now lazily load the optional read-model surface, so SDK-only installations do not require FastAPI. MCP remains on its supported version 1 API through the explicit `<2` dependency bound. Frontend lockfile updates stay within the existing declared version ranges.
+
+## Adversarial remediation changes
+
+The follow-up preserves notification/audit history while adding owner/generation and replay-cycle fields, scheduling indexes, immutable policy snapshots and complete policy-content storage. SQLite migrations handle pre-remediation stores and concurrent startup; old ownerless claims cannot suppress new intake. Previously lost owner links or discarded policy fields cannot be reconstructed.
+
+Behavior intentionally tightens: ACTIVE policy is authoritative; producer and adapter-metadata bypasses are rejected; reads/WS/readiness/metrics require auth by default; cross-actor terminal retries conflict. `UNS_ALLOW_UNAUTHENTICATED_READS` is a narrow explicit HTTP-read compatibility flag, not a write/WS bypass. No privileged producer override path was added.
+
+Write-enabled MCP owns its recovery lifecycle. Runtime policy and transport read adapters are instance-scoped. A read-only console uses a memory-only operator key. Node requirements changed with vulnerability remediation to `^20.19.0 || ^22.12.0 || >=24.0.0`; React stays on18. The original tests remain, with additional adversarial and migration cases rather than a test-suite reduction.
+
+`uns-maintain` adds explicit dry-run, apply and archive modes. It never runs automatically and does not vacuum or choose a compliance retention duration. Follow the current deployment guide before pruning data.

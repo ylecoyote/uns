@@ -12,15 +12,22 @@ The console uses plain operational language and existing table/detail layouts. P
 |---|---|
 | Canonical Python client and transactional runtime | `uns.client`, `uns.runtime` |
 | HTTP and existing MCP tools | `agsignal.app`, `agsignal_mcp.factory` using the runtime |
-| Policy resolution and channel adapters | Existing `notification` modules |
+| Runtime-scoped policy authority and channel adapters | `uns.policy_runtime`, existing `notification` modules |
 | Versioned policy storage and validated snapshot reload | `db.policy_store`, `notification.routes` |
 | Policy-change records and shadow-evidence gates | `db.policy_learning_store`, `notification.policy_config` |
-| Delivery/audit/policy console | `apps/ui`, `agsignal.queries` |
+| Authenticated delivery/audit/policy console | `apps/ui`, instance-scoped `agsignal.queries` |
+| Explicit retention and archive-before-prune | `uns.maintenance` |
 
 ## Explicit boundaries
 
-The authorization rule schemas in `agsignal.governance` are experimental. There is no supported business-action `decide()`/`evaluate()` engine, approval/resume workflow, network enforcement, autonomous optimizer, signed approval, or cryptographically immutable ledger. Audit records are append-only by application convention. External provider acknowledgment does not prove human receipt.
+The authorization rule schemas in `agsignal.governance` are experimental. There is no supported business-action `decide()`/`evaluate()` engine, approval/resume workflow, network enforcement, autonomous optimizer, signed approval, or cryptographically immutable ledger. Normal audit writes append history; explicit administrative archive-and-prune can retire eligible records while retaining a receipt. External provider acknowledgment does not prove human receipt.
 
 Policy approval concerns a proposed configuration change. It does not approve the action described by a notification. Externally supplied shadow evidence requires a trusted evaluator; UNS validates its binding and declared thresholds, not the evaluator's methodology.
 
 The local recording-adapter profile is the reproducible acceptance baseline. Deployment with real channels needs credentials, an authorized recipient, and separately recorded provider evidence.
+
+## Trust and operation
+
+ACTIVE notification policy defines producer obligations. Caller-controlled adapter-routing metadata cannot bypass that policy. HTTP, WebSocket and MCP paths bind their data reads and writes to their own runtime. The service credential grants operator access; there is no RBAC or multi-tenant authorization claim.
+
+Write-enabled MCP owns recovery throughout its lifespan. Callback processing cannot hold the timeout loop. Deduplication records a live owner/generation, and replay starts a fresh attempt cycle without erasing history. Optional maintenance is default-dry-run, SQLite-only and operator-directed; it does not choose retention policy or run automatically.
