@@ -1,17 +1,35 @@
 # UNS architecture
 
-The canonical chain is producer -> policy resolution -> transactional acceptance/outbox -> leased dispatch -> adapter result -> durable acknowledgment state -> audit.
+The canonical chain is producer -> transactional policy resolution and acceptance -> leased dispatch -> provider result -> durable response state -> audit and optional callbacks.
 
-`uns.Runtime` stores the resolved notification and pending work in `uns_notifications`. The same transaction writes acceptance audit and an `uns_events` record. An accepted response therefore has recoverable work. `uns_dedup` applies scoped semantic suppression independently of request idempotency.
+## Acceptance and policy identity
 
-The dispatcher claims work with a conditional database update and lease token, performs bounded external calls through `notification.service.DeliveryService`, and commits the result only while it owns that token. Expired leases can be recovered. A crash after provider acceptance but before local commit can repeat an external effect. Attempt history labels recovery as potentially ambiguous.
+`uns.Runtime` owns a `PolicyRuntime` tied to its database session factory. An immutable ACTIVE snapshot and monotonic revision replace the mutable global registry as canonical authority. Acceptance locks/checks the revision in the same transaction that stores the resolved notification, recoverable work, deduplication relationship and audit. Concurrent activation is ordered against that commit. A fresh HTTP or MCP process hydrates persisted policy automatically.
 
-Delivery and acknowledgment states are separate. The first successful delivery creates the response deadline. ACK, DISMISS, and timeout use conditional transitions so only one terminal state wins. State, response audit, and event commit together. A caller can poll durable events without making execution depend on a notification acknowledgment.
+Snapshots, full per-version policy content and lifecycle rows have separate roles. Lifecycle status remains authoritative; a serialized historical ACTIVE policy cannot revive a RETIRED row. Accepted work retains its exact resolved revision/settings after subsequent activation. Simulation uses a short resolution transaction but creates no notification, delivery or acknowledgment state.
 
-HTTP and the canonical Python client share the runtime. MCP factory tools use the same database configuration. The HTTP lifespan runs recovery and timeout processing once per second. A persistent MCP-only installation also runs an HTTP service or an explicit recovery worker against that database.
+## Deduplication and replay
 
-The console reads the existing SQL audit tables and augments detail views with runtime policy identity and acknowledgment state. Legacy unit/integration composition can inject in-memory services using `skip_persistence_config=True`; that fixture mode is not the durable deployment profile.
+`uns_notifications` holds delivery work, response deadlines and idempotency identity. `uns_dedup` points to an owner and generation for a scoped effective obligation. A duplicate of pending work follows that live owner and is not dispatched independently. Owner success settles followers; owner failure elects one successor and re-links the group atomically, avoiding both a silent lost obligation and a parallel alert storm.
 
-Notification policy lifecycle is distinct from action authorization. The latter's unfinished schema/operator code is retained for compatibility under `agsignal.governance`, outside the supported runtime API.
+FAILED owners never suppress a fresh obligation. Explicit replay starts a new delivery cycle with a fresh cycle budget while preserving cumulative attempt history. Old ownerless dedup claims cannot establish successful delivery and are not trusted after migration. Historical pre-upgrade suppressed events cannot be reliably reconstructed automatically.
 
-UNS is ATP-agnostic. Host integration is optional; see [Integration Modes](sections/integration-modes.md).
+## Delivery and recovery
+
+The dispatcher commits its claim before adapter I/O. Conditional lease checks precede channel and built-in provider retry attempts. Expired owners cannot overwrite newer state, and stale workers record uncertainty instead of making further guarded calls. A pause after a final check or a provider-success/local-commit crash still leaves external effects uncertain.
+
+`worker()` owns separate dispatch, timeout and callback loops. `run_once()` processes dispatch/expiry without waiting on callbacks. The HTTP lifespan and write-enabled MCP lifespan start and stop their owned recovery tasks. They coordinate jobs through database claims rather than a whole-process file lock.
+
+Delivery status and acknowledgment state remain separate. The first qualifying delivery starts the response deadline. ACK, DISMISS and TIMEOUT use conditional transitions with atomic audit. Repeated same-actor responses are idempotent; conflicting state or actor is rejected.
+
+## Transports and console
+
+Python, HTTP and MCP share the durable application service. Public transport authentication is centralized; WebSocket response mutations use Runtime instead of a separate legacy engine. The React console is a read-first presentation surface with runtime-memory operator authentication.
+
+Compatibility modules retain historical import/tool names. Explicit low-level fixture composition remains available for tests; it is not an alternative unauthenticated deployment profile. Transport-owned read adapters must stay tied to their runtime, not a mutable process-global reader.
+
+## Maintenance and boundaries
+
+`uns.schema` performs additive runtime migration and installs dispatch, response and callback scan indexes. `uns.maintenance` offers bounded, default-dry-run retention and optional verified archive-before-prune. It does not run automatically or vacuum the database.
+
+The unfinished action-authorization DSL remains experimental. UNS is ATP-agnostic; host integration is optional. See [Integration Modes](sections/integration-modes.md), [delivery semantics](sections/delivery-semantics.md), and [policy lifecycle](sections/policy-lifecycle.md).

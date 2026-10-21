@@ -1,0 +1,54 @@
+{
+  "failed_delivery_dedup": {
+    "first": "FAILED",
+    "second": "DEDUPLICATED",
+    "adapter_calls": 1
+  },
+  "manual_replay_after_exhaustion": {
+    "status": "FAILED",
+    "adapter_calls": 1,
+    "attempts": 2
+  },
+  "policy_downgrade": {
+    "mode": "BEST_EFFORT",
+    "require_ack": false
+  },
+  "cross_actor_ack": {
+    "returned_actor": "A",
+    "ack_audit_rows": 1,
+    "same_response": true
+  },
+  "database_transaction_during_io": "independent SQLite write succeeded inside adapter call",
+  "stale_worker_fallback": {
+    "old_worker_committed": false,
+    "old_email_calls": 1,
+    "new_email_calls": 1
+  },
+  "callback_delays_expiry": {
+    "while_callbacks_blocked": "PENDING",
+    "after_release": "TIMED_OUT",
+    "callback_loops_entered": 3
+  },
+  "cold_mcp_policy_hydration": {
+    "policy_loaded": false
+  },
+  "cross_process_policy_staleness": {
+    "cached_version": "1",
+    "channels": [
+      "EMAIL"
+    ]
+  },
+  "runtime_indexes": {
+    "uns_notifications": [],
+    "uns_events": [
+      {
+        "name": "ix_uns_events_notification_id",
+        "column_names": [
+          "notification_id"
+        ],
+        "unique": 0,
+        "dialect_options": {}
+      }
+    ]
+  }
+}

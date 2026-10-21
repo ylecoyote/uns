@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-20",
+  "base_commit": "b508cc367f9eccdec5a1cbec2b1c691d16d84132",
+  "reviewed_code_commit": "902300773d7ad41baefab8e007d0f37981ba6be9",
+  "status": "local remediation checks passed; external deployment acceptance not claimed",
+  "model_configuration": "Astra agents, ultra reasoning effort, explicit user authorization",
+  "python_tests_passed": 1705,
+  "python_coverage_percent": 90.17,
+  "console_tests_passed": 305,
+  "ruff": "pass",
+  "mypy": "pass, 91 source files",
+  "bandit": "pass",
+  "ui_boundary": "pass",
+  "package": "minimal/full installs, CLI help, recording demo, old-schema migration and no-write retention dry-run passed",
+  "wheel_source_identity": "90 Python modules matched",
+  "python_dependency_advisories": 0,
+  "frontend_lock_advisories": 0,
+  "frontend_production_advisories": 0,
+  "independent_review": {
+    "read_isolation": {
+      "reviewed_sha": "902300773d7ad41baefab8e007d0f37981ba6be9",
+      "original_reproductions": "5 failed before; 5 passed after",
+      "additional_focused_tests_passed": 14,
+      "unresolved_confirmed_findings": []
+    },
+    "findings_fixed": [
+      "stale provider retries and queued SMTP effects",
+      "concurrent policy first-upgrade DDL",
+      "lossy policy promotion serialization",
+      "retention cursor starvation",
+      "cross-runtime HTTP/MCP read disclosure"
+    ],
+    "scope": "Focused source review and local reproductions, not a production certification"
+  },
+  "limits": [
+    "No real-provider sends or human-receipt acceptance",
+    "No live PostgreSQL operational acceptance",
+    "No hosted CI, publishing or deployment",
+    "External effects remain at least once; guards cannot retract effects already sent",
+    "Historical lost dedup ownership or discarded policy fields cannot be reconstructed",
+    "Operator credential is not RBAC or tenant isolation",
+    "Retention row budget is not byte/time budget; no automatic audit retention or VACUUM"
+  ],
+  "receipt_sha256": {
+    "baseline-reproductions.json": "8e2b3a29b4fea1a0e55ff248bec70081665f4b910a1e44e6b367ed1ef6ee9131",
+    "python-tests.log": "ea99a06019bfe914596f54f71dfa9651dd4849cbbf86b0f5b9cfc9f42644e888",
+    "console-checks.log": "1c42993210f079190abc4a35681d644eb1dd54aa7c79f11650c8631dc07caeea",
+    "static-checks.log": "2f4d19a6b253939a3218c146130d69bf6b363680a2026dac1ded886ace5d8c5f",
+    "build.log": "40ae4b93354fe92f59dfb36af65901928da666fa0a5dcf92f7eb0f89ae286684",
+    "package-smoke.log": "233c91c99a53c5c10dc14e25eef0a50c9c76212b8f22cbb2262896edf7ff46f4",
+    "installed-migration.log": "915a4b4bba7d51129a6fae93fcf8d3212ae76d71efc3f2a63f45923d3b6dcb6c",
+    "python-dependency-audit.json": "189b9441e755f46161e42f1c3ba36594380e960c061928f04987f8de661b4dc0",
+    "frontend-lock-audit.json": "ed10c2ee280cd1fa0d483a576545e95642ad1f8f8bdc7c45e257b68f6f182625",
+    "frontend-production-audit.json": "ed10c2ee280cd1fa0d483a576545e95642ad1f8f8bdc7c45e257b68f6f182625"
+  },
+  "wheel_sha256": "e4da518e56c106c0d575512e71a7776a15d29b8d2067882015625c3b60cac899"
+}

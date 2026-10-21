@@ -1,0 +1,27 @@
+ruff: 0
+All checks passed!
+
+mypy: 0
+pyproject.toml: note: unused section(s): module = ['tests.*']
+Success: no issues found in 91 source files
+
+bandit: 0
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/uns/runtime.py:565
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/uns/runtime.py:566
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/uns/runtime.py:567
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/uns/runtime.py:569
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/uns/runtime.py:570
+
+ui_boundary: 0
+============================================================
+UI Boundary Guardrail
+============================================================
+Checking: apps/ui
+
+All boundary rules satisfied.
+
+  TypeScript/TSX files: 3158
+  Python files: 27
+    (in legacy_flask_reference: 26)
+
+whitespace: 0

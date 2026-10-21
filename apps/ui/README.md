@@ -1,389 +1,122 @@
 # UNS Console
 
-Read-only dashboard for AGSignal Core.
+Read-first, read-only dashboard for UNS. The backend is authoritative for all policy, delivery and response state; the UI is non-authoritative and has no mutation actions.
 
 ## Stack
 
-**Canonical UI**: React + TypeScript + Vite (SPA)
+Canonical UI: **React + TypeScript + Vite (SPA)**.
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| React | 18.x | UI framework |
-| TypeScript | 5.x | Type safety |
-| Vite | 5.x | Build tool and dev server |
-| React Router | 6.x | Client-side routing |
-| Vitest | 1.x | Unit testing |
-| React Testing Library | 14.x | Component testing |
+| Technology | Supported line | Purpose |
+|---|---|---|
+| React | 18.x | UI components |
+| TypeScript | 5.x | Static types |
+| Vite | 7.x | Development and production build |
+| React Router | 7.x | Client-side navigation |
+| Vitest | 4.x | Component and client tests |
+
+Node must satisfy `^20.19.0 || ^22.12.0 || >=24.0.0`, as declared in package.json. Use the committed lockfile with `npm ci`.
 
 ## Design Principles
 
-### Non-Authoritative UI
+The console provides flight instruments for operators. It has no direct backend imports and consumes HTTP GET-only endpoints under `/ui/*`. Phase 1 posture remains read-only dashboards, effective-policy inspection and audit history. Authentication does not turn the UI into an approval or execution surface.
 
-UNS Console is a **read-first "flight instruments" dashboard** per
-[ui-scope.md](../../docs/ui/ui-scope.md). It provides visibility into the signal
-system's state and health without offering direct manipulation capabilities.
+Backend invariants remain authoritative. See [INV-UI-001](../../docs/verification/invariants.yml) and [UI scope](../../docs/ui/ui-scope.md). Degraded responses produce a degraded banner; successful HTTP status is not proof of provider delivery or human comprehension.
 
-**Key constraints:**
+## Operator access
 
-1. **Read-only endpoints only** — UI must only call HTTP endpoints under `/ui/*`
-2. **No direct backend imports** — UI does not import from `src/notification/` or any Python modules
-3. **Non-authoritative** — All business rules and validation logic are enforced by the backend; the UI is strictly a presentation layer
-4. **Degraded-state handling** — UI renders a degraded banner when backend returns `degraded: true`
+The console starts at a sign-in form. An operator enters the configured service API key, which is validated with a protected read before pages mount. The key is held only in memory for that tab and sent in the Authorization header. It is not stored in localStorage/sessionStorage, placed in URLs, or embedded in build output. Reloading or signing out clears the key and unmounts sensitive pages.
 
-### Phase 1 Posture
+A 401 expires the current session; a 403 is shown as an authorization failure without destroying an otherwise valid session. Cancellation and late responses cannot restore a discarded session. Requests reject redirects and bypass browser caches.
 
-| Capability | v1 Status |
-|------------|-----------|
-| Notification authoring | **Not included** |
-| Policy editing | **Not included** |
-| Read-only dashboards | ✅ Included |
-| Metrics & health monitoring | ✅ Included |
-| Mutation actions (POST/PUT/DELETE) | **Not included** |
-
-All UI endpoints are **GET-only**. No mutation actions are exposed in Phase 1.
-
-### Invariant Integrity
-
-**The UI must not bypass system invariants.**
-
-All business rules, validation logic, and safety constraints enforced by the backend remain authoritative. The UI layer is strictly a presentation concern and does not introduce alternative paths that could circumvent policy enforcement or data integrity checks.
-
-See [INV-UI-001](../../docs/verification/invariants.yml) for the formal invariant definition.
+The current backend uses an operator API key, not separate read-only roles. A read-only UI does not make that credential read-only. Host the console only on a trusted origin over HTTPS for shared use. The React console currently has no WebSocket client.
 
 ## Pages
 
-| Route | Page | Description |
-|-------|------|-------------|
-| `/deliveries` | Deliveries Explorer | Paginated list with filters |
-| `/deliveries/:notification_id` | Delivery Detail | Full delivery timeline with attempts |
-| `/policy` | Policy Inspector | Effective policy resolution viewer |
-| `/invariants` | Invariants Viewer | System invariants with filters |
-| `/audit` | Audit Timeline | Audit events with filters |
+| Route | Page |
+|---|---|
+| `/deliveries` | Deliveries Explorer |
+| `/deliveries/:notification_id` | Delivery, response deadline and policy evidence |
+| `/policy` | Effective Policy Inspector |
+| `/invariants` | Invariants Viewer |
+| `/audit` | Audit Timeline |
 
 ## Architecture
 
-This module provides a **JSON API backend** for the React frontend:
-
-- **Backend (this module)**: FastAPI endpoints returning JSON responses
-- **Frontend (React)**: TypeScript/React components in `src/*.tsx` that consume the JSON API
-
-The backend does not serve HTML directly. All HTML rendering is handled by the React frontend.
+The frontend contains React/TypeScript only. The JSON API lives in `src/agsignal/api/` at the repository root. Historical Python UI code is preserved in `legacy_flask_reference/`, is not served by the console, and is not part of its current test suite.
 
 ## Project Structure
 
-```
+```text
 apps/ui/
-├── index.html              # HTML entry point (Vite)
-├── package.json            # npm dependencies and scripts
-├── vite.config.ts          # Vite configuration
-├── tsconfig.json           # TypeScript configuration
-├── .eslintrc.cjs           # ESLint configuration
-├── .env.example            # Environment variable template
-├── __init__.py             # Package init (Python backend)
-├── app.py                  # FastAPI app factory (JSON API backend)
-├── src/
-│   ├── main.tsx            # React entry point
-│   ├── App.tsx             # Layout + routing
-│   ├── App.css             # Global styles
-│   ├── api/                # Typed API client (TypeScript)
-│   │   ├── client.ts       # UNSUIClient
-│   │   ├── types.ts        # Response type definitions
-│   │   ├── audit.ts        # Audit endpoints
-│   │   └── invariants.ts   # Invariants endpoints
-│   ├── pages/              # Page components (React) + API routers (Python)
-│   │   ├── AuditTimeline.tsx
-│   │   ├── InvariantsPage.tsx
-│   │   ├── index.ts
-│   │   ├── __init__.py
-│   │   └── deliveries.py   # Deliveries Explorer JSON API
-│   ├── components/         # Reusable UI components
-│   │   ├── AuditEventCard.tsx
-│   │   ├── AuditFilters.tsx
-│   │   ├── InvariantsList.tsx
-│   │   ├── InvariantsFilter.tsx
-│   │   ├── InvariantsSummary.tsx
-│   │   ├── Pagination.tsx
-│   │   └── index.ts
-│   ├── hooks/              # Custom React hooks
-│   │   ├── useAuditEvents.ts
-│   │   ├── useInvariants.ts
-│   │   └── index.ts
-│   ├── types/              # TypeScript type definitions
-│   │   ├── api.ts
-│   │   ├── common.ts
-│   │   ├── invariants.ts
-│   │   └── index.ts
-│   └── test/               # Test utilities
-│       ├── mocks.ts        # MSW mocks
-│       └── setup.ts        # Vitest setup
-├── static/
-│   └── css/
-│       └── main.css        # Styles
-└── tests/                  # Component, integration, and API tests
-    ├── *.test.tsx          # React component tests
-    ├── *.test.ts           # API client tests
-    └── __init__.py
+  index.html
+  package.json
+  package-lock.json
+  vite.config.ts
+  vitest.config.ts
+  src/
+    main.tsx
+    App.tsx
+    api/          # typed GET clients and runtime contract decoders
+    auth/         # tab-lifetime credential state
+    components/   # sign-in and shared views
+    pages/        # React pages
+    hooks/
+    types/
+    test/
+  tests/          # component and HTTP client tests
+  legacy_flask_reference/  # historical, not an active backend
 ```
 
 ## Local Development
 
-### Prerequisites
+Run the backend separately using [deployment instructions](../../docs/DEPLOYMENT.md). From this directory:
 
-- Node.js 18+ (LTS recommended)
-- npm 9+
-
-### Environment Setup
-
-Copy the environment template:
-
-```bash
-cp .env.example .env
-```
-
-Keep the compatibility API base URL in `.env` for components that read it:
-
-```bash
-# .env
-VITE_UNS_API_BASE_URL=http://localhost:8000
-```
-
-### Install Dependencies
-
-```bash
-cd apps/ui
-npm install
-```
-
-### Run Dev Server
-
-```bash
+```sh
+npm ci
 npm run dev
 ```
 
-Then visit http://localhost:5173
-
-The Vite dev server currently proxies `/ui/*` requests to
-`http://localhost:8000` from `vite.config.ts`. Update `vite.config.ts` if your
-backend runs elsewhere.
-
-### Run Tests
-
-```bash
-# Run tests in watch mode
-npm test
-
-# Run tests once (CI mode)
-npm run test:run
-```
-
-### Run Linting
-
-```bash
-npm run lint
-```
-
-### Type Checking
-
-```bash
-npm run type-check
-```
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-Output is placed in `dist/`.
-
-### Preview Production Build
-
-```bash
-npm run preview
-```
+Visit http://localhost:5173. `vite.config.ts` proxies `/ui/*` to `http://localhost:8000` for local development. Change that development proxy target when needed. Production hosting must route `/ui/*` on the same origin to the UNS backend and serve the SPA for its frontend routes.
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_UNS_API_BASE_URL` | Base URL for UNS Console endpoints | `http://localhost:8000` |
+No environment file is required by the current client. Requests use same-origin `/ui` URLs. The historical `VITE_UNS_API_BASE_URL` setting is not read by the client. `.env.example` records this boundary; do not place credentials in any `VITE_` variable, because such values can be embedded in browser assets.
 
-All environment variables must be prefixed with `VITE_` to be exposed to the browser.
+## Run Tests and Build Scripts
+
+```sh
+npm run test:run
+npm run test:coverage
+npm run type-check
+npm run lint
+npm run build
+npm run ci
+```
+
+`npm test` runs watch mode. `npm run preview` previews `dist/`; it is not a production host. The CI command runs types, lint, tests and build. The independent Python boundary check is `python scripts/ci/check_ui_boundary.py --strict` from the repository root.
 
 ## API Client Usage
 
-The typed API client consumes only `/ui/*` endpoints:
-
 ```typescript
-import { UNSUIClient } from './api/client';
+import { getDeliveries, getDeliveryTimeline } from './src/api/deliveries';
 
-const client = new UNSUIClient();
-
-// List deliveries with filters
-const deliveries = await client.listDeliveries({
-  status: 'DELIVERED',
-  limit: 10,
-});
-
-// Get single delivery timeline
-const timeline = await client.getDeliveryTimeline(notificationId);
-
-// Get invariants with filters
-const invariants = await client.listInvariants({
-  severity: 'HIGH',
-});
-
-// Get audit events
-const events = await client.listAuditEvents({
-  start_time: '2026-01-01T00:00:00Z',
-  end_time: '2026-01-31T23:59:59Z',
-});
+const deliveries = await getDeliveries({ status: 'DELIVERED', limit: 10 });
+const timeline = await getDeliveryTimeline(notificationId);
 ```
 
-### Degraded State Handling
-
-The API client detects degraded responses and exposes them:
-
-```typescript
-const response = await client.listInvariants();
-
-if (response.degraded) {
-  // Show degraded banner in UI
-  console.warn('Data may be incomplete:', response.degraded_reason);
-}
-```
+The client reads the current tab credential. Contract decoders validate the response shape; missing or malformed results must not be treated as successful delivery.
 
 ## API Endpoints Consumed
 
-All endpoints are **GET-only** per Phase 1 posture. The UI consumes only `/ui/*` endpoints:
-
-| Endpoint | Description | Documentation |
-|----------|-------------|---------------|
-| `GET /ui/deliveries` | List delivery timelines | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-| `GET /ui/deliveries/{id}` | Single delivery timeline | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-| `GET /ui/policies/effective` | Effective policy resolution | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-| `GET /ui/invariants` | List system invariants | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-| `GET /ui/invariants/summary` | Invariants summary stats | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-| `GET /ui/audit` | List audit events | [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md) |
-
-## Scripts Reference
-
-| Script | Command | Description |
-|--------|---------|-------------|
-| `dev` | `npm run dev` | Start Vite dev server with HMR |
-| `build` | `npm run build` | Type-check and build for production |
-| `preview` | `npm run preview` | Preview production build |
-| `test` | `npm test` | Run tests in watch mode |
-| `test:run` | `npm run test:run` | Run tests once (CI mode) |
-| `lint` | `npm run lint` | Run ESLint |
-| `type-check` | `npm run type-check` | Run TypeScript type checking |
-| `generate-types` | `npm run generate-types` | Regenerate `src/types/generated.ts` from the FastAPI OpenAPI spec |
-
-## Generated types
-
-`src/types/generated.ts` is generated from the UNS Console OpenAPI
-spec by `scripts/generate-types.ts`. It is committed to the repo so
-day-to-day type-check, lint, build, and test do not require backend
-tooling.
-
-Refresh after a backend API change:
-
-```bash
-npm run generate-types
-```
-
-The script imports the FastAPI app offline (no running server required)
-via `uv run python ... create_app(skip_persistence_config=True).openapi()`,
-so it works in any environment with the Python deps installed.
-
-The hand-written types in `src/types/{api,common,invariants,routes,index}.ts`
-remain the current source of truth for UI code; `generated.ts` is added
-alongside as a parallel source of truth so consumers can migrate gradually.
-Zod schemas stay where they are (zod expressivity exceeds OpenAPI).
-
-CI does **not** regenerate the file. Drift is the maintainer's
-responsibility — re-run after backend changes and commit the result.
-
-## Data Contracts
-
-Response shapes match [ui-data-contracts.md](../../docs/ui/ui-data-contracts.md):
-
-- `DeliveryTimelineListResponse` - Paginated list with filtering
-- `DeliveryTimelineResponse` - Full timeline with attempts
-- `DeliveryTimelineSummary` - Summary for list items
-- `DeliveryAttempt` - Single channel attempt
-- `InvariantsListResponse` - Paginated invariants list
-- `InvariantsSummaryResponse` - Summary statistics
-- `AuditEventsListResponse` - Paginated audit events
-
-## Boundary Rules
-
-The intended canonical UI boundary is a **React SPA** served by Vite, with
-backend JSON APIs in `src/agsignal/api/`. The current tree still contains Python
-UI compatibility artifacts under `apps/ui/`; treat them as migration debt until
-they are moved or explicitly exempted.
-
-### Rules Enforced by CI
-
-| Rule | Description |
-|------|-------------|
-| **NO_PYTHON_IN_CANONICAL_UI** | Target rule: no `.py` files in canonical React UI paths once compatibility artifacts are moved |
-| **NO_TEMPLATES_DIRECTORY** | No `templates/` directories (Flask-style HTML templating) |
-| **NO_FLASK_APP_IN_UI** | No Flask imports or `render_template` patterns in app.py files |
-
-### Allowed Exceptions
-
-Python files currently remain under `apps/ui/` for compatibility tests and
-migration support. New public UI work should use the React/TypeScript stack and
-keep backend logic in `src/agsignal/api/`.
-
-### Migration Guidance
-
-If you have Python files that need to be migrated:
-
-| What | Move To |
-|------|---------|
-| Backend API Routes | `src/agsignal/api/routes_ui.py` |
-| Pydantic Models/Types | `src/notification/models.py` or `src/agsignal/api/read_models.py` |
-| Test Files | `tests/ui_client/` or `tests/docs/` |
-| Reference Code (temporary) | `apps/ui/legacy_flask_reference/` |
-
-### Running the Guardrail
-
-```bash
-# Run checks (warning mode)
-python scripts/ci/check_ui_boundary.py
-
-# Run checks with CI enforcement (fail on violations)
-python scripts/ci/check_ui_boundary.py --strict
-
-# Show migration guidance for violations
-python scripts/ci/check_ui_boundary.py --fix
-```
-
-### CI Enforcement
-
-The UI boundary guardrail runs in CI on every PR that touches:
-- `apps/ui/**`
-- `scripts/ci/check_ui_boundary.py`
-- `.github/workflows/ui.yaml`
-
-Strict mode is the target CI posture after the remaining compatibility artifacts
-are moved or explicitly exempted.
-
-### Current Status
-
-The guardrail currently detects Python files in `apps/ui/`. Those files are
-legacy/compatibility artifacts from the initial FastAPI-based UI implementation
-and should be moved to the appropriate backend locations before strict
-enforcement is treated as a release gate.
-
-See [scripts/ci/check_ui_boundary.py](../../scripts/ci/check_ui_boundary.py) for the full guardrail implementation.
+| Endpoint | Purpose |
+|---|---|
+| GET `/ui/deliveries` | Delivery summaries |
+| GET `/ui/deliveries/{notification_id}` | Delivery and response detail |
+| GET `/ui/audit` | Audit events and sign-in probe |
+| GET `/ui/policies/effective` | Current effective policy |
+| GET `/ui/invariants` | Invariant records |
+| GET `/ui/invariants/summary` | Invariant summary |
 
 ## Related Documentation
 
-- [UI Scope v1](../../docs/ui/ui-scope.md) - v1 constraints and design philosophy
-- [UI Data Contracts](../../docs/ui/ui-data-contracts.md) - API response shapes and contracts
-- [UI Observability](../../docs/ui/ui-observability.md) - Observability for UI layer
-- [System Invariants](../../docs/verification/invariants.yml) - Formal invariant definitions
-- [Phase 1 Verification](../../docs/reports/ui/phase-1-verify.md) - Bounded verification report
+See [UI contracts](../../docs/ui/ui-data-contracts.md), [security](../../docs/SECURITY-MODEL.md), and [verification](../../docs/TESTING.md) for current evidence and limits.

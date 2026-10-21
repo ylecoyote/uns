@@ -1,0 +1,128 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 21%]
+........................................................................ [ 25%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 38%]
+........................................................................ [ 42%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 84%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+........................................................................ [ 97%]
+.................................................                        [100%]
+=============================== warnings summary ===============================
+../../../Users/awiley/Code/uns/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/awiley/Code/uns/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/uns/test_transport_security.py::test_http_and_mcp_previews_use_durable_policy_authority
+  /Users/awiley/Code/uns/.venv/lib/python3.12/site-packages/fastapi/routing.py:372: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.12.9-final-0 _______________
+
+Name                                            Stmts   Miss  Cover
+-------------------------------------------------------------------
+src/agsignal/__init__.py                           22      4    82%
+src/agsignal/_in_memory.py                         23     11    52%
+src/agsignal/adapters.py                            2      0   100%
+src/agsignal/api/__init__.py                        0      0   100%
+src/agsignal/api/auth.py                           69      3    96%
+src/agsignal/api/observability.py                 173     13    92%
+src/agsignal/api/read_models.py                   365     32    91%
+src/agsignal/api/routes_notification.py            93     28    70%
+src/agsignal/api/routes_ui.py                      54      3    94%
+src/agsignal/app.py                               169     25    85%
+src/agsignal/deduplication.py                       2      0   100%
+src/agsignal/errors.py                              8      0   100%
+src/agsignal/governance/__init__.py                 0      0   100%
+src/agsignal/governance/decision_record.py         45      0   100%
+src/agsignal/governance/errors.py                  24      0   100%
+src/agsignal/governance/operators.py               78      9    88%
+src/agsignal/governance/policy_dsl.py              36      0   100%
+src/agsignal/governance/policy_loader.py           50      3    94%
+src/agsignal/integrations.py                        2      0   100%
+src/agsignal/interfaces.py                          3      0   100%
+src/agsignal/models.py                              4      0   100%
+src/agsignal/policies.py                            3      0   100%
+src/agsignal/queries.py                           130      6    95%
+src/agsignal/rate_limiting.py                       2      0   100%
+src/agsignal/responses.py                         275      0   100%
+src/agsignal/sdk.py                                 6      0   100%
+src/agsignal/signaling.py                         103     11    89%
+src/agsignal_mcp/__init__.py                       14      9    36%
+src/agsignal_mcp/factory.py                       107     21    80%
+src/agsignal_mcp/runtime.py                        29      0   100%
+src/agsignal_mcp/tools.py                         167     28    83%
+src/agsignal_mcp/transports/__init__.py             0      0   100%
+src/agsignal_mcp/transports/stdio.py               51     20    61%
+src/db/__init__.py                                  5      0   100%
+src/db/audit_store.py                              63      6    90%
+src/db/models/__init__.py                           6      0   100%
+src/db/models/_base.py                             15      0   100%
+src/db/models/audit.py                             52      0   100%
+src/db/models/policy.py                            46      0   100%
+src/db/models/policy_learning.py                   55      0   100%
+src/db/models/websocket.py                         18      1    94%
+src/db/policy_learning_store.py                   189     16    92%
+src/db/policy_store.py                            225     11    95%
+src/db/websocket_replay_store.py                   43      9    79%
+src/notification/__init__.py                       10      0   100%
+src/notification/acknowledgment.py                188      5    97%
+src/notification/adapters/__init__.py              78      7    91%
+src/notification/adapters/base.py                  60      2    97%
+src/notification/adapters/email.py                160     19    88%
+src/notification/adapters/pagerduty.py            197     49    75%
+src/notification/adapters/slack.py                153     44    71%
+src/notification/adapters/websocket.py            177     23    87%
+src/notification/audit.py                         183     14    92%
+src/notification/channel_health.py                 56      2    96%
+src/notification/config.py                         38      1    97%
+src/notification/deduplication.py                 173     12    93%
+src/notification/dlq.py                            45      2    96%
+src/notification/idempotency.py                    48      6    88%
+src/notification/integrations/__init__.py           2      0   100%
+src/notification/integrations/app_boundary.py      61      1    98%
+src/notification/interfaces.py                     90      1    99%
+src/notification/metrics.py                        42      0   100%
+src/notification/models.py                        142      7    95%
+src/notification/policies.py                      267     10    96%
+src/notification/policy_config.py                  94      7    93%
+src/notification/policy_learning.py               171      8    95%
+src/notification/policy_loader.py                  50      6    88%
+src/notification/rate_limiter.py                   33      4    88%
+src/notification/rate_limiting.py                 101      1    99%
+src/notification/routes.py                        123     16    87%
+src/notification/sdk.py                           118      5    96%
+src/notification/service.py                       217     21    90%
+src/notification/websocket_runtime.py             272     39    86%
+src/uns/__init__.py                                11      1    91%
+src/uns/app.py                                      2      2     0%
+src/uns/client.py                                  12      0   100%
+src/uns/config.py                                  40     15    62%
+src/uns/dlq.py                                     17      7    59%
+src/uns/maintenance.py                            168     12    93%
+src/uns/migrate.py                                 11     11     0%
+src/uns/policy_runtime.py                          55      2    96%
+src/uns/routes.py                                  23     11    52%
+src/uns/runtime.py                                305     27    91%
+src/uns/schema.py                                  26      3    88%
+src/uns/websocket.py                               20      3    85%
+-------------------------------------------------------------------
+TOTAL                                            6865    675    90%
+Required test coverage of 75% reached. Total coverage: 90.17%
+1705 passed, 2 warnings in 56.05s

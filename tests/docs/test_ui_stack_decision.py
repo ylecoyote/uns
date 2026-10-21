@@ -7,7 +7,7 @@ Tests verify that apps/ui/README.md properly documents:
 - Phase 1 posture: GET-only from UI; no mutation actions
 - Degraded-state handling
 - How to run dev server, tests
-- Environment variables (VITE_UNS_API_BASE_URL)
+- Same-origin configuration and absence of build-time credentials
 - .env.example file exists
 """
 
@@ -197,11 +197,14 @@ class TestEnvironmentVariables:
 
     def test_vite_api_base_url_in_readme(self, ui_readme: str) -> None:
         """Verify VITE_UNS_API_BASE_URL is documented in README."""
+        assert "same-origin" in ui_readme
         assert "VITE_UNS_API_BASE_URL" in ui_readme
+        assert "not read" in ui_readme
 
     def test_vite_api_base_url_in_env_example(self, env_example: str) -> None:
         """Verify VITE_UNS_API_BASE_URL is in .env.example."""
         assert "VITE_UNS_API_BASE_URL" in env_example
+        assert all(line.startswith("#") or not line.strip() for line in env_example.splitlines())
 
     def test_vite_prefix_explained(self, ui_readme: str) -> None:
         """Verify VITE_ prefix requirement is explained."""
