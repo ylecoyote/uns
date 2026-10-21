@@ -1,0 +1,413 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "name": "Health public",
+      "passed": true
+    },
+    {
+      "name": "Unauthenticated /ready rejected",
+      "passed": true
+    },
+    {
+      "name": "Wrong credential /ready rejected",
+      "passed": true
+    },
+    {
+      "name": "Unauthenticated /metrics rejected",
+      "passed": true
+    },
+    {
+      "name": "Wrong credential /metrics rejected",
+      "passed": true
+    },
+    {
+      "name": "Unauthenticated /ui/audit rejected",
+      "passed": true
+    },
+    {
+      "name": "Wrong credential /ui/audit rejected",
+      "passed": true
+    },
+    {
+      "name": "Unauthenticated /api/v1/runtime/dead-letters rejected",
+      "passed": true
+    },
+    {
+      "name": "Wrong credential /api/v1/runtime/dead-letters rejected",
+      "passed": true
+    },
+    {
+      "name": "GET /ready -> 200",
+      "passed": true
+    },
+    {
+      "name": "Readiness checks durable profile",
+      "passed": true
+    },
+    {
+      "name": "GET /__smoke__/identity -> 200",
+      "passed": true
+    },
+    {
+      "name": "Running deployment revision/profile",
+      "passed": true
+    },
+    {
+      "name": "GET /metrics -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET / -> 200",
+      "passed": true
+    },
+    {
+      "name": "SPA served at /",
+      "passed": true
+    },
+    {
+      "name": "GET /deliveries -> 200",
+      "passed": true
+    },
+    {
+      "name": "SPA served at /deliveries",
+      "passed": true
+    },
+    {
+      "name": "GET /policy -> 200",
+      "passed": true
+    },
+    {
+      "name": "SPA served at /policy",
+      "passed": true
+    },
+    {
+      "name": "GET /invariants -> 200",
+      "passed": true
+    },
+    {
+      "name": "SPA served at /invariants",
+      "passed": true
+    },
+    {
+      "name": "GET /audit -> 200",
+      "passed": true
+    },
+    {
+      "name": "SPA served at /audit",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/simulate -> 200",
+      "passed": true
+    },
+    {
+      "name": "HTTP simulation has no provider effect",
+      "passed": true
+    },
+    {
+      "name": "Simulation has no durable notification",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 422",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 422",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "Guaranteed recording delivery",
+      "passed": true
+    },
+    {
+      "name": "Policy revision and effective provenance retained",
+      "passed": true
+    },
+    {
+      "name": "Channel completion evidence retained",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "Same-content replay retains identity",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 409",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "Semantic duplicate suppressed after delivery",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 403",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 200",
+      "passed": true
+    },
+    {
+      "name": "ACK attributed to credential principal",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/audit -> 200",
+      "passed": true
+    },
+    {
+      "name": "Audit ACK preserves actual LIVE context and agent",
+      "passed": true
+    },
+    {
+      "name": "Audit timestamps have explicit UTC offset",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/audit -> 200",
+      "passed": true
+    },
+    {
+      "name": "Audit mode filter excludes LIVE ACK",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 200",
+      "passed": true
+    },
+    {
+      "name": "Repeated ACK retains original result",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/dismiss -> 409",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/11ac34a1-1cc0-407d-b0e6-890bbdf263d3/dismiss -> 200",
+      "passed": true
+    },
+    {
+      "name": "Dismiss transition",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "Worker exhausts recording failures",
+      "passed": true
+    },
+    {
+      "name": "GET /api/v1/runtime/dead-letters -> 200",
+      "passed": true
+    },
+    {
+      "name": "Dead-letter inspection retains failed obligation",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/runtime/notifications/d0deec60-c234-4c35-9a3f-05ab1873a0e6/replay -> 200",
+      "passed": true
+    },
+    {
+      "name": "Replay recovery preserves cumulative attempts",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/d0deec60-c234-4c35-9a3f-05ab1873a0e6/ack -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/deliveries -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/audit -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/invariants -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/invariants/summary -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/deliveries/3f2ee787-b90a-4fea-8579-6e5e3ed14de4 -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/policies/effective -> 200",
+      "passed": true
+    },
+    {
+      "name": "GET /ui/invariants/summary -> 200",
+      "passed": true
+    },
+    {
+      "name": "Summary timestamp has explicit UTC offset",
+      "passed": true
+    },
+    {
+      "name": "WebSocket authenticated connection",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "WebSocket real network notification",
+      "passed": true
+    },
+    {
+      "name": "WebSocket BEST_EFFORT reports delivery",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "WebSocket durable attributed ACK",
+      "passed": true
+    },
+    {
+      "name": "WebSocket ACK visible over HTTP",
+      "passed": true
+    },
+    {
+      "name": "WebSocket rejects unauthenticated upgrade",
+      "passed": true
+    },
+    {
+      "name": "Live stdio MCP tool registry",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "MCP sees HTTP durable ACK",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "MCP simulation is marked simulated",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "MCP recording delivery",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications -> 202",
+      "passed": true
+    },
+    {
+      "name": "HTTP/MCP cross-transport idempotency",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "MCP acknowledgment visible over HTTP",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "MCP sees initial durable policy",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/policies/reload -> 200",
+      "passed": true
+    },
+    {
+      "name": "MCP tool result is not an error",
+      "passed": true
+    },
+    {
+      "name": "Running MCP observes HTTP policy activation",
+      "passed": true
+    },
+    {
+      "name": "Accepted obligation keeps original deadline policy",
+      "passed": true
+    },
+    {
+      "name": "Real deadline timeout worker",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/4f0317c5-a549-439e-89d8-45f079ca8b0e/ack -> 409",
+      "passed": true
+    },
+    {
+      "name": "Callback retries retain event identity",
+      "passed": true
+    },
+    {
+      "name": "Pending work recovers after real service restart",
+      "passed": true
+    },
+    {
+      "name": "ACK survives service restart",
+      "passed": true
+    },
+    {
+      "name": "POST /api/v1/notifications/df4687d0-ed5a-4167-aee1-c486591f795c/ack -> 200",
+      "passed": true
+    }
+  ],
+  "ids": {
+    "ack": "3f2ee787-b90a-4fea-8579-6e5e3ed14de4",
+    "duplicate": "ea180788-068f-4704-844a-8fbb048e5c87",
+    "dismiss": "11ac34a1-1cc0-407d-b0e6-890bbdf263d3",
+    "timeout": "4f0317c5-a549-439e-89d8-45f079ca8b0e",
+    "failure": "d0deec60-c234-4c35-9a3f-05ab1873a0e6",
+    "websocket-ack": "7b3416d7-5906-4225-a9e1-f57854ce2c20",
+    "restart": "df4687d0-ed5a-4167-aee1-c486591f795c"
+  },
+  "revision": "07ef52a87b45128b77715f64c8b0e5f8f91387a9",
+  "profile": "recording-only",
+  "real_external_delivery": false
+}

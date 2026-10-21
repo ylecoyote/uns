@@ -1,0 +1,686 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 3.25kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#2 DONE 0.0s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.4
+#3 DONE 0.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 697B done
+#4 DONE 0.0s
+
+#5 [builder 1/6] FROM docker.io/library/python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
+#5 resolve docker.io/library/python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9 0.0s done
+#5 DONE 0.0s
+
+#6 FROM ghcr.io/astral-sh/uv:0.4@sha256:341e448d2ca38f11d8e2768db5464b4c95a4d87f539b8cb7511db86b02fef97e
+#6 resolve ghcr.io/astral-sh/uv:0.4@sha256:341e448d2ca38f11d8e2768db5464b4c95a4d87f539b8cb7511db86b02fef97e 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 30.86kB done
+#7 DONE 0.0s
+
+#8 [builder 2/6] COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /uvx /usr/local/bin/
+#8 CACHED
+
+#9 [builder 3/6] WORKDIR /build
+#9 CACHED
+
+#10 [builder 4/6] COPY pyproject.toml README.md LICENSE NOTICE ./
+#10 CACHED
+
+#11 [builder 5/6] COPY src/ ./src/
+#11 DONE 0.0s
+
+#12 [builder 6/6] RUN uv build --wheel
+#12 0.163 Building wheel...
+#12 0.982 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+#12 0.982 !!
+#12 0.982 
+#12 0.982         ********************************************************************************
+#12 0.982         Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+#12 0.982 
+#12 0.982         By 2027-Feb-18, you need to update your project and remove deprecated calls
+#12 0.982         or your builds will no longer be supported.
+#12 0.982 
+#12 0.982         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 0.982         ********************************************************************************
+#12 0.982 
+#12 0.982 !!
+#12 0.982   corresp(dist, value, root_dir)
+#12 1.051 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+#12 1.051 !!
+#12 1.051 
+#12 1.051         ********************************************************************************
+#12 1.051         Please consider removing the following classifiers in favor of a SPDX license expression:
+#12 1.051 
+#12 1.051         License :: OSI Approved :: Apache Software License
+#12 1.051 
+#12 1.051         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 1.051         ********************************************************************************
+#12 1.051 
+#12 1.051 !!
+#12 1.051   dist._finalize_license_expression()
+#12 1.052 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+#12 1.052 !!
+#12 1.052 
+#12 1.052         ********************************************************************************
+#12 1.052         Please consider removing the following classifiers in favor of a SPDX license expression:
+#12 1.052 
+#12 1.052         License :: OSI Approved :: Apache Software License
+#12 1.052 
+#12 1.052         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 1.052         ********************************************************************************
+#12 1.052 
+#12 1.052 !!
+#12 1.052   self._finalize_license_expression()
+#12 1.053 running egg_info
+#12 1.054 creating src/uns.egg-info
+#12 1.055 writing src/uns.egg-info/PKG-INFO
+#12 1.056 writing dependency_links to src/uns.egg-info/dependency_links.txt
+#12 1.057 writing entry points to src/uns.egg-info/entry_points.txt
+#12 1.057 writing requirements to src/uns.egg-info/requires.txt
+#12 1.057 writing top-level names to src/uns.egg-info/top_level.txt
+#12 1.058 writing manifest file 'src/uns.egg-info/SOURCES.txt'
+#12 1.062 reading manifest file 'src/uns.egg-info/SOURCES.txt'
+#12 1.062 adding license file 'LICENSE'
+#12 1.063 adding license file 'NOTICE'
+#12 1.064 writing manifest file 'src/uns.egg-info/SOURCES.txt'
+#12 1.155 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+#12 1.155 !!
+#12 1.155 
+#12 1.155         ********************************************************************************
+#12 1.155         Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+#12 1.155 
+#12 1.155         By 2027-Feb-18, you need to update your project and remove deprecated calls
+#12 1.155         or your builds will no longer be supported.
+#12 1.155 
+#12 1.155         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 1.155         ********************************************************************************
+#12 1.155 
+#12 1.155 !!
+#12 1.155   corresp(dist, value, root_dir)
+#12 1.165 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+#12 1.165 !!
+#12 1.165 
+#12 1.165         ********************************************************************************
+#12 1.165         Please consider removing the following classifiers in favor of a SPDX license expression:
+#12 1.165 
+#12 1.165         License :: OSI Approved :: Apache Software License
+#12 1.165 
+#12 1.165         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 1.165         ********************************************************************************
+#12 1.165 
+#12 1.165 !!
+#12 1.165   dist._finalize_license_expression()
+#12 1.165 /root/.cache/uv/builds-v0/.tmpDvcFiG/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+#12 1.165 !!
+#12 1.165 
+#12 1.165         ********************************************************************************
+#12 1.165         Please consider removing the following classifiers in favor of a SPDX license expression:
+#12 1.165 
+#12 1.165         License :: OSI Approved :: Apache Software License
+#12 1.165 
+#12 1.165         See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+#12 1.165         ********************************************************************************
+#12 1.165 
+#12 1.165 !!
+#12 1.165   self._finalize_license_expression()
+#12 1.165 running bdist_wheel
+#12 1.169 running build
+#12 1.169 running build_py
+#12 1.170 creating build/lib/notification
+#12 1.171 copying src/notification/channel_health.py -> build/lib/notification
+#12 1.171 copying src/notification/routes.py -> build/lib/notification
+#12 1.171 copying src/notification/policies.py -> build/lib/notification
+#12 1.171 copying src/notification/policy_learning.py -> build/lib/notification
+#12 1.172 copying src/notification/models.py -> build/lib/notification
+#12 1.172 copying src/notification/service.py -> build/lib/notification
+#12 1.173 copying src/notification/idempotency.py -> build/lib/notification
+#12 1.173 copying src/notification/rate_limiting.py -> build/lib/notification
+#12 1.173 copying src/notification/interfaces.py -> build/lib/notification
+#12 1.173 copying src/notification/acknowledgment.py -> build/lib/notification
+#12 1.174 copying src/notification/__init__.py -> build/lib/notification
+#12 1.174 copying src/notification/sdk.py -> build/lib/notification
+#12 1.174 copying src/notification/websocket_runtime.py -> build/lib/notification
+#12 1.174 copying src/notification/metrics.py -> build/lib/notification
+#12 1.175 copying src/notification/dlq.py -> build/lib/notification
+#12 1.175 copying src/notification/audit.py -> build/lib/notification
+#12 1.175 copying src/notification/rate_limiter.py -> build/lib/notification
+#12 1.175 copying src/notification/policy_loader.py -> build/lib/notification
+#12 1.175 copying src/notification/policy_config.py -> build/lib/notification
+#12 1.175 copying src/notification/deduplication.py -> build/lib/notification
+#12 1.176 copying src/notification/config.py -> build/lib/notification
+#12 1.176 creating build/lib/ui_client
+#12 1.176 copying src/ui_client/types.py -> build/lib/ui_client
+#12 1.176 copying src/ui_client/filters.py -> build/lib/ui_client
+#12 1.177 copying src/ui_client/__init__.py -> build/lib/ui_client
+#12 1.177 copying src/ui_client/errors.py -> build/lib/ui_client
+#12 1.177 copying src/ui_client/client.py -> build/lib/ui_client
+#12 1.177 creating build/lib/db
+#12 1.178 copying src/db/policy_store.py -> build/lib/db
+#12 1.178 copying src/db/audit_store.py -> build/lib/db
+#12 1.178 copying src/db/__init__.py -> build/lib/db
+#12 1.178 copying src/db/policy_learning_store.py -> build/lib/db
+#12 1.178 copying src/db/websocket_replay_store.py -> build/lib/db
+#12 1.179 creating build/lib/uns
+#12 1.179 copying src/uns/websocket.py -> build/lib/uns
+#12 1.179 copying src/uns/routes.py -> build/lib/uns
+#12 1.180 copying src/uns/runtime.py -> build/lib/uns
+#12 1.180 copying src/uns/schema.py -> build/lib/uns
+#12 1.180 copying src/uns/__init__.py -> build/lib/uns
+#12 1.180 copying src/uns/app.py -> build/lib/uns
+#12 1.180 copying src/uns/policy_runtime.py -> build/lib/uns
+#12 1.181 copying src/uns/client.py -> build/lib/uns
+#12 1.181 copying src/uns/migrate.py -> build/lib/uns
+#12 1.181 copying src/uns/dlq.py -> build/lib/uns
+#12 1.181 copying src/uns/maintenance.py -> build/lib/uns
+#12 1.181 copying src/uns/config.py -> build/lib/uns
+#12 1.182 creating build/lib/agsignal_mcp
+#12 1.182 copying src/agsignal_mcp/runtime.py -> build/lib/agsignal_mcp
+#12 1.182 copying src/agsignal_mcp/__init__.py -> build/lib/agsignal_mcp
+#12 1.182 copying src/agsignal_mcp/tools.py -> build/lib/agsignal_mcp
+#12 1.183 copying src/agsignal_mcp/factory.py -> build/lib/agsignal_mcp
+#12 1.183 creating build/lib/agsignal
+#12 1.183 copying src/agsignal/policies.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/models.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/adapters.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/rate_limiting.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/interfaces.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/_in_memory.py -> build/lib/agsignal
+#12 1.184 copying src/agsignal/__init__.py -> build/lib/agsignal
+#12 1.185 copying src/agsignal/errors.py -> build/lib/agsignal
+#12 1.185 copying src/agsignal/app.py -> build/lib/agsignal
+#12 1.185 copying src/agsignal/sdk.py -> build/lib/agsignal
+#12 1.185 copying src/agsignal/queries.py -> build/lib/agsignal
+#12 1.185 copying src/agsignal/signaling.py -> build/lib/agsignal
+#12 1.186 copying src/agsignal/deduplication.py -> build/lib/agsignal
+#12 1.186 copying src/agsignal/integrations.py -> build/lib/agsignal
+#12 1.186 copying src/agsignal/responses.py -> build/lib/agsignal
+#12 1.187 creating build/lib/notification/integrations
+#12 1.187 copying src/notification/integrations/__init__.py -> build/lib/notification/integrations
+#12 1.187 copying src/notification/integrations/app_boundary.py -> build/lib/notification/integrations
+#12 1.187 creating build/lib/notification/adapters
+#12 1.188 copying src/notification/adapters/websocket.py -> build/lib/notification/adapters
+#12 1.188 copying src/notification/adapters/email.py -> build/lib/notification/adapters
+#12 1.188 copying src/notification/adapters/base.py -> build/lib/notification/adapters
+#12 1.189 copying src/notification/adapters/pagerduty.py -> build/lib/notification/adapters
+#12 1.189 copying src/notification/adapters/__init__.py -> build/lib/notification/adapters
+#12 1.189 copying src/notification/adapters/slack.py -> build/lib/notification/adapters
+#12 1.190 creating build/lib/db/models
+#12 1.190 copying src/db/models/websocket.py -> build/lib/db/models
+#12 1.190 copying src/db/models/policy_learning.py -> build/lib/db/models
+#12 1.191 copying src/db/models/__init__.py -> build/lib/db/models
+#12 1.191 copying src/db/models/audit.py -> build/lib/db/models
+#12 1.191 copying src/db/models/_base.py -> build/lib/db/models
+#12 1.191 copying src/db/models/policy.py -> build/lib/db/models
+#12 1.191 creating build/lib/agsignal_mcp/transports
+#12 1.192 copying src/agsignal_mcp/transports/stdio.py -> build/lib/agsignal_mcp/transports
+#12 1.192 copying src/agsignal_mcp/transports/__init__.py -> build/lib/agsignal_mcp/transports
+#12 1.193 creating build/lib/agsignal/governance
+#12 1.193 copying src/agsignal/governance/policy_dsl.py -> build/lib/agsignal/governance
+#12 1.193 copying src/agsignal/governance/__init__.py -> build/lib/agsignal/governance
+#12 1.194 copying src/agsignal/governance/errors.py -> build/lib/agsignal/governance
+#12 1.194 copying src/agsignal/governance/operators.py -> build/lib/agsignal/governance
+#12 1.194 copying src/agsignal/governance/decision_record.py -> build/lib/agsignal/governance
+#12 1.194 copying src/agsignal/governance/policy_loader.py -> build/lib/agsignal/governance
+#12 1.194 creating build/lib/agsignal/api
+#12 1.195 copying src/agsignal/api/auth.py -> build/lib/agsignal/api
+#12 1.195 copying src/agsignal/api/routes_notification.py -> build/lib/agsignal/api
+#12 1.195 copying src/agsignal/api/routes_ui.py -> build/lib/agsignal/api
+#12 1.195 copying src/agsignal/api/observability.py -> build/lib/agsignal/api
+#12 1.195 copying src/agsignal/api/read_models.py -> build/lib/agsignal/api
+#12 1.196 copying src/agsignal/api/__init__.py -> build/lib/agsignal/api
+#12 1.196 running egg_info
+#12 1.197 writing src/uns.egg-info/PKG-INFO
+#12 1.198 writing dependency_links to src/uns.egg-info/dependency_links.txt
+#12 1.198 writing entry points to src/uns.egg-info/entry_points.txt
+#12 1.199 writing requirements to src/uns.egg-info/requires.txt
+#12 1.199 writing top-level names to src/uns.egg-info/top_level.txt
+#12 1.202 reading manifest file 'src/uns.egg-info/SOURCES.txt'
+#12 1.202 adding license file 'LICENSE'
+#12 1.202 adding license file 'NOTICE'
+#12 1.203 writing manifest file 'src/uns.egg-info/SOURCES.txt'
+#12 1.204 copying src/notification/py.typed -> build/lib/notification
+#12 1.205 copying src/ui_client/py.typed -> build/lib/ui_client
+#12 1.205 copying src/db/py.typed -> build/lib/db
+#12 1.205 copying src/uns/py.typed -> build/lib/uns
+#12 1.205 copying src/agsignal_mcp/py.typed -> build/lib/agsignal_mcp
+#12 1.206 copying src/agsignal/py.typed -> build/lib/agsignal
+#12 1.206 copying src/agsignal/api/py.typed -> build/lib/agsignal/api
+#12 1.208 installing to build/bdist.linux-aarch64/wheel
+#12 1.208 running install
+#12 1.211 running install_lib
+#12 1.212 creating build/bdist.linux-aarch64/wheel
+#12 1.213 creating build/bdist.linux-aarch64/wheel/notification
+#12 1.213 copying build/lib/notification/channel_health.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.213 copying build/lib/notification/routes.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.214 copying build/lib/notification/policies.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.214 copying build/lib/notification/policy_learning.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.214 copying build/lib/notification/models.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.214 copying build/lib/notification/service.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.214 creating build/bdist.linux-aarch64/wheel/notification/integrations
+#12 1.215 copying build/lib/notification/integrations/__init__.py -> build/bdist.linux-aarch64/wheel/./notification/integrations
+#12 1.215 copying build/lib/notification/integrations/app_boundary.py -> build/bdist.linux-aarch64/wheel/./notification/integrations
+#12 1.215 copying build/lib/notification/idempotency.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/rate_limiting.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/interfaces.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/acknowledgment.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/__init__.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/sdk.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/websocket_runtime.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.215 copying build/lib/notification/py.typed -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.216 copying build/lib/notification/metrics.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.216 copying build/lib/notification/dlq.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.216 copying build/lib/notification/audit.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.217 copying build/lib/notification/rate_limiter.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.217 copying build/lib/notification/policy_loader.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.217 copying build/lib/notification/policy_config.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.218 copying build/lib/notification/deduplication.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.218 creating build/bdist.linux-aarch64/wheel/notification/adapters
+#12 1.218 copying build/lib/notification/adapters/websocket.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.218 copying build/lib/notification/adapters/email.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.218 copying build/lib/notification/adapters/base.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.219 copying build/lib/notification/adapters/pagerduty.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.219 copying build/lib/notification/adapters/__init__.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.219 copying build/lib/notification/adapters/slack.py -> build/bdist.linux-aarch64/wheel/./notification/adapters
+#12 1.219 copying build/lib/notification/config.py -> build/bdist.linux-aarch64/wheel/./notification
+#12 1.220 creating build/bdist.linux-aarch64/wheel/ui_client
+#12 1.220 copying build/lib/ui_client/types.py -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.220 copying build/lib/ui_client/filters.py -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.220 copying build/lib/ui_client/__init__.py -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.221 copying build/lib/ui_client/errors.py -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.221 copying build/lib/ui_client/client.py -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.221 copying build/lib/ui_client/py.typed -> build/bdist.linux-aarch64/wheel/./ui_client
+#12 1.221 creating build/bdist.linux-aarch64/wheel/db
+#12 1.222 copying build/lib/db/policy_store.py -> build/bdist.linux-aarch64/wheel/./db
+#12 1.222 copying build/lib/db/audit_store.py -> build/bdist.linux-aarch64/wheel/./db
+#12 1.222 copying build/lib/db/__init__.py -> build/bdist.linux-aarch64/wheel/./db
+#12 1.222 copying build/lib/db/policy_learning_store.py -> build/bdist.linux-aarch64/wheel/./db
+#12 1.222 copying build/lib/db/py.typed -> build/bdist.linux-aarch64/wheel/./db
+#12 1.222 creating build/bdist.linux-aarch64/wheel/db/models
+#12 1.222 copying build/lib/db/models/websocket.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.222 copying build/lib/db/models/policy_learning.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.222 copying build/lib/db/models/__init__.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.222 copying build/lib/db/models/audit.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.222 copying build/lib/db/models/_base.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.223 copying build/lib/db/models/policy.py -> build/bdist.linux-aarch64/wheel/./db/models
+#12 1.223 copying build/lib/db/websocket_replay_store.py -> build/bdist.linux-aarch64/wheel/./db
+#12 1.223 creating build/bdist.linux-aarch64/wheel/uns
+#12 1.223 copying build/lib/uns/websocket.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.223 copying build/lib/uns/routes.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.223 copying build/lib/uns/runtime.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.223 copying build/lib/uns/schema.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.224 copying build/lib/uns/__init__.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.224 copying build/lib/uns/app.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.224 copying build/lib/uns/policy_runtime.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.224 copying build/lib/uns/client.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 copying build/lib/uns/migrate.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 copying build/lib/uns/py.typed -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 copying build/lib/uns/dlq.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 copying build/lib/uns/maintenance.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 copying build/lib/uns/config.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.225 creating build/bdist.linux-aarch64/wheel/agsignal_mcp
+#12 1.226 copying build/lib/agsignal_mcp/runtime.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
+#12 1.226 copying build/lib/agsignal_mcp/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
+#12 1.226 copying build/lib/agsignal_mcp/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
+#12 1.226 copying build/lib/agsignal_mcp/tools.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
+#12 1.226 creating build/bdist.linux-aarch64/wheel/agsignal_mcp/transports
+#12 1.227 copying build/lib/agsignal_mcp/transports/stdio.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp/transports
+#12 1.227 copying build/lib/agsignal_mcp/transports/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp/transports
+#12 1.227 copying build/lib/agsignal_mcp/factory.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
+#12 1.227 creating build/bdist.linux-aarch64/wheel/agsignal
+#12 1.228 copying build/lib/agsignal/policies.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.228 copying build/lib/agsignal/models.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.228 copying build/lib/agsignal/adapters.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.228 creating build/bdist.linux-aarch64/wheel/agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/policy_dsl.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/errors.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/operators.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/decision_record.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/governance/policy_loader.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
+#12 1.229 copying build/lib/agsignal/rate_limiting.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/interfaces.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/_in_memory.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/errors.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/app.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.230 copying build/lib/agsignal/sdk.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.231 creating build/bdist.linux-aarch64/wheel/agsignal/api
+#12 1.231 copying build/lib/agsignal/api/auth.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.231 copying build/lib/agsignal/api/routes_notification.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.231 copying build/lib/agsignal/api/routes_ui.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.232 copying build/lib/agsignal/api/observability.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.232 copying build/lib/agsignal/api/read_models.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.232 copying build/lib/agsignal/api/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.232 copying build/lib/agsignal/api/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal/api
+#12 1.233 copying build/lib/agsignal/queries.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.233 copying build/lib/agsignal/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.233 copying build/lib/agsignal/signaling.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.233 copying build/lib/agsignal/deduplication.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.234 copying build/lib/agsignal/integrations.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.234 copying build/lib/agsignal/responses.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.234 running install_egg_info
+#12 1.235 Copying src/uns.egg-info to build/bdist.linux-aarch64/wheel/./uns-0.1.0-py3.12.egg-info
+#12 1.236 running install_scripts
+#12 1.237 creating build/bdist.linux-aarch64/wheel/uns-0.1.0.dist-info/WHEEL
+#12 1.238 creating '/build/dist/.tmp9uCOrE/.tmp-9m9z6i40/uns-0.1.0-py3-none-any.whl' and adding 'build/bdist.linux-aarch64/wheel' to it
+#12 1.238 adding 'agsignal/__init__.py'
+#12 1.238 adding 'agsignal/_in_memory.py'
+#12 1.238 adding 'agsignal/adapters.py'
+#12 1.239 adding 'agsignal/app.py'
+#12 1.239 adding 'agsignal/deduplication.py'
+#12 1.239 adding 'agsignal/errors.py'
+#12 1.239 adding 'agsignal/integrations.py'
+#12 1.239 adding 'agsignal/interfaces.py'
+#12 1.239 adding 'agsignal/models.py'
+#12 1.239 adding 'agsignal/policies.py'
+#12 1.239 adding 'agsignal/py.typed'
+#12 1.240 adding 'agsignal/queries.py'
+#12 1.240 adding 'agsignal/rate_limiting.py'
+#12 1.241 adding 'agsignal/responses.py'
+#12 1.241 adding 'agsignal/sdk.py'
+#12 1.242 adding 'agsignal/signaling.py'
+#12 1.242 adding 'agsignal/api/__init__.py'
+#12 1.242 adding 'agsignal/api/auth.py'
+#12 1.243 adding 'agsignal/api/observability.py'
+#12 1.243 adding 'agsignal/api/py.typed'
+#12 1.244 adding 'agsignal/api/read_models.py'
+#12 1.244 adding 'agsignal/api/routes_notification.py'
+#12 1.245 adding 'agsignal/api/routes_ui.py'
+#12 1.245 adding 'agsignal/governance/__init__.py'
+#12 1.245 adding 'agsignal/governance/decision_record.py'
+#12 1.245 adding 'agsignal/governance/errors.py'
+#12 1.246 adding 'agsignal/governance/operators.py'
+#12 1.246 adding 'agsignal/governance/policy_dsl.py'
+#12 1.247 adding 'agsignal/governance/policy_loader.py'
+#12 1.247 adding 'agsignal_mcp/__init__.py'
+#12 1.247 adding 'agsignal_mcp/factory.py'
+#12 1.247 adding 'agsignal_mcp/py.typed'
+#12 1.248 adding 'agsignal_mcp/runtime.py'
+#12 1.248 adding 'agsignal_mcp/tools.py'
+#12 1.248 adding 'agsignal_mcp/transports/__init__.py'
+#12 1.249 adding 'agsignal_mcp/transports/stdio.py'
+#12 1.249 adding 'db/__init__.py'
+#12 1.249 adding 'db/audit_store.py'
+#12 1.250 adding 'db/policy_learning_store.py'
+#12 1.250 adding 'db/policy_store.py'
+#12 1.250 adding 'db/py.typed'
+#12 1.251 adding 'db/websocket_replay_store.py'
+#12 1.251 adding 'db/models/__init__.py'
+#12 1.251 adding 'db/models/_base.py'
+#12 1.251 adding 'db/models/audit.py'
+#12 1.252 adding 'db/models/policy.py'
+#12 1.252 adding 'db/models/policy_learning.py'
+#12 1.252 adding 'db/models/websocket.py'
+#12 1.253 adding 'notification/__init__.py'
+#12 1.253 adding 'notification/acknowledgment.py'
+#12 1.254 adding 'notification/audit.py'
+#12 1.254 adding 'notification/channel_health.py'
+#12 1.255 adding 'notification/config.py'
+#12 1.255 adding 'notification/deduplication.py'
+#12 1.255 adding 'notification/dlq.py'
+#12 1.256 adding 'notification/idempotency.py'
+#12 1.256 adding 'notification/interfaces.py'
+#12 1.256 adding 'notification/metrics.py'
+#12 1.257 adding 'notification/models.py'
+#12 1.257 adding 'notification/policies.py'
+#12 1.258 adding 'notification/policy_config.py'
+#12 1.258 adding 'notification/policy_learning.py'
+#12 1.258 adding 'notification/policy_loader.py'
+#12 1.258 adding 'notification/py.typed'
+#12 1.259 adding 'notification/rate_limiter.py'
+#12 1.259 adding 'notification/rate_limiting.py'
+#12 1.260 adding 'notification/routes.py'
+#12 1.260 adding 'notification/sdk.py'
+#12 1.261 adding 'notification/service.py'
+#12 1.261 adding 'notification/websocket_runtime.py'
+#12 1.262 adding 'notification/adapters/__init__.py'
+#12 1.262 adding 'notification/adapters/base.py'
+#12 1.263 adding 'notification/adapters/email.py'
+#12 1.263 adding 'notification/adapters/pagerduty.py'
+#12 1.264 adding 'notification/adapters/slack.py'
+#12 1.264 adding 'notification/adapters/websocket.py'
+#12 1.264 adding 'notification/integrations/__init__.py'
+#12 1.265 adding 'notification/integrations/app_boundary.py'
+#12 1.265 adding 'ui_client/__init__.py'
+#12 1.266 adding 'ui_client/client.py'
+#12 1.266 adding 'ui_client/errors.py'
+#12 1.266 adding 'ui_client/filters.py'
+#12 1.266 adding 'ui_client/py.typed'
+#12 1.267 adding 'ui_client/types.py'
+#12 1.267 adding 'uns/__init__.py'
+#12 1.267 adding 'uns/app.py'
+#12 1.267 adding 'uns/client.py'
+#12 1.267 adding 'uns/config.py'
+#12 1.268 adding 'uns/dlq.py'
+#12 1.268 adding 'uns/maintenance.py'
+#12 1.268 adding 'uns/migrate.py'
+#12 1.269 adding 'uns/policy_runtime.py'
+#12 1.269 adding 'uns/py.typed'
+#12 1.269 adding 'uns/routes.py'
+#12 1.270 adding 'uns/runtime.py'
+#12 1.270 adding 'uns/schema.py'
+#12 1.270 adding 'uns/websocket.py'
+#12 1.271 adding 'uns-0.1.0.dist-info/licenses/LICENSE'
+#12 1.271 adding 'uns-0.1.0.dist-info/licenses/NOTICE'
+#12 1.272 adding 'uns-0.1.0.dist-info/METADATA'
+#12 1.272 adding 'uns-0.1.0.dist-info/WHEEL'
+#12 1.272 adding 'uns-0.1.0.dist-info/entry_points.txt'
+#12 1.272 adding 'uns-0.1.0.dist-info/top_level.txt'
+#12 1.273 adding 'uns-0.1.0.dist-info/RECORD'
+#12 1.273 removing build/bdist.linux-aarch64/wheel
+#12 1.295 Successfully built dist/uns-0.1.0-py3-none-any.whl
+#12 DONE 1.3s
+
+#13 [runtime 2/6] RUN apt-get update     && apt-get install -y --no-install-recommends libpq5     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [runtime 3/6] RUN groupadd --system --gid 1001 agsignal     && useradd --system --uid 1001 --gid agsignal         --create-home --home-dir /home/agsignal --shell /sbin/nologin agsignal
+#14 CACHED
+
+#15 [runtime 4/6] COPY --from=builder /build/dist/ /tmp/dist/
+#15 DONE 0.0s
+
+#16 [runtime 5/6] RUN set -- /tmp/dist/uns-*.whl     && pip install --no-cache-dir "$1[full]"         "psycopg2-binary>=2.9.0"     && rm -rf /tmp/dist
+#16 0.888 Processing /tmp/dist/uns-0.1.0-py3-none-any.whl (from uns==0.1.0)
+#16 1.014 Collecting psycopg2-binary>=2.9.0
+#16 1.087   Downloading psycopg2_binary-2.9.13-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (4.9 kB)
+#16 1.132 Collecting google-re2<2,>=1.1 (from uns==0.1.0->uns==0.1.0)
+#16 1.158   Downloading google_re2-1.1.20251105-1-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl.metadata (2.4 kB)
+#16 1.223 Collecting pydantic>=2.0.0 (from uns==0.1.0->uns==0.1.0)
+#16 1.247   Downloading pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+#16 1.327 Collecting PyYAML>=6.0.0 (from uns==0.1.0->uns==0.1.0)
+#16 1.347   Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.4 kB)
+#16 1.374 Collecting annotated-types>=0.6.0 (from pydantic>=2.0.0->uns==0.1.0->uns==0.1.0)
+#16 1.389   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+#16 1.710 Collecting pydantic-core==2.50.1 (from pydantic>=2.0.0->uns==0.1.0->uns==0.1.0)
+#16 1.724   Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (6.5 kB)
+#16 1.746 Collecting typing-extensions>=4.16.0 (from pydantic>=2.0.0->uns==0.1.0->uns==0.1.0)
+#16 1.764   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#16 1.787 Collecting typing-inspection>=0.4.4 (from pydantic>=2.0.0->uns==0.1.0->uns==0.1.0)
+#16 1.806   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+#16 1.850 Collecting fastapi>=0.100.0 (from uns==0.1.0->uns==0.1.0)
+#16 1.867   Downloading fastapi-0.156.4-py3-none-any.whl.metadata (26 kB)
+#16 1.903 Collecting uvicorn>=0.22.0 (from uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 1.922   Downloading uvicorn-0.54.0-py3-none-any.whl.metadata (6.6 kB)
+#16 1.944 Collecting slowapi>=0.1.9 (from uns==0.1.0->uns==0.1.0)
+#16 1.961   Downloading slowapi-0.1.10-py3-none-any.whl.metadata (3.3 kB)
+#16 1.985 Collecting prometheus-client>=0.20.0 (from uns==0.1.0->uns==0.1.0)
+#16 2.004   Downloading prometheus_client-0.26.0-py3-none-any.whl.metadata (2.1 kB)
+#16 2.033 Collecting redis>=5.0.0 (from uns==0.1.0->uns==0.1.0)
+#16 2.049   Downloading redis-8.1.0-py3-none-any.whl.metadata (16 kB)
+#16 2.186 Collecting sqlalchemy>=2.0 (from uns==0.1.0->uns==0.1.0)
+#16 2.202   Downloading sqlalchemy-2.1.5-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (9.7 kB)
+#16 2.230 Collecting mcp<2,>=1.0.0 (from mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.252   Downloading mcp-1.30.0-py3-none-any.whl.metadata (9.3 kB)
+#16 2.275 Collecting httpx>=0.25.0 (from uns==0.1.0->uns==0.1.0)
+#16 2.293   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#16 2.322 Collecting starlette>=0.46.0 (from fastapi>=0.100.0->uns==0.1.0->uns==0.1.0)
+#16 2.335   Downloading starlette-1.9.0-py3-none-any.whl.metadata (6.6 kB)
+#16 2.363 Collecting annotated-doc>=0.0.2 (from fastapi>=0.100.0->uns==0.1.0->uns==0.1.0)
+#16 2.380   Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+#16 2.404 Collecting opentelemetry-api>=1.44.0 (from fastapi>=0.100.0->uns==0.1.0->uns==0.1.0)
+#16 2.424   Downloading opentelemetry_api-1.45.1-py3-none-any.whl.metadata (1.4 kB)
+#16 2.464 Collecting anyio (from httpx>=0.25.0->uns==0.1.0->uns==0.1.0)
+#16 2.483   Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+#16 2.510 Collecting certifi (from httpx>=0.25.0->uns==0.1.0->uns==0.1.0)
+#16 2.527   Downloading certifi-2026.10.19-py3-none-any.whl.metadata (2.5 kB)
+#16 2.563 Collecting httpcore==1.* (from httpx>=0.25.0->uns==0.1.0->uns==0.1.0)
+#16 2.579   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#16 2.604 Collecting idna (from httpx>=0.25.0->uns==0.1.0->uns==0.1.0)
+#16 2.620   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+#16 2.642 Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.25.0->uns==0.1.0->uns==0.1.0)
+#16 2.665   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#16 2.691 Collecting httpx-sse>=0.4 (from mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.709   Downloading httpx_sse-0.4.3-py3-none-any.whl.metadata (9.7 kB)
+#16 2.737 Collecting jsonschema>=4.20.0 (from mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.752   Downloading jsonschema-4.26.0-py3-none-any.whl.metadata (7.6 kB)
+#16 2.778 Collecting pydantic-settings>=2.5.2 (from mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.795   Downloading pydantic_settings-2.16.1-py3-none-any.whl.metadata (4.0 kB)
+#16 2.825 Collecting pyjwt>=2.10.1 (from pyjwt[crypto]>=2.10.1->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.839   Downloading pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+#16 2.863 Collecting python-multipart>=0.0.9 (from mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.883   Downloading python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)
+#16 2.910 Collecting sse-starlette>=1.6.1 (from mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.926   Downloading sse_starlette-3.5.0-py3-none-any.whl.metadata (15 kB)
+#16 2.967 Collecting python-dotenv>=1.0.0 (from mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 2.988   Downloading python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+#16 3.014 Collecting typer>=0.16.0 (from mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.029   Downloading typer-0.27.3-py3-none-any.whl.metadata (16 kB)
+#16 3.082 Collecting limits>=2.3 (from slowapi>=0.1.9->uns==0.1.0->uns==0.1.0)
+#16 3.109   Downloading limits-5.8.0-py3-none-any.whl.metadata (10 kB)
+#16 3.147 Collecting click>=7.0 (from uvicorn>=0.22.0->uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 3.163   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+#16 3.194 Collecting httptools>=0.8.0 (from uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 3.208   Downloading httptools-0.9.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (3.5 kB)
+#16 3.241 Collecting uvloop>=0.15.1 (from uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 3.255   Downloading uvloop-0.23.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (5.1 kB)
+#16 3.307 Collecting watchfiles>=0.20 (from uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 3.322   Downloading watchfiles-1.3.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (4.9 kB)
+#16 3.388 Collecting websockets>=13.0 (from uvicorn[standard]>=0.22.0; extra == "server"->uns==0.1.0->uns==0.1.0)
+#16 3.405   Downloading websockets-17.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (6.3 kB)
+#16 3.437 Collecting attrs>=22.2.0 (from jsonschema>=4.20.0->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.464   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+#16 3.486 Collecting jsonschema-specifications>=2023.03.6 (from jsonschema>=4.20.0->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.505   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl.metadata (2.9 kB)
+#16 3.533 Collecting referencing>=0.28.4 (from jsonschema>=4.20.0->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.552   Downloading referencing-0.37.0-py3-none-any.whl.metadata (2.8 kB)
+#16 3.684 Collecting rpds-py>=0.25.0 (from jsonschema>=4.20.0->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.704   Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (4.1 kB)
+#16 3.728 Collecting deprecated>=1.2 (from limits>=2.3->slowapi>=0.1.9->uns==0.1.0->uns==0.1.0)
+#16 3.744   Downloading deprecated-3.0.0-py3-none-any.whl.metadata (6.5 kB)
+#16 3.777 Collecting packaging>=21 (from limits>=2.3->slowapi>=0.1.9->uns==0.1.0->uns==0.1.0)
+#16 3.803   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+#16 3.936 Collecting cryptography>=3.4.0 (from pyjwt[crypto]>=2.10.1->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 3.954   Downloading cryptography-50.0.2-cp311-abi3-manylinux_2_34_aarch64.whl.metadata (4.4 kB)
+#16 3.986 Collecting shellingham>=1.3.0 (from typer>=0.16.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.000   Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+#16 4.033 Collecting rich>=13.8.0 (from typer>=0.16.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.048   Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+#16 4.117 Collecting cffi>=2.0.0 (from cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.137   Downloading cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (2.5 kB)
+#16 4.290 Collecting wrapt<3,>=1.16 (from deprecated>=1.2->limits>=2.3->slowapi>=0.1.9->uns==0.1.0->uns==0.1.0)
+#16 4.309   Downloading wrapt-2.5.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (7.6 kB)
+#16 4.342 Collecting markdown-it-py>=2.2.0 (from rich>=13.8.0->typer>=0.16.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.363   Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+#16 4.391 Collecting pygments<3.0.0,>=2.13.0 (from rich>=13.8.0->typer>=0.16.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.409   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+#16 4.430 Collecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp<2,>=1.0.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.454   Downloading pycparser-3.11-py3-none-any.whl.metadata (8.2 kB)
+#16 4.473 Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=13.8.0->typer>=0.16.0->mcp[cli]<2,>=1.0.0; extra == "mcp"->uns==0.1.0->uns==0.1.0)
+#16 4.489   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+#16 4.513 Downloading psycopg2_binary-2.9.13-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (5.9 MB)
+#16 4.616    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.9/5.9 MB 63.3 MB/s eta 0:00:00
+#16 4.633 Downloading google_re2-1.1.20251105-1-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl (572 kB)
+#16 4.640    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 572.4/572.4 kB 84.9 MB/s eta 0:00:00
+#16 4.656 Downloading pydantic-2.14.1-py3-none-any.whl (488 kB)
+#16 4.677 Downloading pydantic_core-2.50.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (2.0 MB)
+#16 4.701    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 98.1 MB/s eta 0:00:00
+#16 4.718 Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (775 kB)
+#16 4.726    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 775.1/775.1 kB 104.7 MB/s eta 0:00:00
+#16 4.748 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#16 4.771 Downloading fastapi-0.156.4-py3-none-any.whl (147 kB)
+#16 4.790 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#16 4.809 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#16 4.832 Downloading mcp-1.30.0-py3-none-any.whl (234 kB)
+#16 4.853 Downloading prometheus_client-0.26.0-py3-none-any.whl (64 kB)
+#16 4.879 Downloading redis-8.1.0-py3-none-any.whl (560 kB)
+#16 4.886    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 560.6/560.6 kB 92.0 MB/s eta 0:00:00
+#16 4.901 Downloading slowapi-0.1.10-py3-none-any.whl (14 kB)
+#16 4.920 Downloading sqlalchemy-2.1.5-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (4.7 MB)
+#16 4.963    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 109.1 MB/s eta 0:00:00
+#16 4.980 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#16 5.000 Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#16 5.018 Downloading uvicorn-0.54.0-py3-none-any.whl (87 kB)
+#16 5.036 Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+#16 5.056 Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+#16 5.077 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+#16 5.101 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#16 5.127 Downloading httptools-0.9.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (549 kB)
+#16 5.132    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 549.2/549.2 kB 160.4 MB/s eta 0:00:00
+#16 5.149 Downloading httpx_sse-0.4.3-py3-none-any.whl (9.0 kB)
+#16 5.170 Downloading idna-3.20-py3-none-any.whl (69 kB)
+#16 5.190 Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#16 5.210 Downloading limits-5.8.0-py3-none-any.whl (60 kB)
+#16 5.232 Downloading opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+#16 5.249 Downloading pydantic_settings-2.16.1-py3-none-any.whl (80 kB)
+#16 5.266 Downloading pyjwt-2.15.1-py3-none-any.whl (33 kB)
+#16 5.286 Downloading python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+#16 5.305 Downloading python_multipart-0.0.32-py3-none-any.whl (30 kB)
+#16 5.325 Downloading sse_starlette-3.5.0-py3-none-any.whl (17 kB)
+#16 5.351 Downloading starlette-1.9.0-py3-none-any.whl (80 kB)
+#16 5.375 Downloading typer-0.27.3-py3-none-any.whl (123 kB)
+#16 5.397 Downloading uvloop-0.23.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (4.4 MB)
+#16 5.444    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 98.3 MB/s eta 0:00:00
+#16 5.459 Downloading watchfiles-1.3.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (454 kB)
+#16 5.485 Downloading websockets-17.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (227 kB)
+#16 5.509 Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
+#16 5.528 Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#16 5.547 Downloading cryptography-50.0.2-cp311-abi3-manylinux_2_34_aarch64.whl (4.7 MB)
+#16 5.591    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 106.2 MB/s eta 0:00:00
+#16 5.609 Downloading deprecated-3.0.0-py3-none-any.whl (21 kB)
+#16 5.629 Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#16 5.652 Downloading packaging-26.3-py3-none-any.whl (129 kB)
+#16 5.675 Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#16 5.697 Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+#16 5.720 Downloading rpds_py-2026.9.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (373 kB)
+#16 5.747 Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+#16 5.765 Downloading cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (222 kB)
+#16 5.786 Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+#16 5.815 Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+#16 5.823    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 184.5 MB/s eta 0:00:00
+#16 5.839 Downloading wrapt-2.5.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (250 kB)
+#16 5.862 Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+#16 5.881 Downloading pycparser-3.11-py3-none-any.whl (51 kB)
+#16 5.963 Installing collected packages: wrapt, websockets, uvloop, typing-extensions, shellingham, rpds-py, redis, PyYAML, python-multipart, python-dotenv, pyjwt, pygments, pycparser, psycopg2-binary, prometheus-client, packaging, mdurl, idna, httpx-sse, httptools, h11, google-re2, click, certifi, attrs, annotated-types, annotated-doc, uvicorn, typing-inspection, sqlalchemy, referencing, pydantic-core, opentelemetry-api, markdown-it-py, httpcore, deprecated, cffi, anyio, watchfiles, starlette, rich, pydantic, limits, jsonschema-specifications, httpx, cryptography, uns, typer, sse-starlette, slowapi, pydantic-settings, jsonschema, fastapi, mcp
+#16 9.275 Successfully installed PyYAML-6.0.3 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 attrs-26.1.0 certifi-2026.10.19 cffi-2.1.1 click-8.5.0 cryptography-50.0.2 deprecated-3.0.0 fastapi-0.156.4 google-re2-1.1.20251105 h11-0.16.0 httpcore-1.0.9 httptools-0.9.0 httpx-0.28.1 httpx-sse-0.4.3 idna-3.20 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 limits-5.8.0 markdown-it-py-4.2.0 mcp-1.30.0 mdurl-0.1.2 opentelemetry-api-1.45.1 packaging-26.3 prometheus-client-0.26.0 psycopg2-binary-2.9.13 pycparser-3.11 pydantic-2.14.1 pydantic-core-2.50.1 pydantic-settings-2.16.1 pygments-2.21.0 pyjwt-2.15.1 python-dotenv-1.2.4 python-multipart-0.0.32 redis-8.1.0 referencing-0.37.0 rich-15.0.0 rpds-py-2026.9.1 shellingham-1.5.4 slowapi-0.1.10 sqlalchemy-2.1.5 sse-starlette-3.5.0 starlette-1.9.0 typer-0.27.3 typing-extensions-4.16.0 typing-inspection-0.4.4 uns-0.1.0 uvicorn-0.54.0 uvloop-0.23.0 watchfiles-1.3.0 websockets-17.3 wrapt-2.5.1
+#16 9.275 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#16 9.363 
+#16 9.363 [notice] A new release of pip is available: 25.0.1 -> 26.2.2
+#16 9.363 [notice] To update, run: pip install --upgrade pip
+#16 DONE 9.6s
+
+#17 [runtime 6/6] WORKDIR /home/agsignal
+#17 DONE 0.0s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 3.3s done
+#18 exporting manifest sha256:d6ab2534fb392d47bf9ee857f53ef658502ca12b24742ee2ad8e23d90f61e564 done
+#18 exporting config sha256:cd0ac0cd23f22238e243f66b239aacc6cac6b96155274aaf91eeeb9498defa5f done
+#18 exporting attestation manifest sha256:c5bff8bf0b2f2ee9a11d5b505751ba590952874a10bdbeacefe7d768f1352e00 done
+#18 exporting manifest list sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d done
+#18 naming to docker.io/library/uns:local-smoke done
+#18 unpacking to docker.io/library/uns:local-smoke
+#18 unpacking to docker.io/library/uns:local-smoke 0.9s done
+#18 DONE 4.3s
+
+View build details: docker-desktop://dashboard/build/default/default/ienepd16hc2sia43qxlg0g94e

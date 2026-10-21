@@ -1,0 +1,18 @@
+ack_timeout_minutes: 2
+channels:
+- SLACK
+channels_by_mode: null
+config_hash: null
+config_id: null
+dedup_window_seconds: null
+delivery_mode: GUARANTEED
+intent: SAFETY
+live_override: null
+mode_overrides: null
+notification_type: smoke.safety
+preview_override: null
+priority_override: null
+require_ack: true
+shadow_override: null
+status: ACTIVE
+version: '2'
