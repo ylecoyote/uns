@@ -18,7 +18,7 @@ exceptions.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -559,7 +559,7 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
         by_enforcement_type=by_enforcement,
         by_status=by_status,
         exceptions_requiring_review=exceptions_count,
-        last_updated=datetime.now().isoformat(),
+        last_updated=datetime.now(UTC).isoformat(),
     )
 
 

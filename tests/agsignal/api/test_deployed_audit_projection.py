@@ -78,3 +78,11 @@ def test_database_datetimes_keep_explicit_utc_on_wire(projection):
         assert row.created_at.utcoffset() == UTC.utcoffset(None)
     timeline = adapter.get_delivery_timeline(delivery.notification_id)
     assert timeline.created_at.utcoffset() == UTC.utcoffset(None)
+
+
+@pytest.mark.asyncio
+async def test_invariant_summary_timestamp_has_explicit_timezone():
+    from agsignal.queries import get_invariants_summary
+
+    result = await get_invariants_summary()
+    assert result.last_updated.endswith("+00:00")
