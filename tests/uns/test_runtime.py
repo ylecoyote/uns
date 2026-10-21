@@ -258,7 +258,6 @@ def test_policy_reload_failure_keeps_registry_and_database(setup, tmp_path, monk
 
     from agsignal.app import create_app
     from db.models import PersistedNotificationPolicy
-    from notification.policies import get_policy_registry
 
     runtime, _, _, _ = setup
     app = create_app(runtime=runtime, skip_persistence_config=True)
@@ -273,7 +272,7 @@ def test_policy_reload_failure_keeps_registry_and_database(setup, tmp_path, monk
     (path / "b.yaml").write_text(
         "notification_type: test.two\nstatus: ACTIVE\ndelivery_mode: BEST_EFFORT\n"
     )
-    before = get_policy_registry()
+    before = runtime.policy_runtime.registry().get_all()
     original = app.state.policy_store._save_policy
     count = 0
 
@@ -287,13 +286,13 @@ def test_policy_reload_failure_keeps_registry_and_database(setup, tmp_path, monk
     monkeypatch.setattr(app.state.policy_store, "_save_policy", fail_second)
     with pytest.raises(RuntimeError, match="persistence failure"):
         client.post("/api/v1/policies/reload", json={"policy_dir": str(path)})
-    assert get_policy_registry() is before
+    assert runtime.policy_runtime.registry().get_all() == before
     with runtime.sessions() as session:
         assert session.execute(select(PersistedNotificationPolicy)).first() is None
     monkeypatch.setattr(app.state.policy_store, "_save_policy", original)
     response = client.post("/api/v1/policies/reload", json={"policy_dir": str(path)})
     assert response.status_code == 200, response.text
-    assert get_policy_registry().get_sync("test.one")
+    assert runtime.policy_runtime.registry().get_sync("test.one")
 
 
 @pytest.mark.asyncio
@@ -382,7 +381,10 @@ async def test_console_projects_policy_delivery_and_response(setup):
     from agsignal.app import create_app
 
     runtime, _, _, _ = setup
-    client = TestClient(create_app(runtime=runtime, skip_persistence_config=True))
+    app = create_app(runtime=runtime, skip_persistence_config=True)
+    app.state.agsignal_api_key = "test-console-key"
+    app.state.agsignal_api_principal = "p"
+    client = TestClient(app, headers={"Authorization": "Bearer test-console-key"})
     response = await runtime.send(request(), principal="p")
     runtime.acknowledge(response.notification_id, actor="p")
     result = client.get(f"/ui/deliveries/{response.notification_id}")
