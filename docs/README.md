@@ -6,7 +6,7 @@
 | Quickstart: send a signal | [README](../README.md) |
 | Configure policies | [Policy lifecycle](sections/policy-lifecycle.md) |
 | Integrate an app | [API](API.md), [integration modes](sections/integration-modes.md) |
-| Operate and audit | [Deployment](DEPLOYMENT.md), [security](SECURITY-MODEL.md) |
+| Operate and audit | [Deployment](DEPLOYMENT.md), [deployment smoke](DEPLOYMENT_SMOKE.md), [security](SECURITY-MODEL.md) |
 | Extend UNS | [Architecture](ARCHITECTURE.md) |
 | Verify implementation | [Testing](TESTING.md), [consolidated baseline](CONSOLIDATED_BASELINE.md) |
 | Independent/adversarial review | [External review brief](REVIEW_BRIEF.md), [iteration 2 disposition](REMEDIATION_ITERATION2.md) |

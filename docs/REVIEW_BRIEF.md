@@ -1,10 +1,14 @@
 # UNS remediation review brief
 
-Updated 2026-10-20 (local date). Reviewed implementation target: **`ba46a311d071736a6beca241a6e43a1407f29f3b`**. Iteration 2 base: `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`; original remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Subsequent documentation/receipt commits preserve this application code.
+Updated 2026-10-20 (local date). Historical independently reviewed target: **`ba46a311d071736a6beca241a6e43a1407f29f3b`**. Current deployment candidate: **`07ef52a87b45128b77715f64c8b0e5f8f91387a9`**, described below. Iteration 2 base: `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`; original remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Subsequent documentation/receipt commits preserve this application code.
 
 Both iterations are now integrated on **main** through `76fc43e`, with the same reviewed application source. [Consolidated baseline](CONSOLIDATED_BASELINE.md) records the local merge and fresh Python/console/package verification; use main for the current handoff.
 
 This is an author-prepared handoff, not a production certification. An Astra/ultra implementation team addressed the earlier reproduced failures, and separate focused reviewers found additional issues that were repaired. Review the code and failure behavior independently; test totals and line coverage are supporting evidence, not proof of every interleaving.
+
+## Subsequent deployment-candidate correction
+
+The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b45128b77715f64c8b0e5f8f91387a9`, which supersedes the earlier application target for current code. Container execution found distribution/probe/WebSocket packaging gaps; browser smoke found ACK context and UTC projection defects. They are fixed with 11 added regressions, 1,776 passing Python tests and 99 passing live checks. The earlier independent review applies to its frozen target; it is not retroactively claimed for these new corrections. A lasting deployment target and real recipients are still pending.
 
 ## Product boundary
 

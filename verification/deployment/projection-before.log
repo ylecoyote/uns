@@ -1,0 +1,95 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-deploy-prep
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 10 items
+
+tests/agsignal/api/test_deployed_audit_projection.py FFFFFFFF.F          [100%]
+
+=================================== FAILURES ===================================
+____________ test_ack_events_preserve_notification_context[memory] _____________
+tests/agsignal/api/test_deployed_audit_projection.py:39: in test_ack_events_preserve_notification_context
+    assert row.autonomy_mode==AutonomyMode.LIVE
+E   AssertionError: assert <AutonomyMode...EW: 'PREVIEW'> == <AutonomyMode.LIVE: 'LIVE'>
+E     
+E     - LIVE
+E     + PREVIEW
+------------------------------ Captured log setup ------------------------------
+WARNING  agsignal.api.read_models:read_models.py:259 InMemoryReadModelAdapter initialized. Data will not persist across restarts. Use SQLAlchemyReadModelAdapter for production.
+____________ test_ack_events_preserve_notification_context[sqlite] _____________
+tests/agsignal/api/test_deployed_audit_projection.py:39: in test_ack_events_preserve_notification_context
+    assert row.autonomy_mode==AutonomyMode.LIVE
+E   AssertionError: assert <AutonomyMode...EW: 'PREVIEW'> == <AutonomyMode.LIVE: 'LIVE'>
+E     
+E     - LIVE
+E     + PREVIEW
+______ test_ack_context_filters_exclude_unrelated_events[memory-filters0] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('95d863f4-2585-48cc-99bf-f5670cb887a4'), event_type='ack.received', event_time=datetime.datet..., 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.570006+00:00'}, correlation_id=None)
+E     Use -v to get more diff
+------------------------------ Captured log setup ------------------------------
+WARNING  agsignal.api.read_models:read_models.py:259 InMemoryReadModelAdapter initialized. Data will not persist across restarts. Use SQLAlchemyReadModelAdapter for production.
+______ test_ack_context_filters_exclude_unrelated_events[memory-filters1] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('f71dab80-0a9c-44e0-8b80-7a79b028248d'), event_type='ack.received', event_time=datetime.datet..., 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.572005+00:00'}, correlation_id=None)
+E     Use -v to get more diff
+------------------------------ Captured log setup ------------------------------
+WARNING  agsignal.api.read_models:read_models.py:259 InMemoryReadModelAdapter initialized. Data will not persist across restarts. Use SQLAlchemyReadModelAdapter for production.
+______ test_ack_context_filters_exclude_unrelated_events[memory-filters2] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('dccc2c26-5e4f-4a50-bdf0-035f1d719706'), event_type='ack.received', event_time=datetime.datet..., 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.573853+00:00'}, correlation_id=None)
+E     Use -v to get more diff
+------------------------------ Captured log setup ------------------------------
+WARNING  agsignal.api.read_models:read_models.py:259 InMemoryReadModelAdapter initialized. Data will not persist across restarts. Use SQLAlchemyReadModelAdapter for production.
+______ test_ack_context_filters_exclude_unrelated_events[sqlite-filters0] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('a97aa645-573a-445d-a265-336faada5bd7'), event_type='ack.received', event_time=datetime.datet...: None, 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.591158'}, correlation_id=None)
+E     Use -v to get more diff
+______ test_ack_context_filters_exclude_unrelated_events[sqlite-filters1] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('ef649f39-1c93-4367-ad1c-89665149f0cb'), event_type='ack.received', event_time=datetime.datet...: None, 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.609738'}, correlation_id=None)
+E     Use -v to get more diff
+______ test_ack_context_filters_exclude_unrelated_events[sqlite-filters2] ______
+tests/agsignal/api/test_deployed_audit_projection.py:50: in test_ack_context_filters_exclude_unrelated_events
+    assert adapter.get_audit_events(AuditEventFilter(event_type='ack.received',**filters)).items==[]
+E   AssertionError: assert [AuditEvent(a...tion_id=None)] == []
+E     
+E     Left contains one more item: AuditEvent(audit_id=UUID('b20b0651-3bf9-47d2-92ac-b095b25076e2'), event_type='ack.received', event_time=datetime.datet...: None, 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.628929'}, correlation_id=None)
+E     Use -v to get more diff
+__________ test_database_datetimes_keep_explicit_utc_on_wire[sqlite] ___________
+tests/agsignal/api/test_deployed_audit_projection.py:56: in test_database_datetimes_keep_explicit_utc_on_wire
+    assert event.event_time.utcoffset()==UTC.utcoffset(None)
+E   AssertionError: assert None == datetime.timedelta(0)
+E    +  where None = <built-in method utcoffset of datetime.datetime object at 0x10746fe40>()
+E    +    where <built-in method utcoffset of datetime.datetime object at 0x10746fe40> = datetime.datetime(2026, 10, 21, 6, 24, 0, 648645).utcoffset
+E    +      where datetime.datetime(2026, 10, 21, 6, 24, 0, 648645) = AuditEvent(audit_id=UUID('9912eea5-fe34-4a60-88a3-18e864751ce3'), event_type='ack.received', event_time=datetime.datet...: None, 'new_status': 'ACKED', 'acked_by': 'test-user', 'acked_at': '2026-10-21T06:24:00.648645'}, correlation_id=None).event_time
+E    +  and   datetime.timedelta(0) = <built-in method utcoffset of datetime.timezone object at 0x101833710>(None)
+E    +    where <built-in method utcoffset of datetime.timezone object at 0x101833710> = datetime.timezone.utc.utcoffset
+=========================== short test summary info ============================
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_events_preserve_notification_context[memory]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_events_preserve_notification_context[sqlite]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[memory-filters0]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[memory-filters1]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[memory-filters2]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[sqlite-filters0]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[sqlite-filters1]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_ack_context_filters_exclude_unrelated_events[sqlite-filters2]
+FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_database_datetimes_keep_explicit_utc_on_wire[sqlite]
+========================= 9 failed, 1 passed in 0.63s ==========================

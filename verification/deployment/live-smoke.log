@@ -1,0 +1,128 @@
+PASS Health public
+PASS Unauthenticated /ready rejected
+PASS Wrong credential /ready rejected
+PASS Unauthenticated /metrics rejected
+PASS Wrong credential /metrics rejected
+PASS Unauthenticated /ui/audit rejected
+PASS Wrong credential /ui/audit rejected
+PASS Unauthenticated /api/v1/runtime/dead-letters rejected
+PASS Wrong credential /api/v1/runtime/dead-letters rejected
+PASS GET /ready -> 200
+PASS Readiness checks durable profile
+PASS GET /__smoke__/identity -> 200
+PASS Running deployment revision/profile
+PASS GET /metrics -> 200
+PASS GET / -> 200
+PASS SPA served at /
+PASS GET /deliveries -> 200
+PASS SPA served at /deliveries
+PASS GET /policy -> 200
+PASS SPA served at /policy
+PASS GET /invariants -> 200
+PASS SPA served at /invariants
+PASS GET /audit -> 200
+PASS SPA served at /audit
+PASS POST /api/v1/notifications/simulate -> 200
+PASS HTTP simulation has no provider effect
+PASS Simulation has no durable notification
+PASS POST /api/v1/notifications -> 422
+PASS POST /api/v1/notifications -> 422
+PASS POST /api/v1/notifications -> 202
+PASS Guaranteed recording delivery
+PASS Policy revision and effective provenance retained
+PASS Channel completion evidence retained
+PASS POST /api/v1/notifications -> 202
+PASS Same-content replay retains identity
+PASS POST /api/v1/notifications -> 409
+PASS POST /api/v1/notifications -> 202
+PASS Semantic duplicate suppressed after delivery
+PASS POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 403
+PASS POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 200
+PASS ACK attributed to credential principal
+PASS GET /ui/audit -> 200
+PASS Audit ACK preserves actual LIVE context and agent
+PASS Audit timestamps have explicit UTC offset
+PASS GET /ui/audit -> 200
+PASS Audit mode filter excludes LIVE ACK
+PASS POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/ack -> 200
+PASS Repeated ACK retains original result
+PASS POST /api/v1/notifications/3f2ee787-b90a-4fea-8579-6e5e3ed14de4/dismiss -> 409
+PASS POST /api/v1/notifications -> 202
+PASS POST /api/v1/notifications/11ac34a1-1cc0-407d-b0e6-890bbdf263d3/dismiss -> 200
+PASS Dismiss transition
+PASS POST /api/v1/notifications -> 202
+PASS POST /api/v1/notifications -> 202
+PASS Worker exhausts recording failures
+PASS GET /api/v1/runtime/dead-letters -> 200
+PASS Dead-letter inspection retains failed obligation
+PASS POST /api/v1/runtime/notifications/d0deec60-c234-4c35-9a3f-05ab1873a0e6/replay -> 200
+PASS Replay recovery preserves cumulative attempts
+PASS POST /api/v1/notifications/d0deec60-c234-4c35-9a3f-05ab1873a0e6/ack -> 200
+PASS GET /ui/deliveries -> 200
+PASS GET /ui/audit -> 200
+PASS GET /ui/invariants -> 200
+PASS GET /ui/invariants/summary -> 200
+PASS GET /ui/deliveries/3f2ee787-b90a-4fea-8579-6e5e3ed14de4 -> 200
+PASS GET /ui/policies/effective -> 200
+PASS GET /ui/invariants/summary -> 200
+PASS Summary timestamp has explicit UTC offset
+PASS WebSocket authenticated connection
+PASS POST /api/v1/notifications -> 202
+PASS WebSocket real network notification
+PASS WebSocket BEST_EFFORT reports delivery
+PASS POST /api/v1/notifications -> 202
+PASS WebSocket durable attributed ACK
+PASS WebSocket ACK visible over HTTP
+PASS WebSocket rejects unauthenticated upgrade
+[10/21/26 06:33:33] INFO     Processing request of type            server.py:733
+                             ListToolsRequest                                   
+PASS Live stdio MCP tool registry
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP tool result is not an error
+PASS MCP sees HTTP durable ACK
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+                    INFO     Sending notification: type=smoke.safety, sdk.py:247
+                             intent=SAFETY, mode=LIVE,                          
+                             channels=['SLACK']                                 
+PASS MCP tool result is not an error
+PASS MCP simulation is marked simulated
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+                    INFO     Sending notification: type=smoke.safety, sdk.py:247
+                             intent=SAFETY, mode=LIVE,                          
+                             channels=['SLACK']                                 
+                    INFO     Delivering notification:             service.py:259
+                             notification_id=3df93dd1-7695-49e4-a               
+                             a2d-09e9af32560e mode=GUARANTEED                   
+                             channels=['SLACK']                                 
+                    INFO     GUARANTEED delivery succeeded:       service.py:581
+                             notification_id=3df93dd1-7695-49e4-a               
+                             a2d-09e9af32560e channel=SLACK                     
+PASS MCP tool result is not an error
+PASS MCP recording delivery
+PASS POST /api/v1/notifications -> 202
+PASS HTTP/MCP cross-transport idempotency
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP tool result is not an error
+PASS MCP acknowledgment visible over HTTP
+                    INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP tool result is not an error
+PASS MCP sees initial durable policy
+PASS POST /api/v1/policies/reload -> 200
+[10/21/26 06:33:34] INFO     Processing request of type            server.py:733
+                             CallToolRequest                                    
+PASS MCP tool result is not an error
+PASS Running MCP observes HTTP policy activation
+PASS Accepted obligation keeps original deadline policy
+Waiting for real one-minute timeout worker...
+PASS Real deadline timeout worker
+PASS POST /api/v1/notifications/4f0317c5-a549-439e-89d8-45f079ca8b0e/ack -> 409
+PASS Callback retries retain event identity
+PASS Pending work recovers after real service restart
+PASS ACK survives service restart
+PASS POST /api/v1/notifications/df4687d0-ed5a-4167-aee1-c486591f795c/ack -> 200
+SMOKE COMPLETE 99 checks

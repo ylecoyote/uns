@@ -108,8 +108,13 @@ Raw logs, the untouched reviewer reproduction, installed smoke script and SHA-25
 Reproduce with the development environment and commands above. The reviewer file can be run separately with `python -m pytest verification/iteration2/reviewer_reproductions.py`; its expected residual failures are not the regression gate. Run the installed package smoke from outside the source tree with `python /path/to/repo/verification/iteration2/package_smoke.py /path/to/repo` after building/installing the full wheel.
 
 
-## Consolidated main verification (current)
+## Consolidated main merge checkpoint
 
 The canonical main branch fast-forwarded from `b508cc3` through `76fc43e`; application source is unchanged from `ba46a31`. Fresh verification in the canonical checkout passed 1,765 Python tests at 90.70% coverage, 305 console tests plus type/lint/build checks, Ruff, mypy (91 files), Bandit, UI boundary, wheel/source identity (90 modules), installed full-wheel delivery/ACK/repeated migration/no-write retention preview, and the recording demo. The console was freshly installed from its merged lockfile. Existing test/framework warnings are recorded. Advisory databases were not refreshed.
 
 [Consolidated baseline](CONSOLIDATED_BASELINE.md) and [fresh merge receipts](../verification/consolidated/results.json) supersede the iteration checkouts as the current working location. Prior receipts remain unchanged. No remote push, hosted CI, live database migration, real-provider acceptance or deployment occurred.
+
+
+## Container deployment-candidate verification (current)
+
+The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/probe/WebSocket support fixes and browser-discovered audit context/UTC corrections after the consolidated baseline. Full Python verification: 1,776 passed at 90.76% coverage. The installed image passed 99 live HTTP/WebSocket/MCP/recovery checks, module identity and dependency consistency checks, authenticated Compose readiness, and copied-data archive verification. Functional browser flows were exercised in Brave. See [deployment smoke](DEPLOYMENT_SMOKE.md) and [receipts](../verification/deployment/results.json). The lasting target and real recipients remain unspecified; this is isolated recording-profile rehearsal evidence, not production deployment acceptance.

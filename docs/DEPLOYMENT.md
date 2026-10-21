@@ -1,10 +1,12 @@
 # Deploy UNS
 
+See the [deployment candidate smoke report](DEPLOYMENT_SMOKE.md) for the latest container, socket/browser checks, and remaining target selection.
+
 ## Supported local profile
 
 The reproducible profile is Python 3.12, a file-backed SQLite database and recording adapters. Supported Python metadata starts at 3.11. PostgreSQL locking and real-provider acceptance remain separate checks. In-memory SQLite is suitable for demos and is rejected by write-enabled MCP CLI startup.
 
-Install `.[full]` in an isolated environment. For a local service:
+Install `.[full]` in an isolated environment. The server extra includes Uvicorn standard protocol dependencies, including network WebSocket support. The Dockerfile installs its exact built UNS wheel; the Compose readiness probe authenticates with its configured operator key. For a local service:
 
 ```sh
 export UNS_DATABASE_URL='sqlite:///./uns.db'
