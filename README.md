@@ -1,5 +1,7 @@
 # UNS, Unified Notification Service
 
+The canonical development branch is **main**, containing the consolidation and both remediation iterations. See the [consolidated baseline](docs/CONSOLIDATED_BASELINE.md) for merge provenance and fresh verification.
+
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 
 UNS delivers policy-driven notifications and records delivery, acknowledgment, dismissal, and timeout evidence. Notification policies have version identity; proposed policy changes can carry shadow evidence and explicit approval before a new draft is activated.

@@ -1,0 +1,666 @@
+Building source distribution...
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running egg_info
+writing src/uns.egg-info/PKG-INFO
+writing dependency_links to src/uns.egg-info/dependency_links.txt
+writing entry points to src/uns.egg-info/entry_points.txt
+writing requirements to src/uns.egg-info/requires.txt
+writing top-level names to src/uns.egg-info/top_level.txt
+reading manifest file 'src/uns.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/uns.egg-info/SOURCES.txt'
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/private/tmp/uns-uv-cache/builds-v0/.tmpgoHD7K/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running sdist
+running egg_info
+writing src/uns.egg-info/PKG-INFO
+writing dependency_links to src/uns.egg-info/dependency_links.txt
+writing entry points to src/uns.egg-info/entry_points.txt
+writing requirements to src/uns.egg-info/requires.txt
+writing top-level names to src/uns.egg-info/top_level.txt
+reading manifest file 'src/uns.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/uns.egg-info/SOURCES.txt'
+running check
+creating uns-0.1.0
+creating uns-0.1.0/src/agsignal
+creating uns-0.1.0/src/agsignal/api
+creating uns-0.1.0/src/agsignal/governance
+creating uns-0.1.0/src/agsignal_mcp
+creating uns-0.1.0/src/agsignal_mcp/transports
+creating uns-0.1.0/src/db
+creating uns-0.1.0/src/db/models
+creating uns-0.1.0/src/notification
+creating uns-0.1.0/src/notification/adapters
+creating uns-0.1.0/src/notification/integrations
+creating uns-0.1.0/src/ui_client
+creating uns-0.1.0/src/uns
+creating uns-0.1.0/src/uns.egg-info
+copying files to uns-0.1.0...
+copying LICENSE -> uns-0.1.0
+copying NOTICE -> uns-0.1.0
+copying README.md -> uns-0.1.0
+copying pyproject.toml -> uns-0.1.0
+copying src/agsignal/__init__.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/_in_memory.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/adapters.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/app.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/deduplication.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/errors.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/integrations.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/interfaces.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/models.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/policies.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/py.typed -> uns-0.1.0/src/agsignal
+copying src/agsignal/queries.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/rate_limiting.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/responses.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/sdk.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/signaling.py -> uns-0.1.0/src/agsignal
+copying src/agsignal/api/__init__.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/auth.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/observability.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/py.typed -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/read_models.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/routes_notification.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/api/routes_ui.py -> uns-0.1.0/src/agsignal/api
+copying src/agsignal/governance/__init__.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal/governance/decision_record.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal/governance/errors.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal/governance/operators.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal/governance/policy_dsl.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal/governance/policy_loader.py -> uns-0.1.0/src/agsignal/governance
+copying src/agsignal_mcp/__init__.py -> uns-0.1.0/src/agsignal_mcp
+copying src/agsignal_mcp/factory.py -> uns-0.1.0/src/agsignal_mcp
+copying src/agsignal_mcp/py.typed -> uns-0.1.0/src/agsignal_mcp
+copying src/agsignal_mcp/runtime.py -> uns-0.1.0/src/agsignal_mcp
+copying src/agsignal_mcp/tools.py -> uns-0.1.0/src/agsignal_mcp
+copying src/agsignal_mcp/transports/__init__.py -> uns-0.1.0/src/agsignal_mcp/transports
+copying src/agsignal_mcp/transports/stdio.py -> uns-0.1.0/src/agsignal_mcp/transports
+copying src/db/__init__.py -> uns-0.1.0/src/db
+copying src/db/audit_store.py -> uns-0.1.0/src/db
+copying src/db/policy_learning_store.py -> uns-0.1.0/src/db
+copying src/db/policy_store.py -> uns-0.1.0/src/db
+copying src/db/py.typed -> uns-0.1.0/src/db
+copying src/db/websocket_replay_store.py -> uns-0.1.0/src/db
+copying src/db/models/__init__.py -> uns-0.1.0/src/db/models
+copying src/db/models/_base.py -> uns-0.1.0/src/db/models
+copying src/db/models/audit.py -> uns-0.1.0/src/db/models
+copying src/db/models/policy.py -> uns-0.1.0/src/db/models
+copying src/db/models/policy_learning.py -> uns-0.1.0/src/db/models
+copying src/db/models/websocket.py -> uns-0.1.0/src/db/models
+copying src/notification/__init__.py -> uns-0.1.0/src/notification
+copying src/notification/acknowledgment.py -> uns-0.1.0/src/notification
+copying src/notification/audit.py -> uns-0.1.0/src/notification
+copying src/notification/channel_health.py -> uns-0.1.0/src/notification
+copying src/notification/config.py -> uns-0.1.0/src/notification
+copying src/notification/deduplication.py -> uns-0.1.0/src/notification
+copying src/notification/dlq.py -> uns-0.1.0/src/notification
+copying src/notification/idempotency.py -> uns-0.1.0/src/notification
+copying src/notification/interfaces.py -> uns-0.1.0/src/notification
+copying src/notification/metrics.py -> uns-0.1.0/src/notification
+copying src/notification/models.py -> uns-0.1.0/src/notification
+copying src/notification/policies.py -> uns-0.1.0/src/notification
+copying src/notification/policy_config.py -> uns-0.1.0/src/notification
+copying src/notification/policy_learning.py -> uns-0.1.0/src/notification
+copying src/notification/policy_loader.py -> uns-0.1.0/src/notification
+copying src/notification/py.typed -> uns-0.1.0/src/notification
+copying src/notification/rate_limiter.py -> uns-0.1.0/src/notification
+copying src/notification/rate_limiting.py -> uns-0.1.0/src/notification
+copying src/notification/routes.py -> uns-0.1.0/src/notification
+copying src/notification/sdk.py -> uns-0.1.0/src/notification
+copying src/notification/service.py -> uns-0.1.0/src/notification
+copying src/notification/websocket_runtime.py -> uns-0.1.0/src/notification
+copying src/notification/adapters/__init__.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/adapters/base.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/adapters/email.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/adapters/pagerduty.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/adapters/slack.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/adapters/websocket.py -> uns-0.1.0/src/notification/adapters
+copying src/notification/integrations/__init__.py -> uns-0.1.0/src/notification/integrations
+copying src/notification/integrations/app_boundary.py -> uns-0.1.0/src/notification/integrations
+copying src/ui_client/__init__.py -> uns-0.1.0/src/ui_client
+copying src/ui_client/client.py -> uns-0.1.0/src/ui_client
+copying src/ui_client/errors.py -> uns-0.1.0/src/ui_client
+copying src/ui_client/filters.py -> uns-0.1.0/src/ui_client
+copying src/ui_client/py.typed -> uns-0.1.0/src/ui_client
+copying src/ui_client/types.py -> uns-0.1.0/src/ui_client
+copying src/uns/__init__.py -> uns-0.1.0/src/uns
+copying src/uns/app.py -> uns-0.1.0/src/uns
+copying src/uns/client.py -> uns-0.1.0/src/uns
+copying src/uns/config.py -> uns-0.1.0/src/uns
+copying src/uns/dlq.py -> uns-0.1.0/src/uns
+copying src/uns/maintenance.py -> uns-0.1.0/src/uns
+copying src/uns/migrate.py -> uns-0.1.0/src/uns
+copying src/uns/policy_runtime.py -> uns-0.1.0/src/uns
+copying src/uns/py.typed -> uns-0.1.0/src/uns
+copying src/uns/routes.py -> uns-0.1.0/src/uns
+copying src/uns/runtime.py -> uns-0.1.0/src/uns
+copying src/uns/schema.py -> uns-0.1.0/src/uns
+copying src/uns/websocket.py -> uns-0.1.0/src/uns
+copying src/uns.egg-info/PKG-INFO -> uns-0.1.0/src/uns.egg-info
+copying src/uns.egg-info/SOURCES.txt -> uns-0.1.0/src/uns.egg-info
+copying src/uns.egg-info/dependency_links.txt -> uns-0.1.0/src/uns.egg-info
+copying src/uns.egg-info/entry_points.txt -> uns-0.1.0/src/uns.egg-info
+copying src/uns.egg-info/requires.txt -> uns-0.1.0/src/uns.egg-info
+copying src/uns.egg-info/top_level.txt -> uns-0.1.0/src/uns.egg-info
+Writing uns-0.1.0/setup.cfg
+Creating tar archive
+removing 'uns-0.1.0' (and everything under it)
+Building wheel from source distribution...
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running egg_info
+writing src/uns.egg-info/PKG-INFO
+writing dependency_links to src/uns.egg-info/dependency_links.txt
+writing entry points to src/uns.egg-info/entry_points.txt
+writing requirements to src/uns.egg-info/requires.txt
+writing top-level names to src/uns.egg-info/top_level.txt
+reading manifest file 'src/uns.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/uns.egg-info/SOURCES.txt'
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/private/tmp/uns-uv-cache/builds-v0/.tmp7SQYOq/lib/python3.12/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: Apache Software License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running bdist_wheel
+running build
+running build_py
+creating build/lib/agsignal_mcp
+copying src/agsignal_mcp/tools.py -> build/lib/agsignal_mcp
+copying src/agsignal_mcp/__init__.py -> build/lib/agsignal_mcp
+copying src/agsignal_mcp/factory.py -> build/lib/agsignal_mcp
+copying src/agsignal_mcp/runtime.py -> build/lib/agsignal_mcp
+creating build/lib/notification
+copying src/notification/interfaces.py -> build/lib/notification
+copying src/notification/acknowledgment.py -> build/lib/notification
+copying src/notification/metrics.py -> build/lib/notification
+copying src/notification/policy_loader.py -> build/lib/notification
+copying src/notification/service.py -> build/lib/notification
+copying src/notification/rate_limiting.py -> build/lib/notification
+copying src/notification/config.py -> build/lib/notification
+copying src/notification/channel_health.py -> build/lib/notification
+copying src/notification/sdk.py -> build/lib/notification
+copying src/notification/audit.py -> build/lib/notification
+copying src/notification/models.py -> build/lib/notification
+copying src/notification/policy_learning.py -> build/lib/notification
+copying src/notification/deduplication.py -> build/lib/notification
+copying src/notification/idempotency.py -> build/lib/notification
+copying src/notification/rate_limiter.py -> build/lib/notification
+copying src/notification/__init__.py -> build/lib/notification
+copying src/notification/websocket_runtime.py -> build/lib/notification
+copying src/notification/policy_config.py -> build/lib/notification
+copying src/notification/policies.py -> build/lib/notification
+copying src/notification/dlq.py -> build/lib/notification
+copying src/notification/routes.py -> build/lib/notification
+creating build/lib/ui_client
+copying src/ui_client/client.py -> build/lib/ui_client
+copying src/ui_client/__init__.py -> build/lib/ui_client
+copying src/ui_client/types.py -> build/lib/ui_client
+copying src/ui_client/errors.py -> build/lib/ui_client
+copying src/ui_client/filters.py -> build/lib/ui_client
+creating build/lib/db
+copying src/db/websocket_replay_store.py -> build/lib/db
+copying src/db/policy_learning_store.py -> build/lib/db
+copying src/db/__init__.py -> build/lib/db
+copying src/db/policy_store.py -> build/lib/db
+copying src/db/audit_store.py -> build/lib/db
+creating build/lib/uns
+copying src/uns/config.py -> build/lib/uns
+copying src/uns/maintenance.py -> build/lib/uns
+copying src/uns/client.py -> build/lib/uns
+copying src/uns/__init__.py -> build/lib/uns
+copying src/uns/runtime.py -> build/lib/uns
+copying src/uns/app.py -> build/lib/uns
+copying src/uns/policy_runtime.py -> build/lib/uns
+copying src/uns/migrate.py -> build/lib/uns
+copying src/uns/schema.py -> build/lib/uns
+copying src/uns/websocket.py -> build/lib/uns
+copying src/uns/dlq.py -> build/lib/uns
+copying src/uns/routes.py -> build/lib/uns
+creating build/lib/agsignal
+copying src/agsignal/interfaces.py -> build/lib/agsignal
+copying src/agsignal/responses.py -> build/lib/agsignal
+copying src/agsignal/rate_limiting.py -> build/lib/agsignal
+copying src/agsignal/signaling.py -> build/lib/agsignal
+copying src/agsignal/sdk.py -> build/lib/agsignal
+copying src/agsignal/models.py -> build/lib/agsignal
+copying src/agsignal/deduplication.py -> build/lib/agsignal
+copying src/agsignal/__init__.py -> build/lib/agsignal
+copying src/agsignal/app.py -> build/lib/agsignal
+copying src/agsignal/queries.py -> build/lib/agsignal
+copying src/agsignal/_in_memory.py -> build/lib/agsignal
+copying src/agsignal/errors.py -> build/lib/agsignal
+copying src/agsignal/policies.py -> build/lib/agsignal
+copying src/agsignal/integrations.py -> build/lib/agsignal
+copying src/agsignal/adapters.py -> build/lib/agsignal
+creating build/lib/agsignal_mcp/transports
+copying src/agsignal_mcp/transports/__init__.py -> build/lib/agsignal_mcp/transports
+copying src/agsignal_mcp/transports/stdio.py -> build/lib/agsignal_mcp/transports
+creating build/lib/notification/integrations
+copying src/notification/integrations/__init__.py -> build/lib/notification/integrations
+copying src/notification/integrations/app_boundary.py -> build/lib/notification/integrations
+creating build/lib/notification/adapters
+copying src/notification/adapters/__init__.py -> build/lib/notification/adapters
+copying src/notification/adapters/email.py -> build/lib/notification/adapters
+copying src/notification/adapters/pagerduty.py -> build/lib/notification/adapters
+copying src/notification/adapters/base.py -> build/lib/notification/adapters
+copying src/notification/adapters/slack.py -> build/lib/notification/adapters
+copying src/notification/adapters/websocket.py -> build/lib/notification/adapters
+creating build/lib/db/models
+copying src/db/models/_base.py -> build/lib/db/models
+copying src/db/models/audit.py -> build/lib/db/models
+copying src/db/models/policy_learning.py -> build/lib/db/models
+copying src/db/models/policy.py -> build/lib/db/models
+copying src/db/models/__init__.py -> build/lib/db/models
+copying src/db/models/websocket.py -> build/lib/db/models
+creating build/lib/agsignal/governance
+copying src/agsignal/governance/policy_loader.py -> build/lib/agsignal/governance
+copying src/agsignal/governance/decision_record.py -> build/lib/agsignal/governance
+copying src/agsignal/governance/__init__.py -> build/lib/agsignal/governance
+copying src/agsignal/governance/policy_dsl.py -> build/lib/agsignal/governance
+copying src/agsignal/governance/errors.py -> build/lib/agsignal/governance
+copying src/agsignal/governance/operators.py -> build/lib/agsignal/governance
+creating build/lib/agsignal/api
+copying src/agsignal/api/auth.py -> build/lib/agsignal/api
+copying src/agsignal/api/__init__.py -> build/lib/agsignal/api
+copying src/agsignal/api/observability.py -> build/lib/agsignal/api
+copying src/agsignal/api/routes_notification.py -> build/lib/agsignal/api
+copying src/agsignal/api/routes_ui.py -> build/lib/agsignal/api
+copying src/agsignal/api/read_models.py -> build/lib/agsignal/api
+running egg_info
+writing src/uns.egg-info/PKG-INFO
+writing dependency_links to src/uns.egg-info/dependency_links.txt
+writing entry points to src/uns.egg-info/entry_points.txt
+writing requirements to src/uns.egg-info/requires.txt
+writing top-level names to src/uns.egg-info/top_level.txt
+reading manifest file 'src/uns.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/uns.egg-info/SOURCES.txt'
+copying src/agsignal_mcp/py.typed -> build/lib/agsignal_mcp
+copying src/notification/py.typed -> build/lib/notification
+copying src/ui_client/py.typed -> build/lib/ui_client
+copying src/db/py.typed -> build/lib/db
+copying src/uns/py.typed -> build/lib/uns
+copying src/agsignal/py.typed -> build/lib/agsignal
+copying src/agsignal/api/py.typed -> build/lib/agsignal/api
+installing to build/bdist.macosx-11.1-arm64/wheel
+running install
+running install_lib
+creating build/bdist.macosx-11.1-arm64/wheel
+creating build/bdist.macosx-11.1-arm64/wheel/agsignal_mcp
+creating build/bdist.macosx-11.1-arm64/wheel/agsignal_mcp/transports
+copying build/lib/agsignal_mcp/transports/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp/transports
+copying build/lib/agsignal_mcp/transports/stdio.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp/transports
+copying build/lib/agsignal_mcp/tools.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp
+copying build/lib/agsignal_mcp/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp
+copying build/lib/agsignal_mcp/factory.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp
+copying build/lib/agsignal_mcp/runtime.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp
+copying build/lib/agsignal_mcp/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./agsignal_mcp
+creating build/bdist.macosx-11.1-arm64/wheel/notification
+copying build/lib/notification/interfaces.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/acknowledgment.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/metrics.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/policy_loader.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/service.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/rate_limiting.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/config.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/channel_health.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/sdk.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/audit.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/models.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/policy_learning.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/deduplication.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/idempotency.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/rate_limiter.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/websocket_runtime.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+creating build/bdist.macosx-11.1-arm64/wheel/notification/integrations
+copying build/lib/notification/integrations/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/integrations
+copying build/lib/notification/integrations/app_boundary.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/integrations
+creating build/bdist.macosx-11.1-arm64/wheel/notification/adapters
+copying build/lib/notification/adapters/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/adapters/email.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/adapters/pagerduty.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/adapters/base.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/adapters/slack.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/adapters/websocket.py -> build/bdist.macosx-11.1-arm64/wheel/./notification/adapters
+copying build/lib/notification/policy_config.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/policies.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/dlq.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+copying build/lib/notification/routes.py -> build/bdist.macosx-11.1-arm64/wheel/./notification
+creating build/bdist.macosx-11.1-arm64/wheel/ui_client
+copying build/lib/ui_client/client.py -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+copying build/lib/ui_client/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+copying build/lib/ui_client/types.py -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+copying build/lib/ui_client/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+copying build/lib/ui_client/errors.py -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+copying build/lib/ui_client/filters.py -> build/bdist.macosx-11.1-arm64/wheel/./ui_client
+creating build/bdist.macosx-11.1-arm64/wheel/db
+copying build/lib/db/websocket_replay_store.py -> build/bdist.macosx-11.1-arm64/wheel/./db
+copying build/lib/db/policy_learning_store.py -> build/bdist.macosx-11.1-arm64/wheel/./db
+copying build/lib/db/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./db
+copying build/lib/db/policy_store.py -> build/bdist.macosx-11.1-arm64/wheel/./db
+creating build/bdist.macosx-11.1-arm64/wheel/db/models
+copying build/lib/db/models/_base.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/models/audit.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/models/policy_learning.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/models/policy.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/models/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/models/websocket.py -> build/bdist.macosx-11.1-arm64/wheel/./db/models
+copying build/lib/db/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./db
+copying build/lib/db/audit_store.py -> build/bdist.macosx-11.1-arm64/wheel/./db
+creating build/bdist.macosx-11.1-arm64/wheel/uns
+copying build/lib/uns/config.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/maintenance.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/client.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/runtime.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/app.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/policy_runtime.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/migrate.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/schema.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/websocket.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/dlq.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+copying build/lib/uns/routes.py -> build/bdist.macosx-11.1-arm64/wheel/./uns
+creating build/bdist.macosx-11.1-arm64/wheel/agsignal
+copying build/lib/agsignal/interfaces.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/responses.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/rate_limiting.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/signaling.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/sdk.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/models.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/deduplication.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+creating build/bdist.macosx-11.1-arm64/wheel/agsignal/governance
+copying build/lib/agsignal/governance/policy_loader.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/governance/decision_record.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/governance/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/governance/policy_dsl.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/governance/errors.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/governance/operators.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/governance
+copying build/lib/agsignal/app.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/queries.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+creating build/bdist.macosx-11.1-arm64/wheel/agsignal/api
+copying build/lib/agsignal/api/auth.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/__init__.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/observability.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/routes_notification.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/py.typed -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/routes_ui.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/api/read_models.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal/api
+copying build/lib/agsignal/_in_memory.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/errors.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/policies.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/integrations.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+copying build/lib/agsignal/adapters.py -> build/bdist.macosx-11.1-arm64/wheel/./agsignal
+running install_egg_info
+Copying src/uns.egg-info to build/bdist.macosx-11.1-arm64/wheel/./uns-0.1.0-py3.12.egg-info
+running install_scripts
+creating build/bdist.macosx-11.1-arm64/wheel/uns-0.1.0.dist-info/WHEEL
+creating '/private/tmp/uns-merged-dist/.tmp-hpbo8o8y/uns-0.1.0-py3-none-any.whl' and adding 'build/bdist.macosx-11.1-arm64/wheel' to it
+adding 'agsignal/__init__.py'
+adding 'agsignal/_in_memory.py'
+adding 'agsignal/adapters.py'
+adding 'agsignal/app.py'
+adding 'agsignal/deduplication.py'
+adding 'agsignal/errors.py'
+adding 'agsignal/integrations.py'
+adding 'agsignal/interfaces.py'
+adding 'agsignal/models.py'
+adding 'agsignal/policies.py'
+adding 'agsignal/py.typed'
+adding 'agsignal/queries.py'
+adding 'agsignal/rate_limiting.py'
+adding 'agsignal/responses.py'
+adding 'agsignal/sdk.py'
+adding 'agsignal/signaling.py'
+adding 'agsignal/api/__init__.py'
+adding 'agsignal/api/auth.py'
+adding 'agsignal/api/observability.py'
+adding 'agsignal/api/py.typed'
+adding 'agsignal/api/read_models.py'
+adding 'agsignal/api/routes_notification.py'
+adding 'agsignal/api/routes_ui.py'
+adding 'agsignal/governance/__init__.py'
+adding 'agsignal/governance/decision_record.py'
+adding 'agsignal/governance/errors.py'
+adding 'agsignal/governance/operators.py'
+adding 'agsignal/governance/policy_dsl.py'
+adding 'agsignal/governance/policy_loader.py'
+adding 'agsignal_mcp/__init__.py'
+adding 'agsignal_mcp/factory.py'
+adding 'agsignal_mcp/py.typed'
+adding 'agsignal_mcp/runtime.py'
+adding 'agsignal_mcp/tools.py'
+adding 'agsignal_mcp/transports/__init__.py'
+adding 'agsignal_mcp/transports/stdio.py'
+adding 'db/__init__.py'
+adding 'db/audit_store.py'
+adding 'db/policy_learning_store.py'
+adding 'db/policy_store.py'
+adding 'db/py.typed'
+adding 'db/websocket_replay_store.py'
+adding 'db/models/__init__.py'
+adding 'db/models/_base.py'
+adding 'db/models/audit.py'
+adding 'db/models/policy.py'
+adding 'db/models/policy_learning.py'
+adding 'db/models/websocket.py'
+adding 'notification/__init__.py'
+adding 'notification/acknowledgment.py'
+adding 'notification/audit.py'
+adding 'notification/channel_health.py'
+adding 'notification/config.py'
+adding 'notification/deduplication.py'
+adding 'notification/dlq.py'
+adding 'notification/idempotency.py'
+adding 'notification/interfaces.py'
+adding 'notification/metrics.py'
+adding 'notification/models.py'
+adding 'notification/policies.py'
+adding 'notification/policy_config.py'
+adding 'notification/policy_learning.py'
+adding 'notification/policy_loader.py'
+adding 'notification/py.typed'
+adding 'notification/rate_limiter.py'
+adding 'notification/rate_limiting.py'
+adding 'notification/routes.py'
+adding 'notification/sdk.py'
+adding 'notification/service.py'
+adding 'notification/websocket_runtime.py'
+adding 'notification/adapters/__init__.py'
+adding 'notification/adapters/base.py'
+adding 'notification/adapters/email.py'
+adding 'notification/adapters/pagerduty.py'
+adding 'notification/adapters/slack.py'
+adding 'notification/adapters/websocket.py'
+adding 'notification/integrations/__init__.py'
+adding 'notification/integrations/app_boundary.py'
+adding 'ui_client/__init__.py'
+adding 'ui_client/client.py'
+adding 'ui_client/errors.py'
+adding 'ui_client/filters.py'
+adding 'ui_client/py.typed'
+adding 'ui_client/types.py'
+adding 'uns/__init__.py'
+adding 'uns/app.py'
+adding 'uns/client.py'
+adding 'uns/config.py'
+adding 'uns/dlq.py'
+adding 'uns/maintenance.py'
+adding 'uns/migrate.py'
+adding 'uns/policy_runtime.py'
+adding 'uns/py.typed'
+adding 'uns/routes.py'
+adding 'uns/runtime.py'
+adding 'uns/schema.py'
+adding 'uns/websocket.py'
+adding 'uns-0.1.0.dist-info/licenses/LICENSE'
+adding 'uns-0.1.0.dist-info/licenses/NOTICE'
+adding 'uns-0.1.0.dist-info/METADATA'
+adding 'uns-0.1.0.dist-info/WHEEL'
+adding 'uns-0.1.0.dist-info/entry_points.txt'
+adding 'uns-0.1.0.dist-info/top_level.txt'
+adding 'uns-0.1.0.dist-info/RECORD'
+removing build/bdist.macosx-11.1-arm64/wheel
+Successfully built /private/tmp/uns-merged-dist/uns-0.1.0.tar.gz
+Successfully built /private/tmp/uns-merged-dist/uns-0.1.0-py3-none-any.whl

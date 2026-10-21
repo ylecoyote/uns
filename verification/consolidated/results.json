@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-20",
+  "canonical_branch": "main",
+  "previous_canonical_head": "b508cc367f9eccdec5a1cbec2b1c691d16d84132",
+  "integrated_head": "76fc43ec99951f323768bab08e1c7fca34df7a9e",
+  "application_code_target": "ba46a311d071736a6beca241a6e43a1407f29f3b",
+  "merge": "fast-forward, complete history retained, no conflicts or source changes",
+  "python_tests_passed": 1765,
+  "python_coverage_percent": 90.7,
+  "console_tests_passed": 305,
+  "static_checks": [
+    "Ruff passed",
+    "mypy 91 source files passed",
+    "Bandit passed with existing annotation warnings",
+    "UI boundary passed",
+    "git diff --check passed"
+  ],
+  "package": "wheel/sdist built, 90 Python modules match source; separately installed full wheel delivery/ACK, repeated migration and no-write maintenance preview passed",
+  "dependency_advisories": "Not refreshed; historical snapshots retained",
+  "checkpoints": {
+    "uns/consolidation": "b508cc3",
+    "remediation/adversarial": "3f6005f",
+    "remediation/iteration2": "76fc43e"
+  },
+  "limits": [
+    "Local merge only; no push, hosted CI, publication or deployment",
+    "No live provider/human receipt, PostgreSQL or representative load acceptance",
+    "SMTP in-flight effects remain uncertain after timeout; external delivery at least once"
+  ],
+  "receipt_sha256": {
+    "bandit.log": "7ea876d8c15482ce82f073e024544334140f2cfb45c465fa9e34f5f43b13cca1",
+    "wheel-install.log": "99eff744cb47bbd6734b1a2ac91cbdc25f883298f6ee5030bb298a1754ee1f4e",
+    "console-checks.log": "a67d55ab21a649e457cd531ae89c623ad0fbac0b4a354ad543d0538daf75d66a",
+    "python-tests.log": "7f7f5db92ed93f70ae000a95bacc869bf7507c75a0359ee40b6a37f4c028d420",
+    "mypy.log": "d4515fe8d9b6fe2840b7823e3ba97bbb5d824fb94a03de90f2841eae06deabe5",
+    "ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "demo.log": "a534e3dfec7630113a7fa7b2f8851d6933ba3fb924748e800ff5176e801a438d",
+    "package-smoke.log": "8ae5a96b4604d74af01ecd8b8c1ee29db89d8a2063386a7586b99fad2cfad8fa",
+    "ui-boundary.log": "fc19d1ba3aa24007226fc6047516e8e60120b92fe3dbc7baa4155a6060129914",
+    "npm-install.log": "37f31881924ea460f14000b82fcf568277053f4c3dbdab04771ba58a328a147e",
+    "build.log": "c88f974e46d144b3c11a2fae957231d5f5768111b76c173491855c3c6254e1e5",
+    "docs-tests.log": "eeaa88d53b92a3ca16f66431c0a434273866da8917eb088afc5fadd411b766bb"
+  },
+  "wheel_sha256": "3e0ebe3fec9ac2bcdeea399ca3e7160b072e228be51eafd84aaf23de695dde09",
+  "docs_tests_passed": 257
+}

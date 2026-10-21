@@ -8,7 +8,7 @@
 | Integrate an app | [API](API.md), [integration modes](sections/integration-modes.md) |
 | Operate and audit | [Deployment](DEPLOYMENT.md), [security](SECURITY-MODEL.md) |
 | Extend UNS | [Architecture](ARCHITECTURE.md) |
-| Verify implementation | [Testing](TESTING.md) |
+| Verify implementation | [Testing](TESTING.md), [consolidated baseline](CONSOLIDATED_BASELINE.md) |
 | Independent/adversarial review | [External review brief](REVIEW_BRIEF.md), [iteration 2 disposition](REMEDIATION_ITERATION2.md) |
 | Migrate existing callers | [Migration](MIGRATION.md) |
 
