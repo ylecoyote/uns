@@ -20,6 +20,7 @@ from notification.adapters.base import (
     BaseAdapter,
     DeliveryResult,
     HealthCheckResult,
+    guard_provider_attempt,
 )
 from notification.models import Channel, NotificationIntent, Priority
 
@@ -228,6 +229,8 @@ class SlackAdapter(BaseAdapter):
     - Thread replies
     """
 
+    guards_provider_attempts = True
+
     config: SlackConfig
     _client: SlackClient = field(init=False, repr=False)
 
@@ -262,6 +265,7 @@ class SlackAdapter(BaseAdapter):
 
         while attempt < self.config.retry_attempts:
             attempt += 1
+            guard_provider_attempt(self.channel)
             try:
                 response = await self._client.post_message(
                     channel=slack_channel,

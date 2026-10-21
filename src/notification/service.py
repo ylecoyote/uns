@@ -31,7 +31,9 @@ from typing import Any, Protocol
 from notification.adapters.base import (
     AdapterError,
     BaseAdapter,
+    DeliveryLeaseLostError,
     DeliveryResult,
+    provider_attempt_guard,
 )
 from notification.deduplication import should_deduplicate
 from notification.dlq import DLQService
@@ -46,10 +48,6 @@ from notification.policies import get_policy_registry
 from notification.rate_limiting import acquire_rate_limit
 
 logger = logging.getLogger(__name__)
-
-
-class DeliveryLeaseLostError(Exception):
-    """A durable delivery owner lost permission to start another provider call."""
 
 
 class DeliveryError(Exception):
@@ -389,9 +387,13 @@ class DeliveryService:
     ) -> DeliveryResult:
         # Run inside the wait_for task, immediately before adapter entry. There
         # must be no await between the ownership check and starting the effect.
-        if before_attempt is not None:
-            before_attempt(adapter.channel)
-        return await adapter.deliver(notification)
+        token = provider_attempt_guard.set(before_attempt)
+        try:
+            if before_attempt is not None and not adapter.guards_provider_attempts:
+                before_attempt(adapter.channel)
+            return await adapter.deliver(notification)
+        finally:
+            provider_attempt_guard.reset(token)
 
     async def _deliver_websocket(
         self, notification: Notification, *, before_attempt: Callable[[Channel], None] | None = None
