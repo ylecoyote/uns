@@ -14,6 +14,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -40,7 +41,7 @@ from agsignal.responses import AckResponse, SendNotificationRequest, SendNotific
 from db.audit_store import SQLAlchemyAuditStore, delivery_audit_row
 from db.models import AckAuditRecord as AckRow
 from db.models import Base
-from notification.adapters.base import DeliveryLeaseLostError
+from notification.adapters.base import DeliveryLeaseLostError, DeliveryResult
 from notification.audit import create_audit_record
 from notification.models import (
     AckStatus,
@@ -52,6 +53,7 @@ from notification.models import (
 )
 from notification.service import (
     DeliveryError,
+    DeliveryEvidenceError,
     DeliveryService,
     SimpleAdapterRegistry,
 )
@@ -76,6 +78,7 @@ work = Table(
     Column("dedup_key", String(64)),
     Column("dedup_owner_id", String(36)),
     Column("dedup_generation", Integer),
+    Column("dedup_successor_id", String(36)),
     Column("next_attempt", Float, nullable=False),
     Column("lease_until", Float, nullable=False, default=0),
     Column("lease_token", String(36)),
@@ -114,6 +117,7 @@ Index(
 )
 Index("ix_uns_deadline", work.c.ack_status, work.c.deadline)
 Index("ix_uns_dedup_followers", work.c.dedup_owner_id, work.c.dedup_generation)
+Index("ix_uns_dedup_successor", work.c.dedup_successor_id)
 Index(
     "ix_uns_callbacks",
     events.c.callback_pending,
@@ -173,6 +177,7 @@ class Runtime:
                 notification_id=notification_id,
                 kind=kind,
                 at=self.clock(),
+                callback_until=self.clock(),
                 payload=payload,
                 callback_pending=self.callback is not None
                 and kind in ("ACKED", "DISMISSED", "TIMED_OUT"),
@@ -186,9 +191,9 @@ class Runtime:
         result: NotificationResult,
         **metadata: Any,
     ) -> None:
-        session.add(
-            delivery_audit_row(create_audit_record(notification, result, metadata=metadata))
-        )
+        record = create_audit_record(notification, result, metadata=metadata)
+        record = replace(record, audit_created_at=datetime.fromtimestamp(self.clock(), UTC))
+        session.add(delivery_audit_row(record))
 
     def get(self, notification_id: UUID | str) -> dict[str, Any]:
         with self.sessions() as session:
@@ -286,7 +291,7 @@ class Runtime:
                 )
                 now = self.clock()
                 owner = None
-                if current and current["owner_id"] and current["until"] > now:
+                if current and current["owner_id"]:
                     owner = (
                         session.execute(
                             select(work).where(
@@ -299,6 +304,8 @@ class Runtime:
                         .mappings()
                         .first()
                     )
+                if owner and current and owner["status"] == "DELIVERED" and current["until"] <= now:
+                    owner = None
                 generation = (
                     current["generation"]
                     if owner is not None and current is not None
@@ -350,7 +357,9 @@ class Runtime:
             await self.dispatch(response.notification_id)
         return self.response(response.notification_id, replay=response.idempotent_replay)
 
-    def _before_attempt(self, identifier: str, token: str, channel: Channel) -> None:
+    def _before_attempt(
+        self, identifier: str, token: str, channel: Channel, *, record_start: bool = True
+    ) -> None:
         """Fence every new external call; effects already in flight remain uncertain."""
         now = self.clock()
         with self.sessions.begin() as session:
@@ -373,18 +382,20 @@ class Runtime:
             row = session.execute(select(work).where(work.c.id == identifier)).mappings().one()
             if row["lease_until"] <= self.clock():
                 raise DeliveryLeaseLostError("Delivery lease expired while waiting for storage")
-            self._event(
-                session,
-                identifier,
-                "CHANNEL_ATTEMPT_STARTED",
-                {
-                    "channel": channel.value,
-                    "attempt": row["attempts"],
-                    "cycle": row["cycle"],
-                    "cycle_attempt": row["cycle_attempts"],
-                    "provider_effect_may_have_occurred": True,
-                },
-            )
+            if record_start:
+                self._event(
+                    session,
+                    identifier,
+                    "CHANNEL_ATTEMPT_STARTED",
+                    {
+                        "channel": channel.value,
+                        "lease_token": token,
+                        "attempt": row["attempts"],
+                        "cycle": row["cycle"],
+                        "cycle_attempt": row["cycle_attempts"],
+                        "provider_effect_may_have_occurred": True,
+                    },
+                )
         if row["lease_until"] <= self.clock():
             raise DeliveryLeaseLostError("Delivery lease expired while committing attempt evidence")
 
@@ -401,6 +412,53 @@ class Runtime:
                 },
             )
 
+    def _channel_result(
+        self, identifier: str, token: str, row: dict[str, Any], result: DeliveryResult
+    ) -> None:
+        # Append-only observations are attributed to the original lease. They
+        # never overwrite a replacement worker's state or claim delivery success.
+        with self.sessions.begin() as session:
+            self._event(
+                session,
+                identifier,
+                "CHANNEL_ATTEMPT_RESULT",
+                {
+                    "lease_token": token,
+                    "attempt": row["attempts"],
+                    "cycle": row["cycle"],
+                    "cycle_attempt": row["cycle_attempts"],
+                    "channel": result.channel.value,
+                    "success": result.success,
+                    "message_id": result.message_id,
+                    "error": result.error,
+                    "metadata": result.metadata or {},
+                    "provider_observed_at": result.delivered_at.isoformat()
+                    if result.delivered_at
+                    else None,
+                },
+            )
+
+    def _current_owner(self, session: Session, claim: Any, now: float) -> Any:
+        if not claim or not claim["owner_id"]:
+            return None
+        owner = (
+            session.execute(
+                select(work).where(
+                    work.c.id == claim["owner_id"],
+                    work.c.dedup_generation == claim["generation"],
+                    work.c.dedup_owner_id.is_(None),
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if owner and (
+            owner["status"] == "PENDING"
+            or (owner["status"] == "DELIVERED" and claim["until"] > now)
+        ):
+            return owner
+        return None
+
     def _settle_followers(
         self, session: Session, owner: dict[str, Any], *, succeeded: bool
     ) -> None:
@@ -415,43 +473,80 @@ class Runtime:
                 .order_by(work.c.id)
             ).mappings()
         )
-        if not followers:
-            return
-        successor = followers[0]["id"]
-        generation = (owner["dedup_generation"] or 0) + 1
-        if not succeeded:
-            # An expired window may already have a newer owner. Never steal it.
+        claim = (
             session.execute(
-                update(dedup)
-                .where(
-                    dedup.c.key == owner["dedup_key"],
-                    dedup.c.owner_id == owner["id"],
-                    dedup.c.generation == owner["dedup_generation"],
+                select(dedup).where(dedup.c.key == owner["dedup_key"]).with_for_update()
+            )
+            .mappings()
+            .first()
+        )
+        current = self._current_owner(session, claim, self.clock())
+        target = owner if succeeded else current
+        if target and target["id"] == owner["id"] and not succeeded:
+            target = None
+        if not target and not followers:
+            return
+        if not target:
+            # Election is legal only after locking and observing the live claim.
+            # Pending owners remain live after TTL expiry; delivered owners do not.
+            successor = followers[0]
+            generation = (
+                max(owner["dedup_generation"] or 0, claim["generation"] if claim else 0) + 1
+            )
+            target = {**successor, "dedup_generation": generation}
+            values = {
+                "owner_id": target["id"],
+                "generation": generation,
+                # Promotion transfers ownership, not the suppression window.
+                "until": claim["until"] if claim else self.clock(),
+            }
+            if claim:
+                session.execute(
+                    update(dedup)
+                    .where(
+                        dedup.c.key == owner["dedup_key"],
+                        dedup.c.owner_id == claim["owner_id"],
+                        dedup.c.generation == claim["generation"],
+                    )
+                    .values(**values)
                 )
-                .values(owner_id=successor, generation=generation)
+            else:
+                session.execute(insert(dedup).values(key=owner["dedup_key"], **values))
+        satisfied = succeeded or target["status"] == "DELIVERED"
+        if not succeeded:
+            # Durable lineage survives expiration/replacement of the live claim.
+            session.execute(
+                update(work).where(work.c.id == owner["id"]).values(dedup_successor_id=target["id"])
+            )
+            self._event(
+                session,
+                owner["id"],
+                "OBLIGATION_HANDED_OFF",
+                {
+                    "successor_id": target["id"],
+                    "generation": target["dedup_generation"],
+                },
             )
         for follower in followers:
             n = Notification.model_validate(follower["notification"])
             result = NotificationResult.model_validate(follower["outcome"])
-            values: dict[str, Any]
-            if succeeded:
+            promoted = follower["id"] == target["id"]
+            values = {
+                "dedup_owner_id": None if promoted else target["id"],
+                "dedup_generation": target["dedup_generation"],
+            }
+            payload = {
+                "previous_owner_id": owner["id"],
+                "owner_id": target["id"],
+                "generation": target["dedup_generation"],
+            }
+            if satisfied:
                 result = result.model_copy(update={"status": DeliveryStatus.DEDUPLICATED})
-                values = {"status": "DEDUPLICATED", "outcome": result.model_dump(mode="json")}
+                values.update(status="DEDUPLICATED", outcome=result.model_dump(mode="json"))
                 kind = "DEDUP_SATISFIED"
-                payload = {"owner_id": owner["id"], "generation": owner["dedup_generation"]}
             else:
-                promoted = follower["id"] == successor
-                values = {
-                    "dedup_owner_id": None if promoted else successor,
-                    "dedup_generation": generation,
-                    "next_attempt": self.clock(),
-                }
+                values["next_attempt"] = self.clock()
                 kind = "DEDUP_OWNER_PROMOTED" if promoted else "DEDUP_RELINKED"
-                payload = {
-                    "previous_owner_id": owner["id"],
-                    "owner_id": successor,
-                    "generation": generation,
-                }
             session.execute(update(work).where(work.c.id == follower["id"]).values(**values))
             self._audit(session, n, result, event=kind, **payload)
             self._event(session, follower["id"], kind, payload)
@@ -507,9 +602,20 @@ class Runtime:
                 result = await self.delivery.deliver(
                     n,
                     before_attempt=lambda channel: self._before_attempt(identifier, token, channel),
+                    check_lease=lambda channel: self._before_attempt(
+                        identifier, token, channel, record_start=False
+                    ),
+                    after_attempt=lambda result: self._channel_result(
+                        identifier, token, row, result
+                    ),
                 )
         except DeliveryLeaseLostError:
             self._record_lease_loss(identifier, token, row)
+            return False
+        except DeliveryEvidenceError:
+            # The provider may have succeeded. Do not turn an evidence-store
+            # failure into a provider failure or trigger another fallback here.
+            log.exception("Channel evidence commit failed; lease recovery retains uncertainty")
             return False
         except DeliveryError as exc:
             result = exc.result or NotificationResult(
@@ -615,6 +721,7 @@ class Runtime:
                         work.c.next_attempt <= now,
                         work.c.lease_until <= now,
                     )
+                    .order_by(work.c.next_attempt, work.c.id)
                     .limit(100)
                 ).scalars()
             )
@@ -707,6 +814,7 @@ class Runtime:
                         acked_by=actor,
                         acked_at=datetime.fromtimestamp(now, UTC),
                         ack_metadata=metadata,
+                        created_at=datetime.fromtimestamp(now, UTC),
                     )
                 )
                 self._event(session, identifier, target, {"actor": actor, "metadata": metadata})
@@ -725,6 +833,7 @@ class Runtime:
                 session.execute(
                     select(work.c.id)
                     .where(work.c.ack_status == "PENDING", work.c.deadline <= now)
+                    .order_by(work.c.deadline, work.c.id)
                     .limit(100)
                 ).scalars()
             )
@@ -738,59 +847,138 @@ class Runtime:
                     now,
                 )
 
+    def _replay_blocker(self, session: Session, row: Any) -> tuple[str, str] | None:
+        identifier = row["dedup_successor_id"]
+        seen = {row["id"]}
+        while identifier:
+            if identifier in seen:
+                return identifier, "UNRESOLVED_LINEAGE"
+            seen.add(identifier)
+            successor = (
+                session.execute(select(work).where(work.c.id == identifier)).mappings().first()
+            )
+            if not successor or successor["dedup_key"] != row["dedup_key"]:
+                return identifier, "UNRESOLVED_LINEAGE"
+            if successor["status"] in ("PENDING", "DELIVERED", "DEDUPLICATED"):
+                return identifier, successor["status"]
+            identifier = successor["dedup_successor_id"]
+        claim = (
+            session.execute(select(dedup).where(dedup.c.key == row["dedup_key"])).mappings().first()
+        )
+        current = self._current_owner(session, claim, self.clock())
+        if current and current["id"] != row["id"]:
+            return current["id"], current["status"]
+        return None
+
     def replay(self, notification_id: UUID | str, *, actor: str) -> None:
         if not actor:
             raise ValueError("An authenticated actor is required")
+        identifier = str(notification_id)
         with self.sessions.begin() as session:
-            changed = (
-                session.connection()
-                .execute(
-                    update(work)
-                    .where(work.c.id == str(notification_id), work.c.dead_letter.is_(True))
-                    .values(
-                        status="PENDING",
-                        cycle=work.c.cycle + 1,
-                        cycle_attempts=0,
-                        dead_letter=False,
-                        lease_token=None,
-                        next_attempt=self.clock(),
-                        lease_until=0,
-                    )
-                )
-                .rowcount
-            )
-            if not changed:
+            if self.engine.dialect.name == "sqlite":
+                session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            row = session.execute(select(work).where(work.c.id == identifier)).mappings().first()
+            if not row:
                 raise Conflict("Only exhausted dead-letter notifications can be replayed")
+            claim = (
+                session.execute(
+                    select(dedup).where(dedup.c.key == row["dedup_key"]).with_for_update()
+                )
+                .mappings()
+                .first()
+            )
             row = (
-                session.execute(select(work).where(work.c.id == str(notification_id)))
+                session.execute(select(work).where(work.c.id == identifier).with_for_update())
                 .mappings()
                 .one()
             )
+            if not row["dead_letter"] or row["status"] != "FAILED":
+                raise Conflict("Only exhausted dead-letter notifications can be replayed")
+            blocker = self._replay_blocker(session, row)
+            if blocker:
+                target, status = blocker
+                if status == "PENDING":
+                    raise Conflict(f"Obligation recovery is pending under {target}")
+                raise Conflict(
+                    f"Obligation already satisfied or lineage unresolved: {target} ({status})"
+                )
+            # Replaying an earlier failed owner transfers its failed descendants
+            # to this new recovery cycle, preserving satisfaction evidence later.
+            successor_id = row["dedup_successor_id"]
+            while successor_id:
+                successor = (
+                    session.execute(select(work).where(work.c.id == successor_id)).mappings().one()
+                )
+                next_successor = successor["dedup_successor_id"]
+                session.execute(
+                    update(work)
+                    .where(work.c.id == successor_id)
+                    .values(dedup_successor_id=identifier)
+                )
+                successor_id = next_successor
+            generation = max(row["dedup_generation"] or 0, claim["generation"] if claim else 0) + 1
+            if row["dedup_key"]:
+                n = Notification.model_validate(row["notification"])
+                values = {
+                    "owner_id": identifier,
+                    "generation": generation,
+                    "until": self.clock()
+                    + (n.metadata["uns_resolution"]["effective"]["dedup_window_seconds"]),
+                }
+                if claim:
+                    session.execute(
+                        update(dedup).where(dedup.c.key == row["dedup_key"]).values(**values)
+                    )
+                else:
+                    session.execute(insert(dedup).values(key=row["dedup_key"], **values))
+            session.execute(
+                update(work)
+                .where(work.c.id == identifier)
+                .values(
+                    status="PENDING",
+                    cycle=work.c.cycle + 1,
+                    cycle_attempts=0,
+                    dead_letter=False,
+                    lease_token=None,
+                    next_attempt=self.clock(),
+                    lease_until=0,
+                    dedup_owner_id=None,
+                    dedup_successor_id=None,
+                    dedup_generation=generation,
+                )
+            )
             self._event(
                 session,
-                str(notification_id),
+                identifier,
                 "REPLAY_REQUESTED",
                 {
                     "actor": actor,
-                    "cycle": row["cycle"],
+                    "cycle": row["cycle"] + 1,
                     "cumulative_attempts": row["attempts"],
                 },
             )
 
     def dead_letters(self) -> list[dict[str, Any]]:
         with self.sessions() as session:
-            rows = session.execute(select(work).where(work.c.dead_letter.is_(True))).mappings()
-            return [
-                {
-                    "notification_id": r["id"],
-                    "status": r["status"],
-                    "attempts": r["attempts"],
-                    "cycle": r["cycle"],
-                    "cycle_attempts": r["cycle_attempts"],
-                    "outcome": r["outcome"],
-                }
-                for r in rows
-            ]
+            rows = list(
+                session.execute(select(work).where(work.c.dead_letter.is_(True))).mappings()
+            )
+            result = []
+            for row in rows:
+                blocker = self._replay_blocker(session, row)
+                result.append(
+                    {
+                        "notification_id": row["id"],
+                        "status": row["status"],
+                        "attempts": row["attempts"],
+                        "cycle": row["cycle"],
+                        "cycle_attempts": row["cycle_attempts"],
+                        "outcome": row["outcome"],
+                        "replay_blocked_by": blocker[0] if blocker else None,
+                        "replay_block_reason": blocker[1] if blocker else None,
+                    }
+                )
+            return result
 
     async def deliver_callbacks(self) -> None:
         """Retry terminal-event callbacks separately from committed state.
@@ -810,6 +998,7 @@ class Runtime:
                         events.c.callback_until <= now,
                         events.c.callback_attempts < 3,
                     )
+                    .order_by(events.c.callback_until, events.c.at, events.c.id)
                     .limit(100)
                 ).scalars()
             )

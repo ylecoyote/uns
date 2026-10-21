@@ -154,6 +154,8 @@ async def send_signal(
         return data
     if not state.legacy_fixture_mode:
         raise ValueError("A durable runtime is required for MCP mutations")
+    if state.audit_store is None:
+        raise RuntimeError("MCP runtime state is missing its audit store")
     response = await agsignal_signaling.send_signal(
         request=_signaling_request(payload),
         audit_store=state.audit_store,
@@ -186,6 +188,8 @@ async def ack_notification(
         return response.model_dump(mode="json")
     if not state.legacy_fixture_mode:
         raise ValueError("A durable runtime is required for MCP mutations")
+    if state.audit_store is None:
+        raise RuntimeError("MCP runtime state is missing its audit store")
     response = await agsignal_signaling.acknowledge(
         notification_id=payload.notification_id,
         acked_by=active_config.operator_principal,
@@ -222,6 +226,8 @@ async def dismiss_notification(
         return response.model_dump(mode="json")
     if not state.legacy_fixture_mode:
         raise ValueError("A durable runtime is required for MCP mutations")
+    if state.audit_store is None:
+        raise RuntimeError("MCP runtime state is missing its audit store")
     response = await agsignal_signaling.dismiss(
         notification_id=payload.notification_id,
         dismissed_by=active_config.operator_principal,
@@ -237,26 +243,49 @@ async def dismiss_notification(
     }
 
 
-async def get_ack_status(notification_id: str | UUID) -> dict[str, Any]:
+async def get_ack_status(
+    notification_id: str | UUID,
+    runtime_state: RuntimeState | None = None,
+) -> dict[str, Any]:
     """Return ACK status for a notification if it is tracked.
 
-    Delegates to ``agsignal.queries.get_ack_status``. Returns the
-    ``AckStatusResponse`` schema (``notification_id``, ``ack_status``).
+    A supplied runtime owns the read. Legacy callers without a runtime retain
+    ``agsignal.queries.get_ack_status`` and its ``AckStatusResponse`` schema.
     """
+    if runtime_state is not None and runtime_state.runtime is not None:
+        notification_key = str(notification_id)
+        try:
+            ack_status = runtime_state.runtime.get(notification_key)["ack_status"]
+        except KeyError:
+            ack_status = None
+        return {"notification_id": notification_key, "ack_status": ack_status}
     notification_uuid = UUID(str(notification_id))
     response = await query_get_ack_status(notification_id=notification_uuid)
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
-async def get_notification_status(notification_id: str | UUID) -> dict[str, Any]:
-    """Return the tracked notification status available from the ACK engine.
+async def get_notification_status(
+    notification_id: str | UUID,
+    runtime_state: RuntimeState | None = None,
+) -> dict[str, Any]:
+    """Return notification status from the owning runtime.
 
-    Delegates to ``agsignal.queries.get_notification_status``. Returns the
-    ``NotificationStatusResponse`` schema. Several fields
-    (``notification_type``, ``title``, ``message``, ``require_ack``) may be
-    ``None`` when only ack-engine state is available — the canonical schema
-    is defined in ``mcp_server.routes_notification.NotificationStatusResponse``.
+    Runtime reads preserve the durable MCP response shape. Legacy callers
+    without a runtime retain the ACK engine's ``NotificationStatusResponse``
+    schema through ``agsignal.queries.get_notification_status``.
     """
+    if runtime_state is not None and runtime_state.runtime is not None:
+        notification_key = str(notification_id)
+        try:
+            row = runtime_state.runtime.get(notification_key)
+        except KeyError:
+            return {"notification_id": notification_key, "found": False}
+        return {
+            "notification_id": notification_key,
+            "found": True,
+            "ack_status": row["ack_status"],
+            "status": row["status"],
+        }
     notification_uuid = UUID(str(notification_id))
     response = await query_get_notification_status(notification_id=notification_uuid)
     return cast(dict[str, Any], _json_safe(response.model_dump()))
@@ -269,6 +298,8 @@ def get_delivery_status(
     """Return persisted delivery audit status for a notification."""
     notification_uuid = UUID(str(notification_id))
     state = runtime_state or RuntimeState()
+    if state.audit_store is None:
+        raise RuntimeError("MCP runtime state is missing its audit store")
     audits = state.audit_store.get_delivery_audits_for_notification(notification_uuid)
     if not audits:
         return {
@@ -295,6 +326,9 @@ def get_delivery_status(
 def list_dlq(runtime_state: RuntimeState | None = None) -> dict[str, Any]:
     """List visible dead-lettered delivery failures."""
     state = runtime_state or RuntimeState()
+    if state.runtime is not None:
+        items = state.runtime.dead_letters()
+        return {"depth": len(items), "items": items}
     return {
         "depth": state.dlq_service.depth(),
         "items": [entry.model_dump(mode="json") for entry in state.dlq_service.list_entries()],

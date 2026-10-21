@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -33,7 +34,9 @@ from notification.adapters.base import (
     BaseAdapter,
     DeliveryLeaseLostError,
     DeliveryResult,
+    provider_attempt_deadline,
     provider_attempt_guard,
+    provider_lease_guard,
 )
 from notification.deduplication import should_deduplicate
 from notification.dlq import DLQService
@@ -63,6 +66,14 @@ class DeliveryError(Exception):
         super().__init__(message)
         self.notification = notification
         self.channel_errors = channel_errors or {}
+        self.result = result
+
+
+class DeliveryEvidenceError(RuntimeError):
+    """An observed channel result could not be persisted; do not start fallback."""
+
+    def __init__(self, result: DeliveryResult) -> None:
+        super().__init__(f"Unable to record {result.channel.value} delivery evidence")
         self.result = result
 
 
@@ -183,7 +194,12 @@ class DeliveryService:
     adapter_timeout_seconds: float = 10.0
 
     async def deliver(
-        self, notification: Notification, *, before_attempt: Callable[[Channel], None] | None = None
+        self,
+        notification: Notification,
+        *,
+        before_attempt: Callable[[Channel], None] | None = None,
+        check_lease: Callable[[Channel], None] | None = None,
+        after_attempt: Callable[[DeliveryResult], None] | None = None,
     ) -> NotificationResult:
         """Deliver a notification through the configured channels.
 
@@ -254,7 +270,12 @@ class DeliveryService:
 
         # Step 3: WebSocket delivery (fire-and-forget, no rate limit check)
         if Channel.WEBSOCKET in channels:
-            ws_result = await self._deliver_websocket(notification, before_attempt=before_attempt)
+            ws_result = await self._deliver_websocket(
+                notification,
+                before_attempt=before_attempt,
+                check_lease=check_lease,
+                after_attempt=after_attempt,
+            )
             channels_attempted.append(Channel.WEBSOCKET)
             if ws_result.success:
                 channels_succeeded.append(Channel.WEBSOCKET)
@@ -270,12 +291,20 @@ class DeliveryService:
         if delivery_mode == DeliveryMode.GUARANTEED:
             # Sequential fallback for GUARANTEED
             persistent_result = await self._deliver_guaranteed(
-                notification, persistent_channels, before_attempt=before_attempt
+                notification,
+                persistent_channels,
+                before_attempt=before_attempt,
+                check_lease=check_lease,
+                after_attempt=after_attempt,
             )
         else:
             # Attempt all channels for BEST_EFFORT
             persistent_result = await self._deliver_best_effort(
-                notification, persistent_channels, before_attempt=before_attempt
+                notification,
+                persistent_channels,
+                before_attempt=before_attempt,
+                check_lease=check_lease,
+                after_attempt=after_attempt,
             )
 
         channels_attempted.extend(persistent_result["attempted"])
@@ -384,19 +413,74 @@ class DeliveryService:
         adapter: BaseAdapter,
         notification: Notification,
         before_attempt: Callable[[Channel], None] | None,
+        check_lease: Callable[[Channel], None] | None = None,
+        after_attempt: Callable[[DeliveryResult], None] | None = None,
     ) -> DeliveryResult:
         # Run inside the wait_for task, immediately before adapter entry. There
         # must be no await between the ownership check and starting the effect.
-        token = provider_attempt_guard.set(before_attempt)
+        started = False
+
+        def start(channel: Channel) -> None:
+            nonlocal started
+            if before_attempt is not None:
+                before_attempt(channel)
+            started = True
+
+        def observe(result: DeliveryResult) -> None:
+            if after_attempt is not None:
+                try:
+                    after_attempt(result)
+                except Exception as exc:
+                    raise DeliveryEvidenceError(result) from exc
+
+        token = provider_attempt_guard.set(start)
+        lease_token = provider_lease_guard.set(check_lease)
+        deadline_token = provider_attempt_deadline.set(
+            time.monotonic() + self.adapter_timeout_seconds
+        )
         try:
-            if before_attempt is not None and not adapter.guards_provider_attempts:
-                before_attempt(adapter.channel)
-            return await adapter.deliver(notification)
+            try:
+                if not adapter.guards_provider_attempts:
+                    start(adapter.channel)
+                result = await adapter.deliver(notification)
+            except DeliveryLeaseLostError:
+                raise
+            except (Exception, asyncio.CancelledError) as exc:
+                # Completion evidence is independent of authoritative settlement.
+                # Record it here, before gather or a later channel can lose the lease.
+                if after_attempt is not None:
+                    evidence = DeliveryResult(
+                        success=False,
+                        channel=adapter.channel,
+                        error=str(exc) or "Delivery cancelled or timed out",
+                        metadata={
+                            "provider_outcome": "UNKNOWN" if started else "NOT_STARTED",
+                            "provider_effect_may_have_occurred": started,
+                        },
+                        delivered_at=datetime.now(UTC),
+                    )
+                    if isinstance(exc, asyncio.CancelledError):
+                        try:
+                            observe(evidence)
+                        except Exception:
+                            logger.exception("Unable to record cancelled channel evidence")
+                    else:
+                        observe(evidence)
+                raise
+            observe(result)
+            return result
         finally:
+            provider_attempt_deadline.reset(deadline_token)
+            provider_lease_guard.reset(lease_token)
             provider_attempt_guard.reset(token)
 
     async def _deliver_websocket(
-        self, notification: Notification, *, before_attempt: Callable[[Channel], None] | None = None
+        self,
+        notification: Notification,
+        *,
+        before_attempt: Callable[[Channel], None] | None = None,
+        check_lease: Callable[[Channel], None] | None = None,
+        after_attempt: Callable[[DeliveryResult], None] | None = None,
     ) -> DeliveryResult:
         """Deliver via WebSocket (fire-and-forget).
 
@@ -414,7 +498,9 @@ class DeliveryService:
 
         try:
             result = await asyncio.wait_for(
-                self._attempt_adapter(adapter, notification, before_attempt),
+                self._attempt_adapter(
+                    adapter, notification, before_attempt, check_lease, after_attempt
+                ),
                 timeout=self.adapter_timeout_seconds,
             )
             return result
@@ -436,6 +522,8 @@ class DeliveryService:
         channels: list[Channel],
         *,
         before_attempt: Callable[[Channel], None] | None = None,
+        check_lease: Callable[[Channel], None] | None = None,
+        after_attempt: Callable[[DeliveryResult], None] | None = None,
     ) -> dict[str, Any]:
         """Deliver with GUARANTEED semantics.
 
@@ -481,7 +569,9 @@ class DeliveryService:
 
             try:
                 result = await asyncio.wait_for(
-                    self._attempt_adapter(adapter, notification, before_attempt),
+                    self._attempt_adapter(
+                        adapter, notification, before_attempt, check_lease, after_attempt
+                    ),
                     timeout=self.adapter_timeout_seconds,
                 )
                 attempted.append(channel)
@@ -531,6 +621,8 @@ class DeliveryService:
         channels: list[Channel],
         *,
         before_attempt: Callable[[Channel], None] | None = None,
+        check_lease: Callable[[Channel], None] | None = None,
+        after_attempt: Callable[[DeliveryResult], None] | None = None,
     ) -> dict[str, Any]:
         """Deliver with BEST_EFFORT semantics.
 
@@ -555,7 +647,9 @@ class DeliveryService:
 
             try:
                 result = await asyncio.wait_for(
-                    self._attempt_adapter(adapter, notification, before_attempt),
+                    self._attempt_adapter(
+                        adapter, notification, before_attempt, check_lease, after_attempt
+                    ),
                     timeout=self.adapter_timeout_seconds,
                 )
                 return channel, result
@@ -567,7 +661,9 @@ class DeliveryService:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
-            if isinstance(result, (asyncio.CancelledError, DeliveryLeaseLostError)):
+            if isinstance(
+                result, (asyncio.CancelledError, DeliveryLeaseLostError, DeliveryEvidenceError)
+            ):
                 raise result
             if isinstance(result, BaseException):
                 # Unexpected exception

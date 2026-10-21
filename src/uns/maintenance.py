@@ -72,7 +72,14 @@ def _eligible(cutoff: float, now: float) -> list[Any]:
             select(1).where(_ACK.c.notification_id == audit_id, _ACK.c.created_at >= audit_cutoff)
         ),
         ~exists(select(1).where(dedup.c.owner_id == work.c.id, dedup.c.until > now)),
-        ~exists(select(1).where(follower.c.dedup_owner_id == work.c.id)),
+        ~exists(
+            select(1).where(
+                or_(
+                    follower.c.dedup_owner_id == work.c.id,
+                    follower.c.dedup_successor_id == work.c.id,
+                )
+            )
+        ),
     ]
 
 
@@ -349,7 +356,9 @@ def main(argv: list[str] | None = None) -> None:
         "--after-id", help="Continue after a returned next_after_id; omit to start a new pass"
     )
     parser.add_argument(
-        "--archive", type=Path, help="New archive file in a trusted existing directory"
+        "--archive",
+        type=Path,
+        help="Export event/audit rows before pruning them; without this, full removed operational rows remain in database receipts. New file in a trusted existing directory; no file-size reduction promised",
     )
     args = parser.parse_args(argv)
     if not args.database_url:

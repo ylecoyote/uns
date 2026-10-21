@@ -26,11 +26,24 @@ class DeliveryLeaseLostError(Exception):
 provider_attempt_guard: ContextVar[Callable[[Channel], None] | None] = ContextVar(
     "provider_attempt_guard", default=None
 )
+provider_lease_guard: ContextVar[Callable[[Channel], None] | None] = ContextVar(
+    "provider_lease_guard", default=None
+)
+provider_attempt_deadline: ContextVar[float | None] = ContextVar(
+    "provider_attempt_deadline", default=None
+)
 
 
 def guard_provider_attempt(channel: Channel) -> None:
-    """Check the current task's durable lease, when running through UNS."""
+    """Fence and record one provider send, when running through UNS."""
     guard = provider_attempt_guard.get()
+    if guard is not None:
+        guard(channel)
+
+
+def recheck_provider_lease(channel: Channel) -> None:
+    """Check ownership before preparation, without recording a provider send."""
+    guard = provider_lease_guard.get()
     if guard is not None:
         guard(channel)
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from agsignal.responses import SendNotificationRequest
 from agsignal.signaling import _resolve_notification
-from db.policy_store import PolicySnapshot, SQLAlchemyPolicyStore
+from db.policy_store import SQLAlchemyPolicyStore
 from notification.models import Channel, DeliveryMode, Notification
 from notification.policies import PolicyOverrideError, PolicyRegistry
 from notification.policy_loader import compute_policy_content_hash
@@ -26,32 +26,24 @@ _RESERVED_METADATA = frozenset(
 class PolicyRuntime:
     """Resolve immutable, persisted ACTIVE policy at the acceptance transaction.
 
-    No process-global registry is consulted. The private cache holds serialized
-    immutable content and never lends a mutable registry to another request.
-    Every resolution locks and verifies the dedicated revision in the caller's
-    transaction. Activation cannot commit until that transaction completes.
+    No process-global registry is consulted. Each request owns its immutable
+    snapshot and detached registry. Intake locks the revision in the caller's
+    transaction, so activation cannot commit until acceptance completes.
+    Inspection and standalone simulation read a consistent committed snapshot.
     """
 
     def __init__(
         self, sessions: sessionmaker[Session], *, adapters: SimpleAdapterRegistry | None = None
     ) -> None:
-        self._sessions = sessions
         self._adapters = adapters
         self.store = SQLAlchemyPolicyStore(sessions)
         self.store.ensure_snapshot_schema()
         # Cold HTTP/MCP processes hydrate and migrate existing policy state here.
-        self._snapshot: PolicySnapshot = self.store.load_snapshot()
+        self.store.load_snapshot()
 
     def registry(self) -> PolicyRegistry:
         """A detached view for effective-policy queries; never mutable authority."""
-        with self._sessions.begin() as session:
-            return self._current(session).registry()
-
-    def _current(self, session: Session) -> PolicySnapshot:
-        snapshot = self.store.load_snapshot(session)
-        if snapshot.revision != self._snapshot.revision:
-            self._snapshot = snapshot
-        return self._snapshot
+        return self.store.load_snapshot().registry()
 
     def resolve(
         self,
@@ -60,10 +52,10 @@ class PolicyRuntime:
         session: Session | None = None,
         principal: str,
     ) -> Notification:
-        """Resolve with no delivery/audit side effects, retaining caller's lock.
+        """Resolve with no delivery/audit side effects.
 
-        Intake MUST pass its acceptance session. Standalone use opens a short
-        transaction for simulation, without creating notification or audit rows.
+        Intake MUST pass its acceptance session to retain the revision lock
+        until commit. Standalone simulation uses the read-only snapshot path.
         """
         if not principal:
             raise ValueError("An authenticated principal is required")
@@ -81,10 +73,9 @@ class PolicyRuntime:
                 "Producer metadata cannot control adapter routing or urgency: "
                 + ", ".join(rejected)
             )
-        if session is None:
-            with self._sessions.begin() as transaction:
-                return self.resolve(request, session=transaction, principal=principal)
-        snapshot = self._current(session)
+        snapshot = (
+            self.store.load_snapshot() if session is None else self.store.lock_snapshot(session)
+        )
         registry = snapshot.registry()
         _, notification = _resolve_notification(request, policy_registry=registry)
         if not notification.channels:
