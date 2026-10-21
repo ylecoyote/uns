@@ -23,7 +23,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -447,22 +447,28 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         }
         from uuid import UUID
 
-        # Note: AckAuditRecord doesn't have all the context fields,
-        # so we use placeholder values where needed
+        records = self._audit_store.get_delivery_audits_for_notification(record.notification_id)
+        context = records[0] if records else None
         return AuditEvent(
             audit_id=record.audit_id,
             event_type=status_to_event.get(record.new_status, "ack.unknown"),
             event_time=record.audit_created_at,
             notification_id=record.notification_id,
-            notification_type="",  # Not available in ack records
-            autonomy_mode=AutonomyMode.PREVIEW,  # Placeholder - not stored in ack record
-            agent_id=UUID("00000000-0000-0000-0000-000000000000"),  # Placeholder
+            notification_type=context.notification_type if context else "",
+            autonomy_mode=AutonomyMode(context.autonomy_mode) if context else AutonomyMode.PREVIEW,
+            agent_id=context.agent_id if context else UUID("00000000-0000-0000-0000-000000000000"),
+            plan_id=context.plan_id if context else None,
+            decision_snapshot_id=context.decision_snapshot_id if context else None,
+            execution_snapshot_id=context.execution_snapshot_id if context else None,
+            skip_snapshot_id=context.skip_snapshot_id if context else None,
+            correlation_id=context.correlation_id if context else None,
             payload={
                 "old_status": record.old_status.value if record.old_status else None,
                 "new_status": record.new_status.value,
                 "acked_by": record.acked_by,
                 "acked_at": record.acked_at.isoformat(),
                 **record.metadata,
+                "context_unavailable": context is None,
             },
         )
 
@@ -549,6 +555,12 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                 if filter_criteria.end_time and ack_record.audit_created_at >= filter_criteria.end_time:
                     continue
                 event = self._ack_record_to_event(ack_record)
+                if filter_criteria.agent_id and event.agent_id != filter_criteria.agent_id:
+                    continue
+                if filter_criteria.autonomy_mode and event.autonomy_mode != filter_criteria.autonomy_mode:
+                    continue
+                if filter_criteria.correlation_id and event.correlation_id != filter_criteria.correlation_id:
+                    continue
                 if filter_criteria.event_type and event.event_type != filter_criteria.event_type:
                     continue
                 all_events.append(event)
@@ -573,6 +585,11 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
 # =============================================================================
 # SQLAlchemy Read Model Adapter
 # =============================================================================
+
+
+def _utc(value: datetime) -> datetime:
+    """SQLite strips timezone metadata from UTC audit columns; restore it on reads."""
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
 
 class SQLAlchemyReadModelAdapter(ReadModelAdapter):
@@ -686,8 +703,8 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                     intent=NotificationIntent(r.intent),
                     delivery_mode=DeliveryMode(r.delivery_mode),
                     status=DeliveryStatus(r.status),
-                    created_at=r.notification_created_at,
-                    delivered_at=r.delivered_at,
+                    created_at=_utc(r.notification_created_at),
+                    delivered_at=_utc(r.delivered_at) if r.delivered_at else None,
                     channels_attempted=[Channel(c) for c in r.channels_attempted],
                     channels_succeeded=[Channel(c) for c in r.channels_succeeded],
                     autonomy_mode=AutonomyMode(r.autonomy_mode),
@@ -741,8 +758,8 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         attempt_id=uuid4(),
                         channel=channel,
                         status=status,
-                        started_at=result.delivered_at,
-                        completed_at=result.delivered_at,
+                        started_at=_utc(result.delivered_at),
+                        completed_at=_utc(result.delivered_at),
                         duration_ms=0,
                         error_message=result.error_message if status == "FAILED" else None,
                     )
@@ -754,8 +771,8 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 intent=NotificationIntent(result.intent),
                 delivery_mode=DeliveryMode(result.delivery_mode),
                 status=DeliveryStatus(result.status),
-                created_at=result.notification_created_at,
-                delivered_at=result.delivered_at,
+                created_at=_utc(result.notification_created_at),
+                delivered_at=_utc(result.delivered_at) if result.delivered_at else None,
                 attempts=attempts,
                 channels_attempted=[Channel(c) for c in result.channels_attempted],
                 channels_succeeded=[Channel(c) for c in result.channels_succeeded],
@@ -848,7 +865,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         AuditEvent(
                             audit_id=r.id,
                             event_type=event_type,
-                            event_time=r.created_at,
+                            event_time=_utc(r.created_at),
                             notification_id=r.notification_id,
                             notification_type=r.notification_type,
                             autonomy_mode=AutonomyMode(r.autonomy_mode),
@@ -870,7 +887,21 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
             # Query ack audits (if not filtering for delivery-only events)
             if filter_criteria.event_type is None or filter_criteria.event_type.startswith("ack."):
-                ack_stmt = select(AckAuditRecordDB)
+                latest_context = (
+                    select(NotificationAuditRecord.id)
+                    .where(NotificationAuditRecord.notification_id == AckAuditRecordDB.notification_id)
+                    .order_by(NotificationAuditRecord.created_at.desc(), NotificationAuditRecord.id.desc())
+                    .limit(1).correlate(AckAuditRecordDB).scalar_subquery()
+                )
+                ack_stmt = select(AckAuditRecordDB, NotificationAuditRecord).outerjoin(
+                    NotificationAuditRecord, NotificationAuditRecord.id == latest_context
+                )
+                if filter_criteria.agent_id:
+                    ack_stmt = ack_stmt.where(NotificationAuditRecord.agent_id == filter_criteria.agent_id)
+                if filter_criteria.autonomy_mode:
+                    ack_stmt = ack_stmt.where(NotificationAuditRecord.autonomy_mode == filter_criteria.autonomy_mode.value)
+                if filter_criteria.correlation_id:
+                    ack_stmt = ack_stmt.where(NotificationAuditRecord.correlation_id == filter_criteria.correlation_id)
 
                 if filter_criteria.start_time:
                     ack_stmt = ack_stmt.where(
@@ -888,9 +919,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 ack_results = (
                     session.execute(
                         ack_stmt.order_by(AckAuditRecordDB.created_at.desc()).limit(fetch_limit)
-                    )
-                    .scalars()
-                    .all()
+                    ).all()
                 )
 
                 ack_status_to_event = {
@@ -902,7 +931,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 # Use UUID directly since it's already imported at module level
                 nil_uuid = UUID("00000000-0000-0000-0000-000000000000")
 
-                for r in ack_results:
+                for r, context in ack_results:
                     event_type = ack_status_to_event.get(r.new_status, "ack.unknown")
                     if filter_criteria.event_type and event_type != filter_criteria.event_type:
                         continue
@@ -910,16 +939,22 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         AuditEvent(
                             audit_id=r.id,
                             event_type=event_type,
-                            event_time=r.created_at,
+                            event_time=_utc(r.created_at),
                             notification_id=r.notification_id,
-                            notification_type="",
-                            autonomy_mode=AutonomyMode.PREVIEW,
-                            agent_id=nil_uuid,
+                            notification_type=context.notification_type if context else "",
+                            autonomy_mode=AutonomyMode(context.autonomy_mode) if context else AutonomyMode.PREVIEW,
+                            agent_id=context.agent_id if context else nil_uuid,
+                            plan_id=context.plan_id if context else None,
+                            decision_snapshot_id=context.decision_snapshot_id if context else None,
+                            execution_snapshot_id=context.execution_snapshot_id if context else None,
+                            skip_snapshot_id=context.skip_snapshot_id if context else None,
+                            correlation_id=context.correlation_id if context else None,
                             payload={
                                 "old_status": r.old_status,
                                 "new_status": r.new_status,
                                 "acked_by": r.acked_by,
-                                "acked_at": r.acked_at.isoformat() if r.acked_at else None,
+                                "acked_at": _utc(r.acked_at).isoformat() if r.acked_at else None,
+                                "context_unavailable": context is None,
                             },
                         )
                     )
