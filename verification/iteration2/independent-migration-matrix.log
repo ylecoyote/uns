@@ -1,0 +1,16 @@
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=ba6801de-bd1c-4374-a8c4-7b83620b7890 channel=SLACK error=None
+No WebSocket adapter registered
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=2bdea08b-eb9b-4eeb-9e16-43365f4e6b9e channel=SLACK error=None
+No WebSocket adapter registered
+No WebSocket adapter registered
+GUARANTEED delivery failed, trying fallback: notification_id=16c79068-182c-4ecb-993d-b70e490e0f02 channel=SLACK error=None
+No WebSocket adapter registered
+root [('DELIVERED', None), ('FAILED', '857d3801-3e6e-47a5-9aa4-ae12c4210c11'), ('FAILED', '857d3801-3e6e-47a5-9aa4-ae12c4210c11')] PASS
+middle [('FAILED', 'ce06c269-bd94-4326-9432-df452807bb32'), ('DELIVERED', None), ('FAILED', 'ce06c269-bd94-4326-9432-df452807bb32')] PASS
+leaf [('FAILED', '29a0e83c-10c6-4bfe-b7cc-715a4e60dabe'), ('FAILED', '29a0e83c-10c6-4bfe-b7cc-715a4e60dabe'), ('DELIVERED', None)] PASS
+pending_root [('PENDING', None), ('FAILED', '77ebac36-878c-4403-9e88-f3a2fb3d4fbe'), ('FAILED', '77ebac36-878c-4403-9e88-f3a2fb3d4fbe')] PASS
+all_failed, first recovery 0 then 1 PASS
+all_failed, first recovery 1 then 2 PASS
+all_failed, first recovery 2 then 0 PASS

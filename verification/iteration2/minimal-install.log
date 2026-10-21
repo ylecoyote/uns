@@ -1,0 +1,12 @@
+Using Python 3.12.9 environment at: /private/tmp/uns-iteration2-minimal
+Resolved 8 packages in 138ms
+Prepared 1 package in 9ms
+Installed 8 packages in 9ms
+ + annotated-types==0.8.0
+ + google-re2==1.1.20251105
+ + pydantic==2.14.1
+ + pydantic-core==2.50.1
+ + pyyaml==6.0.3
+ + typing-extensions==4.16.0
+ + typing-inspection==0.4.4
+ + uns==0.1.0 (from file:///private/tmp/uns-iteration2/dist/uns-0.1.0-py3-none-any.whl)

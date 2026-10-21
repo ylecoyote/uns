@@ -1,0 +1,83 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/uns-iteration2
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items
+
+verification/iteration2/reviewer_reproductions.py FFFFFFFFFFF            [100%]
+
+=================================== FAILURES ===================================
+_ test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered _
+verification/iteration2/reviewer_reproductions.py:116: in test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered
+    assert runtime.get(follower1.notification_id)["status"] == "DEDUPLICATED"
+E   AssertionError: assert 'DELIVERED' == 'DEDUPLICATED'
+E     
+E     - DEDUPLICATED
+E     + DELIVERED
+_ test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send __
+verification/iteration2/reviewer_reproductions.py:141: in test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send
+    assert len(adapter.calls) == 2  # Expected: 1 failed (n_a) + 1 delivered (n_b), no 2nd delivered send
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: assert 3 == 2
+E    +  where 3 = len(['fe3328eb-41e3-4c8a-8495-d3095ce53dac', '40164e00-a7e8-44cd-bd42-7ea3bde4f930', 'fe3328eb-41e3-4c8a-8495-d3095ce53dac'])
+E    +    where ['fe3328eb-41e3-4c8a-8495-d3095ce53dac', '40164e00-a7e8-44cd-bd42-7ea3bde4f930', 'fe3328eb-41e3-4c8a-8495-d3095ce53dac'] = RecordingAdapter(channel=SLACK).calls
+______ test_f03_best_effort_lease_loss_discards_completed_channel_outcome ______
+verification/iteration2/reviewer_reproductions.py:188: in test_f03_best_effort_lease_loss_discards_completed_channel_outcome
+    assert "SLACK" in row["outcome"]["channels_succeeded"]
+E   AssertionError: assert 'SLACK' in []
+_ test_f04a_email_adapter_single_send_emits_duplicate_channel_attempt_started __
+verification/iteration2/reviewer_reproductions.py:234: in test_f04a_email_adapter_single_send_emits_duplicate_channel_attempt_started
+    assert kinds.count("CHANNEL_ATTEMPT_STARTED") == 1
+E   AssertionError: assert 2 == 1
+E    +  where 2 = <built-in method count of list object at 0x11311e700>('CHANNEL_ATTEMPT_STARTED')
+E    +    where <built-in method count of list object at 0x11311e700> = ['ACCEPTED', 'ATTEMPT_STARTED', 'CHANNEL_ATTEMPT_STARTED', 'CHANNEL_ATTEMPT_STARTED', 'DELIVERY_RESULT'].count
+_ test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout _
+verification/iteration2/reviewer_reproductions.py:299: in test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout
+    assert sendmail_completed_at == []  # Fails: sendmail completed after dispatch finished!
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   assert [137410.389845916] == []
+E     
+E     Left contains one more item: 137410.389845916
+E     Use -v to get more diff
+_____ test_f05_read_only_policy_registry_executes_unconditional_sql_update _____
+verification/iteration2/reviewer_reproductions.py:315: in test_f05_read_only_policy_registry_executes_unconditional_sql_update
+    assert update_statements == []
+E   AssertionError: assert ['UPDATE noti...ingleton = ?'] == []
+E     
+E     Left contains one more item: 'UPDATE notification_policy_revision SET revision=notification_policy_revision.revision WHERE notification_policy_revision.singleton = ?'
+E     Use -v to get more diff
+___ test_f06a_deliver_callbacks_orders_new_zero_until_ahead_of_overdue_retry ___
+verification/iteration2/reviewer_reproductions.py:368: in test_f06a_deliver_callbacks_orders_new_zero_until_ahead_of_overdue_retry
+    assert early_event_id in delivered_event_ids
+E   AssertionError: assert 'be4a6f4a-67ad-4088-9e6f-1ae198696324' in ['edb35e27-4df2-4f9a-9520-d1af9ef84875', 'f1626653-98cb-4ab1-8a56-73cce38e4df9', '85369235-b986-458d-bcbb-eed52f3c344c...6df0-c184-4827-a9da-998c0d0737cd', '491763e4-4124-4e87-a57b-1056d7e2b9c9', 'dd66bcae-41b6-42b5-a34c-56a722bd5eee', ...]
+_ test_f06b_deliver_callbacks_starves_overdue_retry_across_ticks_under_fresh_arrivals _
+verification/iteration2/reviewer_reproductions.py:419: in test_f06b_deliver_callbacks_starves_overdue_retry_across_ticks_under_fresh_arrivals
+    assert early_event_id in delivered_event_ids
+E   AssertionError: assert '33116504-909b-4792-8093-cc105f8b5ec1' in ['351f13aa-0976-410d-ac50-b66353178106', 'cf46d079-0485-46df-8d7b-921e5169c8d9', 'a1515f09-c64b-451c-916d-54324e67909a...8efa-f510-4131-9ba9-8588e3e8bc6f', '5859198d-c0bb-40de-bed4-f5925fa5ebba', '31144906-60e0-4b2f-884f-5cece289eb8d', ...]
+______ test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime ______
+verification/iteration2/reviewer_reproductions.py:439: in test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime
+    assert delivery_status["found"] is True
+E   assert False is True
+_ test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event _
+verification/iteration2/reviewer_reproductions.py:485: in test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event
+    assert "removed" not in receipt["payload"]
+E   AssertionError: assert 'removed' not in {'applied': True, 'operator': 'ops', 'cutoff': 1792561312.4373848, 'idempotency_seconds': 60.0, ...}
+_______ test_f08b_retention_blocks_pruning_under_synthetic_runtime_clock _______
+verification/iteration2/reviewer_reproductions.py:512: in test_f08b_retention_blocks_pruning_under_synthetic_runtime_clock
+    assert report["deleted_rows"] >= 1
+E   assert 0 >= 1
+=========================== short test summary info ============================
+FAILED verification/iteration2/reviewer_reproductions.py::test_f01_stale_window_owner_failure_promotes_follower_after_new_owner_delivered
+FAILED verification/iteration2/reviewer_reproductions.py::test_f02_replay_after_follower_promoted_and_delivered_causes_duplicate_send
+FAILED verification/iteration2/reviewer_reproductions.py::test_f03_best_effort_lease_loss_discards_completed_channel_outcome
+FAILED verification/iteration2/reviewer_reproductions.py::test_f04a_email_adapter_single_send_emits_duplicate_channel_attempt_started
+FAILED verification/iteration2/reviewer_reproductions.py::test_f04b_slow_smtp_executor_thread_completes_sendmail_after_adapter_timeout
+FAILED verification/iteration2/reviewer_reproductions.py::test_f05_read_only_policy_registry_executes_unconditional_sql_update
+FAILED verification/iteration2/reviewer_reproductions.py::test_f06a_deliver_callbacks_orders_new_zero_until_ahead_of_overdue_retry
+FAILED verification/iteration2/reviewer_reproductions.py::test_f06b_deliver_callbacks_starves_overdue_retry_across_ticks_under_fresh_arrivals
+FAILED verification/iteration2/reviewer_reproductions.py::test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime
+FAILED verification/iteration2/reviewer_reproductions.py::test_f08a_non_archive_retention_embeds_full_deleted_rows_in_unprunable_event
+FAILED verification/iteration2/reviewer_reproductions.py::test_f08b_retention_blocks_pruning_under_synthetic_runtime_clock
+============================== 11 failed in 4.07s ==============================

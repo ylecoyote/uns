@@ -6,7 +6,7 @@ DRAFT is proposal state, PREVIEW is shadow-only, ACTIVE is eligible for runtime,
 
 Canonical Runtime uses immutable database snapshots and a monotonic revision. `notification_policy_revision` records the current revision; `notification_policy_snapshots` retains serialized ACTIVE snapshots and hashes. `notification_policy_contents` preserves complete per-version content, including DRAFT/PREVIEW intent and priority fields, while `notification_policies` retains lifecycle/history compatibility. Row status remains authoritative.
 
-A fresh process hydrates the persisted snapshot. Each intake checks and locks the revision inside its acceptance transaction. Activation and acceptance therefore have a defined commit order across processes without polling generic database changes or requiring pub/sub. Different runtime databases do not share mutable policy authority.
+A fresh process hydrates the persisted snapshot. Each intake checks and locks the revision inside its acceptance transaction. Activation and acceptance therefore have a defined commit order across processes without polling generic database changes or requiring pub/sub. Different runtime databases do not share mutable policy authority. Steady-state inspection and simulation read revision plus immutable snapshot with one SELECT and no write lock. Cold bootstrap may initialize durable snapshot state; intake/mutations still use the revision lock.
 
 Reload validates the complete candidate, persists it transactionally and advances the revision. Failure leaves the prior snapshot active. Accepted work retains original settings. Effective-policy inspection and simulation use the same resolved mode overrides and configured intent as intake.
 

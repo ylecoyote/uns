@@ -6,13 +6,13 @@ The canonical chain is producer -> transactional policy resolution and acceptanc
 
 `uns.Runtime` owns a `PolicyRuntime` tied to its database session factory. An immutable ACTIVE snapshot and monotonic revision replace the mutable global registry as canonical authority. Acceptance locks/checks the revision in the same transaction that stores the resolved notification, recoverable work, deduplication relationship and audit. Concurrent activation is ordered against that commit. A fresh HTTP or MCP process hydrates persisted policy automatically.
 
-Snapshots, full per-version policy content and lifecycle rows have separate roles. Lifecycle status remains authoritative; a serialized historical ACTIVE policy cannot revive a RETIRED row. Accepted work retains its exact resolved revision/settings after subsequent activation. Simulation uses a short resolution transaction but creates no notification, delivery or acknowledgment state.
+Snapshots, full per-version policy content and lifecycle rows have separate roles. Lifecycle status remains authoritative; a serialized historical ACTIVE policy cannot revive a RETIRED row. Accepted work retains its exact resolved revision/settings after subsequent activation. Steady-state inspection and simulation read revision plus immutable snapshot with one SELECT and do not reserve the writer. Intake/mutations retain the revision lock. Cold initialization may write to bootstrap legacy snapshots; missing referenced snapshot state fails closed. Simulation creates no notification, delivery or acknowledgment state.
 
 ## Deduplication and replay
 
 `uns_notifications` holds delivery work, response deadlines and idempotency identity. `uns_dedup` points to an owner and generation for a scoped effective obligation. A duplicate of pending work follows that live owner and is not dispatched independently. Owner success settles followers; owner failure elects one successor and re-links the group atomically, avoiding both a silent lost obligation and a parallel alert storm.
 
-FAILED owners never suppress a fresh obligation. Explicit replay starts a new delivery cycle with a fresh cycle budget while preserving cumulative attempt history. Old ownerless dedup claims cannot establish successful delivery and are not trusted after migration. Historical pre-upgrade suppressed events cannot be reliably reconstructed automatically.
+Pending ownership remains exclusive beyond TTL expiry. Promotion retains the suppression window. Durable `dedup_successor_id` handoffs protect replay after claim expiry/replacement and retain referenced satisfaction evidence during maintenance. Failed histories remain visible, but replay conflicts when a successor is pending/delivered or lineage cannot be established. FAILED owners never suppress a fresh obligation. Explicit replay starts a new delivery cycle with a fresh cycle budget while preserving cumulative attempt history. Old ownerless dedup claims cannot establish successful delivery and are not trusted after migration. Historical pre-upgrade suppressed events cannot be reliably reconstructed automatically.
 
 ## Delivery and recovery
 

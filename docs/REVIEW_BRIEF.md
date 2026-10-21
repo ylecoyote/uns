@@ -1,6 +1,6 @@
 # UNS remediation review brief
 
-Prepared 2026-10-20. Reviewed implementation target: **`902300773d7ad41baefab8e007d0f37981ba6be9`**. Remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Later documentation/receipt commits do not change this code target.
+Updated 2026-10-20 (local date). Reviewed implementation target: **`ba46a311d071736a6beca241a6e43a1407f29f3b`**. Iteration 2 base: `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`; original remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Subsequent documentation/receipt commits preserve this application code.
 
 This is an author-prepared handoff, not a production certification. An Astra/ultra implementation team addressed the earlier reproduced failures, and separate focused reviewers found additional issues that were repaired. Review the code and failure behavior independently; test totals and line coverage are supporting evidence, not proof of every interleaving.
 
@@ -12,20 +12,20 @@ An acknowledgment records an actor response, not human comprehension or permissi
 
 ## What changed after adversarial feedback
 
-| Area | Remediation |
-|---|---|
-| Failed-owner suppression | Dedup now records owner/generation and effective obligation. Pending followers remain linked to live work; failure elects one successor rather than silently dropping followers or releasing an alert storm. FAILED owners cannot suppress fresh intake. |
-| Exhausted replay | A new replay cycle gets a fresh attempt budget; cumulative attempts and audit history remain. |
-| Policy coherence | Cold processes hydrate immutable ACTIVE snapshots. A dedicated monotonic database revision is checked/locked in the acceptance transaction, ordering activation against intake across processes. |
-| Producer authority | Differing ACTIVE-policy overrides and adapter-routing/severity metadata bypasses are rejected. No payload can grant an administrative exception. |
-| Lease loss | Guards precede fallback channels, built-in internal retries, and queued SMTP effects. Stale database commits remain fenced. Already-sent effects remain uncertain. |
-| Recovery lifecycle | HTTP and write-enabled MCP own dispatch, expiry and callback loops. Callback batches cannot hold the expiry loop. CLI shutdown joins workers; standalone writable MCP requires persistent storage. |
-| Authentication | Reads, writes, readiness, metrics and WS handshake are authenticated by default. Only minimal liveness is public. WS ACK uses durable Runtime and verified identity. |
-| Read isolation | HTTP/MCP readers are bound to their owning runtime. The independent reviewer reproduced cross-runtime disclosures before the fix and verified the original five cases pass afterward. |
-| Retention | Explicit bounded dry-run/apply and optional durable archive-before-prune protect unsettled obligations. Continuation cursors prevent oversized groups from starving later groups. |
-| Frontend | Runtime-memory operator sign-in, safe cancellation/logout and authenticated reads. Dependency upgrades removed the previously recorded frontend advisories. |
+The first iteration added durable policy snapshots, owner/follower dedup, replay cycles, provider guards, isolated recovery, authenticated/scoped transport reads and explicit retention. The second review supplied 11 executable assertions, all reproduced on its base. [Iteration 2 decisions and dispositions](REMEDIATION_ITERATION2.md) records the exact response, including corrected source claims and by-design behavior.
 
-Other corrections preserve full draft/preview policy content, make first-upgrade policy schema creation concurrency-safe, align effective-policy inspection with actual mode resolution, and fix exact channel-array filtering in SQLite instead of serialized substring matching.
+| Area | Current behavior |
+|---|---|
+| Dedup ownership | Pending ownership survives TTL expiry; promotion preserves window expiry. Legacy overlapping failure follows the current owner without replacing it or electing parallel work. |
+| Replay | Durable successor lineage prevents replay after satisfaction or during successor recovery. Atomic replay claims ownership; failed history remains visible with replay blockers until explicit resolution. Migration conservatively recovers recorded promotion groups, including prior root replay and missing successors. |
+| Lease evidence | Completed channels append observations attributed to their original lease even when another channel loses ownership. Authoritative state remains fenced; evidence-store failure cannot trigger immediate fallback. |
+| SMTP | Lease rechecks do not double-count sends. Shared deadlines/cancellation prevent later send admission. Already-started effects can finish after timeout and remain UNKNOWN locally. |
+| Policy reads | Steady-state inspection/simulation uses one SELECT; acceptance and mutations keep transactional revision locking. |
+| Scheduling | Callback initial due times and explicit ordering prevent fresh arrivals from systematically preempting overdue retries. Dispatch and expiry have explicit due-time ordering. |
+| MCP | Direct runtime-bound helpers and server wrappers share durable reads, while explicit injected dependencies and legacy unbound behavior remain supported. |
+| Retention/audit | Runtime audit clocks align. Successor references protect replay evidence. Non-archive receipt preservation is intentional; CLI help clarifies its storage limits. |
+
+Authentication, override rejection, frontend controls and first-iteration fixes remain in place. There is no force-send override, fleet-wide rate limiter, or new action-authorization capability.
 
 ## Current mechanism
 
@@ -41,7 +41,7 @@ Event + host identity + context
 
 Simulation does not create notification/audit/delivery state. `send()` still attempts dispatch before returning; callers needing a fast handoff use `accept()` and a running worker. Idempotency uses principal/source/key plus request fingerprint; semantic deduplication is a separate producer-defined grouping contract.
 
-GUARANTEED requires a selected persistent-channel success or visible exhausted failure. WebSocket success cannot satisfy it. Fallback stops at the first successful selected persistent channel. Default adapter calls are bounded at 10 seconds with a 60-second lease. The external call and database commit are not atomic: pauses after the last guard or crashes after provider acceptance can still repeat an external effect.
+GUARANTEED requires a selected persistent-channel success or visible exhausted failure. WebSocket success cannot satisfy it. Fallback stops at the first successful selected persistent channel. Default async adapter waits use 10 seconds with a 60-second lease; blocking DNS/SMTP effects already started may outlive that wait. The external call and database commit are not atomic: pauses after the last guard or crashes after provider acceptance can still repeat an external effect.
 
 Response deadlines begin at qualifying delivery. Same-actor/same-state replay retains the original result; conflicting state or actor fails. An administrative retention operation can retire eligible history only under explicit operator parameters and a retained receipt. Normal append behavior is not cryptographic immutability.
 
@@ -57,25 +57,24 @@ Response deadlines begin at qualifying delivery. Same-actor/same-state replay re
 
 ## Recorded verification
 
-| Check | Result |
+| Check | Result at iteration 2 implementation |
 |---|---|
-| Python suite | 1,705 passed; 90.17% combined coverage |
-| Console | 305 tests passed, with prior 289 retained; types/lint/build passed |
-| Static and boundaries | Ruff, mypy across 91 source files, Bandit, UI boundary and whitespace checks passed |
-| Dependencies | Zero advisories in current frontend full/production lock audits and installed Python dependency audit |
-| Packaging | Wheel/sdist built; 90 shipped Python modules matched source; minimal/full installation and CLI checks passed |
-| Installed migration | Legacy pending work preserved through repeated migrations; maintenance dry-run left DB bytes unchanged |
-| Focused re-review | Original 5 disclosure reproductions passed after repair; 14 additional isolation/retention edge checks passed at the target commit |
+| Python suite | 1,765 passed; 90.70% combined coverage |
+| Static/boundaries | Ruff, mypy across 91 source files, Bandit, UI boundary and whitespace checks passed |
+| Packaging | Wheel/sdist, 90 module source identities, separate minimal/full installs, delivery/ACK, repeated migration CLI and unchanged-byte retention preview |
+| Independent focused review | 86 runtime/schema/retention tests, actual baseline upgrades and multi-node replay matrices; additional policy and adapter reviews |
+| Reviewer reproductions | Baseline 11 failures reproduced. Final untouched file: 5 pass / 6 documented contract/setup mismatches; replacement regression assertions verify the adopted semantics. |
+| Frontend/advisory evidence | Unchanged this iteration. Prior 305 console tests and zero-advisory snapshots were not rerun and are historical, not current audit claims. |
 
-The unpublished local package is not registry-audited. Advisory results are dated snapshots. No publication, deployment or live-database pruning was performed. [Current testing report](TESTING.md) and [machine-readable receipts](../verification/remediation/results.json) contain commands, hashes and remaining limits. The original consolidation evidence remains historical and does not supersede the adversarial findings.
+[Current testing report](TESTING.md) and [machine-readable receipts](../verification/iteration2/results.json) contain commands, hashes and remaining limits. No publication, deployment or live-database pruning occurred. Independent reviews are focused engineering evidence, not production/security certification. Logs can contain private machine paths; distinguish sanitized sharing copies from original receipts.
 
 ## Where to inspect
 
 | Concern | Source and tests |
 |---|---|
-| Owner/follower transitions, cycles, leases, expiry | `src/uns/runtime.py`, `src/notification/service.py`, `src/notification/adapters/`, `tests/uns/test_delivery_remediation.py` |
-| Policy snapshots and linearization | `src/uns/policy_runtime.py`, `src/db/policy_store.py`, `tests/uns/test_policy_authority.py` |
-| Auth, lifecycle and scoped reads | `src/agsignal/api/`, `src/agsignal/queries.py`, `src/agsignal_mcp/`, `tests/uns/test_transport_security.py`, `tests/agsignal_mcp/test_lifecycle.py` |
+| Owner/follower transitions, cycles, leases, expiry | `src/uns/runtime.py`, `src/notification/service.py`, `src/notification/adapters/`, `tests/uns/test_delivery_remediation.py`, `tests/uns/test_iteration2_runtime.py`, `tests/notification/test_delivery_attempt_evidence.py` |
+| Policy snapshots and linearization | `src/uns/policy_runtime.py`, `src/db/policy_store.py`, `tests/uns/test_policy_authority.py`, `tests/uns/test_policy_read_isolation.py` |
+| Auth, lifecycle and scoped reads | `src/agsignal/api/`, `src/agsignal/queries.py`, `src/agsignal_mcp/`, `tests/uns/test_transport_security.py`, `tests/agsignal_mcp/test_lifecycle.py`, `tests/agsignal_mcp/test_runtime_bound_reads.py` |
 | Real process policy refresh | `tests/uns/test_cross_transport_acceptance.py` |
 | Retention and migrations | `src/uns/maintenance.py`, `src/uns/schema.py`, `tests/uns/test_maintenance.py` |
 | Console access and dependency changes | `apps/ui/src/auth/`, `apps/ui/src/components/ConsoleSignIn.tsx`, `apps/ui/package-lock.json` |

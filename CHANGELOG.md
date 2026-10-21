@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Pending dedup ownership across expiry, fenced follower election, and replay safety using durable successor evidence and conservative upgrade reconstruction.
+- Channel completion evidence after lease loss; SMTP start accounting and timeout/cancellation uncertainty without false fallback on evidence-store errors.
+- Read-only policy snapshot queries, overdue callback fairness, runtime-bound MCP helpers, SUCCESS audit mapping, and consistent runtime audit clocks.
+
+### Clarified
+
+- Replay recovers an unsatisfied obligation; retained failures expose replay blockers until explicit resolution. No force-send bypass.
+- Non-archive retention deliberately preserves removed operational records and does not promise storage compaction.
+- See [iteration 2 report](docs/REMEDIATION_ITERATION2.md) and [verification](docs/TESTING.md) for exact evidence and deployment limits.
+
 ## [0.1.0] - 2025-01-23
 
 ### Added
