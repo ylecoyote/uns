@@ -87,7 +87,9 @@
     "runtime-after.log": "70579dc1f3cb61c5e33f58a1e8876d72185b996494b3f24442486c48016270b6",
     "runtime-before.log": "aab4450d5c97f8368185868d4191c9814a70083faf971f20fc041ca17852cb22",
     "targeted-tests.log": "795bef92803b6aea600868d76753996b2b0702bc3a9c4237e3654c4477e333e2",
-    "ui-boundary.log": "9a320ddc28598415966c6b5bb30f8bae3be34124592fee8dc63087c5ded0fbd0"
+    "ui-boundary.log": "9a320ddc28598415966c6b5bb30f8bae3be34124592fee8dc63087c5ded0fbd0",
+    "workspace-tests.log": "694af6ae56b73b9db64742825386be5cda2edb1f7e32e17d7f6658819ebf4c42",
+    "workspace-demo.log": "881e07c3a06e3459360dd23498a341ba3d59698a2d02394d8a9a9f93d72b1f1d"
   },
   "source_sha256": {
     "src/__init__.py": "d7aa1d20fa9a16eb46a0a69c032a6f68b7086afd59e5bd9c7a3cd939273901bc",
@@ -182,5 +184,12 @@
     "src/uns/schema.py": "4aa1ec514216f3bb66daf5334dbe3260c7f5975eb5a2db6db150306bb93be213",
     "src/uns/websocket.py": "030e5a554d612a5c8208ce51db817eb011ddf489655013226773584c919a8d2d"
   },
-  "wheel_sha256": "07eb394948f488f51757d1a70b40c55c42574aa518073f2d9582bcb287dad36b"
+  "wheel_sha256": "07eb394948f488f51757d1a70b40c55c42574aa518073f2d9582bcb287dad36b",
+  "final_workspace": {
+    "path": "<repo-root>-iteration2",
+    "own_environment": "installed with validated dependency constraints",
+    "tests_passed": 273,
+    "recording_demo": "pass",
+    "receipt_and_source_hashes": "verified after relocation"
+  }
 }
