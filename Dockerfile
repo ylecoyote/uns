@@ -1,15 +1,15 @@
-# AGSignal — multi-stage container build using uv.
+# UNS multi-stage container build using uv.
 #
 # Build:
-#   docker build -t agsignal:dev .
+#   docker build -t uns:dev .
 #
-# Run AGSignal (unified Core + Console):
+# Run UNS (HTTP API; serve the built console on the same origin):
 #   docker run --rm -p 127.0.0.1:8000:8000 \
 #     -e AGSIGNAL_API_KEY=<secret> \
 #     -e AGSIGNAL_API_PRINCIPAL=ops-rotation \
 #     -e DATABASE_URL=postgresql+psycopg2://... \
 #     -e AGSIGNAL_REDIS_URL=redis://... \
-#     agsignal:dev
+#     uns:dev
 #
 # Production:
 #   - Front with a reverse proxy that terminates TLS and restricts /metrics,
@@ -54,8 +54,8 @@ RUN groupadd --system --gid 1001 agsignal \
 # available, plus the Postgres driver. Derivative images that only need a
 # subset (e.g. SDK-only producers) can install with no extras instead.
 COPY --from=builder /build/dist/ /tmp/dist/
-RUN pip install --no-cache-dir --find-links /tmp/dist \
-        "agsignal[full]" \
+RUN set -- /tmp/dist/uns-*.whl \
+    && pip install --no-cache-dir "$1[full]" \
         "psycopg2-binary>=2.9.0" \
     && rm -rf /tmp/dist
 
@@ -80,4 +80,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
 
 # Unified AGSignal HTTP service. Both Core (write) and Console (read)
 # surfaces live in one process post-Phase-3.
-CMD ["uvicorn", "agsignal.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "uns.app:app", "--host", "0.0.0.0", "--port", "8000"]
