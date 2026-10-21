@@ -89,6 +89,7 @@ all = [
 [project.scripts]
 uns = "agsignal.app:main"
 uns-migrate = "uns.migrate:main"
+uns-maintain = "uns.maintenance:main"
 uns-mcp = "agsignal_mcp.transports.stdio:main"
 agsignal = "agsignal.app:main"
 
