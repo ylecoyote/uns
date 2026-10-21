@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from agsignal.api.read_models import ReadModelAdapter
     from uns.runtime import Runtime
 
 from agsignal._in_memory import InMemoryRedisList
@@ -39,9 +40,17 @@ class RuntimeState:
 
     runtime: Runtime | None = None
     legacy_fixture_mode: bool = False
+    read_model_adapter: ReadModelAdapter | None = field(default=None, init=False)
     audit_store: AuditStore = field(default_factory=InMemoryAuditStore)
     dlq_service: DLQService = field(
         default_factory=lambda: DLQService(redis_client=InMemoryRedisList())
     )
     channel_health_tracker: ChannelHealthTracker = field(default_factory=ChannelHealthTracker)
     idempotency_records: dict[str, SendNotificationResponse] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.runtime is not None:
+            from agsignal.api.read_models import SQLAlchemyReadModelAdapter
+            self.read_model_adapter = SQLAlchemyReadModelAdapter(
+                self.runtime.sessions, runtime=self.runtime,
+            )

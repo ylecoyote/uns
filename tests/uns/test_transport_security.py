@@ -184,3 +184,85 @@ async def test_http_and_mcp_previews_use_durable_policy_authority(configured):
     async with create_connected_server_and_client_session(create_mcp_server(runtime=runtime)) as session:
         result = await session.call_tool("simulate_signal", {"payload": payload})
         assert result.isError
+
+
+@pytest.fixture
+def isolated_stores(tmp_path, monkeypatch):
+    from notification.rate_limiting import configure_rate_limiter
+
+    configure_rate_limiter({})
+    for name in ("UNS_POLICY_DIR", "AGSIGNAL_POLICY_DIR"):
+        monkeypatch.delenv(name, raising=False)
+    runtimes = [Runtime(f"sqlite:///{tmp_path}/{label}.db", create_tables=True) for label in ("a", "b")]
+    identifiers = []
+    for label, runtime in zip(("a", "b"), runtimes):
+        payload = signal().model_copy(update={"notification_type": f"private.{label}", "title": label})
+        accepted = runtime.accept(payload, principal=label)
+        identifiers.append(str(accepted.notification_id))
+    yield runtimes, identifiers
+    for runtime in runtimes:
+        runtime.engine.dispose()
+
+
+def isolated_app(runtime, label):
+    app = create_app(runtime=runtime, skip_persistence_config=True)
+    app.state.agsignal_api_key = f"key-{label}"
+    app.state.agsignal_api_principal = f"principal-{label}"
+    return app
+
+
+@pytest.mark.parametrize("later_transport", ["http", "mcp"])
+@pytest.mark.parametrize("path", ["/ui/deliveries", "/ui/audit"])
+def test_http_reads_stay_bound_to_authenticated_app(isolated_stores, path, later_transport):
+    from agsignal_mcp.factory import create_mcp_server
+
+    runtimes, identifiers = isolated_stores
+    app = isolated_app(runtimes[0], "a")
+    if later_transport == "http":
+        isolated_app(runtimes[1], "b")
+    else:
+        create_mcp_server(runtime=runtimes[1])
+    response = TestClient(app).get(path, headers={"Authorization": "Bearer key-a"})
+    assert response.status_code == 200
+    assert {item["notification_id"] for item in response.json()["items"]} == {identifiers[0]}
+
+
+@pytest.mark.parametrize("later_transport", ["http", "mcp"])
+def test_http_timeline_cannot_read_another_runtime(isolated_stores, later_transport):
+    from agsignal_mcp.factory import create_mcp_server
+
+    runtimes, identifiers = isolated_stores
+    app = isolated_app(runtimes[0], "a")
+    if later_transport == "http":
+        isolated_app(runtimes[1], "b")
+    else:
+        create_mcp_server(runtime=runtimes[1])
+    client = TestClient(app, headers={"Authorization": "Bearer key-a"})
+    assert client.get(f"/ui/deliveries/{identifiers[1]}").status_code == 404
+    own = client.get(f"/ui/deliveries/{identifiers[0]}")
+    assert own.status_code == 200
+    assert own.json()["notification_id"] == identifiers[0]
+    assert own.json()["runtime_state"]["delivery_status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("later_transport", ["http", "mcp"])
+@pytest.mark.parametrize("tool", ["list_deliveries", "list_audit_events"])
+async def test_mcp_reads_stay_bound_to_server_runtime(isolated_stores, tool, later_transport):
+    import json
+
+    from mcp.shared.memory import create_connected_server_and_client_session
+
+    from agsignal_mcp.factory import create_mcp_server
+
+    runtimes, identifiers = isolated_stores
+    server = create_mcp_server(runtime=runtimes[0])
+    if later_transport == "http":
+        isolated_app(runtimes[1], "b")
+    else:
+        create_mcp_server(runtime=runtimes[1])
+    async with create_connected_server_and_client_session(server) as session:
+        result = await session.call_tool(tool, {"limit": 25})
+        assert not result.isError
+        body = json.loads(result.content[0].text)
+        assert {item["notification_id"] for item in body["items"]} == {identifiers[0]}

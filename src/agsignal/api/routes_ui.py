@@ -120,6 +120,7 @@ router = APIRouter(prefix="/ui", tags=["ui"], dependencies=[Depends(require_read
     description="Query delivery timelines with optional filtering. Read-only endpoint.",
 )
 async def list_deliveries(
+    http_request: Request,
     cursor: str | None = Query(default=None, description="Pagination cursor"),
     limit: int = Query(default=25, ge=1, le=100, description="Items per page"),
     start_time: datetime | None = Query(default=None, description="Filter by created_at >="),
@@ -156,6 +157,7 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode,
         notification_type=notification_type,
         channel=channel,
+        read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
     )
 
 
@@ -171,6 +173,7 @@ async def list_deliveries(
 )
 async def get_delivery_timeline(
     notification_id: UUID,
+    http_request: Request,
 ) -> DeliveryTimelineResponse:
     """HTTP adapter — delegates to agsignal.queries.get_delivery_timeline.
 
@@ -186,7 +189,10 @@ async def get_delivery_timeline(
     )
 
     try:
-        return await _query_delivery_timeline(notification_id=notification_id)
+        return await _query_delivery_timeline(
+            notification_id=notification_id,
+            read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
+        )
     except NotFoundError as exc:
         message = f"Delivery timeline not found for notification {notification_id}"
         error_response = create_error_response_with_request_id(
@@ -318,6 +324,7 @@ async def get_invariants_summary() -> InvariantSummaryResponse:
     description="Query audit event stream with filtering. Read-only endpoint.",
 )
 async def list_audit_events(
+    http_request: Request,
     cursor: str | None = Query(default=None, description="Pagination cursor"),
     limit: int = Query(default=25, ge=1, le=100, description="Items per page"),
     start_time: datetime | None = Query(default=None, description="Filter by event_time >="),
@@ -351,6 +358,7 @@ async def list_audit_events(
         agent_id=agent_id,
         autonomy_mode=autonomy_mode,
         correlation_id=correlation_id,
+        read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
     )
 
 

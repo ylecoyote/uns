@@ -366,7 +366,9 @@ async def get_invariants_summary() -> dict[str, Any]:
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
-async def list_deliveries(limit: int = 25) -> dict[str, Any]:
+async def list_deliveries(
+    limit: int = 25, *, runtime_state: RuntimeState | None = None,
+) -> dict[str, Any]:
     """Return delivery read-model entries.
 
     Delegates to ``agsignal.queries.list_deliveries``.
@@ -383,11 +385,14 @@ async def list_deliveries(limit: int = 25) -> dict[str, Any]:
         autonomy_mode=None,
         notification_type=None,
         channel=None,
+        read_adapter=runtime_state.read_model_adapter if runtime_state is not None else None,
     )
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
-async def list_audit_events(limit: int = 25) -> dict[str, Any]:
+async def list_audit_events(
+    limit: int = 25, *, runtime_state: RuntimeState | None = None,
+) -> dict[str, Any]:
     """Return audit read-model entries.
 
     Delegates to ``agsignal.queries.list_audit_events``.
@@ -402,5 +407,6 @@ async def list_audit_events(limit: int = 25) -> dict[str, Any]:
         agent_id=None,
         autonomy_mode=None,
         correlation_id=None,
+        read_adapter=runtime_state.read_model_adapter if runtime_state is not None else None,
     )
     return cast(dict[str, Any], _json_safe(response.model_dump()))

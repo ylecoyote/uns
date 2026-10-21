@@ -66,10 +66,6 @@ def create_mcp_server(
     owns_runtime = runtime is None
     runtime = runtime or build_runtime()
     state = RuntimeState(runtime=runtime, audit_store=runtime.audit_store)
-    from agsignal.api.read_models import SQLAlchemyReadModelAdapter, configure_read_model_adapter
-    adapter = SQLAlchemyReadModelAdapter(runtime.sessions)
-    adapter.runtime = runtime
-    configure_read_model_adapter(adapter)
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncIterator[RuntimeState]:
         worker = None
@@ -135,12 +131,12 @@ def create_mcp_server(
     @mcp.tool(name="list_deliveries")
     async def list_deliveries_tool(limit: int = 25) -> dict[str, object]:
         """Return delivery read-model entries."""
-        return await list_deliveries_impl(limit=limit)
+        return await list_deliveries_impl(limit=limit, runtime_state=state)
 
     @mcp.tool(name="list_audit_events")
     async def list_audit_events_tool(limit: int = 25) -> dict[str, object]:
         """Return audit read-model entries."""
-        return await list_audit_events_impl(limit=limit)
+        return await list_audit_events_impl(limit=limit, runtime_state=state)
 
     @mcp.tool(name="get_effective_policy")
     async def get_effective_policy_tool(
