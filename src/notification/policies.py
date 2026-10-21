@@ -76,6 +76,10 @@ _DEFAULT_CHANNELS_SHADOW: dict[NotificationIntent, list[Channel]] = {
 DEFAULT_DEDUP_WINDOW_SECONDS = 300  # 5 minutes
 
 
+class PolicyOverrideError(ValueError):
+    """A producer attempted to change policy or adapter-controlled obligations."""
+
+
 class PolicyStatus(str, Enum):
     """Lifecycle status for notification routing policies."""
 

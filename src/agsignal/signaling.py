@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from agsignal.responses import (
@@ -31,8 +31,11 @@ from notification.models import (
     Notification,
     NotificationResult,
 )
-from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
+from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, PolicyRegistry, get_policy_registry
 from notification.sdk import NotificationSDK
+
+if TYPE_CHECKING:
+    from uns.policy_runtime import PolicyRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +328,8 @@ async def send_signal(
 async def simulate_signal(
     *,
     request: SendNotificationRequest,
+    policy_runtime: PolicyRuntime | None = None,
+    principal: str = "simulation",
 ) -> SimulateNotificationResponse:
     """Preview routing and acknowledgment behavior without delivery side effects.
 
@@ -342,9 +347,27 @@ async def simulate_signal(
     Raises:
         ValidationError: If the SDK rejects the resolved notification.
     """
-    result, notification = _resolve_notification(request)
-    policy = get_policy_registry().get_sync(notification.notification_type)
-    policy_source = "policy" if policy is not None else "default"
+    if policy_runtime is None:
+        result, notification = _resolve_notification(request)
+        policy = get_policy_registry().get_sync(notification.notification_type)
+        policy_source = "policy" if policy is not None else "default"
+        dedup_window = (
+            policy.dedup_window_seconds
+            if policy is not None and policy.dedup_window_seconds is not None
+            else DEFAULT_DEDUP_WINDOW_SECONDS
+        )
+    else:
+        from notification.models import DeliveryStatus
+
+        notification = policy_runtime.resolve(request, principal=principal)
+        result = NotificationResult(
+            notification_id=notification.notification_id,
+            status=DeliveryStatus.SUCCESS,
+            channels_attempted=notification.channels,
+        )
+        provenance = notification.metadata["uns_resolution"]
+        policy_source = "default" if provenance["defaults_version"] else "policy"
+        dedup_window = provenance["effective"]["dedup_window_seconds"]
     warnings = [
         f"resolved via {policy_source} routing; no delivery, replay, or ack side effects were recorded"
     ]
@@ -362,11 +385,7 @@ async def simulate_signal(
         require_ack=bool(notification.require_ack),
         ack_status=None,
         dedup_key=notification.dedup_key or "",
-        dedup_window_seconds=(
-            policy.dedup_window_seconds
-            if policy is not None and policy.dedup_window_seconds is not None
-            else DEFAULT_DEDUP_WINDOW_SECONDS
-        ),
+        dedup_window_seconds=dedup_window,
         policy_source=policy_source,
         warnings=warnings,
         message="notification simulated",
@@ -426,6 +445,8 @@ def _persist_ack_audit(
 
 def _resolve_notification(
     request: SendNotificationRequest,
+    *,
+    policy_registry: PolicyRegistry | None = None,
 ) -> tuple[NotificationResult, Notification]:
     """Resolve a send-notification request into a (result, notification) pair.
 
@@ -448,7 +469,7 @@ def _resolve_notification(
             channels_failed=[],
         )
 
-    sdk = NotificationSDK(delivery_handler=_capture_delivery)
+    sdk = NotificationSDK(policy_registry=policy_registry, delivery_handler=_capture_delivery)
 
     # ValidationError propagates unchanged; route layer translates to 422.
     result = sdk.send(
@@ -496,7 +517,6 @@ def _idempotency_set(store: Any, key: str, value: Any) -> None:
         store[key] = value
     except TypeError:  # pragma: no cover - defensive; Phase 5 firms up typing
         logger.warning(
-            "Idempotency store does not support write semantics; "
-            "key=%s value not cached",
+            "Idempotency store does not support write semantics; key=%s value not cached",
             key,
         )

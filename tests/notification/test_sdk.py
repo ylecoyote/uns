@@ -946,8 +946,8 @@ class TestSDKPolicyOverrides:
         assert delivered is not None
         assert delivered.ack_timeout_minutes == 5
 
-    def test_explicit_override_takes_precedence_over_policy(self) -> None:
-        """Explicit overrides should take precedence over policy."""
+    def test_explicit_override_cannot_replace_active_policy(self) -> None:
+        """Producers cannot change ACTIVE obligations before delivery."""
         delivered: Notification | None = None
 
         def handler(n: Notification) -> NotificationResult:
@@ -979,21 +979,19 @@ class TestSDKPolicyOverrides:
             agent_id=uuid4(),
         )
 
-        sdk.send(
-            notification_type="test.info",
-            intent=NotificationIntent.INFORMATIONAL,
-            title="Info",
-            message="Info message",
-            source="test",
-            autonomy_context=context,
-            delivery_mode_override=DeliveryMode.BEST_EFFORT,
-            channels_override=[Channel.SLACK],
-        )
+        with pytest.raises(ValueError, match="ACTIVE policy"):
+            sdk.send(
+                notification_type="test.info",
+                intent=NotificationIntent.INFORMATIONAL,
+                title="Info",
+                message="Info message",
+                source="test",
+                autonomy_context=context,
+                delivery_mode_override=DeliveryMode.BEST_EFFORT,
+                channels_override=[Channel.SLACK],
+            )
 
-        assert delivered is not None
-        # Explicit override beats policy
-        assert delivered.delivery_mode == DeliveryMode.BEST_EFFORT
-        assert delivered.channels == [Channel.SLACK]
+        assert delivered is None
 
 
 class TestSDKPriority:
