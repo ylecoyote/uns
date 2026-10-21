@@ -8,13 +8,31 @@ interface for the delivery service.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from notification.models import Channel, Notification
+
+
+class DeliveryLeaseLostError(Exception):
+    """The durable delivery owner must not start another provider effect."""
+
+
+provider_attempt_guard: ContextVar[Callable[[Channel], None] | None] = ContextVar(
+    "provider_attempt_guard", default=None
+)
+
+
+def guard_provider_attempt(channel: Channel) -> None:
+    """Check the current task's durable lease, when running through UNS."""
+    guard = provider_attempt_guard.get()
+    if guard is not None:
+        guard(channel)
 
 
 class AdapterStatus(str, Enum):
@@ -124,6 +142,10 @@ class BaseAdapter(ABC):
     - Reporting health status
     - Handling channel-specific errors appropriately
     """
+
+    # Built-in retrying adapters guard each provider call themselves. Custom
+    # adapters default to one guard at entry and must opt in if they retry.
+    guards_provider_attempts: ClassVar[bool] = False
 
     @property
     @abstractmethod

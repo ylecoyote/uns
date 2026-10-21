@@ -10,6 +10,7 @@ import asyncio
 import logging
 import smtplib
 import ssl
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
@@ -22,8 +23,10 @@ from notification.adapters.base import (
     AdapterStatus,
     AdapterTimeoutError,
     BaseAdapter,
+    DeliveryLeaseLostError,
     DeliveryResult,
     HealthCheckResult,
+    guard_provider_attempt,
 )
 from notification.models import Channel, NotificationIntent, Priority
 
@@ -99,6 +102,8 @@ class EmailAdapter(BaseAdapter):
     - Custom recipient routing
     """
 
+    guards_provider_attempts = True
+
     config: EmailConfig
     _loop: asyncio.AbstractEventLoop | None = field(default=None, init=False, repr=False)
 
@@ -129,6 +134,7 @@ class EmailAdapter(BaseAdapter):
                 await asyncio.wait_for(
                     loop.run_in_executor(
                         None,
+                        copy_context().run,
                         self._send_email_sync,
                         message,
                         to_addresses,
@@ -153,6 +159,8 @@ class EmailAdapter(BaseAdapter):
                     delivered_at=datetime.now(UTC),
                 )
 
+            except DeliveryLeaseLostError:
+                raise
             except TimeoutError:
                 last_error = AdapterTimeoutError(
                     f"Email delivery timed out after {attempt} attempts",
@@ -288,11 +296,13 @@ class EmailAdapter(BaseAdapter):
         ]
 
         if notification.require_ack:
-            lines.extend([
-                "",
-                "*** This notification requires acknowledgment ***",
-                f"Timeout: {notification.ack_timeout_minutes} minutes",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "*** This notification requires acknowledgment ***",
+                    f"Timeout: {notification.ack_timeout_minutes} minutes",
+                ]
+            )
 
         return "\n".join(lines)
 
@@ -313,7 +323,9 @@ class EmailAdapter(BaseAdapter):
         # Priority headers
         priority = notification.priority or Priority.NORMAL
         importance = PRIORITY_IMPORTANCE.get(priority, "normal")
-        msg["X-Priority"] = str({Priority.HIGH: 1, Priority.NORMAL: 3, Priority.LOW: 5}.get(priority, 3))
+        msg["X-Priority"] = str(
+            {Priority.HIGH: 1, Priority.NORMAL: 3, Priority.LOW: 5}.get(priority, 3)
+        )
         msg["Importance"] = importance
 
         # Custom headers
@@ -369,7 +381,7 @@ class EmailAdapter(BaseAdapter):
                     <h2 style="margin: 10px 0;">{notification.title}</h2>
                 </div>
                 <div class="content">
-                    {notification.message.replace(chr(10), '<br>')}
+                    {notification.message.replace(chr(10), "<br>")}
                 </div>
                 {ack_section}
                 <div class="footer">
@@ -398,7 +410,8 @@ class EmailAdapter(BaseAdapter):
         message: MIMEMultipart,
         to_addresses: list[str],
     ) -> None:
-        """Synchronous email sending (runs in executor)."""
+        """Synchronous email sending (runs in executor with copied lease context)."""
+        guard_provider_attempt(self.channel)
         server: smtplib.SMTP
         if self.config.use_ssl:
             context = ssl.create_default_context()
@@ -421,6 +434,7 @@ class EmailAdapter(BaseAdapter):
         try:
             if self.config.username and self.config.password:
                 server.login(self.config.username, self.config.password)
+            guard_provider_attempt(self.channel)
             server.sendmail(
                 self.config.from_address,
                 to_addresses,

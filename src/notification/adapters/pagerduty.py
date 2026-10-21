@@ -22,6 +22,7 @@ from notification.adapters.base import (
     BaseAdapter,
     DeliveryResult,
     HealthCheckResult,
+    guard_provider_attempt,
 )
 from notification.models import Channel, NotificationIntent, Priority
 
@@ -249,6 +250,8 @@ class PagerDutyAdapter(BaseAdapter):
     - Rich custom details
     """
 
+    guards_provider_attempts = True
+
     config: PagerDutyConfig
     _client: PagerDutyClient = field(init=False, repr=False)
 
@@ -281,6 +284,7 @@ class PagerDutyAdapter(BaseAdapter):
 
         while attempt < self.config.retry_attempts:
             attempt += 1
+            guard_provider_attempt(self.channel)
             try:
                 response = await self._client.send_event(
                     action=PagerDutyEventAction.TRIGGER,

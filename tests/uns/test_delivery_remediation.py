@@ -362,3 +362,138 @@ async def test_websocket_lease_loss_blocks_every_persistent_channel(state, mode)
     assert len(websocket.calls) == 1
     assert not slack.calls and not email.calls
     assert runtime.get(first.notification_id)["status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", [Channel.SLACK, Channel.PAGERDUTY, Channel.EMAIL])
+async def test_builtin_provider_retries_recheck_lease(state, monkeypatch, channel):
+    import smtplib
+    from unittest.mock import AsyncMock
+
+    from notification.adapters.base import AdapterDeliveryError
+    from notification.adapters.email import EmailAdapter, EmailConfig
+    from notification.adapters.pagerduty import PagerDutyAdapter, PagerDutyConfig
+    from notification.adapters.slack import SlackAdapter, SlackConfig
+
+    runtime, _, _, now, _ = state
+    calls = []
+
+    async def retryable_failure(**kwargs):
+        calls.append(now[0])
+        now[0] += runtime.lease_seconds + 1
+        raise AdapterDeliveryError("transient provider failure", retryable=True)
+
+    if channel == Channel.SLACK:
+        adapter = SlackAdapter(SlackConfig("xoxb-regression", "test"))
+        adapter._client.post_message = AsyncMock(side_effect=retryable_failure)
+    elif channel == Channel.PAGERDUTY:
+        adapter = PagerDutyAdapter(PagerDutyConfig("0" * 32))
+        adapter._client.send_event = AsyncMock(side_effect=retryable_failure)
+    else:
+        adapter = EmailAdapter(
+            EmailConfig(
+                "test.invalid",
+                25,
+                "",
+                "",
+                "test@example.invalid",
+                ["test@example.invalid"],
+                use_tls=False,
+            )
+        )
+
+        class SMTP:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def sendmail(self, *args):
+                calls.append(now[0])
+                now[0] += runtime.lease_seconds + 1
+                raise smtplib.SMTPException("transient SMTP failure")
+
+            def quit(self):
+                pass
+
+        monkeypatch.setattr(smtplib, "SMTP", SMTP)
+    runtime.adapters.register(adapter)
+    first = runtime.accept(request(), principal="producer")
+    notification = runtime.get(first.notification_id)["notification"]
+    notification["channels"] = [channel.value]
+    with runtime.sessions.begin() as session:
+        session.execute(
+            update(work)
+            .where(work.c.id == str(first.notification_id))
+            .values(notification=notification)
+        )
+    assert not await runtime.dispatch(first.notification_id)
+    assert calls == [1000.0]
+    assert runtime.get(first.notification_id)["status"] == "PENDING"
+    assert runtime.events(first.notification_id)[-1]["kind"] == "LEASE_LOST"
+
+
+@pytest.mark.asyncio
+async def test_email_executor_queue_does_not_start_a_provider_call_after_expiry(state, monkeypatch):
+    import smtplib
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from notification.adapters.email import EmailAdapter, EmailConfig
+
+    runtime, _, _, now, _ = state
+    calls = []
+    adapter = EmailAdapter(
+        EmailConfig(
+            "test.invalid",
+            25,
+            "",
+            "",
+            "test@example.invalid",
+            ["test@example.invalid"],
+            use_tls=False,
+        )
+    )
+
+    class SMTP:
+        def __init__(self, *args, **kwargs):
+            calls.append("connected")
+
+        def sendmail(self, *args):
+            calls.append("sent")
+
+        def quit(self):
+            pass
+
+    monkeypatch.setattr(smtplib, "SMTP", SMTP)
+    runtime.adapters.register(adapter)
+    first = runtime.accept(request(), principal="producer")
+    notification = runtime.get(first.notification_id)["notification"]
+    notification["channels"] = ["EMAIL"]
+    with runtime.sessions.begin() as session:
+        session.execute(
+            update(work)
+            .where(work.c.id == str(first.notification_id))
+            .values(notification=notification)
+        )
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    original = loop.run_in_executor
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        blocker = executor.submit(release.wait, 5)
+        monkeypatch.setattr(
+            loop, "run_in_executor", lambda _pool, fn, *args: original(executor, fn, *args)
+        )
+        task = asyncio.create_task(runtime.dispatch(first.notification_id))
+        try:
+            await asyncio.sleep(0.05)
+            now[0] += runtime.lease_seconds + 1
+            release.set()
+            assert not await task
+        finally:
+            release.set()
+            blocker.result(timeout=2)
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+    assert calls == []
+    assert runtime.get(first.notification_id)["status"] == "PENDING"
