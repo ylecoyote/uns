@@ -77,6 +77,7 @@ from notification.models import (
 )
 from notification.policies import (
     DEFAULT_DEDUP_WINDOW_SECONDS,
+    PolicyRegistry,
     get_default_ack_timeout,
     get_default_channels,
     get_default_delivery_mode,
@@ -271,6 +272,8 @@ async def get_effective_policy(
     intent: NotificationIntent,
     autonomy_mode: AutonomyMode,
     irreversible: bool = False,
+    *,
+    policy_registry: PolicyRegistry | None = None,
 ) -> EffectivePolicyResponse:
     """Get effective policy resolution for a notification type.
 
@@ -286,7 +289,7 @@ async def get_effective_policy(
     # (minus the @router.get decorator and the log_endpoint_call observability
     # call, which is a route-handler concern).
 
-    registry = get_policy_registry()
+    registry = policy_registry if policy_registry is not None else get_policy_registry()
     policy = registry.get_sync(notification_type)
 
     # Determine effective values

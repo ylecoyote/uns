@@ -37,6 +37,7 @@ from notification.models import (
 )
 from notification.policies import (
     NotificationPolicy,
+    PolicyOverrideError,
     PolicyRegistry,
     get_default_ack_timeout,
     get_default_channels,
@@ -104,7 +105,9 @@ class NotificationSDK:
                 This allows for testing and for integration with external
                 delivery systems (e.g., RQ job queue).
         """
-        self._policy_registry = policy_registry or get_policy_registry()
+        self._policy_registry = (
+            policy_registry if policy_registry is not None else get_policy_registry()
+        )
         self._context_provider = context_provider
         self._ack_callback = ack_callback or NoOpAcknowledgmentCallback()
         self._delivery_handler = delivery_handler
@@ -166,6 +169,34 @@ class NotificationSDK:
 
         # Look up policy
         policy = self._policy_registry.get_sync(notification_type)
+
+        # ACTIVE policy is authority, not a suggestion. Equal producer values
+        # are harmless; differing values (including apparently stronger ones)
+        # require a separate policy activation, never a payload self-grant.
+        if policy is not None and policy.is_runtime_enforced:
+            if policy.intent is not None and intent != policy.intent:
+                raise PolicyOverrideError("intent differs from ACTIVE policy")
+            expected = {
+                "delivery_mode": self._resolve_delivery_mode(
+                    intent, context.autonomy_mode, policy, None
+                ),
+                "channels": self._resolve_channels(
+                    intent, context.autonomy_mode, irreversible, policy, None
+                ),
+                "require_ack": self._resolve_require_ack(
+                    intent, context.autonomy_mode, policy, None
+                ),
+                "priority": self._resolve_priority(intent, policy, None),
+            }
+            supplied = {
+                "delivery_mode": delivery_mode_override,
+                "channels": channels_override,
+                "require_ack": require_ack_override,
+                "priority": priority_override,
+            }
+            for field, value in supplied.items():
+                if value is not None and value != expected[field]:
+                    raise PolicyOverrideError(f"{field} override differs from ACTIVE policy")
 
         # Derive values using policy overrides and defaults
         delivery_mode = self._resolve_delivery_mode(

@@ -7,7 +7,11 @@ table's domain (audit vs policy vs learning vs websocket replay).
 
 from db.models._base import AckStatusDB, Base, DeliveryStatusDB
 from db.models.audit import AckAuditRecord, NotificationAuditRecord
-from db.models.policy import PersistedNotificationPolicy
+from db.models.policy import (
+    NotificationPolicyRevision,
+    NotificationPolicySnapshot,
+    PersistedNotificationPolicy,
+)
 from db.models.policy_learning import (
     PersistedPolicyDelta,
     PersistedShadowEvaluationAggregate,
@@ -21,6 +25,8 @@ __all__ = [
     "Base",
     "DeliveryStatusDB",
     "NotificationAuditRecord",
+    "NotificationPolicyRevision",
+    "NotificationPolicySnapshot",
     "PersistedNotificationPolicy",
     "PersistedPolicyDelta",
     "PersistedShadowEvaluationAggregate",

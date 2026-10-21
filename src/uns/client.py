@@ -20,4 +20,6 @@ class Client:
         return await self.runtime.send(request, principal=self.principal)
 
     async def simulate(self, request: SendNotificationRequest) -> SimulateNotificationResponse:
-        return await simulate_signal(request=request)
+        return await simulate_signal(
+            request=request, policy_runtime=self.runtime.policy_runtime, principal=self.principal
+        )

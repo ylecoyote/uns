@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Table, insert, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from db.models import PersistedNotificationPolicy
+from db.models import (
+    NotificationPolicyRevision,
+    NotificationPolicySnapshot,
+    PersistedNotificationPolicy,
+)
 from notification.models import AutonomyMode, Channel, DeliveryMode
 from notification.policies import (
     ModeOverride,
@@ -31,43 +37,193 @@ class PolicySaveResult:
     previous_version_id: UUID | None = None
 
 
+@dataclass(frozen=True)
+class PolicySnapshot:
+    """Immutable serialized content. Each registry is an isolated deserialization."""
+
+    revision: int
+    content_json: str
+    content_hash: str
+
+    def registry(self) -> PolicyRegistry:
+        registry = PolicyRegistry()
+        for content in json.loads(self.content_json):
+            registry.register(NotificationPolicy.model_validate(content))
+        return registry
+
+
 class SQLAlchemyPolicyStore:
     """SQLAlchemy-backed store for persisted notification policies."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
+    def ensure_snapshot_schema(self) -> None:
+        """Add only new policy tables; legacy policy rows remain untouched."""
+        engine = self._session_factory.kw["bind"]
+        cast(Table, NotificationPolicyRevision.__table__).create(engine, checkfirst=True)
+        cast(Table, NotificationPolicySnapshot.__table__).create(engine, checkfirst=True)
+
+    def load_snapshot(self, session: Session | None = None) -> PolicySnapshot:
+        """Lock the revision until caller commit, then read its immutable content.
+
+        Activation takes the same row lock. The no-op UPDATE is deliberate: it
+        reserves SQLite's writer before any policy read, and row-locks PostgreSQL.
+        A cache check outside the acceptance transaction is not sufficient.
+        """
+        if session is None:
+            with self._session_factory.begin() as transaction:
+                return self.load_snapshot(transaction)
+        changed = (
+            session.connection()
+            .execute(
+                update(NotificationPolicyRevision)
+                .where(NotificationPolicyRevision.singleton == 1)
+                .values(revision=NotificationPolicyRevision.revision)
+            )
+            .rowcount
+        )
+        if not changed:
+            # A concurrent first initializer can win on PostgreSQL; a savepoint
+            # preserves our outer transaction when its singleton insert wins.
+            try:
+                with session.begin_nested():
+                    session.execute(
+                        insert(NotificationPolicyRevision).values(singleton=1, revision=-1)
+                    )
+            except IntegrityError:
+                pass
+            session.execute(
+                update(NotificationPolicyRevision)
+                .where(NotificationPolicyRevision.singleton == 1)
+                .values(revision=NotificationPolicyRevision.revision)
+            )
+        revision = session.execute(
+            select(NotificationPolicyRevision.revision).where(
+                NotificationPolicyRevision.singleton == 1
+            )
+        ).scalar_one()
+        if revision == -1:
+            # One-time migration of already deployed policy rows. This is done
+            # under the same lock, so another process cannot accept an empty
+            # snapshot while the legacy ACTIVE policies are being hydrated.
+            rows = session.execute(
+                select(PersistedNotificationPolicy).where(
+                    PersistedNotificationPolicy.status == PolicyStatus.ACTIVE.value
+                )
+            ).scalars()
+            policies = [_row_to_policy(row) for row in rows]
+            if len({policy.notification_type for policy in policies}) != len(policies):
+                raise ValueError("Legacy storage contains multiple ACTIVE policies for one type")
+            snapshot = self._write_snapshot(session, 1 if policies else 0, policies)
+        else:
+            row = session.execute(
+                select(NotificationPolicySnapshot).where(
+                    NotificationPolicySnapshot.revision == revision
+                )
+            ).scalar_one()
+            snapshot = PolicySnapshot(
+                revision, json.dumps(row.content, sort_keys=True), row.content_hash
+            )
+        return snapshot
+
+    def _write_snapshot(
+        self, session: Session, revision: int, policies: list[NotificationPolicy]
+    ) -> PolicySnapshot:
+        content = [
+            policy.model_dump(mode="json")
+            for policy in sorted(policies, key=lambda policy: policy.notification_type)
+        ]
+        content_hash = compute_policy_content_hash({"policies": content})
+        session.add(
+            NotificationPolicySnapshot(
+                revision=revision, content=content, content_hash=content_hash
+            )
+        )
+        session.execute(
+            update(NotificationPolicyRevision)
+            .where(NotificationPolicyRevision.singleton == 1)
+            .values(revision=revision)
+        )
+        session.flush()
+        return PolicySnapshot(revision, json.dumps(content, sort_keys=True), content_hash)
+
+    def _activate(
+        self, session: Session, previous: PolicySnapshot, policies: list[NotificationPolicy]
+    ) -> None:
+        content = [
+            policy.model_dump(mode="json")
+            for policy in sorted(policies, key=lambda policy: policy.notification_type)
+        ]
+        if compute_policy_content_hash({"policies": content}) != previous.content_hash:
+            self._write_snapshot(session, previous.revision + 1, policies)
+
     def _get_session(self) -> Session:
         return self._session_factory()
 
     def save_policy(self, policy: NotificationPolicy) -> PolicySaveResult:
-        """Persist one policy atomically."""
+        """Persist and activate one policy atomically with its runtime revision."""
+        self.ensure_snapshot_schema()
         with self._session_factory.begin() as session:
-            return self._save_policy(session, policy)
+            previous = self.load_snapshot(session)
+            result = self._save_policy(session, policy)
+            if policy.status == PolicyStatus.ACTIVE:
+                current = previous.registry().get_all()
+                current[policy.notification_type] = policy.model_copy(
+                    update={"config_id": result.policy_id, "config_hash": result.content_hash}
+                )
+                self._activate(session, previous, list(current.values()))
+            return result
 
     def save_snapshot(self, policies: list[NotificationPolicy]) -> int:
-        """Persist an entire validated snapshot or leave storage unchanged."""
+        """Atomically replace ACTIVE authority; retain immutable revision history."""
+        identities = [(policy.notification_type, policy.status) for policy in policies]
+        if len(identities) != len(set(identities)):
+            raise ValueError("Duplicate notification type/status in policy snapshot")
+        self.ensure_snapshot_schema()
         with self._session_factory.begin() as session:
+            previous = self.load_snapshot(session)
             results = [self._save_policy(session, policy) for policy in policies]
-            active_types = [p.notification_type for p in policies if p.status == PolicyStatus.ACTIVE]
-            from sqlalchemy import update
-            session.execute(update(PersistedNotificationPolicy).where(
-                PersistedNotificationPolicy.status == PolicyStatus.ACTIVE.value,
-                PersistedNotificationPolicy.notification_type.not_in(active_types)
-            ).values(status=PolicyStatus.RETIRED.value, is_active=False))
+            active = [
+                policy.model_copy(
+                    update={"config_id": result.policy_id, "config_hash": result.content_hash}
+                )
+                for policy, result in zip(policies, results)
+                if policy.status == PolicyStatus.ACTIVE
+            ]
+            session.execute(
+                update(PersistedNotificationPolicy)
+                .where(
+                    PersistedNotificationPolicy.status == PolicyStatus.ACTIVE.value,
+                    PersistedNotificationPolicy.notification_type.not_in(
+                        [p.notification_type for p in active]
+                    ),
+                )
+                .values(
+                    status=PolicyStatus.RETIRED.value, is_active=False, retired_at=datetime.now(UTC)
+                )
+            )
+            self._activate(session, previous, active)
             return sum(result.created for result in results)
 
     def _save_policy(self, session: Session, policy: NotificationPolicy) -> PolicySaveResult:
         content = _policy_to_persisted_content(policy)
-        content_hash = compute_policy_content_hash(content)
+        content_hash = compute_policy_content_hash(
+            policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+        )
         duplicate = session.execute(
             select(PersistedNotificationPolicy).where(
                 PersistedNotificationPolicy.content_hash == content_hash
             )
         ).scalar_one_or_none()
         if duplicate is not None:
-            if duplicate.status == PolicyStatus.RETIRED.value and policy.status != PolicyStatus.RETIRED:
-                raise ValueError("A retired policy version cannot be reactivated; publish a new version")
+            if (
+                duplicate.status == PolicyStatus.RETIRED.value
+                and policy.status != PolicyStatus.RETIRED
+            ):
+                raise ValueError(
+                    "A retired policy version cannot be reactivated; publish a new version"
+                )
             return PolicySaveResult(
                 policy_id=duplicate.policy_id,
                 content_hash=content_hash,
@@ -115,24 +271,29 @@ class SQLAlchemyPolicyStore:
             rows = (
                 session.execute(
                     select(PersistedNotificationPolicy).where(
-                        PersistedNotificationPolicy.status.in_([status.value for status in statuses])
+                        PersistedNotificationPolicy.status.in_(
+                            [status.value for status in statuses]
+                        )
                     )
                 )
                 .scalars()
                 .all()
             )
-            registry = PolicyRegistry(
-                runtime_only=statuses == (PolicyStatus.ACTIVE,)
-            )
+            registry = PolicyRegistry(runtime_only=statuses == (PolicyStatus.ACTIVE,))
             for row in sorted(rows, key=lambda item: _status_sort_key(item.status)):
-                registry.register(_row_to_policy(row))
+                if row.status != PolicyStatus.ACTIVE.value:
+                    registry.register(_row_to_policy(row))
+            if PolicyStatus.ACTIVE in statuses:
+                for policy in self.load_runtime_registry().get_all().values():
+                    registry.register(policy)
             return registry
         finally:
             session.close()
 
     def load_runtime_registry(self) -> PolicyRegistry:
         """Load only ACTIVE policies eligible for runtime enforcement."""
-        return self.load_registry(statuses=(PolicyStatus.ACTIVE,))
+        self.ensure_snapshot_schema()
+        return self.load_snapshot().registry()
 
     def load_shadow_registry(self) -> PolicyRegistry:
         """Load only PREVIEW policies eligible for shadow evaluation."""
@@ -187,13 +348,20 @@ def _policy_to_persisted_content(policy: NotificationPolicy) -> dict[str, Any]:
 
     for mode in AutonomyMode:
         override = policy._get_mode_override(mode)
-        if override is None:
+        if override is None and not policy.channels_by_mode:
             continue
+        override = override or ModeOverride()
         mode_payload: dict[str, Any] = {}
         if override.channels is not None:
             channel_values = [channel.value for channel in override.channels]
             channels[mode.value] = channel_values
             mode_payload["channels"] = channel_values
+        elif policy.channels_by_mode and mode in policy.channels_by_mode:
+            channel_values = [channel.value for channel in policy.channels_by_mode[mode]]
+            channels[mode.value] = channel_values
+            mode_payload["channels"] = channel_values
+        if override.ack_timeout_minutes is not None:
+            mode_payload["ack_timeout_minutes"] = override.ack_timeout_minutes
         if override.require_ack is not None:
             require_ack[mode.value] = override.require_ack
             mode_payload["require_ack"] = override.require_ack
@@ -233,7 +401,7 @@ def _row_to_policy(row: PersistedNotificationPolicy) -> NotificationPolicy:
     )
 
     for mode in AutonomyMode:
-        update: dict[str, Any] = {}
+        update: dict[str, Any] = dict((row.mode_overrides or {}).get(mode.value, {}))
         if mode.value in raw_channels:
             update["channels"] = [Channel(channel) for channel in raw_channels[mode.value]]
         if mode.value in raw_require_ack:

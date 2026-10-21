@@ -118,9 +118,7 @@ class PersistedNotificationPolicy(Base):
         DateTime(timezone=True), nullable=True, comment="When policy was retired"
     )
 
-    __table_args__ = (
-        Index("ix_notification_policy_type_status", "notification_type", "status"),
-    )
+    __table_args__ = (Index("ix_notification_policy_type_status", "notification_type", "status"),)
 
     def __repr__(self) -> str:
         return (
@@ -128,3 +126,25 @@ class PersistedNotificationPolicy(Base):
             f"notification_type={self.notification_type}, "
             f"version={self.version}, status={self.status})"
         )
+
+
+class NotificationPolicyRevision(Base):
+    """Singleton serialization point shared by activation and notification intake."""
+
+    __tablename__ = "notification_policy_revision"
+
+    singleton: Mapped[int] = mapped_column(primary_key=True)
+    revision: Mapped[int] = mapped_column(nullable=False)
+
+
+class NotificationPolicySnapshot(Base):
+    """Append-only, complete policy content for one activated runtime revision."""
+
+    __tablename__ = "notification_policy_snapshots"
+
+    revision: Mapped[int] = mapped_column(primary_key=True)
+    content: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
