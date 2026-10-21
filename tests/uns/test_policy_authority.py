@@ -620,3 +620,97 @@ async def test_effective_policy_unconfigured_channels_and_no_ack_match_runtime(d
             AutonomyMode.LIVE,
             policy_registry=runtime.registry(),
         )
+
+
+def test_real_runtime_intake_and_separate_process_activation_share_commit_order(database):
+    """Actual durable intake holds revision authority until its work/audit commit."""
+    from uns.runtime import Runtime
+
+    url, sessions = database
+    runtime = Runtime(url, create_tables=True)
+    SQLAlchemyPolicyStore(sessions).save_snapshot([policy()])
+    accepting = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            """
+import json, os, sys
+from agsignal.responses import SendNotificationRequest
+from uns.runtime import Runtime
+runtime = Runtime(os.environ["UNS_DATABASE_URL"])
+original = runtime.policy_runtime.resolve
+def gated(request, **kwargs):
+    notification = original(request, **kwargs)
+    print("resolved", flush=True)
+    sys.stdin.readline()
+    return notification
+runtime.policy_runtime.resolve = gated
+request = SendNotificationRequest.model_validate(json.loads(sys.stdin.readline()))
+response = runtime.accept(request, principal="producer")
+row = runtime.get(response.notification_id)
+print(json.dumps({"notification": row["notification"], "events": runtime.events(response.notification_id)}), flush=True)
+""",
+        ],
+        env=child_environment(url),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    activating = None
+    try:
+        accepting.stdin.write(request().model_dump_json() + "\n")
+        accepting.stdin.flush()
+        assert accepting.stdout.readline().strip() == "resolved"
+        activating = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                """
+import os
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from db.policy_store import SQLAlchemyPolicyStore
+from notification.policies import NotificationPolicy
+engine = create_engine(os.environ["UNS_DATABASE_URL"])
+@event.listens_for(engine, "before_cursor_execute")
+def probe(conn, cursor, statement, parameters, context, executemany):
+    if statement.startswith("UPDATE notification_policy_revision"):
+        print("locking", flush=True)
+SQLAlchemyPolicyStore(sessionmaker(engine)).save_snapshot([
+    NotificationPolicy(notification_type="policy.alarm", version="2", channels=["EMAIL"], require_ack=True)
+])
+print("committed", flush=True)
+""",
+            ],
+            env=child_environment(url),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        assert activating.stdout.readline().strip() == "locking"
+        with selectors.DefaultSelector() as selector:
+            selector.register(activating.stdout, selectors.EVENT_READ)
+            assert not selector.select(timeout=0.2)
+        accepted_output, accepted_error = accepting.communicate("\n", timeout=10)
+        assert accepting.returncode == 0, accepted_error
+        activation_output, activation_error = activating.communicate(timeout=10)
+        assert activating.returncode == 0, activation_error
+        assert "committed" in activation_output
+        accepted = json.loads(accepted_output)
+        assert accepted["notification"]["channels"] == ["SLACK"]
+        assert accepted["notification"]["metadata"]["uns_resolution"]["snapshot_revision"] == 1
+        acceptance_event = next(
+            event for event in accepted["events"] if event["kind"] == "ACCEPTED"
+        )
+        assert acceptance_event["payload"]["snapshot_revision"] == 1
+        later = runtime.accept(request(), principal="producer")
+        later_notification = runtime.get(later.notification_id)["notification"]
+        assert later_notification["channels"] == ["EMAIL"]
+        assert later_notification["metadata"]["uns_resolution"]["snapshot_revision"] == 2
+    finally:
+        for child in (accepting, activating):
+            if child is not None and child.poll() is None:
+                child.kill()
+                child.communicate()
+        runtime.engine.dispose()
