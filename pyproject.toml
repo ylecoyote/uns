@@ -59,7 +59,7 @@ sql = [
 ]
 # MCP server transports (FastMCP + stdio).
 mcp = [
-    "mcp[cli]>=1.0.0,<2",
+    "mcp[cli]>=2.3.0,<3",
 ]
 # HTTP-based channel adapters (Slack, PagerDuty webhooks).
 adapters = [
