@@ -2,29 +2,26 @@
 
 ## Supported Versions
 
-AGSignal is pre-1.0 software. Security fixes are provided for the latest released
-minor version.
+UNS (Unified Notification Service, package `uns` / `agsignal`) is pre-1.0 software. Security fixes are provided for the latest `0.1.x` release line on `main`.
 
-## Threat Model
+| Version | Supported |
+| :--- | :--- |
+| `0.1.x` | Yes |
+| `< 0.1.0` | No |
 
-For an explicit description of trust boundaries, threats, mitigations, and
-known gaps, see [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md). Read it
-before relying on AGSignal in a high-stakes deployment.
+## Threat Model & Security Boundaries
+
+For an authoritative description of authentication, principal attribution, policy override protections, WebSocket subprotocol handshakes, MCP write gates, and known operational boundaries, read [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md) before deploying UNS.
 
 ## Reporting a Vulnerability
 
-Report suspected vulnerabilities through GitHub private vulnerability reporting
-for this repository. Do not open a public issue for a security vulnerability.
+Please report suspected security vulnerabilities through **GitHub Private Vulnerability Reporting** (`Security` -> `Report a vulnerability`) on this repository. **Do not open a public GitHub issue for a security vulnerability.**
 
 Please include:
 
-- Affected version or commit
-- Reproduction steps
-- Impact and affected deployment mode
-- Any relevant logs with secrets removed
+- Affected version or commit SHA
+- Step-by-step reproduction or proof-of-concept test
+- Impact and affected deployment surface (HTTP API, WebSocket, `uns-mcp`, `uns-maintain`, or `UNS Console`)
+- Relevant logs or payloads with all real credentials redacted
 
-The maintainers will acknowledge valid reports as soon as practical, coordinate
-a fix, and publish advisories when user action is required.
-
-Before making this repository public, enable GitHub private vulnerability
-reporting in repository settings.
+Maintainers will acknowledge reports promptly, validate the finding, coordinate remediation, and publish a security advisory when operator action or upgrading is required.

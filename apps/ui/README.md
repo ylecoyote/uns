@@ -119,4 +119,4 @@ The client reads the current tab credential. Contract decoders validate the resp
 
 ## Related Documentation
 
-See [UI contracts](../../docs/ui/ui-data-contracts.md), [security](../../docs/SECURITY-MODEL.md), and [verification](../../docs/TESTING.md) for current evidence and limits.
+See [Operator Console Guide](../../docs/user-guides/OPERATOR-CONSOLE-GUIDE.md), [UI scope](../../docs/ui/ui-scope.md), [UI contracts](../../docs/ui/ui-data-contracts.md), [security](../../docs/SECURITY-MODEL.md), and [verification](../../docs/TESTING.md) for current evidence and limits.

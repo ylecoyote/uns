@@ -115,3 +115,6 @@ docs/reports/ui/_logs/*.log
 
 # Local uv resolver output; this library does not commit a uv lockfile.
 uv.lock
+
+# MkDocs static site output
+site/

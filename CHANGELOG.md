@@ -1,23 +1,36 @@
 # Changelog
 
-All notable changes to the Unified Notification Service (UNS) will be documented in this file.
+All notable changes to the Unified Notification Service (UNS) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-
-- Pending dedup ownership across expiry, fenced follower election, and replay safety using durable successor evidence and conservative upgrade reconstruction.
-- Channel completion evidence after lease loss; SMTP start accounting and timeout/cancellation uncertainty without false fallback on evidence-store errors.
-- Read-only policy snapshot queries, overdue callback fairness, runtime-bound MCP helpers, SUCCESS audit mapping, and consistent runtime audit clocks.
-
-### Clarified
-
-- Replay recovers an unsatisfied obligation; retained failures expose replay blockers until explicit resolution. No force-send bypass.
-- Non-archive retention deliberately preserves removed operational records and does not promise storage compaction.
-- See [iteration 2 report](docs/REMEDIATION_ITERATION2.md) and [verification](docs/TESTING.md) for exact evidence and deployment limits.
+### Added
+- **Durable Transactional Outbox Runtime (`uns.Runtime` & `uns.Client`):**
+  - Atomic SQLite/SQLAlchemy intake (`uns_notifications`, `uns_events`, `uns_dedup`) combining policy provenance resolution, idempotency verification (`principal + source + idempotency_key`), and deduplication window claiming (`LEADER` / `FOLLOWER` generations).
+  - Fenced 60-second delivery leases (`lease_token`, `lease_until`) with pre-channel fencing (`CHANNEL_ATTEMPT_STARTED`), append-only per-channel attempt observations (`CHANNEL_ATTEMPT_RESULT`), `LEASE_LOST` recording, exponential retry backoff, and automatic follower settlement (`DEDUP_SATISFIED` on leader delivery; `OBLIGATION_HANDED_OFF`, `DEDUP_OWNER_PROMOTED`, and `DEDUP_RELINKED` on leader exhaustion).
+  - Durable successor lineage (`dedup_successor_id`) and guarded replay (`replay_blocked_by`, `replay_block_reason`) preventing duplicate delivery when a successor obligation is pending or already satisfied (`F-01`, `F-02`).
+  - Deadline/cancellation-aware SMTP admission and `UNKNOWN` provider outcome recording for timed-out in-flight sends (`F-04a`, `F-04b`).
+  - Durable acknowledgment deadline sweeps (`TIMED_OUT`) and due-time ordered (`callback_until, at, id`) at-least-once terminal callback delivery (`deliver_callbacks`, `F-06`).
+  - Operator dead-letter inspection (`GET /api/v1/runtime/dead-letters`), attributable cycle replay (`POST /api/v1/runtime/notifications/{id}/replay`), and non-replay failure resolution (`DELETE /api/v1/dlq/{id}`).
+- **Revision-Locked Policy Authority (`uns.policy_runtime.PolicyRuntime`):**
+  - Immutable `ACTIVE` policy snapshots (`notification_policy_revisions`, `notification_policy_snapshots`) locked at intake and read in a single lock-free `SELECT` during warm simulation/inspection (`F-05`).
+  - Strict enforcement blocking producer overrides from weakening `ACTIVE` policies and blocking reserved adapter-steering metadata keys (`slack_channel`, `email_to`, `pagerduty_severity`, `websocket_user_id`).
+- **Unified HTTP, Console Read-Model, & WebSocket Service (`uns` / `agsignal.app:create_app`):**
+  - Consolidated FastAPI service mounting `/api/v1/notifications/*`, `/api/v1/runtime/*`, `/api/v1/policies/reload`, `/ui/*`, `/ws/agents/{agent_id}`, public `/healthz`, and authenticated `/readyz` and `/metrics`.
+  - Pre-accept WebSocket authentication supporting native `Authorization: Bearer` headers and browser `agsignal.v1` + `bearer.<base64url>` subprotocols with closed-list `Origin` validation.
+- **Trusted-Local MCP Server (`uns-mcp`):**
+  - Read-only default mode (`stdio-local`) and explicit `--enable-writes` mode (`stdio-persistent`) requiring `UNS_DATABASE_URL`, `UNS_API_PRINCIPAL`, and `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` with an owned lifespan recovery worker and runtime-bound read helpers (`F-07`).
+- **Explicit Database Maintenance & Archival CLI (`uns-maintain` & `uns-migrate`):**
+  - `uns-migrate` for idempotent additive schema bootstrap, successor-lineage reconstruction, and callback due-time normalization.
+  - `uns-maintain` for bounded operational pruning, cursor continuation (`--after-id`), and `O_EXCL` mode-`0600` SHA-256 verified JSON group archival (`--archive`).
+- **Read-Only UNS Console (`apps/ui`) & Local Recording Stack:**
+  - React 18 + TypeScript + Vite SPA enforcing `INV-UI-001` (`GET /ui/*` only) with tab-memory API key authentication across `/deliveries`, `/deliveries/:id`, `/policy`, `/invariants`, and `/audit`.
+  - Persistent localhost recording deployment (`scripts/deploy/local_stack.py`, `docs/LOCAL_DEPLOYMENT.md`, `docs/DEPLOYMENT_SMOKE.md`).
+- **Comprehensive Documentation Suite (`docs/`):**
+  - Production Deployment reference (`docs/DEPLOYMENT.md`), complete API reference (`docs/API.md`), Support State Machine & Schema guide (`docs/support/STATE-MACHINE-AND-SCHEMA.md`), Troubleshooting Guides (`docs/tsg/TSG-01` through `TSG-06`), User/Integrator Manuals (`docs/user-guides/`), and MkDocs Material GitHub Pages configuration (`mkdocs.yml`, `.github/workflows/docs.yml`).
 
 ## [0.1.0] - 2025-01-23
 
@@ -123,14 +136,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API reference documentation
 - Architecture documentation
 - Contributing guidelines
-
-### Technical Details
-
-- Python 3.10+ compatibility
-- Pydantic v2 for data validation
-- Redis for distributed deduplication/rate limiting
-- SQLAlchemy 2.0 for database ORM
-- FastAPI for HTTP API
-- pytest for testing with asyncio support
-- ruff for linting and formatting
-- mypy for type checking

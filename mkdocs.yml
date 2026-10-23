@@ -1,0 +1,96 @@
+site_name: UNS — Unified Notification Service
+site_description: Policy-driven notification delivery, durable outbox recovery, and acknowledgment audit for autonomous agents
+site_url: https://ylecoyote.github.io/agsignal/
+repo_url: https://github.com/ylecoyote/agsignal
+repo_name: ylecoyote/agsignal
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - callouts
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: README.md
+  - Core Contracts:
+      - Product Contract: PRODUCT.md
+      - Architecture: ARCHITECTURE.md
+      - Security Model: SECURITY-MODEL.md
+      - Delivery Semantics: sections/delivery-semantics.md
+      - Policy Lifecycle: sections/policy-lifecycle.md
+      - Integration Modes: sections/integration-modes.md
+      - Observability: sections/observability.md
+  - User & Integrator Guides:
+      - Producer Integration Guide: user-guides/PRODUCER-INTEGRATION-GUIDE.md
+      - AI Agent & MCP Guide: user-guides/AGENT-MCP-GUIDE.md
+      - Operator Console Guide: user-guides/OPERATOR-CONSOLE-GUIDE.md
+  - Deployment & Reference:
+      - Deployment Guide: DEPLOYMENT.md
+      - Local Deployment Runbook: LOCAL_DEPLOYMENT.md
+      - Deployment Smoke Report: DEPLOYMENT_SMOKE.md
+      - API Reference: API.md
+      - Testing & Verification: TESTING.md
+      - Consolidated Baseline: CONSOLIDATED_BASELINE.md
+      - Iteration 2 Remediation: REMEDIATION_ITERATION2.md
+      - External Review Brief: REVIEW_BRIEF.md
+      - Migration & Provenance: MIGRATION.md
+  - Support & Troubleshooting (TSGs):
+      - TSG Triage Matrix: tsg/README.md
+      - State Machine & Schema Reference: support/STATE-MACHINE-AND-SCHEMA.md
+      - "TSG-01: DLQ & Safe Replay": tsg/TSG-01-DLQ-AND-REPLAY.md
+      - "TSG-02: Worker Leases & Provider Effects": tsg/TSG-02-LEASES-AND-PROVIDER-EFFECTS.md
+      - "TSG-03: Ack Timeouts & Callbacks": tsg/TSG-03-ACK-TIMEOUTS-AND-CALLBACKS.md
+      - "TSG-04: Policy Lifecycle & Overrides": tsg/TSG-04-POLICY-LIFECYCLE-AND-OVERRIDES.md
+      - "TSG-05: MCP & Agent WebSocket Recovery": tsg/TSG-05-MCP-AND-AGENT-RECOVERY.md
+      - "TSG-06: Maintenance & Archival": tsg/TSG-06-MAINTENANCE-AND-ARCHIVAL.md
+  - Console Specifications:
+      - UI Scope: ui/ui-scope.md
+      - UI Data Contracts: ui/ui-data-contracts.md
+      - UI Read Models: ui/ui-read-models.md
+      - UI Observability: ui/ui-observability.md

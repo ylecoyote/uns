@@ -25,11 +25,46 @@ def test_pyproject_uses_agsignal_publish_identity() -> None:
 def test_license_file_uses_apache_2_0() -> None:
     license_text = (ROOT / "LICENSE").read_text()
     readme = (ROOT / "README.md").read_text()
+    contributing = (ROOT / "CONTRIBUTING.md").read_text()
+    security = (ROOT / "SECURITY.md").read_text()
 
     assert "Apache License" in license_text
     assert "Version 2.0, January 2004" in license_text
     assert "License-Apache--2.0" in readme
     assert "Apache License 2.0 - see [LICENSE](LICENSE)" in readme
+    assert "Apache License 2.0 - see [LICENSE](LICENSE)" in contributing
+    assert "MIT License" not in contributing
+    assert "Before making this repository public" not in security
+
+
+def test_mkdocs_nav_files_resolve() -> None:
+    import yaml
+
+    mkdocs_path = ROOT / "mkdocs.yml"
+    assert mkdocs_path.exists()
+    # Read nav section paths using safe_load on lines excluding !!python/name tags
+    raw = "\n".join(
+        line for line in mkdocs_path.read_text().splitlines() if "!!python/name:" not in line
+    )
+    config = yaml.safe_load(raw)
+    docs_dir = ROOT / config.get("docs_dir", "docs")
+
+    def _collect_paths(node: object) -> list[str]:
+        paths: list[str] = []
+        if isinstance(node, str) and node.endswith(".md"):
+            paths.append(node)
+        elif isinstance(node, list):
+            for item in node:
+                paths.extend(_collect_paths(item))
+        elif isinstance(node, dict):
+            for value in node.values():
+                paths.extend(_collect_paths(value))
+        return paths
+
+    nav_paths = _collect_paths(config["nav"])
+    assert len(nav_paths) >= 20
+    for rel_path in nav_paths:
+        assert (docs_dir / rel_path).exists(), f"Missing mkdocs nav target: {rel_path}"
 
 
 def test_agsignal_integrations_exposes_generic_boundary_only() -> None:
