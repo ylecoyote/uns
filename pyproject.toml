@@ -94,11 +94,11 @@ uns-mcp = "agsignal_mcp.transports.stdio:main"
 agsignal = "agsignal.app:main"
 
 [project.urls]
-Homepage = "https://github.com/ylecoyote/agsignal"
-Repository = "https://github.com/ylecoyote/agsignal"
-Issues = "https://github.com/ylecoyote/agsignal/issues"
-Changelog = "https://github.com/ylecoyote/agsignal/blob/main/CHANGELOG.md"
-Documentation = "https://github.com/ylecoyote/agsignal#readme"
+Homepage = "https://github.com/ylecoyote/uns"
+Repository = "https://github.com/ylecoyote/uns"
+Issues = "https://github.com/ylecoyote/uns/issues"
+Changelog = "https://github.com/ylecoyote/uns/blob/main/CHANGELOG.md"
+Documentation = "https://ylecoyote.github.io/uns/"
 
 [tool.setuptools.packages.find]
 where = ["src"]

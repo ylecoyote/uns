@@ -19,8 +19,8 @@ Thank you for your interest in contributing to the **Unified Notification Servic
 
 ```bash
 # Clone the repository
-git clone https://github.com/ylecoyote/agsignal.git
-cd agsignal
+git clone https://github.com/ylecoyote/uns.git
+cd uns
 
 # Create and activate virtual environment
 python3.12 -m venv .venv

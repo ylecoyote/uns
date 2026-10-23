@@ -20,6 +20,8 @@ def test_pyproject_uses_agsignal_publish_identity() -> None:
     # full server stack with one install line.
     assert '"uns[server,redis,sql,mcp,adapters]"' in content
     assert '"uns[full,dev]"' in content
+    assert 'Repository = "https://github.com/ylecoyote/uns"' in content
+    assert 'Documentation = "https://ylecoyote.github.io/uns/"' in content
 
 
 def test_license_file_uses_apache_2_0() -> None:
