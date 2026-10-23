@@ -268,6 +268,7 @@ def maintain(
                             or_(
                                 owner.c.id == dedup.c.owner_id,
                                 owner.c.dedup_owner_id == dedup.c.owner_id,
+                                owner.c.dedup_key == dedup.c.key,
                             ),
                             owner.c.id.not_in(identifiers),
                         )

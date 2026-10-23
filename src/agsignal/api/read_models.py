@@ -794,7 +794,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
         limit: int = 25,
     ) -> PaginatedResult:
         """Get paginated list of audit events from database."""
-        from sqlalchemy import select
+        from sqlalchemy import func, select
 
         from db.models import AckAuditRecord as AckAuditRecordDB
         from db.models import NotificationAuditRecord
@@ -806,6 +806,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             offset = self._decode_cursor(cursor)
             fetch_limit = offset + limit + 1
             all_events: list[AuditEvent] = []
+            total_count = 0
 
             # Query delivery audits
             delivery_stmt = select(NotificationAuditRecord)
@@ -843,10 +844,30 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 "RATE_LIMITED": "delivery.rate_limited",
                 "PENDING": "delivery.started",
             }
+            event_to_delivery_statuses = {
+                "delivery.succeeded": ("DELIVERED", "SUCCESS"),
+                "delivery.failed": ("FAILED",),
+                "delivery.deduplicated": ("DEDUPLICATED",),
+                "delivery.rate_limited": ("RATE_LIMITED",),
+                "delivery.started": ("PENDING",),
+            }
 
             if filter_criteria.event_type is None or filter_criteria.event_type.startswith(
                 "delivery."
             ):
+                if filter_criteria.event_type is not None:
+                    matching_statuses = event_to_delivery_statuses.get(
+                        filter_criteria.event_type, ()
+                    )
+                    delivery_stmt = delivery_stmt.where(
+                        NotificationAuditRecord.status.in_(matching_statuses)
+                    )
+                total_count += (
+                    session.execute(
+                        select(func.count()).select_from(delivery_stmt.subquery())
+                    ).scalar()
+                    or 0
+                )
                 delivery_results = (
                     session.execute(
                         delivery_stmt.order_by(NotificationAuditRecord.created_at.desc()).limit(
@@ -916,18 +937,38 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         AckAuditRecordDB.notification_id == filter_criteria.notification_id
                     )
 
-                ack_results = (
-                    session.execute(
-                        ack_stmt.order_by(AckAuditRecordDB.created_at.desc()).limit(fetch_limit)
-                    ).all()
-                )
-
                 ack_status_to_event = {
                     "PENDING": "ack.pending",
                     "ACKED": "ack.received",
                     "DISMISSED": "ack.dismissed",
                     "TIMED_OUT": "ack.timed_out",
                 }
+                event_to_ack_statuses = {
+                    "ack.pending": ("PENDING",),
+                    "ack.received": ("ACKED",),
+                    "ack.dismissed": ("DISMISSED",),
+                    "ack.timed_out": ("TIMED_OUT",),
+                }
+                if filter_criteria.event_type is not None:
+                    matching_ack_statuses = event_to_ack_statuses.get(
+                        filter_criteria.event_type, ()
+                    )
+                    ack_stmt = ack_stmt.where(
+                        AckAuditRecordDB.new_status.in_(matching_ack_statuses)
+                    )
+                total_count += (
+                    session.execute(
+                        select(func.count()).select_from(ack_stmt.subquery())
+                    ).scalar()
+                    or 0
+                )
+
+                ack_results = (
+                    session.execute(
+                        ack_stmt.order_by(AckAuditRecordDB.created_at.desc()).limit(fetch_limit)
+                    ).all()
+                )
+
                 # Use UUID directly since it's already imported at module level
                 nil_uuid = UUID("00000000-0000-0000-0000-000000000000")
 
@@ -963,7 +1004,6 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
             all_events.sort(key=lambda e: e.event_time, reverse=True)
 
             # Apply pagination
-            total_count = len(all_events)
             page = all_events[offset : offset + limit]
             has_more = offset + limit < total_count
 

@@ -698,3 +698,76 @@ def test_policy_reload_rejects_missing_directory(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_policy_reload_rejects_empty_directory_and_traversal(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    client = _client()
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+
+    empty_resp = client.post("/api/v1/policies/reload", json={"policy_dir": str(empty_dir)})
+    assert empty_resp.status_code == 422
+
+    traversal_resp = client.post(
+        "/api/v1/policies/reload",
+        json={"policy_dir": f"{tmp_path}/../etc"},
+    )
+    assert traversal_resp.status_code == 422
+
+    allowed_root = tmp_path / "allowed"
+    allowed_root.mkdir()
+    monkeypatch.setenv("UNS_POLICY_DIR", str(allowed_root))  # type: ignore[attr-defined]
+    outside_resp = client.post("/api/v1/policies/reload", json={"policy_dir": str(tmp_path)})
+    assert outside_resp.status_code == 422
+
+
+def test_email_adapter_escapes_html_and_sanitizes_headers() -> None:
+    from uuid import uuid4
+
+    from notification.adapters.email import EmailAdapter, EmailConfig
+    from notification.models import AutonomyContext, AutonomyMode, Notification, NotificationIntent
+
+    adapter = EmailAdapter(
+        EmailConfig(
+            smtp_host="localhost",
+            smtp_port=587,
+            username="u",
+            password="p",
+            from_address="uns@example.com\r\nBcc: attacker@example.com",
+            default_to_addresses=["ops@example.com"],
+        )
+    )
+    n = Notification(
+        notification_type="safety.alert",
+        intent=NotificationIntent.SAFETY,
+        autonomy_context=AutonomyContext(
+            autonomy_mode=AutonomyMode.LIVE,
+            agent_id=uuid4(),
+        ),
+        title='<script>alert("xss")</script>\r\nInjected: header',
+        message='Click <a href="https://evil.example">here</a>\nNext line',
+        source="producer<b>1</b>",
+    )
+    html_body = adapter._build_html_body(n)
+    assert "<script>" not in html_body
+    assert "&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;" in html_body
+    assert '&lt;a href=&quot;https://evil.example&quot;&gt;here&lt;/a&gt;<br>Next line' in html_body
+    assert "producer&lt;b&gt;1&lt;/b&gt;" in html_body
+
+    mime_msg = adapter._build_message(n, ["ops@example.com"])
+    assert "\r" not in mime_msg["Subject"]
+    assert "\n" not in mime_msg["Subject"]
+    assert "\r" not in mime_msg["From"]
+    assert "\n" not in mime_msg["From"]
+
+
+def test_oversized_metadata_rejected() -> None:
+    import pytest
+    from pydantic import ValidationError as PydanticValidationError
+
+    from agsignal.responses import AckRequest
+
+    with pytest.raises(PydanticValidationError, match="metadata must not exceed"):
+        AckRequest(metadata={"blob": "x" * 70_000})

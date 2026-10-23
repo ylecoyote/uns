@@ -376,3 +376,54 @@ async def test_upgrade_reconstructs_successful_legacy_root_replay_transitively(s
             assert reopened.get(identifier)["dedup_successor_id"] == str(a.notification_id)
             with pytest.raises(Conflict, match="satisfied"):
                 reopened.replay(identifier, actor="ops")
+
+
+@pytest.mark.asyncio
+async def test_same_window_replacement_after_solo_leader_failure_links_successor(state):
+    runtime, adapter, _, now, _ = state
+    a = runtime.accept(request("solo-a"), principal="p")
+    await fail(runtime, adapter, a.notification_id)
+    assert runtime.get(a.notification_id)["status"] == "FAILED"
+    assert runtime.get(a.notification_id)["dedup_successor_id"] is None
+
+    # B arrives in the same dedup window after solo leader A failed.
+    now[0] += 10
+    b = runtime.accept(request("replacement-b"), principal="p")
+    assert runtime.get(a.notification_id)["dedup_successor_id"] == str(b.notification_id)
+    await runtime.dispatch(b.notification_id)
+    runtime.acknowledge(b.notification_id, actor="ops")
+
+    # Even after B's dedup window expires, replaying A is blocked because B satisfied it.
+    now[0] += 10000
+    with pytest.raises(Conflict, match="satisfied"):
+        runtime.replay(a.notification_id, actor="ops")
+    report = maintain(
+        runtime.engine, cutoff=5000, idempotency_seconds=60, now=now[0], apply=True, operator="ops"
+    )
+    assert report["dedup_keys"] == []
+
+
+@pytest.mark.asyncio
+async def test_exhausted_callback_clears_pending_and_allows_retention(state):
+    runtime, _, _, now, _ = state
+
+    async def always_fail(row):
+        raise RuntimeError("webhook down")
+
+    runtime.callback = always_fail
+    accepted = await runtime.send(request("cb-exhaust"), principal="p")
+    runtime.acknowledge(accepted.notification_id, actor="ops")
+
+    for _ in range(3):
+        await runtime.deliver_callbacks()
+        now[0] += 30
+
+    ack_event = [e for e in runtime.events(accepted.notification_id) if e["kind"] == "ACKED"][0]
+    assert ack_event["callback_attempts"] == 3
+    assert ack_event["callback_pending"] is False
+
+    now[0] += 10000
+    report = maintain(
+        runtime.engine, cutoff=5000, idempotency_seconds=60, now=now[0], apply=True, operator="ops"
+    )
+    assert str(accepted.notification_id) in report["notification_ids"]

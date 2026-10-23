@@ -12,8 +12,10 @@ All UI endpoints emit observability data through this module.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
+from collections import deque
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -25,6 +27,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 # Context variable for request ID propagation
 _request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
@@ -98,11 +101,12 @@ class MetricsCollector:
     For production, replace with Prometheus, StatsD, or similar.
     """
 
-    def __init__(self) -> None:
-        self._metrics: list[RequestMetric] = []
+    def __init__(self, max_samples: int = 10_000) -> None:
+        self._max_samples = max_samples
+        self._metrics: deque[RequestMetric] = deque(maxlen=max_samples)
         self._request_counts: dict[str, int] = {}
         self._error_counts: dict[str, int] = {}
-        self._latency_samples: dict[str, list[float]] = {}
+        self._latency_samples: dict[str, deque[float]] = {}
 
     def record_request(
         self,
@@ -129,7 +133,7 @@ class MetricsCollector:
 
         # Record latency
         if key not in self._latency_samples:
-            self._latency_samples[key] = []
+            self._latency_samples[key] = deque(maxlen=self._max_samples)
         self._latency_samples[key].append(latency_ms)
 
         # Record error if applicable
@@ -212,11 +216,11 @@ class MetricsCollector:
             Dict with min, max, avg, p50, p95, p99 latencies, or None if no data.
         """
         key = f"{method}:{endpoint}"
-        samples = self._latency_samples.get(key, [])
+        samples = self._latency_samples.get(key)
         if not samples:
             return None
 
-        sorted_samples = sorted(samples)
+        sorted_samples: list[float] = sorted(samples)
         count = len(sorted_samples)
 
         def percentile(p: float) -> float:
@@ -367,7 +371,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
         # Generate or extract request ID
         request_id = request.headers.get("X-Request-ID")
-        if not request_id:
+        if not request_id or not _REQUEST_ID_PATTERN.match(request_id):
             request_id = generate_request_id()
         set_request_id(request_id)
 

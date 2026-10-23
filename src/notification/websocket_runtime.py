@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -288,6 +289,10 @@ class RedisWebSocketSubscriber:
         self._reconnect_initial_delay_seconds = reconnect_initial_delay_seconds
         self._reconnect_max_delay_seconds = reconnect_max_delay_seconds
         self._tasks_by_agent: dict[UUID, asyncio.Task[None]] = {}
+        self._executor = ThreadPoolExecutor(
+            max_workers=16,
+            thread_name_prefix="uns-ws-redis",
+        )
 
     @property
     def active_subscription_count(self) -> int:
@@ -345,11 +350,21 @@ class RedisWebSocketSubscriber:
             while True:
                 pubsub: RedisPubSub | None = None
                 try:
+                    loop = asyncio.get_running_loop()
                     pubsub = self._redis.pubsub()
-                    await asyncio.to_thread(pubsub.subscribe, self.channel_for_agent(agent_id))
+                    await loop.run_in_executor(
+                        self._executor,
+                        pubsub.subscribe,
+                        self.channel_for_agent(agent_id),
+                    )
                     reconnect_delay = self._reconnect_initial_delay_seconds
                     while True:
-                        message = await asyncio.to_thread(pubsub.get_message, True, 0.5)
+                        message = await loop.run_in_executor(
+                            self._executor,
+                            pubsub.get_message,
+                            True,
+                            0.5,
+                        )
                         await self.handle_message(message)
                 except asyncio.CancelledError:
                     raise
@@ -371,7 +386,10 @@ class RedisWebSocketSubscriber:
                 finally:
                     if pubsub is not None:
                         with suppress(Exception):
-                            await asyncio.to_thread(pubsub.close)
+                            await asyncio.get_running_loop().run_in_executor(
+                                self._executor,
+                                pubsub.close,
+                            )
         except asyncio.CancelledError:
             raise
         finally:

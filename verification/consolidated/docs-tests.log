@@ -1,7 +1,7 @@
 ============================= test session starts ==============================
 platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.7.0
 cachedir: /private/tmp/uns-merged-doc-cache
-rootdir: <repo-root>
+rootdir: <workspace>/uns
 configfile: pyproject.toml
 plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function

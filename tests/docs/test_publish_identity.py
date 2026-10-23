@@ -151,3 +151,15 @@ def test_no_bytecode_artifacts_are_tracked() -> None:
     )
 
     assert result.stdout == ""
+
+
+def test_no_workstation_paths_are_tracked() -> None:
+    result = subprocess.run(
+        ["git", "grep", "-n", "/" + "Users/awiley"],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.stdout == ""

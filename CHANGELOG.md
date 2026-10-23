@@ -32,6 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Comprehensive Documentation Suite (`docs/`):**
   - Production Deployment reference (`docs/DEPLOYMENT.md`), complete API reference (`docs/API.md`), Support State Machine & Schema guide (`docs/support/STATE-MACHINE-AND-SCHEMA.md`), Troubleshooting Guides (`docs/tsg/TSG-01` through `TSG-06`), User/Integrator Manuals (`docs/user-guides/`), and MkDocs Material GitHub Pages configuration (`mkdocs.yml`, `.github/workflows/docs.yml`).
 
+### Fixed & Hardened
+- **Same-Window Dedup Replacement & Callback Retention (`uns.Runtime`, `uns.maintenance`):**
+  - Linked `dedup_successor_id` and emitted `OBLIGATION_HANDED_OFF` when a new request replaces a failed solo leader within the same deduplication window, and preserved `uns_dedup` generation state while any retained notification shares `dedup_key`.
+  - Refreshed per-callback lease timestamps (`self.clock()`) inside `deliver_callbacks()` and cleared `callback_pending` on 3rd-attempt exhaustion so exhausted callbacks do not block `uns-maintain` retention pruning.
+- **Email, Rate-Limiter, Policy Reload, & Audit Query Hardening:**
+  - Escaped HTML entities (`html.escape`) in `EmailAdapter._build_html_body()` and sanitized CR/LF characters from MIME header fields.
+  - Keyed HTTP rate-limiter buckets by SHA-256 digests of verified API keys only, falling back to client IP for unauthenticated or invalid headers.
+  - Constrained `POST /api/v1/policies/reload` to reject path traversal (`..`), enforce `UNS_POLICY_DIR` root boundaries when configured, and reject empty policy directories (`loaded_count == 0`).
+  - Pushed `event_type` filtering and `total_count` computation into SQL `WHERE` / `COUNT(*)` clauses in `SQLAlchemyReadModelAdapter.get_audit_events()`.
+  - Bounded `MetricsCollector` sample storage with ring buffers (`deque(maxlen=10_000)`), validated `X-Request-ID` headers, capped serialized request `metadata` at 64 KiB, isolated `RedisWebSocketSubscriber` onto a dedicated thread pool, and added `.github/workflows/ci.yml`.
+
 ## [0.1.0] - 2025-01-23
 
 ### Added

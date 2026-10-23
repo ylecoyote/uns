@@ -83,8 +83,12 @@ async def record_response(event: dict[str, Any]) -> None:
 
 
 def make_runtime() -> Runtime:
+    from agsignal.app import configure_runtime_policies
+
     registry = SimpleAdapterRegistry()
     for channel in (Channel.SLACK, Channel.EMAIL, Channel.PAGERDUTY):
         registry.register(RecordingAdapter(channel))
     # Deliberately do not construct credential-driven real provider adapters.
-    return Runtime(os.environ["UNS_DATABASE_URL"], adapters=registry, callback=record_response)
+    runtime = Runtime(os.environ["UNS_DATABASE_URL"], adapters=registry, callback=record_response)
+    configure_runtime_policies(runtime)
+    return runtime
