@@ -19,12 +19,13 @@ they were structurally incompatible and could not consolidate.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from notification.dlq import DLQEntry
 from notification.models import (
@@ -37,6 +38,15 @@ from notification.models import (
     NotificationIntent,
     Priority,
 )
+
+MAX_METADATA_BYTES = 65_536
+
+
+def _validate_metadata_size(value: dict[str, Any]) -> dict[str, Any]:
+    encoded = json.dumps(value, default=str).encode("utf-8")
+    if len(encoded) > MAX_METADATA_BYTES:
+        raise ValueError(f"metadata must not exceed {MAX_METADATA_BYTES} serialized bytes")
+    return value
 
 # ────────────────────────────────────────────────────────────────────────────
 # Console / read enums (relocated from agsignal/api/routes_ui.py)
@@ -164,6 +174,11 @@ class SendNotificationRequest(BaseModel):
         description="Producer retry key scoped by source",
         min_length=1,
     )
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _validate_metadata_size(v)
 
 
 class SendNotificationResponse(BaseModel):
@@ -301,6 +316,11 @@ class AckRequest(BaseModel):
         default_factory=dict, description="Additional acknowledgment metadata"
     )
 
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _validate_metadata_size(v)
+
 
 class DismissRequest(BaseModel):
     """Request body for dismissing a notification."""
@@ -309,6 +329,11 @@ class DismissRequest(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional dismissal metadata"
     )
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _validate_metadata_size(v)
 
 
 class AckResponse(BaseModel):

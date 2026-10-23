@@ -1,5 +1,5 @@
 {
-  "backup_path": "/Users/awiley/Library/Application Support/UNS/backups/initial-local-20261021T070302Z.db",
+  "backup_path": "$HOME/Library/Application Support/UNS/backups/initial-local-20261021T070302Z.db",
   "sha256": "45299ff47a07b44ec42e58bca27ab229f5ac636c9f3f2cf8b81901e7a410f826",
   "sqlite_quick_check": "ok",
   "operator_key_mode": "0o600",

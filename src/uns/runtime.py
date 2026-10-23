@@ -291,19 +291,28 @@ class Runtime:
                 )
                 now = self.clock()
                 owner = None
+                failed_owner = None
                 if current and current["owner_id"]:
-                    owner = (
+                    candidate = (
                         session.execute(
                             select(work).where(
                                 work.c.id == current["owner_id"],
                                 work.c.dedup_generation == current["generation"],
                                 work.c.dedup_owner_id.is_(None),
-                                work.c.status.in_(("PENDING", "DELIVERED")),
                             )
                         )
                         .mappings()
                         .first()
                     )
+                    if candidate and candidate["status"] in ("PENDING", "DELIVERED"):
+                        owner = candidate
+                    elif (
+                        candidate
+                        and candidate["status"] == "FAILED"
+                        and candidate["dedup_successor_id"] is None
+                        and current["until"] > now
+                    ):
+                        failed_owner = candidate
                 if owner and current and owner["status"] == "DELIVERED" and current["until"] <= now:
                     owner = None
                 generation = (
@@ -339,6 +348,24 @@ class Runtime:
                         )
                     else:
                         session.execute(insert(dedup).values(key=dedup_key, **claim))
+                    if failed_owner:
+                        session.execute(
+                            update(work)
+                            .where(
+                                work.c.id == failed_owner["id"],
+                                work.c.dedup_successor_id.is_(None),
+                            )
+                            .values(dedup_successor_id=identifier)
+                        )
+                        self._event(
+                            session,
+                            failed_owner["id"],
+                            "OBLIGATION_HANDED_OFF",
+                            {
+                                "successor_id": identifier,
+                                "generation": generation,
+                            },
+                        )
                 session.execute(update(work).where(work.c.id == identifier).values(**values))
                 self._audit(session, n, result, event="accepted", principal=principal)
                 self._event(session, identifier, "ACCEPTED", provenance)
@@ -989,7 +1016,20 @@ class Runtime:
         if self.callback is None:
             return
         now = self.clock()
-        with self.sessions() as session:
+        with self.sessions.begin() as session:
+            session.connection().execute(
+                update(events)
+                .where(
+                    events.c.callback_pending.is_(True),
+                    events.c.callback_until <= now,
+                    events.c.callback_attempts >= 3,
+                )
+                .values(
+                    callback_pending=False,
+                    callback_token=None,
+                    callback_until=now,
+                )
+            )
             identifiers = list(
                 session.execute(
                     select(events.c.id)
@@ -1004,6 +1044,7 @@ class Runtime:
             )
         for identifier in identifiers:
             token = str(uuid4())
+            claim_now = self.clock()
             with self.sessions.begin() as session:
                 changed = (
                     session.connection()
@@ -1012,12 +1053,12 @@ class Runtime:
                         .where(
                             events.c.id == identifier,
                             events.c.callback_pending.is_(True),
-                            events.c.callback_until <= now,
+                            events.c.callback_until <= claim_now,
                             events.c.callback_attempts < 3,
                         )
                         .values(
                             callback_token=token,
-                            callback_until=now + 30,
+                            callback_until=claim_now + 30,
                             callback_attempts=events.c.callback_attempts + 1,
                         )
                     )
@@ -1036,13 +1077,19 @@ class Runtime:
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"[:2000]
             with self.sessions.begin() as session:
+                finish_now = self.clock()
+                exhausted = int(event["callback_attempts"]) >= 3
                 session.connection().execute(
                     update(events)
                     .where(events.c.id == identifier, events.c.callback_token == token)
                     .values(
-                        callback_pending=error is not None,
+                        callback_pending=error is not None and not exhausted,
                         callback_error=error,
-                        callback_until=self.clock() + 2 ** event["callback_attempts"],
+                        callback_until=(
+                            finish_now
+                            if error is None or exhausted
+                            else finish_now + 2 ** event["callback_attempts"]
+                        ),
                         callback_token=None,
                     )
                 )

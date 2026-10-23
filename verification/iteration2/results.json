@@ -186,7 +186,7 @@
   },
   "wheel_sha256": "07eb394948f488f51757d1a70b40c55c42574aa518073f2d9582bcb287dad36b",
   "final_workspace": {
-    "path": "/Users/awiley/Code/uns-iteration2",
+    "path": "<workspace>/uns-iteration2",
     "own_environment": "installed with validated dependency constraints",
     "tests_passed": 273,
     "recording_demo": "pass",

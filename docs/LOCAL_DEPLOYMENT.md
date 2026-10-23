@@ -4,7 +4,7 @@ The user selected localhost with recording adapters. The service is deployed at 
 
 ## Sign in
 
-Paste the contents of `/Users/awiley/Library/Application Support/UNS/operator-api-key.txt` into the console's API key field. The file is mode 0600 inside a private configuration directory. The key stays in browser-tab memory; reload or sign-out clears it. Credential values are not in the repository, vault, receipts or URLs.
+Paste the contents of `$HOME/Library/Application Support/UNS/operator-api-key.txt` into the console's API key field. The file is mode 0600 inside a private configuration directory. The key stays in browser-tab memory; reload or sign-out clears it. Credential values are not in the repository, vault, receipts or URLs.
 
 The visible banner says **Local recording mode**. Slack, email and PagerDuty channels write durable local receipts instead of contacting providers. WebSockets are available to authenticated local clients. DELIVERED in this profile means recording-sink acceptance, not an external message or human receipt. Notification details are in SQLite; lightweight channel receipts and response callbacks are in the same persistent data volume.
 
@@ -13,7 +13,7 @@ The visible banner says **Local recording mode**. Slack, email and PagerDuty cha
 - Application image: `uns:07ef52a`, pinned by image ID `sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d`. Core code is `07ef52a87b45128b77715f64c8b0e5f8f91387a9`.
 - Recording composition: `deploy/local/recording_runtime.py`, `local_app.py`, and `local_mcp.py`, deployed from profile commit `be2b3c9` as a read-only release snapshot.
 - Fixed reverse proxy: `deploy/local/nginx.conf` from `9fd53d8`, with the Nginx image pinned by digest in the installed Compose configuration.
-- Configuration and immutable profile/console snapshot: `/Users/awiley/Library/Application Support/UNS/`. Active release is recorded in `active-release.txt`; active deployment is `compose.json`.
+- Configuration and immutable profile/console snapshot: `$HOME/Library/Application Support/UNS/`. Active release is recorded in `active-release.txt`; active deployment is `compose.json`.
 - Database, local channel receipts and response receipts: Docker volume `uns-local-data`. Source-checkout changes do not mutate the running release.
 
 Containers `uns-local` and `uns-local-ingress` use `unless-stopped` restart policies. They restart with Docker after an engine restart unless deliberately stopped. Docker Desktop startup on Mac login and OS-reboot behavior were not changed or separately tested.
@@ -35,7 +35,7 @@ Read-only local MCP can be started with `docker exec -i uns-local python /profil
 
 ## Backup and verification
 
-An initial consistent SQLite backup was created through SQLite's backup API and passed `PRAGMA quick_check`. It is under `/Users/awiley/Library/Application Support/UNS/backups/`, mode 0600; its filename and SHA-256 are in the deployment receipt. This is an initial recovery copy, not an automatic backup/retention schedule. Restore into a stopped service with a compatible code/profile release and preserve the existing volume until the restored copy is verified.
+An initial consistent SQLite backup was created through SQLite's backup API and passed `PRAGMA quick_check`. It is under `$HOME/Library/Application Support/UNS/backups/`, mode 0600; its filename and SHA-256 are in the deployment receipt. This is an initial recovery copy, not an automatic backup/retention schedule. Restore into a stopped service with a compatible code/profile release and preserve the existing volume until the restored copy is verified.
 
 **62 checks passed against this persistent deployment**, including protected/public endpoints, visible recording banners, simulation, recorded Slack/email/PagerDuty acceptance, idempotency/dedup/conflicts, actor-bound ACK/dismiss, UTC audit projection, actual proxied WebSockets, read-only and write-enabled MCP, cross-transport idempotency, a real one-minute timeout, durable local callbacks, persisted pending-work recovery and ACK survival after an application restart. The final demo notification was acknowledged after the run. The earlier isolated full rehearsal passed 99 checks against the same application image, including fault injection, retries and copied-data retention.
 

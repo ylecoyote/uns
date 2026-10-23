@@ -416,25 +416,29 @@ class TestCreateApp:
         assert int(retry_after) >= 1
 
     def test_rate_limit_keys_independently_per_principal(self):
-        """Different Bearer tokens get independent rate-limit counters."""
+        """Verified API key gets an independent hashed bucket; spoofed headers share IP limit."""
         from fastapi.testclient import TestClient
 
         env = {"AGSIGNAL_RATE_LIMIT_DEFAULT": "2/minute"}
         with patch.dict(os.environ, env, clear=True):
             app = create_app(skip_persistence_config=True)
             app.state.agsignal_api_key = "test-key"
-            client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+            client = TestClient(app)
 
-            headers_alice = {"Authorization": "Bearer alice-key"}
-            headers_bob = {"Authorization": "Bearer bob-key"}
+            headers_verified = {"Authorization": "Bearer test-key"}
+            headers_spoof_1 = {"Authorization": "Bearer spoof-key-1"}
+            headers_spoof_2 = {"Authorization": "Bearer spoof-key-2"}
 
-            # Alice hits her limit.
-            assert client.get("/healthz", headers=headers_alice).status_code == 200
-            assert client.get("/healthz", headers=headers_alice).status_code == 200
-            assert client.get("/healthz", headers=headers_alice).status_code == 429
+            # Verified principal hits its bucket limit.
+            assert client.get("/healthz", headers=headers_verified).status_code == 200
+            assert client.get("/healthz", headers=headers_verified).status_code == 200
+            assert client.get("/healthz", headers=headers_verified).status_code == 429
 
-            # Bob is independent — first request still passes.
-            assert client.get("/healthz", headers=headers_bob).status_code == 200
+            # Anonymous / unverified traffic is independent of verified principal,
+            # but rotating spoofed headers shares the single remote-IP bucket.
+            assert client.get("/healthz", headers=headers_spoof_1).status_code == 200
+            assert client.get("/healthz", headers=headers_spoof_2).status_code == 200
+            assert client.get("/healthz", headers={"Authorization": "Bearer spoof-key-3"}).status_code == 429
 
     def test_create_app_allows_console_cors_preflight(self):
         """Browser console origins can preflight read and write API headers."""

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import logging
 import smtplib
 import ssl
@@ -369,6 +370,11 @@ class EmailAdapter(BaseAdapter):
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _sanitize_header(value: str) -> str:
+        """Strip CR/LF characters from MIME header values."""
+        return value.replace("\r", " ").replace("\n", " ").strip()
+
     def _build_message(
         self,
         notification: Notification,
@@ -379,9 +385,9 @@ class EmailAdapter(BaseAdapter):
 
         # Headers
         prefix = INTENT_PREFIX.get(notification.intent, "[UNS]")
-        msg["Subject"] = f"{prefix} {notification.title}"
-        msg["From"] = self.config.from_address
-        msg["To"] = ", ".join(to_addresses)
+        msg["Subject"] = self._sanitize_header(f"{prefix} {notification.title}")
+        msg["From"] = self._sanitize_header(self.config.from_address)
+        msg["To"] = self._sanitize_header(", ".join(to_addresses))
 
         # Priority headers
         priority = notification.priority or Priority.NORMAL
@@ -392,9 +398,11 @@ class EmailAdapter(BaseAdapter):
         msg["Importance"] = importance
 
         # Custom headers
-        msg["X-UNS-Notification-ID"] = str(notification.notification_id)
-        msg["X-UNS-Intent"] = notification.intent.value
-        msg["X-UNS-Autonomy-Mode"] = notification.autonomy_context.autonomy_mode.value
+        msg["X-UNS-Notification-ID"] = self._sanitize_header(str(notification.notification_id))
+        msg["X-UNS-Intent"] = self._sanitize_header(notification.intent.value)
+        msg["X-UNS-Autonomy-Mode"] = self._sanitize_header(
+            notification.autonomy_context.autonomy_mode.value
+        )
 
         # Plain text body
         text_body = self.format_message(notification)
@@ -412,6 +420,12 @@ class EmailAdapter(BaseAdapter):
         color = {"HIGH": "#dc3545", "NORMAL": "#fd7e14", "LOW": "#6c757d"}.get(
             priority.value, "#fd7e14"
         )
+        safe_intent = html.escape(notification.intent.value, quote=True)
+        safe_title = html.escape(notification.title, quote=True)
+        safe_message = html.escape(notification.message, quote=True).replace("\n", "<br>")
+        safe_source = html.escape(notification.source, quote=True)
+        safe_agent = html.escape(str(notification.autonomy_context.agent_id), quote=True)
+        safe_mode = html.escape(notification.autonomy_context.autonomy_mode.value, quote=True)
 
         ack_section = ""
         if notification.require_ack:
@@ -440,19 +454,19 @@ class EmailAdapter(BaseAdapter):
         <body>
             <div class="container">
                 <div class="header">
-                    <span class="badge intent-badge">{notification.intent.value}</span>
-                    <h2 style="margin: 10px 0;">{notification.title}</h2>
+                    <span class="badge intent-badge">{safe_intent}</span>
+                    <h2 style="margin: 10px 0;">{safe_title}</h2>
                 </div>
                 <div class="content">
-                    {notification.message.replace(chr(10), "<br>")}
+                    {safe_message}
                 </div>
                 {ack_section}
                 <div class="footer">
                     <strong>Notification Details:</strong><br>
                     ID: {notification.notification_id}<br>
-                    Source: {notification.source}<br>
-                    Agent: {notification.autonomy_context.agent_id}<br>
-                    Mode: {notification.autonomy_context.autonomy_mode.value}
+                    Source: {safe_source}<br>
+                    Agent: {safe_agent}<br>
+                    Mode: {safe_mode}
                 </div>
             </div>
         </body>

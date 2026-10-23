@@ -812,3 +812,63 @@ class TestSQLAlchemyAdapter:
             "ack_audit_records" in statement and "LIMIT" in statement.upper()
             for statement in audit_selects
         )
+
+    def test_get_audit_events_filters_event_type_in_sql_before_limit(self, tmp_path):
+        """Filtering by event_type finds older matching rows beyond fetch_limit."""
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from agsignal.api.read_models import SQLAlchemyReadModelAdapter
+        from db.models import Base, NotificationAuditRecord
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'audit-filter-sql.db'}")
+        Base.metadata.create_all(engine)
+        session_factory = sessionmaker(bind=engine)
+        adapter = SQLAlchemyReadModelAdapter(session_factory=session_factory)
+
+        now = datetime.now(UTC)
+        session = session_factory()
+        try:
+            # Insert 30 newer DELIVERED rows and 2 older FAILED rows.
+            for idx in range(32):
+                status_val = "DELIVERED" if idx < 30 else "FAILED"
+                created_at = now - timedelta(seconds=idx)
+                session.add(
+                    NotificationAuditRecord(
+                        id=uuid4(),
+                        notification_id=uuid4(),
+                        notification_type="test.notification",
+                        status=status_val,
+                        channels_attempted=["SLACK"],
+                        channels_succeeded=["SLACK"] if status_val == "DELIVERED" else [],
+                        channels_failed=[] if status_val == "DELIVERED" else ["SLACK"],
+                        error_message=None if status_val == "DELIVERED" else "failed",
+                        intent="OPERATIONAL",
+                        delivery_mode="BEST_EFFORT",
+                        autonomy_mode="LIVE",
+                        agent_id=uuid4(),
+                        plan_id=None,
+                        decision_snapshot_id=None,
+                        execution_snapshot_id=None,
+                        skip_snapshot_id=None,
+                        title="Test",
+                        source="test",
+                        correlation_id=None,
+                        notification_metadata={},
+                        audit_metadata={},
+                        notification_created_at=created_at,
+                        delivered_at=created_at,
+                        created_at=created_at,
+                    )
+                )
+            session.commit()
+        finally:
+            session.close()
+
+        result = adapter.get_audit_events(
+            AuditEventFilter(event_type="delivery.failed"),
+            limit=10,
+        )
+        assert result.total_count == 2
+        assert len(result.items) == 2
+        assert all(item.event_type == "delivery.failed" for item in result.items)

@@ -363,8 +363,17 @@ def main() -> None:
     uvicorn.run("uns.app:app", host=host, port=port, reload=False)
 
 
-# ASGI entrypoint owns its configured Runtime and closes it on lifespan exit.
-app = create_app()
+# ASGI entrypoint lazily initializes its configured Runtime when ``app`` is accessed.
+_default_app: FastAPI | None = None
+
+
+def __getattr__(name: str) -> Any:
+    global _default_app
+    if name == "app":
+        if _default_app is None:
+            _default_app = create_app()
+        return _default_app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 if __name__ == "__main__":

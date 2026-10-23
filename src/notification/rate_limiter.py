@@ -22,6 +22,8 @@ Configuration:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 
 from fastapi import FastAPI, Request
@@ -31,21 +33,42 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 
+def _configured_api_key(request: Request) -> str | None:
+    state_key = getattr(request.app.state, "agsignal_api_key", None)
+    if state_key is not None:
+        return str(state_key)
+    return os.environ.get("UNS_API_KEY", os.environ.get("AGSIGNAL_API_KEY"))
+
+
 def _rate_limit_key(request: Request) -> str:
     """Compose a rate-limit key from the verified principal or remote IP.
 
-    Authenticated callers are keyed by their bearer token / API key. Anonymous
-    callers fall back to remote IP. The key string is a slowapi storage key,
-    not a credential — but we still avoid logging full keys elsewhere.
+    Authenticated callers whose bearer token / API key matches the configured
+    key are keyed by a SHA-256 digest of that key. Unauthenticated or invalid
+    callers fall back to remote IP so rotating spoofed headers cannot bypass
+    rate limits or grow limiter state unboundedly.
     """
+    supplied_key: str | None = None
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return f"key:{auth[7:]}"
-    api_key = request.headers.get("x-agsignal-api-key") or request.headers.get(
-        "x-uns-api-key"
-    )
-    if api_key:
-        return f"key:{api_key}"
+        candidate = auth[7:].strip()
+        if candidate:
+            supplied_key = candidate
+    else:
+        api_key = request.headers.get("x-agsignal-api-key") or request.headers.get(
+            "x-uns-api-key"
+        )
+        if api_key and api_key.strip():
+            supplied_key = api_key.strip()
+
+    configured_key = _configured_api_key(request)
+    if (
+        supplied_key
+        and configured_key
+        and hmac.compare_digest(supplied_key.encode("utf-8"), configured_key.encode("utf-8"))
+    ):
+        digest = hashlib.sha256(supplied_key.encode("utf-8")).hexdigest()[:32]
+        return f"key:{digest}"
     return f"ip:{get_remote_address(request)}"
 
 

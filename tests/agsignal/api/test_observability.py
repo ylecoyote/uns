@@ -238,6 +238,17 @@ class TestObservabilityMiddleware:
         assert response.status_code == 200
         assert response.headers["X-Request-ID"] == custom_id
 
+    def test_middleware_replaces_invalid_request_id(self, client: TestClient):
+        """Test that middleware replaces oversized or invalid X-Request-ID headers."""
+        bad_id = "bad id with spaces!"
+        response = client.get(
+            "/ui/deliveries",
+            headers={"X-Request-ID": bad_id},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["X-Request-ID"].startswith("req-")
+
     def test_middleware_records_metrics(self, client: TestClient, metrics_collector: MetricsCollector):
         """Test that middleware records request metrics."""
         # Make a request
