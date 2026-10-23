@@ -35,7 +35,7 @@ export const PaginationInfoSchema = z.object({
 export const ErrorDetailSchema = z.object({
   code: z.string(),
   message: z.string(),
-  details: z.record(z.unknown()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -155,7 +155,7 @@ export const AuditEventSchema = z.object({
   notification_id: z.string(),
   notification_type: z.string(),
   autonomy_context: AutonomyContextSchema,
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   correlation_id: z.string().optional(),
 });
 
@@ -183,7 +183,7 @@ export const DeliveryAttemptSchema = z.object({
   duration_ms: z.number(),
   error_message: z.string().nullable().optional(),
   error_code: z.string().nullable().optional(),
-  metadata: z.record(z.unknown()).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 /**
@@ -286,9 +286,9 @@ export const InvariantListResponseSchema = z.object({
  */
 export const InvariantSummaryResponseSchema = z.object({
   total_count: z.number(),
-  by_severity: z.record(z.number()),
-  by_enforcement_type: z.record(z.number()),
-  by_status: z.record(z.number()),
+  by_severity: z.record(z.string(), z.number()),
+  by_enforcement_type: z.record(z.string(), z.number()),
+  by_status: z.record(z.string(), z.number()),
   exceptions_requiring_review: z.number(),
   last_updated: z.string(),
   degraded: z.boolean().optional(),
@@ -336,7 +336,7 @@ export const ResolutionContextSchema = z.object({
 export const EffectivePolicyResponseSchema = z.object({
   notification_type: z.string(),
   effective: EffectivePolicySchema,
-  resolution: z.record(z.array(ResolutionStepSchema)),
+  resolution: z.record(z.string(), z.array(ResolutionStepSchema)),
   resolution_context: ResolutionContextSchema,
 });
 

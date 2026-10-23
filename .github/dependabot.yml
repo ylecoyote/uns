@@ -5,12 +5,25 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # agsignal_mcp targets the FastMCP 1.x runtime API (mcp[cli]>=1.0.0,<2)
+      - dependency-name: "mcp"
+        versions: [">= 2.0.0"]
 
   - package-ecosystem: npm
     directory: /apps/ui
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+    ignore:
+      # Keep ESLint 8 until .eslintrc is migrated to flat config and eslint-plugin-react-hooks is upgraded
+      - dependency-name: "eslint"
+        versions: [">= 9.0.0"]
 
   - package-ecosystem: github-actions
     directory: /

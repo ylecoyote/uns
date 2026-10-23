@@ -1073,7 +1073,8 @@ class Runtime:
                 )
             error = None
             try:
-                await asyncio.wait_for(self.callback(event), timeout=10)
+                async with asyncio.timeout(10):
+                    await self.callback(event)
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"[:2000]
             with self.sessions.begin() as session:

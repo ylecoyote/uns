@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Keyed HTTP rate-limiter buckets by SHA-256 digests of verified API keys only, falling back to client IP for unauthenticated or invalid headers.
   - Constrained `POST /api/v1/policies/reload` to reject path traversal (`..`), enforce `UNS_POLICY_DIR` root boundaries when configured, and reject empty policy directories (`loaded_count == 0`).
   - Pushed `event_type` filtering and `total_count` computation into SQL `WHERE` / `COUNT(*)` clauses in `SQLAlchemyReadModelAdapter.get_audit_events()`.
-  - Bounded `MetricsCollector` sample storage with ring buffers (`deque(maxlen=10_000)`), validated `X-Request-ID` headers, capped serialized request `metadata` at 64 KiB, isolated `RedisWebSocketSubscriber` onto a dedicated thread pool, and added `.github/workflows/ci.yml`.
+  - Bounded `MetricsCollector` sample storage with ring buffers (`deque(maxlen=10_000)`), validated `X-Request-ID` headers, capped serialized request `metadata` at 64 KiB, isolated `RedisWebSocketSubscriber` onto a dedicated thread pool, and hardened `.github/workflows/python-tests.yml` with strict `mypy` verification.
 
 ## [0.1.0] - 2025-01-23
 
