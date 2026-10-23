@@ -1,366 +1,189 @@
 # Contributing to UNS
 
-Thank you for your interest in contributing to the Unified Notification Service (UNS).
+Thank you for your interest in contributing to the **Unified Notification Service (UNS)**.
 
 ## Development Setup
 
 ### Prerequisites
 
 **Backend:**
-- Python 3.10 or higher
-- pip or uv package manager
-- Redis (for integration tests)
+- Python 3.11 or higher (Python 3.12 recommended)
+- `uv` or `pip` package manager
+- SQLite 3 (bundled with Python; Redis is optional for multi-instance WebSocket fanout tests)
 
-**UI (apps/ui):**
-- Node.js 20 or higher
-- npm (included with Node.js)
+**UNS Console (`apps/ui`):**
+- Node.js `^20.19.0 || ^22.12.0 || >=24.0.0`
+- `npm` (use `npm ci` with the committed lockfile)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd unified-notification-service
+git clone https://github.com/ylecoyote/agsignal.git
+cd agsignal
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create and activate virtual environment
+python3.12 -m venv .venv
+source .venv/bin/activate
 
-# Install with development dependencies
+# Install with all runtime and development dependencies
 pip install -e ".[dev]"
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all Python + UI contract tests
 pytest
 
+# Run documentation contract tests
+pytest tests/docs/
+
 # Run with coverage
-pytest --cov=src --cov-report=html
+pytest tests apps/ui/tests --cov=src/uns --cov=src/agsignal --cov=src/notification --cov=src/db --cov=src/agsignal_mcp
 
-# Run specific test file
-pytest tests/notification/test_sdk.py
-
-# Run tests matching pattern
-pytest -k "test_safety"
-
-# Run with verbose output
-pytest -v
+# Run a specific test file
+pytest tests/uns/test_remediation_runtime.py
 ```
 
-### Code Quality
+### Code Quality & Security Checks
 
 ```bash
 # Lint code
-ruff check src tests
-
-# Auto-fix lint issues
-ruff check --fix src tests
+ruff check src tests scripts apps
 
 # Format code
 ruff format src tests
 
 # Type check
 mypy src
+
+# Security static analysis
+bandit -q -r src
 ```
 
-### UI Development (apps/ui)
+### UNS Console Development (`apps/ui`)
 
-The UI is a React/TypeScript application built with Vite. All UI code is in `apps/ui/`.
+The **UNS Console** is a read-only React + TypeScript + Vite Single Page Application in `apps/ui/`.
 
 ```bash
-# Navigate to UI directory
 cd apps/ui
 
-# Install dependencies
+# Install dependencies from lockfile
 npm ci
 
-# Start development server (proxies to backend on port 8000)
+# Start local development server (proxies /ui/* to localhost:8000)
 npm run dev
 
-# Run linting
-npm run lint
-
-# Run type checking
-npm run type-check
-
-# Run tests (interactive)
-npm run test
-
-# Run tests once (for CI)
-npm run test:run
-
-# Run tests with coverage
-npm run test:coverage
-
-# Build for production
-npm run build
-
-# Run full CI pipeline locally
+# Run full UI CI pipeline (type-check, lint, vitest, and production build)
 npm run ci
 ```
 
-**UI CI Requirements:**
-- ESLint must pass with zero warnings (`--max-warnings 0`)
-- TypeScript must have no type errors
-- All tests must pass (minimum 50% coverage threshold)
-- Production build must succeed
+From the repository root, verify the strict UI read-only boundary (`INV-UI-001`):
+
+```bash
+python scripts/ci/check_ui_boundary.py --strict
+```
 
 ## Project Structure
 
-```
+```text
 src/
-├── notification/           # Core notification package
-│   ├── models.py          # Data contracts
-│   ├── interfaces.py      # Integration protocols
-│   ├── policies.py        # Policy schema & registry
-│   ├── sdk.py             # Producer interface
-│   ├── service.py         # Delivery orchestration
-│   ├── deduplication.py   # Deduplication engine
-│   ├── rate_limiting.py   # Rate limiting
-│   ├── acknowledgment.py  # Ack lifecycle
-│   ├── audit.py           # Audit logging
-│   └── adapters/          # Channel adapters
-├── db/                    # Database models
-└── mcp_server/            # HTTP API routes
-
-tests/
-└── notification/          # Test files mirror src structure
+├── uns/                    # Canonical durable outbox runtime & CLI entrypoints
+│   ├── runtime.py          # Transactional outbox, leased dispatch, dedup, ACK & callback worker
+│   ├── client.py           # Principal-bound async Client (send, simulate)
+│   ├── policy_runtime.py   # Revision-locked ACTIVE policy resolver & override guard
+│   ├── config.py           # Environment composition (UNS_* and AGSIGNAL_* aliases)
+│   ├── routes.py           # /api/v1/runtime/* inspection, DLQ, and replay routes
+│   ├── maintenance.py      # Explicit retention & SHA-256 verified archive CLI (uns-maintain)
+│   └── migrate.py          # Idempotent additive schema bootstrap (uns-migrate)
+├── agsignal/               # Unified FastAPI HTTP/WebSocket service & read models
+│   ├── app.py              # Unified FastAPI factory (uns / agsignal CLI entrypoint)
+│   ├── signaling.py        # Shared transport signaling service
+│   ├── queries.py          # Read-model queries for /ui/* and MCP
+│   └── api/                # Auth, observability, /v1/notifications/*, and /ui/* routers
+├── agsignal_mcp/           # Model Context Protocol (MCP) server (uns-mcp)
+│   ├── factory.py          # FastMCP factory & lifespan recovery worker
+│   ├── tools.py            # 16 MCP tool implementations
+│   └── transports/stdio.py # Trusted-local stdio entrypoint
+├── notification/           # Core models, policy engine, and channel adapters
+│   ├── models.py           # Domain contracts (Notification, AutonomyContext, etc.)
+│   ├── policies.py         # Policy schema, registry, and delta validation
+│   ├── service.py          # Channel delivery pipeline orchestration
+│   └── adapters/           # Slack, Email, PagerDuty, and WebSocket adapters
+├── db/                     # SQLAlchemy audit and policy snapshot persistence
+└── ui_client/              # Typed Python read-model client helpers
 
 apps/
-└── ui/                    # React UI application
-    ├── src/
-    │   ├── api/           # Typed API client
-    │   ├── components/    # React components
-    │   ├── hooks/         # Custom React hooks
-    │   ├── pages/         # Page components
-    │   ├── types/         # TypeScript types
-    │   └── utils/         # Utilities
-    └── tests/             # Component and integration tests
+└── ui/                     # UNS Console (React + TypeScript + Vite SPA)
+
+docs/
+├── support/                # State machines, database schema, and event catalog
+├── tsg/                    # Troubleshooting Guides (TSG-01 through TSG-06)
+├── user-guides/            # Operator Console, Producer, and Agent/MCP guides
+├── sections/               # Delivery semantics, policy lifecycle, integration, observability
+└── ui/                     # UI scope and JSON data contracts
 ```
 
 ## Coding Standards
 
-### Style Guide
+- Follow PEP 8 with Ruff enforcement (`line-length = 100`).
+- Use strict type annotations (`mypy --strict` on `src/`).
+- Preserve existing docstrings and comments unless intentionally updating behavior.
+- Never allow untrusted producer payloads or metadata to override `ACTIVE` policy routing or caller principal attribution.
 
-- Follow PEP 8 with Ruff enforcement
-- Maximum line length: 100 characters
-- Use type hints for all function signatures
-- Use docstrings for public functions and classes
+## Writing Tests
 
-### Naming Conventions
-
-- Classes: `PascalCase`
-- Functions/methods: `snake_case`
-- Constants: `UPPER_SNAKE_CASE`
-- Private members: `_leading_underscore`
-
-### Documentation
-
-- All public APIs must have docstrings
-- Use Google-style docstrings:
+Prefer testing against the canonical durable `uns.Runtime` and `uns.Client` (or using explicit `delivery_handler` wiring when testing low-level `NotificationSDK`):
 
 ```python
-def send_safety(
-    notification_type: str,
-    title: str,
-    message: str,
-    source: str,
-    autonomy_context: AutonomyContext | None = None,
-) -> NotificationResult:
-    """Send a SAFETY intent notification.
+import pytest
+from uuid import uuid4
 
-    SAFETY notifications have GUARANTEED delivery and require acknowledgment
-    in LIVE mode by default.
+from agsignal.responses import AutonomyContextRequest, SendNotificationRequest
+from notification.models import AutonomyMode, Channel, NotificationIntent
+from uns import Client, Runtime
 
-    Args:
-        notification_type: Namespaced notification type
-        title: Notification title
-        message: Notification body
-        source: Producer identifier
-        autonomy_context: Required autonomy context
 
-    Returns:
-        NotificationResult with delivery outcome
+@pytest.mark.asyncio
+async def test_durable_send_and_ack(tmp_path):
+    runtime = Runtime(f"sqlite:///{tmp_path / 'test.db'}", create_tables=True)
+    client = Client(runtime, principal="test-operator")
 
-    Raises:
-        ValidationError: If autonomy_context is missing or invalid
-    """
-```
-
-## Testing Guidelines
-
-### Test Organization
-
-- One test file per source module
-- Test classes named `Test<ClassName>`
-- Test methods named `test_<behavior>`
-
-### Test Categories
-
-1. **Unit Tests**: Test individual functions/methods in isolation
-2. **Integration Tests**: Test component interactions
-3. **Contract Tests**: Verify API contracts and invariants
-
-### Writing Good Tests
-
-```python
-class TestNotificationSDK:
-    """Tests for NotificationSDK."""
-
-    def test_send_safety_with_valid_context_succeeds(self):
-        """SAFETY notification with valid context should succeed."""
-        sdk = NotificationSDK()
-        context = AutonomyContext(
-            autonomy_mode=AutonomyMode.LIVE,
+    request = SendNotificationRequest(
+        notification_type="system.alert",
+        intent=NotificationIntent.OPERATIONAL,
+        title="Test Signal",
+        message="Verifying durable outbox intake",
+        source="test_suite",
+        autonomy_context=AutonomyContextRequest(
+            autonomy_mode=AutonomyMode.PREVIEW,
             agent_id=uuid4(),
-        )
+        ),
+    )
 
-        result = sdk.send_safety(
-            notification_type="test.safety",
-            title="Test",
-            message="Test message",
-            source="test",
-            autonomy_context=context,
-        )
-
-        assert result.status == DeliveryStatus.SUCCESS
-
-    def test_send_without_context_raises_validation_error(self):
-        """Sending without autonomy_context should raise ValidationError."""
-        sdk = NotificationSDK()
-
-        with pytest.raises(ValidationError) as exc_info:
-            sdk.send_safety(
-                notification_type="test.safety",
-                title="Test",
-                message="Test message",
-                source="test",
-            )
-
-        assert "autonomy_context" in str(exc_info.value)
+    preview = await client.simulate(request)
+    assert Channel.WEBSOCKET in preview.resolved_channels
+    runtime.engine.dispose()
 ```
 
-### Test Coverage
+## Invariants (`docs/verification/invariants.yml`)
 
-- Aim for 90%+ code coverage
-- Cover edge cases and error conditions
-- Test invariants documented in PRD
+If your pull request introduces or modifies any system invariant:
+1. Update [`docs/verification/invariants.yml`](docs/verification/invariants.yml) with severity, enforcement type, and evidence links.
+2. Ensure all contract and documentation tests (`pytest tests/docs/`) pass.
 
 ## Pull Request Process
 
-### Before Submitting
-
-1. Run all tests and ensure they pass
-2. Run linting and fix any issues
-3. Run type checking and fix any issues
-4. Update documentation if needed
-5. Add tests for new functionality
-
-### PR Guidelines
-
-1. **Title**: Clear, concise description of changes
-2. **Description**: Explain what and why, not how
-3. **Size**: Keep PRs focused and reviewable
-4. **Commits**: Logical, atomic commits with clear messages
-
-### Commit Messages
-
-Follow conventional commits:
-
-```
-type(scope): description
-
-[optional body]
-
-[optional footer]
-```
-
-Types:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Formatting, no code change
-- `refactor`: Code change that neither fixes nor adds
-- `test`: Adding or correcting tests
-- `chore`: Maintenance tasks
-
-Examples:
-```
-feat(sdk): add send_governance convenience method
-fix(dedup): handle Redis connection failures gracefully
-docs(readme): add policy configuration examples
-test(adapters): add integration tests for Slack adapter
-```
-
-## Invariants (Must/Never/Always Statements)
-
-For full definitions and enforcement options, see `docs/verification/invariants.md`.
-
-### When this applies
-If your PR introduces, changes, or removes any statement that asserts a strong property using words like:
-- must / must not
-- never / always
-- guaranteed
-- required / forbidden
-- invariant / cannot happen
-
-…then this section applies.
-
-### Requirements for invariant changes
-1. **Update the invariant registry**
-   - Add/update an entry in `docs/verification/invariants.yml`
-   - Include severity, enforcement type (guard/isolation/test/exception), and evidence links.
-
-2. **Run invariant verification**
-   - Run `/verify_invariants <affected paths>` and attach the output to the PR
-   - Or provide an equivalent bounded-verification artifact generated via Ralphy tasks.
-
-3. **Provide enforcement evidence**
-   - For `guard`: link to the guard code and rationale
-   - For `test`: link to the test(s) that fail on violation
-   - For `isolation`: document the structural constraint that prevents violations
-   - For `exception`: include rationale, owner, and mitigation plan
-
-### Reviewer checklist (invariant PRs)
-- Registry updated (`docs/verification/invariants.yml`)
-- Verification output attached (`/verify_invariants` or equivalent)
-- Enforcement evidence is clear and appropriately scoped
-- Any exception is explicitly owned and risk-accepted
-
-## Architecture Decisions
-
-### Key Invariants
-
-1. **INV-CTX-001** — `autonomy_context` is REQUIRED for all notifications
-2. **INV-CTX-002** — `autonomy_mode` and `agent_id` must be set in context
-3. **INV-DEL-001** — SAFETY and GOVERNANCE use GUARANTEED delivery
-4. **INV-ACK-001** — SAFETY in LIVE mode requires acknowledgment
-5. **INV-MSG-001** — Title max 200 chars, message max 4000 chars
-
-### Adding New Features
-
-1. Review the PRD and architecture docs
-2. Ensure feature aligns with design principles
-3. Add tests before implementing
-4. Update documentation
-
-### Adding New Channels
-
-1. Create adapter in `src/notification/adapters/`
-2. Implement `BaseAdapter` protocol
-3. Add to `Channel` enum
-4. Register in adapter factory
-5. Add rate limit defaults
-6. Add tests
+1. Run `ruff check src tests scripts apps` and `pytest`.
+2. If touching `apps/ui` or `/ui/*` contracts, run `python scripts/ci/check_ui_boundary.py --strict` and `npm --prefix apps/ui run ci`.
+3. Follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
 
 ## Getting Help
 
-- Check existing documentation in `/docs`
-- Review the PRD (`prd.md`) for specifications
-- Open an issue for questions
+- Browse the documentation index in [`docs/README.md`](docs/README.md).
+- Review the product contract in [`docs/PRODUCT.md`](docs/PRODUCT.md) and security model in [`docs/SECURITY-MODEL.md`](docs/SECURITY-MODEL.md).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing to UNS, you agree that your contributions will be licensed under the Apache License 2.0 - see [LICENSE](LICENSE).

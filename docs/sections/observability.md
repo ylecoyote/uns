@@ -1,15 +1,17 @@
 # Observability
 
-This document describes the observability model for the AGSignal Core, including health states, metrics, DLQ visibility, and monitoring semantics.
+This document describes the observability model for UNS (`uns.Runtime` and AGSignal Core), including health states, readiness and Prometheus metrics endpoints, durable DLQ visibility, structured audit events, and monitoring semantics.
 
 ## Overview
 
-AGSignal Core provides observability through:
-- **Adapter health status**: Per-channel health reporting (HEALTHY, DEGRADED, UNHEALTHY)
-- **Delivery metrics**: Latency, success/failure rates, retry counts
-- **DLQ visibility**: Escalation callbacks for GUARANTEED delivery failures
-- **Acknowledgment tracking**: Timeout counts and escalation events
-- **Audit logging**: Comprehensive delivery audit trail
+UNS and AGSignal Core provide observability through:
+- **Process liveness and authenticated readiness probes**: Public `GET /health` (`/healthz`) and authenticated `GET /ready` (`/readyz`) checking SQLite/SQLAlchemy connectivity, configured channels, ACTIVE policy count, and durable DLQ depth
+- **Prometheus and Console metrics**: Authenticated `GET /metrics` and read-model endpoints under `/ui/*`
+- **Adapter health status**: Per-channel health reporting (`HEALTHY`, `DEGRADED`, `UNHEALTHY`) and `GET /api/v1/channels/health`
+- **Delivery metrics**: Latency, success/failure rates, retry cycles, and fallback counts
+- **DLQ visibility**: Durable `uns_notifications.dead_letter = true` persistence (`GET /api/v1/runtime/dead-letters`, `GET /api/v1/dlq`, MCP `list_dlq`) plus low-level escalation callbacks for `GUARANTEED` delivery failures
+- **Acknowledgment tracking**: Durable deadline sweeps (`TIMED_OUT`), `ack_audit_records`, and at-least-once callback tracking (`callback_pending`, `callback_attempts`, `callback_error`)
+- **Audit logging**: Comprehensive operational event stream (`uns_events`) and compliance audit trail (`notification_audit_records`)
 
 ## Health States
 
@@ -34,12 +36,12 @@ class AdapterStatus(str, Enum):
 
 ### What "DEGRADED" Means for AGSignal Core
 
-A DEGRADED adapter indicates:
+A `DEGRADED` adapter indicates:
 
-1. **Elevated latency**: Response times exceed normal thresholds but delivery is possible
-2. **Intermittent failures**: Some delivery attempts fail but retries may succeed
+1. **Elevated latency**: Response times exceed normal thresholds (`latency_ms`) but delivery is possible
+2. **Intermittent failures**: Some delivery attempts fail but retries or subsequent attempts may succeed
 3. **Reduced reliability**: The channel is operational but not meeting SLA targets
-4. **Partial service**: External dependencies (e.g., Slack API) may be experiencing issues
+4. **Partial service**: External dependencies (e.g., Slack API or SMTP relay) may be experiencing issues
 
 **Operational Guidance for DEGRADED State:**
 
@@ -50,8 +52,8 @@ A DEGRADED adapter indicates:
 | Single adapter DEGRADED | Other channels unaffected | Review adapter-specific diagnostics |
 
 **DEGRADED vs UNHEALTHY:**
-- DEGRADED: "Try delivery but expect some failures" - AGSignal Core will attempt the channel
-- UNHEALTHY: "Do not attempt delivery" - AGSignal Core will skip to fallback immediately
+- `DEGRADED`: "Try delivery but expect some failures" - AGSignal Core will attempt the channel
+- `UNHEALTHY`: "Do not attempt delivery" - AGSignal Core will skip to fallback immediately
 
 ### HealthCheckResult
 
@@ -68,13 +70,13 @@ class HealthCheckResult:
 
 ### Health Check Infrastructure
 
-Adapters implement health checks individually:
+Adapters implement health checks individually and runtime channel health is tracked via `ChannelHealthTracker` (`GET /api/v1/channels/health` and MCP `get_channel_health`):
 
 ```python
 # Check all adapters via registry
-from notification.adapters import AdapterRegistry
+from notification.service import SimpleAdapterRegistry
 
-registry = AdapterRegistry()
+registry = SimpleAdapterRegistry()
 results = await registry.health_check_all()
 # Returns: dict[Channel, HealthCheckResult]
 ```
@@ -86,73 +88,96 @@ results = await registry.health_check_all()
 | Slack | API connectivity test | Tests auth and channel access |
 | Email | SMTP connection test | Verifies SMTP server reachability |
 | PagerDuty | API ping | Note: Events API has no health endpoint; returns HEALTHY if configured |
-| WebSocket | Connection state | Always HEALTHY (fire-and-forget semantics) |
+| WebSocket | Connection state | Checks active agent socket availability |
 
 ## /health Endpoint
 
 ### Current Implementation
 
-The HTTP health endpoint is located at `GET /health` (also aliased to `/healthz`):
+The public HTTP liveness endpoint is located at `GET /health` (also aliased to `GET /healthz`):
 
 ```python
 # src/agsignal/app.py
-@app.get("/health")
-@app.get("/healthz")
+@app.get("/health", tags=["system"])
+@app.get("/healthz", tags=["system"])
 async def health() -> dict[str, str]:
     return {
         "status": "alive",
-        "service": "agsignal",
+        "service": "uns",
         "version": __version__,
     }
 ```
 
 ### Endpoint Semantics
 
-Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}`. Post-Phase-3 it returns `{"status": "alive", "service": "agsignal", "version": ...}` with both liveness and identity. The endpoint does NOT invoke adapter health checks — those live at `/readyz`.
+Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}`. In the unified UNS service it returns `{"status": "alive", "service": "uns", "version": ...}` as a lightweight liveness stub. The `/health` endpoint is intentionally unauthenticated for load-balancer liveness probes and does NOT invoke database queries or adapter health checks—those live at the authenticated `/ready` and `/readyz` endpoints.
 
-It does NOT currently:
-- Invoke adapter health checks (use `/readyz` instead)
+`/health` does NOT:
+- Query the database or invoke adapter health checks (use `/readyz` instead)
 - Check DLQ depth (surfaced in `/readyz`)
 - Verify pending acknowledgment timeouts
-- Report per-channel status (use `/readyz` for `channels_configured`)
+- Report per-channel status (use `/readyz` for `channels_configured` or `/api/v1/channels/health`)
 
-**Response format**:
+**Response format (`GET /health` and `GET /healthz`)**:
 
 ```json
 {
   "status": "alive",
-  "service": "agsignal",
-  "version": "..."
+  "service": "uns",
+  "version": "0.1.0"
 }
 ```
 
-**Important**: The `/health` endpoint is a minimal liveness probe for load balancer health checks. For comprehensive system readiness (adapter reachability, DLQ depth, channel configuration), call `/readyz`.
+### Authenticated Readiness Probe (`GET /ready` and `GET /readyz`)
 
-### Future Considerations
+Unlike `/health`, the readiness probe requires a valid operator credential (`Authorization: Bearer <UNS_API_KEY>` or `X-UNS-API-Key`) and verifies both Core and Console readiness:
 
-A full health endpoint could include:
+```json
+{
+  "status": "ready",
+  "service": "uns",
+  "version": "0.1.0",
+  "channels_configured": {
+    "slack": true,
+    "pagerduty": false,
+    "email": true
+  },
+  "policy_count": 4,
+  "dlq_depth": 0,
+  "read_model_adapter": "SQLAlchemyReadModelAdapter",
+  "audit_logger": "SQLAlchemyAuditStore"
+}
+```
 
-| Field | Description |
-|-------|-------------|
-| `status` | Overall system status (healthy/degraded/unhealthy) |
-| `adapters` | Per-channel health status |
-| `pending_acks` | Count of pending acknowledgments |
-| `ack_timeouts_last_hour` | Number of timeout events |
-| `dlq_depth` | Count of failed GUARANTEED deliveries (if tracked) |
+If the SQLite/SQLAlchemy database connection fails, `/readyz` returns `"status": "not_ready"` with `"error"`.
+
+### Authenticated Prometheus Metrics (`GET /metrics`)
+
+`GET /metrics` (protected by `require_write_principal`) exports Prometheus text-format metrics for HTTP request latency, status codes, rate-limiter rejections, and notification counters.
 
 ## DLQ (Dead Letter Queue) Visibility
 
-### Escalation Callback Architecture
+### Durable Runtime DLQ (`uns.Runtime`)
 
-DLQ functionality is implemented via the **escalation callback** mechanism, not a persistent queue. When GUARANTEED delivery fails all channels, the callback is invoked:
+In the canonical durable runtime (`uns.Runtime`), `GUARANTEED` notifications that exhaust `max_attempts` (default `3` attempts in a cycle) transition to `status = "FAILED"` with `dead_letter = True` in `uns_notifications`.
+
+Operators inspect and remediate durable dead-letter entries via:
+- **HTTP Runtime Inspection**: `GET /api/v1/runtime/dead-letters` (returns `notification_id`, `status`, `attempts`, `cycle`, `cycle_attempts`, `outcome`)
+- **HTTP Operations DLQ**: `GET /api/v1/dlq` (lists entries and `depth`) and `DELETE /api/v1/dlq/{entry_id}` (marks `dead_letter = False` and records a `FAILURE_RESOLVED` event)
+- **HTTP Attributable Replay**: `POST /api/v1/runtime/notifications/{id}/replay` (increments `cycle`, resets `cycle_attempts = 0`, sets `status = "PENDING"`, and records `REPLAY_REQUESTED` with the authenticated `actor`)
+- **MCP Tool**: `list_dlq`
+
+### Low-Level Escalation Callback Architecture
+
+In low-level `DeliveryService` usage, DLQ notification is also supported via the **escalation callback** mechanism (`escalation_callback`). When `GUARANTEED` delivery fails all channels in a `DeliveryService.deliver()` call, the callback is invoked:
 
 ```python
-# Configure at service initialization
+# Configure at low-level service initialization
 from notification.service import configure_delivery_service
 
 service = configure_delivery_service(
     adapter_registry=registry,
-    escalation_callback=my_dlq_handler,  # DLQ entry point
+    escalation_callback=my_dlq_handler,  # Low-level DLQ hook
 )
 ```
 
@@ -160,10 +185,10 @@ service = configure_delivery_service(
 
 | Rule | Description |
 |------|-------------|
-| **GUARANTEED-only** | Only GUARANTEED delivery failures trigger escalation; BEST_EFFORT failures do NOT |
-| **Pre-exception** | Callback invoked BEFORE `DeliveryError` is raised |
-| **Isolated failures** | Callback exceptions are logged but do not prevent `DeliveryError` |
-| **Full context** | Callback receives complete notification and error details |
+| **GUARANTEED-only** | Only `GUARANTEED` delivery failures enter the durable DLQ or trigger `escalation_callback`; `BEST_EFFORT` failures do NOT |
+| **Pre-exception** | In `DeliveryService`, `escalation_callback` is invoked BEFORE `DeliveryError` is raised |
+| **Isolated failures** | Callback exceptions are logged but do not prevent `DeliveryError` or durable commit |
+| **Full context** | Durable `uns_notifications.outcome` and `escalation_callback` preserve complete notification and `channel_errors` details |
 
 ### Escalation Callback Signature
 
@@ -182,67 +207,57 @@ def escalation_callback(
 
 ### DLQ Entry Information
 
-The escalation callback receives:
+Both durable dead-letter rows (`uns_notifications`) and `escalation_callback` preserve:
 
 | Field | Source | Description |
 |-------|--------|-------------|
 | `notification_id` | `Notification` | Unique identifier |
 | `notification_type` | `Notification` | Type for policy lookup |
-| `intent` | `Notification` | SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL |
+| `intent` | `Notification` | `SAFETY`, `GOVERNANCE`, `OPERATIONAL`, `INFORMATIONAL` |
 | `autonomy_context` | `Notification` | Agent ID, autonomy mode, plan ID |
 | `title` | `Notification` | Notification title |
 | `message` | `Notification` | Notification body |
 | `source` | `Notification` | Originating system |
 | `correlation_id` | `Notification` | Optional correlation ID |
 | `created_at` | `Notification` | Original creation timestamp |
-| `metadata` | `Notification` | Additional key-value pairs |
-| `channel_errors` | Callback arg | Per-channel failure reasons |
+| `metadata` | `Notification` | Additional key-value pairs (including `uns_resolution` provenance) |
+| `channel_errors` | `outcome` / Callback arg | Per-channel failure reasons |
 
 ### Operator Impact of DLQ
 
-**Visibility Responsibility**: AGSignal Core does not persist DLQ entries internally. Operators must implement DLQ visibility in their escalation callback:
+**Visibility Responsibility**: When running `uns.Runtime` (HTTP or write-enabled MCP), dead-letter state is persisted automatically in `uns_notifications` (`dead_letter = True`) and surfaced in `/readyz` (`dlq_depth`), `/api/v1/runtime/dead-letters`, and `/api/v1/dlq`. When running low-level `DeliveryService` without `uns.Runtime`, operators must persist DLQ entries in their `escalation_callback`:
 
 ```python
-# Example: DLQ callback with external persistence
+# Example: Low-level DLQ callback with external alerting
 def dlq_handler(notification: Notification, channel_errors: dict[Channel, str]) -> None:
-    # Persist to external DLQ store
-    dlq_store.insert({
-        "notification_id": str(notification.notification_id),
-        "intent": notification.intent.value,
-        "channel_errors": {c.value: e for c, e in channel_errors.items()},
-        "failed_at": datetime.now(UTC).isoformat(),
-    })
-
-    # Alert operations team
     alerting_service.send_alert(
         severity="critical",
         message=f"GUARANTEED delivery failed: {notification.notification_id}",
     )
 ```
 
-**DLQ Metrics (Operator-Provided)**:
+**DLQ Metrics**:
 
-| Metric | Description | Owner |
-|--------|-------------|-------|
-| `dlq_depth` | Count of unprocessed DLQ entries | Operator's DLQ store |
-| `dlq_oldest_entry_age` | Time since oldest entry was created | Operator's DLQ store |
-| `dlq_processing_rate` | Rate of DLQ entries being resolved | Operator's monitoring |
+| Metric | Description | Source |
+|--------|-------------|--------|
+| `dlq_depth` | Count of unresolved dead-letter entries | `GET /readyz`, `GET /api/v1/dlq`, `list_dlq` |
+| `cycle` / `attempts` | Cumulative retry cycles and attempts per dead-lettered notification | `GET /api/v1/runtime/dead-letters` |
 
 ## Key Metrics
 
 ### Metric Categories
 
-AGSignal Core exposes the following metric categories through logging and callback hooks:
+UNS and AGSignal Core expose the following metric categories through `/metrics`, `/readyz`, `/ui/*`, structured logs, and callback hooks:
 
 #### 1. Delivery Latency
 
 | Metric | Source | Description |
 |--------|--------|-------------|
 | `adapter_latency_ms` | `HealthCheckResult.latency_ms` | Per-adapter response time |
-| `delivery_duration_ms` | Computed from timestamps | End-to-end delivery time |
+| `delivery_duration_ms` | Computed from `uns_events.at` timestamps | End-to-end delivery time (`ACCEPTED` to `DELIVERY_RESULT`) |
 | `channel_attempt_duration_ms` | Per-channel timing | Time for individual channel attempt |
 
-**Intent**: Identify slow channels and optimize fallback ordering.
+**Intent**: Identify slow channels, tune lease durations (`lease_seconds`), and optimize fallback ordering.
 
 #### 2. Delivery Success/Failure
 
@@ -251,7 +266,7 @@ AGSignal Core exposes the following metric categories through logging and callba
 | `channels_attempted` | `NotificationResult` | List of channels tried |
 | `channels_succeeded` | `NotificationResult` | Channels that delivered |
 | `channels_failed` | `NotificationResult` | Channels that failed |
-| `delivery_status` | `NotificationResult.status` | SUCCESS, FAILED, DEDUPLICATED |
+| `delivery_status` | `NotificationResult.status` | `DELIVERED`, `SUCCESS`, `FAILED`, `DEDUPLICATED`, `PENDING` |
 
 **Intent**: Track delivery reliability and identify failing channels.
 
@@ -259,47 +274,46 @@ AGSignal Core exposes the following metric categories through logging and callba
 
 | Metric | Source | Description |
 |--------|--------|-------------|
-| `fallback_count` | Computed from `channels_attempted` | Number of fallback attempts in GUARANTEED mode |
+| `fallback_count` | Computed from `channels_attempted` | Number of fallback attempts in `GUARANTEED` mode |
 | `fallback_triggered` | Boolean | Whether primary channel failed |
+| `attempts` / `cycle_attempts` | `uns_notifications` | Durable worker dispatch attempts across cycles |
 
-**Intent**: Monitor GUARANTEED delivery health; frequent fallbacks indicate channel instability.
+**Intent**: Monitor `GUARANTEED` delivery health; frequent fallbacks or retry cycles indicate channel instability.
 
-**Note**: AGSignal Core does not implement automatic retries within a single channel. Fallback is sequential across channels (Slack → Email → PagerDuty).
+**Note**: Within a single dispatch attempt, fallback is sequential across configured channels (e.g., Slack $\rightarrow$ Email $\rightarrow$ PagerDuty). Across failed dispatch attempts, `uns.Runtime` schedules exponential backoff retries (`retry_seconds * 2 ** min(cycle_attempts - 1, 10)`) up to `max_attempts`.
 
 #### 4. DLQ Depth
 
 | Metric | Source | Description |
 |--------|--------|-------------|
-| `dlq_entry_count` | Escalation callback | Count of GUARANTEED failures |
+| `dlq_depth` | `Runtime.dead_letters()` / `escalation_callback` | Count of exhausted `GUARANTEED` failures |
 
-**Intent**: Monitor undelivered critical notifications requiring manual intervention.
-
-**Implementation**: DLQ depth is tracked by the operator's escalation callback implementation, not AGSignal Core.
+**Intent**: Monitor undelivered critical notifications requiring operator investigation or replay.
 
 #### 5. Acknowledgment Timeout Counts
 
 | Metric | Source | Description |
 |--------|--------|-------------|
-| `pending_acks` | `AckStorage.get_pending_notifications()` | Notifications awaiting ack |
-| `timed_out_acks` | `AcknowledgmentEngine.check_all_timeouts()` | Notifications that timed out |
-| `safety_escalations` | Escalation callback | SAFETY timeouts in LIVE mode |
+| `pending_acks` | `uns_notifications.ack_status == 'PENDING'` / `AckStorage` | Notifications awaiting human or operator response |
+| `timed_out_acks` | `Runtime.expire()` / `AcknowledgmentEngine.check_all_timeouts()` | Notifications whose `deadline` elapsed (`TIMED_OUT`) |
+| `safety_escalations` | `TIMED_OUT` payload (`escalation_required: true`) | `SAFETY` timeouts requiring escalation |
 
-**Intent**: Identify operator response time issues and SAFETY escalation patterns.
+**Intent**: Identify operator response time issues and `SAFETY` escalation patterns.
 
 **Default Timeout Values**:
 
 | Intent | Timeout | Escalation on Timeout |
 |--------|---------|----------------------|
-| SAFETY | 15 minutes | Yes (LIVE mode only) |
-| GOVERNANCE | 30 minutes | No |
-| OPERATIONAL | None | N/A |
-| INFORMATIONAL | None | N/A |
+| `SAFETY` | 15 minutes | Yes (`LIVE` mode) |
+| `GOVERNANCE` | 30 minutes | No |
+| `OPERATIONAL` | None | N/A |
+| `INFORMATIONAL` | None | N/A |
 
 #### 6. Rate Limiting Events
 
 | Metric | Source | Description |
 |--------|--------|-------------|
-| `rate_limit_exceeded` | Logged event | Channel rate limit hit |
+| `rate_limit_exceeded` | Logged event / HTTP 429 | Channel or HTTP rate limit hit |
 | `rate_limit_channel` | Logged event | Which channel was limited |
 
 **Intent**: Detect notification storms and tune rate limits.
@@ -319,22 +333,23 @@ Key events logged at various levels:
 
 | Event | Level | Data |
 |-------|-------|------|
-| Delivery start | INFO | notification_id, channels, mode |
-| Channel attempt success | INFO | notification_id, channel |
-| Channel attempt failure | WARNING | notification_id, channel, error |
-| GUARANTEED failure | ERROR | notification_id, channel_errors |
-| Escalation callback failure | ERROR | notification_id, callback error |
-| Ack timeout | WARNING | notification_id, intent, autonomy_mode |
-| SAFETY escalation | CRITICAL | notification_id |
-| Rate limit exceeded | WARNING | channel |
+| Delivery start | INFO | `notification_id`, `channels`, `mode` |
+| Channel attempt success | INFO | `notification_id`, `channel` |
+| Channel attempt failure | WARNING | `notification_id`, `channel`, `error` |
+| GUARANTEED failure | ERROR | `notification_id`, `channel_errors` |
+| Escalation callback failure | ERROR | `notification_id`, callback error |
+| Ack timeout | WARNING | `notification_id`, `intent`, `autonomy_mode` |
+| SAFETY escalation | CRITICAL | `notification_id` |
+| Rate limit exceeded | WARNING | `channel` |
 
 ### Metric Collection Patterns
 
-AGSignal Core uses standard Python logging. Operators can collect metrics by:
+Operators can collect metrics by:
 
-1. **Log aggregation**: Parse structured logs (JSON logging recommended)
-2. **Callback hooks**: Implement `AuditLogger` and `AcknowledgmentCallback` protocols
-3. **Adapter registry polling**: Periodically call `health_check_all()`
+1. **Prometheus scraping**: Scrape authenticated `GET /metrics` and `GET /readyz`
+2. **Log aggregation**: Parse structured JSON logs correlated by `request_id`, `notification_id`, and `correlation_id`
+3. **Callback hooks**: Implement `AuditLogger` and `AcknowledgmentCallback` protocols (or `Runtime.callback`)
+4. **Adapter registry polling**: Call `GET /api/v1/channels/health` or `health_check_all()`
 
 **Example: Custom Metrics via AuditLogger**:
 
@@ -371,17 +386,18 @@ class MetricsAuditLogger:
 | **Normal** | Full delivery flow | Full delivery flow | Standard logging |
 | **Single channel down** | Fallback to next channel | Log and continue | Elevated logging |
 | **Primary channel DEGRADED** | Attempt then fallback | Attempt with lower confidence | Health check shows DEGRADED |
-| **All channels DEGRADED** | Attempt all, may fail | Attempt all, log failures | All health checks DEGRADED |
-| **All channels UNHEALTHY** | Escalate + raise exception | Log FAILED, no exception | DLQ entries, critical alerts |
+| **All channels DEGRADED** | Attempt all, may retry/fail | Attempt all, log failures | All health checks DEGRADED |
+| **All channels UNHEALTHY** | Retry up to `max_attempts`, then DLQ (`dead_letter=True`) | Mark `FAILED`, no DLQ | `dlq_depth > 0`, critical alerts |
 
 ### Degradation Detection
 
 Operators should monitor for:
 
-1. **Elevated fallback rates**: More than 10% of GUARANTEED deliveries using fallback channels
-2. **Increasing ack timeouts**: Rising count of SAFETY/GOVERNANCE timeouts
-3. **DLQ growth**: Any entries in DLQ require investigation
-4. **Adapter health transitions**: Any adapter moving to DEGRADED or UNHEALTHY
+1. **Elevated fallback rates**: More than 10% of `GUARANTEED` deliveries using fallback channels
+2. **Increasing ack timeouts**: Rising count of `SAFETY` / `GOVERNANCE` `TIMED_OUT` events
+3. **DLQ growth**: Any `dlq_depth > 0` in `/readyz` or `/api/v1/runtime/dead-letters` requires investigation (see [TSG-01](../tsg/TSG-01-DLQ-AND-REPLAY.md))
+4. **Lease losses**: `LEASE_LOST` events in `uns_events` indicating slow provider sockets exceeding `lease_seconds` (see [TSG-02](../tsg/TSG-02-LEASES-AND-PROVIDER-EFFECTS.md))
+5. **Adapter health transitions**: Any adapter moving to `DEGRADED` or `UNHEALTHY`
 
 ### Recovery Patterns
 
@@ -394,42 +410,46 @@ Operators should monitor for:
 
 ## Audit Trail
 
-All deliveries generate audit records through the `AuditLogger` protocol:
+All deliveries and state transitions generate durable records in `uns_events`, `notification_audit_records`, and `ack_audit_records` (and through the `AuditLogger` protocol):
 
 | Event | Logged Fields |
 |-------|---------------|
-| Delivery start | notification_id, channels, delivery_mode |
-| Channel attempt | channel, success/failure, error |
-| Delivery complete | status, channels_succeeded, channels_failed |
-| Escalation | notification_id, channel_errors |
-| Ack registered | notification_id, intent, timeout |
-| Ack received | notification_id, status, acked_by |
-| Ack timeout | notification_id, intent, autonomy_mode |
+| `ACCEPTED` / Delivery start | `notification_id`, `principal`, `uns_resolution` (policy snapshot & effective values) |
+| `ATTEMPT_STARTED` / `CHANNEL_ATTEMPT_STARTED` | `channel`, `attempt`, `cycle`, `cycle_attempt`, `provider_effect_may_have_occurred` |
+| `DELIVERY_RESULT` / Delivery complete | `status`, `attempt`, `cycle`, `dead_letter`, `outcome` (`channels_succeeded`, `channels_failed`) |
+| `LEASE_LOST` | `lease_token`, `attempt`, `provider_effect_may_have_occurred` |
+| `DEDUP_LINKED` / `DEDUP_SATISFIED` / `DEDUP_OWNER_PROMOTED` | `owner_id`, `previous_owner_id`, `generation` |
+| `ACKED` / `DISMISSED` | `actor`, `metadata`, `responded_at` |
+| `TIMED_OUT` | `actor` (`uns-timeout-worker`), `escalation_required` |
+| `REPLAY_REQUESTED` / `FAILURE_RESOLVED` | `actor`, `cycle`, `cumulative_attempts` |
+| `RETENTION_APPLIED` | `operator`, `cutoff`, `deleted_rows`, `archive` (or `removed` payload) |
 
 ### Audit Invariant
 
 Every delivery (success or failure) MUST generate an audit record containing:
-- Notification metadata
-- Delivery outcome
-- Autonomy context (agent_id, mode)
-- Timestamp
+- Notification metadata and resolved policy provenance (`policy_config_id`, `policy_config_hash`)
+- Delivery outcome (`channels_attempted`, `channels_succeeded`, `channels_failed`)
+- Autonomy context (`agent_id`, `autonomy_mode`)
+- Timestamp (`created_at`, `delivered_at`)
 
 ## Summary
 
 | Aspect | Description | Implementation Status |
 |--------|-------------|----------------------|
-| **Adapter health** | Per-channel HEALTHY/DEGRADED/UNHEALTHY | Implemented |
-| **/health endpoint** | Returns liveness payload `{"status": "alive", "service": "agsignal", "version": ...}` | Minimal stub (liveness only) |
-| **DLQ visibility** | Via escalation callback | Operator-implemented |
-| **Delivery metrics** | Via logging and audit callbacks | Implemented |
-| **Ack timeout tracking** | Via AcknowledgmentEngine | Implemented |
-| **Rate limit metrics** | Via logging | Implemented |
-| **External metrics export** | Prometheus, StatsD, etc. | Not implemented |
-| **Distributed tracing** | OpenTelemetry, Jaeger | Not implemented |
+| **Adapter health** | Per-channel `HEALTHY`/`DEGRADED`/`UNHEALTHY` | Implemented |
+| **/health endpoint** | Public liveness stub `{"status": "alive", "service": "uns", "version": ...}` | Implemented (liveness only) |
+| **/readyz endpoint** | Authenticated DB, policy count, channel config, and `dlq_depth` check | Implemented |
+| **/metrics endpoint** | Authenticated Prometheus metrics exporter | Implemented |
+| **DLQ visibility** | Durable `uns_notifications.dead_letter` (`/api/v1/runtime/dead-letters`) + `escalation_callback` | Implemented |
+| **Delivery metrics** | Via Prometheus `/metrics`, `/ui/*`, structured logs, and audit callbacks | Implemented |
+| **Ack timeout tracking** | Durable `Runtime.expire()` worker + `AcknowledgmentEngine` | Implemented |
+| **Rate limit metrics** | Via slowapi HTTP middleware and per-channel token buckets | Implemented |
 
 ## Related Documentation
 
 - [Delivery Semantics](delivery-semantics.md) - GUARANTEED vs BEST_EFFORT behavior
-- [Integration Modes](integration-modes.md) - Context provider and callback configuration
+- [Integration Modes](integration-modes.md) - Runtime, client, context provider, and callback configuration
 - [Policy Lifecycle](policy-lifecycle.md) - Policy resolution and routing
 - [Architecture](../ARCHITECTURE.md) - System architecture overview
+- [Support State Machine & Schema](../support/STATE-MACHINE-AND-SCHEMA.md) - Database tables and event catalog
+- [Troubleshooting Guides (TSGs)](../tsg/README.md) - Incident runbooks
