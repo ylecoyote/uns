@@ -51,7 +51,7 @@ server = [
 ]
 # Production storage backend for idempotency, dedup, DLQ, rate-limit shared state.
 redis = [
-    "redis>=5.0.0",
+    "redis>=8.1.0",
 ]
 # SQLAlchemy-backed audit / policy / replay stores.
 sql = [
