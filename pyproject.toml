@@ -63,7 +63,7 @@ mcp = [
 ]
 # HTTP-based channel adapters (Slack, PagerDuty webhooks).
 adapters = [
-    "httpx>=0.25.0",
+    "httpx>=0.28.1",
 ]
 # Everything an operator needs to self-host both apps end-to-end.
 full = [
