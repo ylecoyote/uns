@@ -1,8 +1,8 @@
 site_name: UNS — Unified Notification Service
 site_description: Policy-driven notification delivery, durable outbox recovery, and acknowledgment audit for autonomous agents
-site_url: https://ylecoyote.github.io/agsignal/
-repo_url: https://github.com/ylecoyote/agsignal
-repo_name: ylecoyote/agsignal
+site_url: https://ylecoyote.github.io/uns/
+repo_url: https://github.com/ylecoyote/uns
+repo_name: ylecoyote/uns
 docs_dir: docs
 site_dir: site
 
