@@ -78,7 +78,7 @@ dev = [
     "fakeredis>=2.20.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
-    "bandit>=1.8.0",
+    "bandit>=1.9.4",
     "pip-audit>=2.10.1",
 ]
 # Backwards-compatible alias for legacy install instructions.
