@@ -83,7 +83,7 @@ async def record_response(event: dict[str, Any]) -> None:
 
 
 def make_runtime() -> Runtime:
-    from agsignal.app import configure_runtime_policies
+    from uns.config import configure_runtime_policies
 
     registry = SimpleAdapterRegistry()
     for channel in (Channel.SLACK, Channel.EMAIL, Channel.PAGERDUTY):
