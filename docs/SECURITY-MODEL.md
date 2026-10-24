@@ -10,10 +10,10 @@ The primary `UNS_API_KEY` grants full operator authority (`admin`, `producer`, `
 |---|---|---|---|
 | `UNS_API_KEY` | `UNS_API_PRINCIPAL` | `admin`, `producer`, `responder`, `observer` | Full operator access (all write, response, admin, and read routes) |
 | `UNS_PRODUCER_API_KEY` | `UNS_PRODUCER_API_PRINCIPAL` | `producer`, `observer` | Submit and simulate notifications (`POST /api/v1/notifications*`) and read status/audit |
-| `UNS_RESPONDER_API_KEY` | `UNS_RESPONDER_API_PRINCIPAL` | `responder`, `observer` | Acknowledge or dismiss notifications (`POST /api/v1/notifications/{id}/ack`, `/dismiss`) and read status/audit |
+| `UNS_RESPONDER_API_KEY` | `UNS_RESPONDER_API_PRINCIPAL` | `responder`, `observer` | Acknowledge or dismiss notifications through HTTP (`POST /api/v1/notifications/{id}/ack`, `/dismiss`) or WebSocket commands, and read status/audit |
 | `UNS_OBSERVER_API_KEY` | `UNS_OBSERVER_API_PRINCIPAL` | `observer` | Read-only access to Console (`/ui/*`), status, readiness (`/readyz`), and WebSocket streams |
 
-Out-of-scope calls with a valid scoped key return `403 Forbidden` (`insufficient_scope`). Shared keys still identify a configured principal rather than individual end-user identities.
+Out-of-scope HTTP calls with a valid scoped key return `403 Forbidden` (`insufficient_scope`). Shared keys still identify a configured principal rather than individual end-user identities.
 
 Mandatory event emission and classification belong in trusted host code (for example, an application worker or agent supervisor emitting a signal when a job exhausts its retry budget), rather than relying on an untrusted model prompt to self-report failures. UNS's durability guarantee begins at its acceptance boundary (`202 Accepted`).
 
@@ -23,7 +23,9 @@ ACK/DISMISS attribution derives from the verified principal. Payload identities 
 
 ## WebSocket and MCP
 
-WebSocket connections authenticate before acceptance. Native clients can use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` in the subprotocol header; the server echoes only `agsignal.v1`, never the credential-bearing protocol. Tokens in query strings are rejected. ACK messages use the same durable Runtime and verified actor as HTTP.
+WebSocket connections authenticate and require `observer` scope before acceptance. This scope permits stream reads and notification replay. Native clients can use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` in the subprotocol header; the server echoes only `agsignal.v1`, never the credential-bearing protocol. Tokens in query strings are rejected.
+
+Every WebSocket ACK or DISMISS command separately checks the authenticated principal's `responder` scope, which the full operator/admin credential also grants. This uses the same capability enforcement as HTTP responses and the same durable Runtime and verified actor. Producer and observer credentials cannot mutate notification response state through WebSockets. An out-of-scope command returns an error frame with `type: "error"` and `error: "insufficient_scope"`, leaves response state and audit history unchanged, and keeps the authorized read stream open.
 
 The MCP CLI exposes trusted local stdio. It is read-only by default. Write-enabled startup requires an explicit flag, a persistent database, an operator principal and a delivery confirmation token. The host owns access to the process and its environment. This is not an internet-facing MCP authentication scheme.
 

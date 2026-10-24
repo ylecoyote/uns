@@ -16,7 +16,12 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from agsignal.api.auth import WritePrincipal, require_websocket_principal, resolve_requested_actor
+from agsignal.api.auth import (
+    WritePrincipal,
+    require_principal_scope,
+    require_websocket_principal,
+    resolve_requested_actor,
+)
 from notification.channel_health import ChannelHealthTracker
 from notification.models import AckStatus, Channel
 
@@ -478,6 +483,7 @@ async def _handle_ack_message(
     from uns.runtime import Conflict
 
     try:
+        require_principal_scope(principal, "responder")
         notification_id = UUID(str(message.get("notification_id", "")))
         requested_status = AckStatus(str(message.get("status", AckStatus.ACKED.value)))
         if requested_status not in (AckStatus.ACKED, AckStatus.DISMISSED):

@@ -28,7 +28,9 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    case,
     create_engine,
+    func,
     insert,
     select,
     update,
@@ -57,6 +59,7 @@ from notification.service import (
     DeliveryService,
     SimpleAdapterRegistry,
 )
+from uns.database import is_in_memory_database_url
 from uns.policy_runtime import PolicyRuntime
 from uns.schema import migrate_runtime_schema
 
@@ -151,12 +154,8 @@ class Runtime:
         callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> None:
         options: dict[str, Any] = {}
-        is_in_memory = (
-            database_url in ("sqlite://", "sqlite:///:memory:")
-            or ":memory:" in database_url
-            or "mode=memory" in database_url
-        )
-        if database_url in ("sqlite://", "sqlite:///:memory:"):
+        is_in_memory = is_in_memory_database_url(database_url)
+        if is_in_memory:
             options = {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
         self.database_url = database_url
         self.persistence_mode = "in_memory" if is_in_memory else "persistent"
@@ -204,14 +203,16 @@ class Runtime:
 
     def _resolve_obligation_owner(
         self, session: Session, row: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Follow deduplication owner and successor lineage to the canonical obligation row."""
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Resolve the complete lineage without treating a broken link as an owner."""
         current = row
         seen = {str(row["id"])}
-        for _ in range(10):
+        while True:
             next_id = current.get("dedup_owner_id") or current.get("dedup_successor_id")
-            if not next_id or str(next_id) in seen:
-                break
+            if not next_id:
+                return current, None
+            if str(next_id) in seen:
+                return None, "CYCLE"
             seen.add(str(next_id))
             candidate = (
                 session.execute(select(work).where(work.c.id == str(next_id)))
@@ -219,9 +220,10 @@ class Runtime:
                 .first()
             )
             if candidate is None:
-                break
+                return None, "MISSING_TARGET"
+            if row["dedup_key"] is None or candidate["dedup_key"] != row["dedup_key"]:
+                return None, "GROUP_MISMATCH"
             current = dict(candidate)
-        return current
 
     def get(self, notification_id: UUID | str) -> dict[str, Any]:
         with self.sessions() as session:
@@ -233,11 +235,13 @@ class Runtime:
             if row is None:
                 raise KeyError(str(notification_id))
             result = dict(row)
-            owner = self._resolve_obligation_owner(session, result)
-            inherited = str(owner["id"]) != str(result["id"])
-            result["obligation_owner_id"] = str(owner["id"])
-            result["effective_ack_status"] = owner["ack_status"] if inherited else result["ack_status"]
+            owner, resolution_error = self._resolve_obligation_owner(session, result)
+            inherited = owner is not None and str(owner["id"]) != str(result["id"])
+            result["obligation_owner_id"] = str(owner["id"]) if owner is not None else None
+            result["effective_ack_status"] = owner["ack_status"] if owner is not None else None
             result["ack_inherited"] = inherited
+            result["obligation_resolution_status"] = "RESOLVED" if owner is not None else "UNRESOLVED"
+            result["obligation_resolution_error"] = resolution_error
             return result
 
     def events(self, notification_id: UUID | str) -> list[dict[str, Any]]:
@@ -257,7 +261,7 @@ class Runtime:
         row = self.get(notification_id)
         n = Notification.model_validate(row["notification"])
         result = NotificationResult.model_validate(row["outcome"])
-        owner_id = row.get("obligation_owner_id") or row["id"]
+        owner_id = row.get("obligation_owner_id")
         effective_ack = row.get("effective_ack_status")
         return SendNotificationResponse(
             notification_id=n.notification_id,
@@ -267,15 +271,22 @@ class Runtime:
             channels_failed=result.channels_failed,
             require_ack=bool(n.require_ack),
             ack_status=AckStatus(row["ack_status"]) if row["ack_status"] else None,
-            obligation_owner_id=UUID(str(owner_id)),
+            obligation_owner_id=UUID(str(owner_id)) if owner_id else None,
             effective_ack_status=AckStatus(effective_ack) if effective_ack else None,
             ack_inherited=bool(row.get("ack_inherited", False)),
+            obligation_resolution_status=row["obligation_resolution_status"],
+            obligation_resolution_error=row["obligation_resolution_error"],
             idempotent_replay=replay,
             created_at=n.created_at,
             message=(
-                f"{row['status'].lower()}: delivery obligation {row['dedup_owner_id']}"
-                if row["dedup_owner_id"]
-                else row["status"].lower()
+                f"{row['status'].lower()}: obligation lineage unresolved "
+                f"({row['obligation_resolution_error']})"
+                if row["obligation_resolution_status"] == "UNRESOLVED"
+                else (
+                    f"{row['status'].lower()}: delivery obligation {owner_id}"
+                    if row["ack_inherited"]
+                    else row["status"].lower()
+                )
             ),
         )
 
@@ -1152,51 +1163,61 @@ class Runtime:
             return bool(changed)
 
     def operational_progress(self) -> dict[str, Any]:
-        """Summarize outbox, acknowledgment, callback, and dead-letter progress."""
+        """Aggregate retained operational evidence without loading work histories.
+
+        Pending age starts at durable acceptance, independently of retry backoff.
+        UNKNOWN counts retained channel-result observations, not unique obligations.
+        """
         now = self.clock()
+        pending = (work.c.status == "PENDING", work.c.dedup_owner_id.is_(None))
+        callbacks = (
+            events.c.callback_pending.is_(True),
+            events.c.callback_attempts < 3,
+        )
+        attempt_available_at = case(
+            (work.c.lease_until > work.c.next_attempt, work.c.lease_until),
+            else_=work.c.next_attempt,
+        )
+        summary = select(
+            select(func.count()).select_from(work).where(*pending)
+            .scalar_subquery().label("pending_count"),
+            select(func.min(events.c.at))
+            .select_from(work.join(events, work.c.id == events.c.notification_id))
+            .where(*pending, events.c.kind == "ACCEPTED")
+            .scalar_subquery().label("oldest_accepted_at"),
+            select(func.min(attempt_available_at))
+            .where(*pending, work.c.next_attempt <= now, work.c.lease_until <= now)
+            .scalar_subquery().label("oldest_due_attempt_at"),
+            select(func.count()).select_from(work)
+            .where(work.c.ack_status == "PENDING", work.c.deadline <= now)
+            .scalar_subquery().label("overdue_ack_count"),
+            select(func.count()).select_from(events).where(*callbacks)
+            .scalar_subquery().label("pending_callback_count"),
+            select(func.min(events.c.callback_until))
+            .where(*callbacks, events.c.callback_until <= now)
+            .scalar_subquery().label("oldest_due_callback_at"),
+            select(func.count()).select_from(work).where(work.c.dead_letter.is_(True))
+            .scalar_subquery().label("unresolved_failure_count"),
+            select(func.count()).select_from(events)
+            .where(
+                events.c.kind == "CHANNEL_ATTEMPT_RESULT",
+                events.c.payload["metadata"]["provider_outcome"].as_string() == "UNKNOWN",
+            )
+            .scalar_subquery().label("unknown_attempt_count"),
+        )
         with self.sessions() as session:
-            pending_rows = list(
-                session.execute(
-                    select(work.c.next_attempt).where(
-                        work.c.status == "PENDING",
-                        work.c.dedup_owner_id.is_(None),
-                    )
-                ).scalars()
-            )
-            overdue_acks = list(
-                session.execute(
-                    select(work.c.deadline).where(
-                        work.c.ack_status == "PENDING",
-                        work.c.deadline <= now,
-                    )
-                ).scalars()
-            )
-            pending_callbacks = list(
-                session.execute(
-                    select(events.c.callback_until).where(
-                        events.c.callback_pending.is_(True),
-                        events.c.callback_attempts < 3,
-                    )
-                ).scalars()
-            )
-            dead_letter_count = len(
-                list(
-                    session.execute(
-                        select(work.c.id).where(work.c.dead_letter.is_(True))
-                    ).scalars()
-                )
-            )
-        due_pending = [ float(ts) for ts in pending_rows if ts is not None and float(ts) <= now ]
-        due_callbacks = [ float(ts) for ts in pending_callbacks if ts is not None and float(ts) <= now ]
+            row = session.execute(summary).mappings().one()
+
+        def age(timestamp: float | None) -> float | None:
+            return round(max(0.0, now - timestamp), 3) if timestamp is not None else None
+
         return {
-            "pending_count": len(pending_rows),
-            "oldest_pending_age_seconds": (
-                round(max(0.0, now - min(due_pending)), 3) if due_pending else None
-            ),
-            "overdue_ack_count": len(overdue_acks),
-            "pending_callback_count": len(pending_callbacks),
-            "oldest_callback_retry_age_seconds": (
-                round(max(0.0, now - min(due_callbacks)), 3) if due_callbacks else None
-            ),
-            "unresolved_failure_count": dead_letter_count,
+            "pending_count": row["pending_count"],
+            "oldest_pending_age_seconds": age(row["oldest_accepted_at"]),
+            "oldest_due_attempt_lateness_seconds": age(row["oldest_due_attempt_at"]),
+            "overdue_ack_count": row["overdue_ack_count"],
+            "pending_callback_count": row["pending_callback_count"],
+            "oldest_callback_retry_age_seconds": age(row["oldest_due_callback_at"]),
+            "unresolved_failure_count": row["unresolved_failure_count"],
+            "unknown_attempt_count": row["unknown_attempt_count"],
         }

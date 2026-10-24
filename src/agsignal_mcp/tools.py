@@ -243,6 +243,20 @@ async def dismiss_notification(
     }
 
 
+def _obligation_projection(row: dict[str, Any]) -> dict[str, Any]:
+    """Keep both durable MCP status tools aligned with the runtime projection."""
+    return {
+        key: row[key]
+        for key in (
+            "obligation_owner_id",
+            "effective_ack_status",
+            "ack_inherited",
+            "obligation_resolution_status",
+            "obligation_resolution_error",
+        )
+    }
+
+
 async def get_ack_status(
     notification_id: str | UUID,
     runtime_state: RuntimeState | None = None,
@@ -250,18 +264,25 @@ async def get_ack_status(
     """Return ACK status for a notification if it is tracked.
 
     A supplied runtime owns the read. Legacy callers without a runtime retain
-    ``agsignal.queries.get_ack_status`` and its ``AckStatusResponse`` schema.
+    ``agsignal.queries.get_ack_status`` and the legacy two-field response.
     """
     if runtime_state is not None and runtime_state.runtime is not None:
         notification_key = str(notification_id)
         try:
-            ack_status = runtime_state.runtime.get(notification_key)["ack_status"]
+            row = runtime_state.runtime.get(notification_key)
         except KeyError:
-            ack_status = None
-        return {"notification_id": notification_key, "ack_status": ack_status}
+            return {"notification_id": notification_key, "ack_status": None}
+        return {
+            "notification_id": notification_key,
+            "ack_status": row["ack_status"],
+            **_obligation_projection(row),
+        }
     notification_uuid = UUID(str(notification_id))
     response = await query_get_ack_status(notification_id=notification_uuid)
-    return cast(dict[str, Any], _json_safe(response.model_dump()))
+    return {
+        "notification_id": str(response.notification_id),
+        "ack_status": response.ack_status.value if response.ack_status is not None else None,
+    }
 
 
 async def get_notification_status(
@@ -285,6 +306,7 @@ async def get_notification_status(
             "found": True,
             "ack_status": row["ack_status"],
             "status": row["status"],
+            **_obligation_projection(row),
         }
     notification_uuid = UUID(str(notification_id))
     response = await query_get_notification_status(notification_id=notification_uuid)

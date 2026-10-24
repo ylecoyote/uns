@@ -97,10 +97,16 @@ async def test_direct_helpers_read_durable_send_and_ack_with_runtime_isolation(r
 
     assert await get_ack_status(UUID(notification_id), runtime_state=state) == {
         "notification_id": notification_id, "ack_status": "ACKED",
+        "obligation_owner_id": notification_id, "effective_ack_status": "ACKED",
+        "ack_inherited": False, "obligation_resolution_status": "RESOLVED",
+        "obligation_resolution_error": None,
     }
     assert await get_notification_status(notification_id, runtime_state=state) == {
         "notification_id": notification_id, "found": True,
         "ack_status": "ACKED", "status": "DELIVERED",
+        "obligation_owner_id": notification_id, "effective_ack_status": "ACKED",
+        "ack_inherited": False, "obligation_resolution_status": "RESOLVED",
+        "obligation_resolution_error": None,
     }
     assert get_delivery_status(notification_id, runtime_state=state)["found"] is True
     assert {item["notification_id"] for item in

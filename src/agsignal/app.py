@@ -200,7 +200,9 @@ def create_app(
     owns_runtime = runtime is None and not skip_persistence_config
     if runtime is None and not skip_persistence_config:
         from uns.config import build_runtime
-        runtime = build_runtime()
+        # This factory also serves direct ASGI/Uvicorn and container startup,
+        # which do not pass through the CLI's validation in main().
+        runtime = build_runtime(require_persistent=True)
     elif runtime is not None:
         from uns.config import configure_runtime_policies
         configure_runtime_policies(runtime)
@@ -350,7 +352,11 @@ def create_app(
             "persistence_mode": persistence_mode,
             "channels_configured": _channel_readiness(),
             "policy_count": len(runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()),
-            "dlq_depth": app.state.dlq_service.depth(),
+            "dlq_depth": (
+                operational_progress["unresolved_failure_count"]
+                if operational_progress is not None
+                else app.state.dlq_service.depth()
+            ),
             "read_model_adapter": read_model_adapter,
             "audit_logger": audit_logger_type,
         }

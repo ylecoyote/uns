@@ -267,9 +267,11 @@ async def get_notification_status(
             require_ack=n["require_ack"],
             created_at=n["created_at"],
             ack_status=row["ack_status"],
-            obligation_owner_id=UUID(str(owner_id)) if owner_id else notification_id,
+            obligation_owner_id=UUID(str(owner_id)) if owner_id else None,
             effective_ack_status=row.get("effective_ack_status"),
             ack_inherited=bool(row.get("ack_inherited", False)),
+            obligation_resolution_status=row["obligation_resolution_status"],
+            obligation_resolution_error=row["obligation_resolution_error"],
         )
     return await _query_notification_status(notification_id=notification_id)
 
@@ -294,9 +296,11 @@ async def get_ack_status(
             return AckStatusResponse(
                 notification_id=notification_id,
                 ack_status=row["ack_status"],
-                obligation_owner_id=UUID(str(owner_id)) if owner_id else notification_id,
+                obligation_owner_id=UUID(str(owner_id)) if owner_id else None,
                 effective_ack_status=row.get("effective_ack_status"),
                 ack_inherited=bool(row.get("ack_inherited", False)),
+                obligation_resolution_status=row["obligation_resolution_status"],
+                obligation_resolution_error=row["obligation_resolution_error"],
             )
         except KeyError:
             return AckStatusResponse(notification_id=notification_id, ack_status=None)

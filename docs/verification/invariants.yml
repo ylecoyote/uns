@@ -3,9 +3,32 @@
 # UI endpoints expose this data via /ui/invariants for compliance and audit purposes.
 
 version: "1.0"
-last_updated: "2026-01-23"
+last_updated: "2026-10-24"
 
 invariants:
+  - id: "INV-AUTH-001"
+    statement: |
+      HTTP and WebSocket acknowledgments and dismissals require responder
+      capability on the verified principal, including full operator credentials.
+      Producer and observer credentials must not mutate response state through
+      either transport. Denied commands preserve response state and audit history.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Shared principal-scope check protects HTTP routes and every WebSocket ACK/DISMISS command; observer scope permits stream reads only"
+    evidence:
+      - path: "src/agsignal/api/auth.py"
+        note: "require_principal_scope enforces the requested capability on an authenticated principal"
+      - path: "src/notification/websocket_runtime.py"
+        note: "WebSocket response commands require responder scope before invoking the durable runtime"
+      - path: "tests/uns/test_scoped_websocket_auth.py"
+        note: "Bearer and browser-subprotocol tests reject producer/observer ACK/DISMISS without state or audit changes while preserving replay reads"
+      - path: "tests/uns/test_transport_security.py"
+        note: "HTTP scope and actor-attribution regressions verify capability separation"
+    owner: "platform-team"
+    last_reviewed: "2026-10-24"
+
   - id: "INV-ACK-001"
     statement: |
       Acknowledgments must not gate execution. Acks exist for state transitions

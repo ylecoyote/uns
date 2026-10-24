@@ -9,7 +9,7 @@ Install `uns[full]` from the local wheel or `.[full]` from source. `uns.Runtime(
 - `await client.simulate(request)`: policy resolution only, no side effects.
 - `runtime.accept(request, principal=...)`: atomic acceptance, returns pending owner/follower state or a satisfied duplicate; idempotent retry retains identity.
 - `await client.send(request)`: accept and attempt dispatch; pending failures recover through the worker.
-- `runtime.get(id)`, `runtime.events(id)`: inspect durable state and event history.
+- `runtime.get(id)`, `runtime.events(id)`: inspect durable state, the [canonical obligation response projection](#canonical-obligation-response-projection), and event history.
 - `runtime.acknowledge(id, actor=..., dismiss=False)`: conditional terminal response.
 - `await runtime.run_once()`: recover eligible work and process timeouts without awaiting callbacks.
 - `await runtime.worker()`: owned dispatch, timeout and callback loops with independent progress.
@@ -39,6 +39,37 @@ from uns.runtime import Conflict
 | `runtime.dead_letters() -> list[dict[str, Any]]` | Return all rows in `uns_notifications` where `dead_letter == True`, including `replay_blocked_by` and `replay_block_reason` when recovery is unsafe or redundant. | None |
 | `await runtime.deliver_callbacks() -> None` | Claim up to 100 events ordered by `(callback_until, at, id)` with `callback_pending == True` and `callback_attempts < 3` under a 30-second lease, invoke `self.callback(event)` with a 10s timeout, and apply `2 ** attempts` backoff on error. | None |
 
+### Canonical obligation response projection
+
+Deduplicated notifications and failed predecessors can share a response obligation with another notification. The same projection is available from Python `runtime.get(id)` and `runtime.response(id)`, Python acceptance/send responses, HTTP submission and status/ACK-status reads, and runtime-bound MCP `send_signal`, `get_notification_status`, and `get_ack_status`. UUIDs are serialized as strings in JSON.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ack_status` | `PENDING`, `ACKED`, `DISMISSED`, `TIMED_OUT`, or `null` | The requested notification's own stored response state. This historical value is never replaced by an owner's response. |
+| `obligation_owner_id` | UUID or `null` | The terminal canonical owner after following the complete owner/successor lineage. Equals the requested ID for an independent owner; null if resolution fails. |
+| `effective_ack_status` | ACK status or `null` | The resolved owner's current response state. Null can mean no response is tracked yet, no ACK is required, or owner resolution failed; inspect `obligation_resolution_status`. |
+| `ack_inherited` | boolean | True when a successfully resolved owner differs from the requested notification. False for a self-owned or unresolved obligation. |
+| `obligation_resolution_status` | `RESOLVED`, `UNRESOLVED`, or `null` | Whether the complete lineage resolved. Null is the additive schema default for legacy or missing-record responses. |
+| `obligation_resolution_error` | `CYCLE`, `MISSING_TARGET`, `GROUP_MISMATCH`, or `null` | Why lineage could not be resolved. Null when resolution succeeds. |
+
+Poll the original notification ID and use `effective_ack_status` only when resolution is `RESOLVED`. A follower can retain `ack_status: null` while its owner is `ACKED`; a failed predecessor can retain delivery status `FAILED` while the successor has satisfied the response obligation. Reads do not rewrite historical status or audit records. ACK/DISMISS mutations target the resolved `obligation_owner_id`; they do not automatically redirect a follower ID, and the normal actor/state/deadline checks still apply.
+
+For example, an HTTP ACK-status read or runtime-bound MCP ACK-status tool can return:
+
+```json
+{
+  "notification_id": "2c5f9b4c-6b3e-4d1a-9c12-4a8f0c8e7b11",
+  "ack_status": null,
+  "obligation_owner_id": "3d6a0c5d-7c4f-4e2b-ad23-5b9f1d9f8c22",
+  "effective_ack_status": "ACKED",
+  "ack_inherited": true,
+  "obligation_resolution_status": "RESOLVED",
+  "obligation_resolution_error": null
+}
+```
+
+When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_status` are null and `ack_inherited` is false, even if an intermediate row contains an ACK. Inspect the error and retained history; an intermediate row is never presented as the canonical owner. Missing-ID MCP reads keep their existing minimal shapes (`found: false` for notification status, or `ack_status: null` for ACK status). The legacy MCP ACK helper without a runtime keeps its two-field response and does not infer owner state.
+
 ### `SendNotificationRequest` Schema (`agsignal.responses`)
 
 | Field | Type | Required | Default | Description |
@@ -62,7 +93,7 @@ from uns.runtime import Conflict
 
 ## HTTP
 
-`uns.app:app` and `agsignal.app:app` mount the same service. Configure `UNS_API_KEY` and `UNS_API_PRINCIPAL`; send `Authorization: Bearer ...` for API reads and mutations, readiness, metrics and runtime inspection. Existing `AGSIGNAL_*` aliases remain usable.
+`uns.app:app` and `agsignal.app:app` mount the same service. Configure an operator or scoped credential from the matrix below; send `Authorization: Bearer ...` for protected API requests. Existing `AGSIGNAL_*` aliases remain usable.
 
 | Method and path | Meaning |
 |---|---|
@@ -70,7 +101,8 @@ from uns.runtime import Conflict
 | POST `/api/v1/notifications/simulate` | Resolve without effects |
 | GET `/api/v1/notifications/{id}/delivery` | Existing delivery audit history |
 | GET `/api/v1/notifications/{id}` | Notification and response status |
-| POST `/api/v1/notifications/{id}/ack` or `/dismiss` | Authenticated human response |
+| GET `/api/v1/notifications/{id}/ack-status` | Stored and effective response state with canonical owner resolution |
+| POST `/api/v1/notifications/{id}/ack` or `/dismiss` | Authenticated actor response to the canonical owner |
 | POST `/api/v1/policies/reload` | Validate and atomically persist a notification-policy snapshot before swapping registry |
 | GET `/api/v1/runtime/notifications/{id}` | Full state, policy provenance and recovery events |
 | GET `/api/v1/runtime/dead-letters` | Durable exhausted failures |
@@ -82,19 +114,30 @@ Idempotency scope is authenticated principal plus source plus key. Same content 
 
 ### Authentication Headers
 
-All HTTP endpoints except `GET /health` and `GET /healthz` require one of the following headers matching `UNS_API_KEY`:
-- `Authorization: Bearer <UNS_API_KEY>` (recommended)
-- `X-UNS-API-Key: <UNS_API_KEY>`
-- `X-AGSignal-API-Key: <UNS_API_KEY>`
+By default, all HTTP endpoints except `GET /health` and `GET /healthz` require an authenticated credential with the capability required by the endpoint. Supply it through one of these headers:
+
+- `Authorization: Bearer <credential>` (recommended)
+- `X-UNS-API-Key: <credential>`
+- `X-AGSignal-API-Key: <credential>`
+
+| Configured credential | Capabilities | Principal configuration |
+|---|---|---|
+| `UNS_API_KEY` | All reads (including `/metrics`), producer operations, responses, and administration | `UNS_API_PRINCIPAL` |
+| `UNS_PRODUCER_API_KEY` | Send, simulate, and observer-protected reads; no ACK/DISMISS, `/metrics`, or administration | `UNS_PRODUCER_API_PRINCIPAL` |
+| `UNS_RESPONDER_API_KEY` | ACK/DISMISS and observer-protected reads; no send, `/metrics`, or administration | `UNS_RESPONDER_API_PRINCIPAL` |
+| `UNS_OBSERVER_API_KEY` | Observer-protected reads only, including Console, readiness, and runtime inspection; no `/metrics` | `UNS_OBSERVER_API_PRINCIPAL` |
+
+Policy reload, DLQ resolution/replay, and `/metrics` require operator authority. These are capability scopes, not per-producer or tenant data isolation: an observer-capable credential can read the instance's records through observer-protected endpoints. Use distinct key values for distinct roles; reusing a value combines its configured capabilities. The verified credential's principal supplies response attribution. The optional legacy anonymous-read mode applies only to selected HTTP GET/HEAD reads; it never grants mutations, WebSockets, readiness, metrics, or runtime inspection. See [Security Model](SECURITY-MODEL.md).
 
 | Status Code | Error Code / Detail | Cause |
 | :--- | :--- | :--- |
 | `401 Unauthorized` | `unauthorized` | Missing or invalid API key. |
-| `403 Forbidden` | `principal_override_forbidden` | `acked_by` or `dismissed_by` in request body does not match `UNS_API_PRINCIPAL`. |
+| `403 Forbidden` | `insufficient_scope` | The authenticated credential lacks the endpoint's required capability. |
+| `403 Forbidden` | `principal_override_forbidden` | `acked_by` or `dismissed_by` does not match the authenticated credential's principal. |
 | `404 Not Found` | `not_found` / `"Notification not found"` | Notification ID or DLQ entry ID does not exist. |
 | `409 Conflict` | `"Idempotency key reused..."` / `"Obligation already satisfied..."` | Idempotency key payload mismatch, ACK after deadline/by different actor, or replay blocked by non-dead-letter status or active/satisfied successor lineage. |
 | `422 Unprocessable Entity` | `validation_error` | Schema validation failure, disallowed producer override against ACTIVE policy, or forbidden adapter-control metadata key. |
-| `503 Service Unavailable` | `write_auth_not_configured` | `UNS_API_KEY` is not set on the server. |
+| `503 Service Unavailable` | `write_auth_not_configured` | No API credential is configured on the server. |
 
 ### Endpoint Details & Examples
 
@@ -109,6 +152,11 @@ Accepts a `SendNotificationRequest`, commits the outbox row, and attempts immedi
   "channels_failed": [],
   "require_ack": true,
   "ack_status": "PENDING",
+  "obligation_owner_id": "2c5f9b4c-6b3e-4d1a-9c12-4a8f0c8e7b11",
+  "effective_ack_status": "PENDING",
+  "ack_inherited": false,
+  "obligation_resolution_status": "RESOLVED",
+  "obligation_resolution_error": null,
   "idempotent_replay": false,
   "created_at": "2026-10-22T21:00:00Z",
   "message": "delivered"
@@ -119,7 +167,7 @@ Accepts a `SendNotificationRequest`, commits the outbox row, and attempts immedi
 #### 2. `POST /api/v1/notifications/{id}/ack` and `/dismiss` (Status `200 OK`)
 *(Also mounted at `/v1/notifications/{id}/ack` and `/v1/notifications/{id}/dismiss`)*
 ```json
-// Request Body (optional; acked_by/dismissed_by must match UNS_API_PRINCIPAL if provided)
+// Request Body (optional; acked_by/dismissed_by must match the credential's principal if provided)
 {
   "metadata": {
     "ticket_id": "INC-4092",
@@ -183,8 +231,8 @@ The factory and CLI default to read-only. `uns-mcp --enable-writes` requires a p
 | `ack_notification` | Write | `payload: AckNotificationInput` (`notification_id`, optional `acked_by`, `metadata`) | Acknowledge a pending notification as `UNS_API_PRINCIPAL`. |
 | `dismiss_notification` | Write | `payload: AckNotificationInput` (`notification_id`, optional `acked_by`, `metadata`) | Dismiss a pending notification as `UNS_API_PRINCIPAL`. |
 | `get_delivery_status` | Read-Only / Write | `notification_id: str` | Return persisted delivery audit records (`found`, `delivery_status`, `channels_attempted`, `audits`). |
-| `get_notification_status` | Read-Only / Write | `notification_id: str` | Return durable notification status (`found`, `status`, `ack_status`). |
-| `get_ack_status` | Read-Only / Write | `notification_id: str` | Return current `ack_status` (`PENDING`, `ACKED`, `DISMISSED`, `TIMED_OUT`, or `null`). |
+| `get_notification_status` | Read-Only / Write | `notification_id: str` | Return durable notification status (`found`, `status`, raw `ack_status`) and the canonical obligation response projection above. |
+| `get_ack_status` | Read-Only / Write | `notification_id: str` | Return raw `ack_status` plus canonical owner, effective ACK, inheritance, and resolution status/error when bound to a runtime. |
 | `list_deliveries` | Read-Only / Write | `limit: int = 25` | Return recent delivery read-model entries. |
 | `list_audit_events` | Read-Only / Write | `limit: int = 25` | Return recent audit read-model entries. |
 | `get_effective_policy` | Read-Only / Write | `notification_type: str`, `intent: str`, `autonomy_mode: str`, `irreversible: bool = False` | Resolve effective policy and resolution provenance for a signal shape. |
@@ -205,7 +253,7 @@ Canonical intake locks the ACTIVE revision in its acceptance transaction; steady
 
 ## WebSocket authentication
 
-Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` subprotocols; the selected protocol is only `agsignal.v1`. Query-string credentials are rejected. ACK/DISMISS messages use the verified principal and durable Runtime.
+Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` subprotocols; the selected protocol is only `agsignal.v1`. Query-string credentials are rejected. Observer-capable credentials can connect and read, but every ACK/DISMISS command separately requires responder or operator capability and uses the verified principal and durable Runtime. A read-capable connection does not grant response authority.
 
 ### WebSocket Handshake Examples
 

@@ -6,7 +6,7 @@ This guide covers local and single-node production deployment of the Unified Not
 
 ## Supported local profile
 
-The reproducible profile is Python 3.12, a file-backed SQLite database and recording adapters. Supported Python metadata starts at 3.11. PostgreSQL locking and real-provider acceptance remain separate checks. In-memory SQLite is suitable for demos and is rejected by write-enabled MCP CLI startup.
+The reproducible profile is Python 3.12, a file-backed SQLite database and recording adapters. Supported Python metadata starts at 3.11. PostgreSQL locking and real-provider acceptance remain separate checks. In-memory SQLite requires explicit opt-in for HTTP demos and is always rejected by write-enabled MCP CLI startup.
 
 Install `.[full]` in an isolated environment. The server extra includes Uvicorn standard protocol dependencies, including network WebSocket support. The Dockerfile installs its exact built UNS wheel; the Compose readiness probe authenticates with its configured operator key. For a local service:
 
@@ -18,7 +18,17 @@ export UNS_API_PRINCIPAL='local-operator'
 .venv/bin/uns
 ```
 
-Use actual deployment secret provisioning rather than committing environment files. Back up an existing database before migration. Only `/health` and `/healthz` are public liveness; readiness and metrics require the operator credential. Shared hosting needs HTTPS/WSS and a trusted origin. Do not expose a development server publicly.
+Use actual deployment secret provisioning rather than committing environment files. Back up an existing database before migration. Only `/health` and `/healthz` are public liveness; readiness accepts authenticated credentials with `observer` scope, while `/metrics` requires the full operator credential. Shared hosting needs HTTPS/WSS and a trusted origin. Do not expose a development server publicly.
+
+### Persistence at HTTP startup
+
+The `uns` CLI and the default HTTP application factory refuse to start with a missing, empty, or in-memory database URL unless ephemeral operation is explicitly enabled. The check also applies when Uvicorn imports `uns.app:app` or `agsignal.app:app`, including the shipped Docker command and ASGI factory startup. Configure a persistent `UNS_DATABASE_URL` (or its supported alias), migrate it, and mount the database directory on persistent storage when using a container.
+
+For an intentional local demo, use `uns --in-memory` or set `UNS_ALLOW_IN_MEMORY=true` before starting the HTTP service. Missing or empty database configuration then selects `sqlite://`. These options permit volatile storage; they do not replace an already configured persistent URL. `/readyz` reports the actual `persistence_mode` as `persistent` or `in_memory`. The HTTP opt-in does not relax the separate persistent-storage requirement for MCP writes.
+
+Startup validation and runtime diagnostics share the same SQLAlchemy URL parser. SQLite URLs without a file path—including `sqlite://`, `sqlite:///`, and `sqlite+pysqlite://`—and explicit `:memory:` databases are volatile. SQLite file URIs such as `sqlite:///file:memdb1?mode=memory&uri=true` are also volatile. URI options only apply when `uri=true` is enabled; memory-related text inside an ordinary filename or a different database backend does not select in-memory SQLite.
+
+Embedded code can still deliberately construct a memory `Runtime` or call the compatibility `build_runtime()` builder, then pass that runtime explicitly to `create_app(runtime=...)`. That trusted composition does not require the HTTP environment opt-in. Calling `create_app()` without an injected runtime uses the guarded service configuration.
 
 ---
 
@@ -30,16 +40,25 @@ UNS reads `UNS_*` environment variables first and falls back to `AGSIGNAL_*` ali
 
 | Variable | Legacy Alias | Default | Required | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `UNS_DATABASE_URL` | `AGSIGNAL_DATABASE_URL`, `DATABASE_URL` | `sqlite://` (in-memory) | **Yes** (Production / MCP Writes) | SQLAlchemy database URL (e.g., `sqlite:////var/lib/uns/uns.db`). Must be a persistent file path for write-enabled `uns-mcp` and `uns-maintain`. |
-| `UNS_API_KEY` | `AGSIGNAL_API_KEY` | *(None)* | **Yes** | Shared secret required for HTTP writes, reads (by default), `/readyz`, `/metrics`, and WebSocket establishment. If unset, protected endpoints return `503 write_auth_not_configured`. |
+| `UNS_DATABASE_URL` | `AGSIGNAL_DATABASE_URL`, `DATABASE_URL` | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., `sqlite:////var/lib/uns/uns.db`). Use file-backed SQLite for the exercised deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
+| `UNS_ALLOW_IN_MEMORY` | `AGSIGNAL_ALLOW_IN_MEMORY` | `false` | No | Explicit HTTP demo opt-in (`true`/`1`/`yes`/`on`), also enabled by `uns --in-memory`. Permits missing or volatile database configuration; does not weaken the MCP write guard. |
+| `UNS_API_KEY` | `AGSIGNAL_API_KEY` | *(None)* | For operator access | Full operator credential (`admin`, `producer`, `responder`, `observer`), required for administrative endpoints and `/metrics`. Scoped credentials can access their permitted endpoints without this key. If no credentials are configured, protected endpoints return `503 write_auth_not_configured`. |
 | `UNS_API_PRINCIPAL` | `AGSIGNAL_API_PRINCIPAL` | `agsignal-api-key` | **Yes** (MCP Writes) | Audited actor/principal identity bound to `UNS_API_KEY` and `uns-mcp --enable-writes`. |
+| `UNS_PRODUCER_API_KEY` | `AGSIGNAL_PRODUCER_API_KEY` | *(None)* | No | Grants `producer` and `observer`: submit/simulate notifications and read status/audit. Cannot acknowledge, dismiss, or administer policies and dead letters. |
+| `UNS_PRODUCER_API_PRINCIPAL` | `AGSIGNAL_PRODUCER_API_PRINCIPAL` | `uns-producer` | No | Audited principal bound to the producer credential. |
+| `UNS_RESPONDER_API_KEY` | `AGSIGNAL_RESPONDER_API_KEY` | *(None)* | No | Grants `responder` and `observer`: ACK/DISMISS through HTTP or WebSocket commands and read status/audit. Cannot submit notifications or administer policies and dead letters. |
+| `UNS_RESPONDER_API_PRINCIPAL` | `AGSIGNAL_RESPONDER_API_PRINCIPAL` | `uns-responder` | No | Audited principal bound to the responder credential. |
+| `UNS_OBSERVER_API_KEY` | `AGSIGNAL_OBSERVER_API_KEY` | *(None)* | No | Grants `observer`: Console, status/audit, readiness, and WebSocket stream/replay reads. Does not permit mutations or `/metrics`. |
+| `UNS_OBSERVER_API_PRINCIPAL` | `AGSIGNAL_OBSERVER_API_PRINCIPAL` | `uns-observer` | No | Principal bound to the observer credential. |
 | `UNS_HOST` | `AGSIGNAL_HOST` | `127.0.0.1` | No | Bind address for the `uns` HTTP/WebSocket server (`--host` CLI override). |
 | `UNS_PORT` | `AGSIGNAL_PORT` | `8000` | No | TCP port for the `uns` HTTP/WebSocket server (`--port` CLI override). |
 | `UNS_POLICY_DIR` | `AGSIGNAL_POLICY_DIR` | *(None)* | No | Directory of YAML policy definitions loaded and persisted into the durable `notification_policies` store at startup. |
-| `UNS_CREATE_TABLES` | `AGSIGNAL_CREATE_TABLES` | `false` (`true` for `sqlite://`) | No | When `true`, runs additive table bootstrap on startup (`uns-migrate` is recommended instead in production). |
+| `UNS_CREATE_TABLES` | `AGSIGNAL_CREATE_TABLES` | `false` (`true` for explicit in-memory operation) | No | When `true`, runs additive table bootstrap on startup (`uns-migrate` is recommended instead in production). |
 | `UNS_ALLOWED_ORIGINS` | `AGSIGNAL_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | No | Comma-separated list of allowed CORS and WebSocket `Origin` headers for the UNS Console. |
 | `UNS_ALLOW_UNAUTHENTICATED_READS` | `AGSIGNAL_ALLOW_UNAUTHENTICATED_READS` | `false` | No | Compatibility flag (`true`/`1`/`yes`) permitting unauthenticated HTTP `GET`/`HEAD` on read routes only. Never enables writes, `/readyz`, `/metrics`, or WebSockets. |
 | `AGSIGNAL_ENABLE_DOCS` | *(None)* | `false` | No | Enables interactive `/docs`, `/redoc`, and `/openapi.json` endpoints when set to `true`. Keep `false` in production. |
+
+Use distinct secret values for different capability roles; configuring the same secret for multiple roles combines their granted scopes. Capability scopes restrict operations, not tenant or per-producer data access. WebSocket connections require `observer` scope, while each ACK/DISMISS command requires `responder` scope. See the [Security Model](SECURITY-MODEL.md) for the complete authority and attribution contract.
 
 ### MCP Process (`uns-mcp`)
 
@@ -112,7 +131,7 @@ flowchart LR
 
 From `apps/ui`, use `npm ci` then `npm run dev`. Node must satisfy `^20.19.0 || ^22.12.0 || >=24.0.0`. The development proxy forwards same-origin `/ui/*` to localhost:8000. For production, serve the SPA and route `/ui/*` to the backend on the same trusted origin.
 
-Operators enter the API key at runtime. It lives in tab memory only; logout or reload removes it. Do not put keys in VITE variables, browser storage or URLs. The credential is an operator credential even though the console only makes reads. See [console instructions](../apps/ui/README.md) and the [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md).
+Operators enter an API key at runtime. Use `UNS_OBSERVER_API_KEY` for the read-only Console; other credentials with `observer` scope also work. A full operator key retains administrative authority even when entered into a read-only UI. The key lives in tab memory only; logout or reload removes it. Do not put keys in VITE variables, browser storage or URLs. See [console instructions](../apps/ui/README.md) and the [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md).
 
 ### Building the Console for Production
 
@@ -200,7 +219,7 @@ WantedBy=multi-user.target
   ```sh
   curl -fsS http://127.0.0.1:8000/healthz
   ```
-- **Readiness Probe (`GET /readyz`):** Authenticated. Verifies SQLite connectivity (`SELECT 1`), policy store hydration, DLQ depth, and read-model/audit configuration.
+- **Readiness Probe (`GET /readyz`):** Requires authenticated `observer` scope, included in all configured capability roles. Verifies SQLite connectivity (`SELECT 1`), policy store hydration, DLQ depth, and read-model/audit configuration. A dedicated observer key can replace the operator key in the example below.
   ```sh
   curl -fsS -H "Authorization: Bearer $UNS_API_KEY" http://127.0.0.1:8000/readyz
   ```
@@ -226,10 +245,10 @@ sqlite3 /var/lib/uns/uns.db ".backup '/var/backups/uns/uns-$(date -u +%Y%m%dT%H%
 
 ### Secret Rotation
 
-To rotate `UNS_API_KEY` or `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN`:
+To rotate an operator or scoped HTTP API key, or `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN`:
 1. Update the secret in your secret manager / `/etc/uns/uns.env`.
 2. Restart `uns` and any write-enabled `uns-mcp` processes (`systemctl restart uns`).
-3. Update downstream HTTP producers and re-enter the API key in active UNS Console browser tabs.
+3. Update affected HTTP clients, reconnect WebSocket clients, and re-enter the replacement key in affected UNS Console browser tabs.
 
 ---
 

@@ -231,8 +231,8 @@ class TestCreateApp:
         rm._read_model_adapter = None
         audit._audit_logger = None
 
-        # Create app (should configure persistence)
-        with patch.dict(os.environ, {}, clear=True):
+        # The test deliberately opts into ephemeral application storage.
+        with patch.dict(os.environ, {"UNS_ALLOW_IN_MEMORY": "true"}, clear=True):
             app = create_app()
 
         adapter = app.state.read_model_adapter
@@ -265,7 +265,7 @@ class TestCreateApp:
 
     def test_create_app_includes_ui_routes(self):
         """Test create_app includes UI routes."""
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"UNS_ALLOW_IN_MEMORY": "true"}, clear=True):
             app = create_app()
 
         # Check that UI routes are registered
@@ -280,7 +280,7 @@ class TestCreateApp:
         """Test health check endpoint works."""
         from fastapi.testclient import TestClient
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"UNS_ALLOW_IN_MEMORY": "true"}, clear=True):
             app = create_app()
             app.state.agsignal_api_key = "test-key"
             client = TestClient(app, headers={"Authorization": "Bearer test-key"})
@@ -312,7 +312,7 @@ class TestCreateApp:
         """`/ready` confirms the read-model adapter and audit logger are wired."""
         from fastapi.testclient import TestClient
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"UNS_ALLOW_IN_MEMORY": "true"}, clear=True):
             app = create_app()
             app.state.agsignal_api_key = "test-key"
             client = TestClient(app, headers={"Authorization": "Bearer test-key"})
@@ -329,7 +329,7 @@ class TestCreateApp:
         """`/readyz` returns the same payload as `/ready`."""
         from fastapi.testclient import TestClient
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"UNS_ALLOW_IN_MEMORY": "true"}, clear=True):
             app = create_app()
             app.state.agsignal_api_key = "test-key"
             client = TestClient(app, headers={"Authorization": "Bearer test-key"})

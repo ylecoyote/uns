@@ -6,28 +6,23 @@ import argparse
 import asyncio
 import os
 import signal
-from urllib.parse import unquote
 
 from mcp.server.fastmcp import FastMCP
-from sqlalchemy.engine import make_url
 
 from agsignal_mcp.factory import create_mcp_server
 from agsignal_mcp.runtime import MCPRuntimeConfig
 from uns.config import value
+from uns.database import is_in_memory_database_url
 
 
 def runtime_config(*, enable_writes: bool = False) -> MCPRuntimeConfig:
     """Read host configuration without placing secrets in arguments or URLs."""
     if not enable_writes:
         return MCPRuntimeConfig()
-    database_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
+    database_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "")).strip()
     if not database_url:
         raise ValueError("Set UNS_DATABASE_URL before enabling MCP writes")
-    parsed = make_url(database_url)
-    sqlite_path = unquote(parsed.database or "").removeprefix("file:")
-    if parsed.get_backend_name() == "sqlite" and (
-        not sqlite_path or sqlite_path == ":memory:" or parsed.query.get("mode") == "memory"
-    ):
+    if is_in_memory_database_url(database_url):
         raise ValueError("Write-enabled MCP requires a persistent database")
     principal = value("API_PRINCIPAL")
     if not principal:
