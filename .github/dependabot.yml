@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    versioning-strategy: widen
     ignore:
       # agsignal_mcp targets the FastMCP 1.x runtime API (mcp[cli]>=1.0.0,<2)
       - dependency-name: "mcp"
@@ -20,10 +21,26 @@ updates:
         patterns:
           - "vitest"
           - "@vitest/*"
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
     ignore:
       # Keep ESLint 8 until .eslintrc is migrated to flat config and eslint-plugin-react-hooks is upgraded
       - dependency-name: "eslint"
         versions: [">= 9.0.0"]
+      # Keep TypeScript 5.x until @typescript-eslint/parser supports TypeScript 6+/7+
+      - dependency-name: "typescript"
+        versions: [">= 6.0.0"]
+      # Keep React 18 until a coordinated React 19 upgrade
+      - dependency-name: "react"
+        versions: [">= 19.0.0"]
+      - dependency-name: "react-dom"
+        versions: [">= 19.0.0"]
+      - dependency-name: "@types/react"
+        versions: [">= 19.0.0"]
+      - dependency-name: "@types/react-dom"
+        versions: [">= 19.0.0"]
 
   - package-ecosystem: github-actions
     directory: /
