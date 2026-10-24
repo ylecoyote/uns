@@ -10,8 +10,8 @@ The visible banner says **Local recording mode**. Slack, email and PagerDuty cha
 
 ## Installed components
 
-- Application image: `uns:07ef52a`, pinned by image ID `sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d`. Core code is `07ef52a87b45128b77715f64c8b0e5f8f91387a9`.
-- Recording composition: `deploy/local/recording_runtime.py`, `local_app.py`, and `local_mcp.py`, deployed from profile commit `be2b3c9` as a read-only release snapshot.
+- Application image: `uns:8156cb6`, pinned by image ID `sha256:1cf4d7cf73aaafcd484dd1c42657dc3ea5bc602c792a7d8ff4908f02a00823e6`. Core code is `8156cb6b6b699e37f01ba8b729f6be3c4935e100`.
+- Recording composition: `deploy/local/recording_runtime.py`, `local_app.py`, and `local_mcp.py`, deployed as a read-only release snapshot under `$HOME/Library/Application Support/UNS/releases/8156cb6`.
 - Fixed reverse proxy: `deploy/local/nginx.conf` from `9fd53d8`, with the Nginx image pinned by digest in the installed Compose configuration.
 - Configuration and immutable profile/console snapshot: `$HOME/Library/Application Support/UNS/`. Active release is recorded in `active-release.txt`; active deployment is `compose.json`.
 - Database, local channel receipts and response receipts: Docker volume `uns-local-data`. Source-checkout changes do not mutate the running release.
