@@ -8,8 +8,8 @@ This guide explains how autonomous agents, MCP hosts (such as Claude Desktop, Cu
 
 1. **Read-Only by Default:** `uns-mcp` starts in read-only mode (`mode="stdio-local"`, `read_only=True`) unless explicitly launched with `--enable-writes` and host-supplied environment secrets.
 2. **Host-Controlled Identity (`UNS_API_PRINCIPAL`):** Tool inputs cannot spoof or escalate caller identity. Every write action (`send_signal`, `ack_notification`, `dismiss_notification`) is attributed to the host's `UNS_API_PRINCIPAL`.
-3. **Explicit Two-Factor Delivery Gate on `send_signal`:**
-   Even when `--enable-writes` is active, calling `send_signal` defaults to a side-effect-free simulation (`deliver=False`) unless the tool call explicitly passes:
+3. **Explicit Confirmation Gate on `send_signal`:**
+   Even when `--enable-writes` is active, calling `send_signal` defaults to a side-effect-free simulation (`deliver=False`) unless the tool call explicitly passes all three confirmation parameters:
    - `"deliver": true`
    - `"operator_intent": "deliver"`
    - `"operator_confirmation_token": "<value matching UNS_MCP_DELIVERY_CONFIRMATION_TOKEN>"`

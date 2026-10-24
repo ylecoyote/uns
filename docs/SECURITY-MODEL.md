@@ -4,7 +4,18 @@
 
 HTTP reads and mutations require the configured operator API key by default. Only `/health` and `/healthz` expose minimal unauthenticated liveness. Readiness, metrics, runtime inspection, notification state, policies and console data are protected. Configure `UNS_API_KEY` and `UNS_API_PRINCIPAL`; existing AGSIGNAL-prefixed aliases remain compatible.
 
-The credential grants operator access. There is no RBAC, per-agent authorization or multi-tenant identity claim. Do not distribute an operator key to a producer that must be prevented from invoking administrative endpoints. The React console makes GET-only requests, but its credential is not a read-only credential.
+The primary `UNS_API_KEY` grants full operator authority (`admin`, `producer`, `responder`, `observer`). For deployments where independent applications, ACK bots, or dashboards should not hold administrative authority (`POST /api/v1/policies/reload`, `DELETE /api/v1/dlq/{id}`, `POST /api/v1/runtime/notifications/{id}/replay`), UNS supports optional capability-scoped credentials:
+
+| Environment Variable | Principal Variable | Granted Scopes | Permitted Operations |
+|---|---|---|---|
+| `UNS_API_KEY` | `UNS_API_PRINCIPAL` | `admin`, `producer`, `responder`, `observer` | Full operator access (all write, response, admin, and read routes) |
+| `UNS_PRODUCER_API_KEY` | `UNS_PRODUCER_API_PRINCIPAL` | `producer`, `observer` | Submit and simulate notifications (`POST /api/v1/notifications*`) and read status/audit |
+| `UNS_RESPONDER_API_KEY` | `UNS_RESPONDER_API_PRINCIPAL` | `responder`, `observer` | Acknowledge or dismiss notifications (`POST /api/v1/notifications/{id}/ack`, `/dismiss`) and read status/audit |
+| `UNS_OBSERVER_API_KEY` | `UNS_OBSERVER_API_PRINCIPAL` | `observer` | Read-only access to Console (`/ui/*`), status, readiness (`/readyz`), and WebSocket streams |
+
+Out-of-scope calls with a valid scoped key return `403 Forbidden` (`insufficient_scope`). Shared keys still identify a configured principal rather than individual end-user identities.
+
+Mandatory event emission and classification belong in trusted host code (for example, an application worker or agent supervisor emitting a signal when a job exhausts its retry budget), rather than relying on an untrusted model prompt to self-report failures. UNS's durability guarantee begins at its acceptance boundary (`202 Accepted`).
 
 ACK/DISMISS attribution derives from the verified principal. Payload identities must match it. A different actor cannot replay another actor's terminal response as their own: it conflicts while preserving original attribution. In-process Python callers and MCP launch configuration are trusted host boundaries, not authentication for arbitrary payload-supplied principals.
 

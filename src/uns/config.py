@@ -53,12 +53,40 @@ def configured_adapters() -> SimpleAdapterRegistry:
     return registry
 
 
-def build_runtime() -> Runtime:
-    url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://"))
+def is_in_memory_database_url(url: str) -> bool:
+    """Return True when the database URL points to volatile in-memory storage."""
+    normalized = url.strip().lower()
+    return (
+        not normalized
+        or normalized in {"sqlite://", "sqlite:///:memory:"}
+        or ":memory:" in normalized
+        or "mode=memory" in normalized
+    )
+
+
+def ensure_daemon_persistence_configured(*, allow_in_memory: bool = False) -> str:
+    """Validate that daemon startup has an explicit persistent database or opt-in volatile flag."""
+    raw_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
+    env_allow = value("ALLOW_IN_MEMORY", "false").lower() in {"1", "true", "yes", "on"}
+    if is_in_memory_database_url(raw_url) and not (allow_in_memory or env_allow):
+        raise RuntimeError(
+            "Refusing to start the UNS daemon with volatile in-memory storage. "
+            "Set UNS_DATABASE_URL to a persistent SQLite path (for example, "
+            "sqlite:////var/lib/uns/uns.db) or pass --in-memory / "
+            "UNS_ALLOW_IN_MEMORY=true for ephemeral local testing."
+        )
+    return raw_url or "sqlite://"
+
+
+def build_runtime(*, require_persistent: bool = False) -> Runtime:
+    if require_persistent:
+        url = ensure_daemon_persistence_configured()
+    else:
+        url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://"))
     runtime = Runtime(
         url,
         adapters=configured_adapters(),
-        create_tables=url == "sqlite://" or value("CREATE_TABLES").lower() == "true",
+        create_tables=is_in_memory_database_url(url) or value("CREATE_TABLES").lower() == "true",
     )
     try:
         configure_runtime_policies(runtime)

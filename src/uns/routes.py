@@ -5,10 +5,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from agsignal.api.auth import WritePrincipal, require_write_principal
+from agsignal.api.auth import (
+    WritePrincipal,
+    require_admin_principal,
+    require_authenticated_observer,
+)
 from uns.runtime import Conflict
 
-router = APIRouter(prefix="/api/v1/runtime", dependencies=[Depends(require_write_principal)])
+router = APIRouter(prefix="/api/v1/runtime", dependencies=[Depends(require_authenticated_observer)])
 
 
 @router.get("/notifications/{notification_id}")
@@ -29,7 +33,7 @@ def dead_letters(request: Request) -> list[dict[str, Any]]:
 def replay(
     notification_id: UUID,
     request: Request,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_admin_principal),
 ) -> dict[str, str]:
     try:
         request.app.state.runtime.replay(notification_id, actor=principal.subject)

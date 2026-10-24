@@ -194,6 +194,18 @@ class SendNotificationResponse(BaseModel):
         default=None,
         description="Current acknowledgment status when tracked",
     )
+    obligation_owner_id: UUID | None = Field(
+        default=None,
+        description="Canonical delivery and response owner ID (differs when deduplicated or handed off)",
+    )
+    effective_ack_status: AckStatus | None = Field(
+        default=None,
+        description="Effective acknowledgment status, including inherited deduplication owner status",
+    )
+    ack_inherited: bool = Field(
+        default=False,
+        description="Whether the effective acknowledgment status is inherited from a deduplication owner",
+    )
     idempotency_key: str | None = Field(
         default=None,
         description="Producer idempotency key when supplied",
@@ -353,6 +365,18 @@ class AckStatusResponse(BaseModel):
     ack_status: AckStatus | None = Field(
         default=None, description="Current ack status (null if not tracked)"
     )
+    obligation_owner_id: UUID | None = Field(
+        default=None,
+        description="Canonical delivery and response owner ID",
+    )
+    effective_ack_status: AckStatus | None = Field(
+        default=None,
+        description="Effective acknowledgment status, including inherited owner status",
+    )
+    ack_inherited: bool = Field(
+        default=False,
+        description="Whether acknowledgment state is inherited from a deduplication owner",
+    )
 
 
 class NotificationStatusResponse(BaseModel):
@@ -364,6 +388,18 @@ class NotificationStatusResponse(BaseModel):
     title: str | None = Field(default=None, description="Notification title")
     message: str | None = Field(default=None, description="Notification message")
     ack_status: AckStatus | None = Field(default=None, description="Current ack status")
+    obligation_owner_id: UUID | None = Field(
+        default=None,
+        description="Canonical delivery and response owner ID",
+    )
+    effective_ack_status: AckStatus | None = Field(
+        default=None,
+        description="Effective acknowledgment status, including inherited owner status",
+    )
+    ack_inherited: bool = Field(
+        default=False,
+        description="Whether acknowledgment state is inherited from a deduplication owner",
+    )
     require_ack: bool | None = Field(default=None, description="Whether ack is required")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
     found: bool = Field(description="Whether the notification was found")

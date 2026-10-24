@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from agsignal.api.auth import (
     WritePrincipal,
     require_read_principal,
-    require_write_principal,
+    require_responder_principal,
     resolve_requested_actor,
 )
 from agsignal.queries import get_ack_status as _query_ack_status
@@ -73,7 +73,7 @@ router = APIRouter(prefix="/v1/notifications", tags=["notifications"], dependenc
 async def acknowledge_notification(
     notification_id: UUID,
     http_request: Request,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_responder_principal),
     request: AckRequest | None = None,
 ) -> AckResponse:
     """HTTP adapter — delegates to agsignal.signaling.acknowledge.
@@ -161,7 +161,7 @@ async def acknowledge_notification(
 async def dismiss_notification(
     notification_id: UUID,
     http_request: Request,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_responder_principal),
     request: DismissRequest | None = None,
 ) -> AckResponse:
     """HTTP adapter — delegates to agsignal.signaling.dismiss.
@@ -256,9 +256,21 @@ async def get_notification_status(
         except KeyError:
             return NotificationStatusResponse(notification_id=notification_id, found=False)
         n = row["notification"]
-        return NotificationStatusResponse(notification_id=notification_id, found=True,
-            notification_type=n["notification_type"], intent=n["intent"], title=n["title"],
-            message=n["message"], require_ack=n["require_ack"], created_at=n["created_at"], ack_status=row["ack_status"])
+        owner_id = row.get("obligation_owner_id")
+        return NotificationStatusResponse(
+            notification_id=notification_id,
+            found=True,
+            notification_type=n["notification_type"],
+            intent=n["intent"],
+            title=n["title"],
+            message=n["message"],
+            require_ack=n["require_ack"],
+            created_at=n["created_at"],
+            ack_status=row["ack_status"],
+            obligation_owner_id=UUID(str(owner_id)) if owner_id else notification_id,
+            effective_ack_status=row.get("effective_ack_status"),
+            ack_inherited=bool(row.get("ack_inherited", False)),
+        )
     return await _query_notification_status(notification_id=notification_id)
 
 
@@ -277,7 +289,15 @@ async def get_ack_status(
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         try:
-            return AckStatusResponse(notification_id=notification_id, ack_status=runtime.get(notification_id)["ack_status"])
+            row = runtime.get(notification_id)
+            owner_id = row.get("obligation_owner_id")
+            return AckStatusResponse(
+                notification_id=notification_id,
+                ack_status=row["ack_status"],
+                obligation_owner_id=UUID(str(owner_id)) if owner_id else notification_id,
+                effective_ack_status=row.get("effective_ack_status"),
+                ack_inherited=bool(row.get("ack_inherited", False)),
+            )
         except KeyError:
             return AckStatusResponse(notification_id=notification_id, ack_status=None)
     return await _query_ack_status(notification_id=notification_id)

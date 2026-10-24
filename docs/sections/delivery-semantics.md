@@ -10,7 +10,15 @@
 | DEDUPLICATED | A matching delivered owner satisfied the duplicate obligation |
 | RATE_LIMITED | An attempt could not obtain a channel token; this is not delivery success |
 
-GUARANTEED requires a persistent channel. Selected persistent channels run in Slack, Email, PagerDuty order, stopping at the first success. WebSocket success cannot satisfy that contract. WebSocket-only configuration must explicitly use BEST_EFFORT. Legacy SUCCESS audit outcomes describe an actual successful attempt, not mere acceptance.
+GUARANTEED requires a persistent channel and provides **bounded durable delivery**, not infinite retry or guaranteed human comprehension: each cycle performs up to three attempts with exponential backoff before recording a visible dead-letter (`FAILED`, `dead_letter=True`) for operator inspection or replay. Selected persistent channels run in Slack, Email, PagerDuty order, stopping at the first success. WebSocket success cannot satisfy that contract. WebSocket-only configuration must explicitly use BEST_EFFORT. Legacy SUCCESS audit outcomes describe an actual successful attempt, not mere acceptance.
+
+### Delivery fallback vs. post-silence escalation
+
+| Operational Question | Mechanism | Boundary |
+|---|---|---|
+| What if the first provider rejects or fails to accept the message? | **Delivery fallback** (`Slack → Email → PagerDuty`) | Runs within a dispatch attempt until the first selected persistent channel succeeds. |
+| What if a provider accepts the message, but nobody acknowledges before `deadline`? | **Response timeout** (`TIMED_OUT`) + **durable host callback** | Once a persistent channel accepts the message, delivery fallback for that cycle is complete. Expiry transitions `ack_status` to `TIMED_OUT` and invokes the configured host callback. |
+| Who gets paged next on human silence, and on what schedule? | **External incident escalation** (e.g. PagerDuty escalation policy) or **host callback handler** | Route urgent unacknowledged incidents directly to PagerDuty (or trigger a secondary notification from the timeout callback). |
 
 BEST_EFFORT attempts persistent channels concurrently; WebSocket is separate. The runtime adapter deadline is 10 seconds and its default lease is 60 seconds. Provider-local retries share the adapter deadline. Blocking SMTP work uses remaining monotonic/socket budgets and cancellation checks before send admission; Python cannot terminate an already-running SMTP/DNS operation. Default GUARANTEED cycles have three attempts with exponential backoff starting at one second.
 
@@ -24,7 +32,7 @@ For overlapping owners retained from earlier versions, failure settlement consul
 
 Manual replay preserves notification identity, cumulative attempts and event history. It increments delivery cycle and resets only that cycle's budget. Historical failed outcomes remain auditable. Exhausted failures stay in the durable dead-letter view until explicit resolution/replay. Replay is recovery of an unsatisfied obligation, not a force-send operation. It conflicts if a successor is pending, delivered, or has unresolved lineage, or if another current owner is pending or delivered inside the suppression window. A successful replay atomically acquires ownership and starts a new cycle/window. Failed descendants transfer to that cycle, so replaying a former owner cannot later make those descendants replayable after satisfaction.
 
-`dedup_successor_id` retains handoff evidence independently of the current claim/window. Dead-letter reads expose `replay_blocked_by` and `replay_block_reason`; they do not erase historical failure or automatically clear the dead-letter flag. An operator may explicitly resolve that failure. Deliberate new notification requests use new idempotency identities and remain subject to ordinary policy and dedup rules; no `force` bypass is provided.
+`dedup_successor_id` retains handoff evidence independently of the current claim/window. Status and acceptance responses expose `obligation_owner_id`, `effective_ack_status`, and `ack_inherited` so callers can inspect the canonical obligation's response state directly without parsing status messages. Dead-letter reads expose `replay_blocked_by` and `replay_block_reason`; they do not erase historical failure or automatically clear the dead-letter flag. An operator may explicitly resolve that failure. Deliberate new notification requests use new idempotency identities and remain subject to ordinary policy and dedup rules; no `force` bypass is provided.
 
 Old ownerless dedup claims are never taken as evidence of delivery. Previously suppressed pre-upgrade rows remain historical because their lost association cannot be reliably reconstructed; operators may need to reissue those obligations.
 
