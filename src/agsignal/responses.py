@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -206,6 +206,14 @@ class SendNotificationResponse(BaseModel):
         default=False,
         description="Whether the effective acknowledgment status is inherited from a deduplication owner",
     )
+    obligation_resolution_status: Literal["RESOLVED", "UNRESOLVED"] | None = Field(
+        default=None,
+        description="Whether the canonical owner was resolved; null for legacy or missing records",
+    )
+    obligation_resolution_error: Literal["CYCLE", "MISSING_TARGET", "GROUP_MISMATCH"] | None = Field(
+        default=None,
+        description="Reason canonical owner resolution failed; null when resolved",
+    )
     idempotency_key: str | None = Field(
         default=None,
         description="Producer idempotency key when supplied",
@@ -377,6 +385,14 @@ class AckStatusResponse(BaseModel):
         default=False,
         description="Whether acknowledgment state is inherited from a deduplication owner",
     )
+    obligation_resolution_status: Literal["RESOLVED", "UNRESOLVED"] | None = Field(
+        default=None,
+        description="Whether the canonical owner was resolved; null for legacy or missing records",
+    )
+    obligation_resolution_error: Literal["CYCLE", "MISSING_TARGET", "GROUP_MISMATCH"] | None = Field(
+        default=None,
+        description="Reason canonical owner resolution failed; null when resolved",
+    )
 
 
 class NotificationStatusResponse(BaseModel):
@@ -399,6 +415,14 @@ class NotificationStatusResponse(BaseModel):
     ack_inherited: bool = Field(
         default=False,
         description="Whether acknowledgment state is inherited from a deduplication owner",
+    )
+    obligation_resolution_status: Literal["RESOLVED", "UNRESOLVED"] | None = Field(
+        default=None,
+        description="Whether the canonical owner was resolved; null for legacy or missing records",
+    )
+    obligation_resolution_error: Literal["CYCLE", "MISSING_TARGET", "GROUP_MISMATCH"] | None = Field(
+        default=None,
+        description="Reason canonical owner resolution failed; null when resolved",
     )
     require_ack: bool | None = Field(default=None, description="Whether ack is required")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")

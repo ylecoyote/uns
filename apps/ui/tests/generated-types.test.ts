@@ -12,7 +12,7 @@ describe("generated types", () => {
     expectTypeOf<paths["/ui/audit"]>().toBeObject();
   });
 
-  it("includes the /v1/notifications/{notification_id}/ack endpoint", () => {
-    expectTypeOf<paths["/v1/notifications/{notification_id}/ack"]>().toBeObject();
+  it("includes the /api/v1/notifications/{notification_id}/ack endpoint", () => {
+    expectTypeOf<paths["/api/v1/notifications/{notification_id}/ack"]>().toBeObject();
   });
 });

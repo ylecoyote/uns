@@ -123,3 +123,27 @@ The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/prob
 ## Persistent localhost deployment acceptance
 
 The user accepted localhost plus recording adapters. The pinned application image is unchanged from `07ef52a`; the permanent recording composition and fixed ingress are versioned under `deploy/local/`. All 62 persistent-deployment checks passed, including real network transports, local provider recordings, one-minute timeout, callbacks and restart recovery. App isolation, loopback-only ingress and a consistent SQLite backup were checked. [Runbook](LOCAL_DEPLOYMENT.md) and [receipts](../verification/local-deployment/results.json) record the running deployment. No real-provider or remote-production acceptance is implied.
+
+## Review follow-up verification — 2026-10-24
+
+Base: `7cf5c12c7a25607fff8242b2bdfe115a145dc485`. This follow-up closes the WebSocket response-scope gap, applies the persistence guard to the default ASGI/application-factory path, shares SQLite URL classification across startup and diagnostics, resolves complete obligation lineage, aligns runtime-bound MCP response evidence, and aggregates readiness progress without loading work histories.
+
+| Check | Result |
+|---|---|
+| Full Python suite (`tests` and `apps/ui/tests`) | **1,854 passed**, 90.99% combined coverage against the 75% gate |
+| New regressions | 16 scoped WebSocket cases, 37 persistence/entrypoint cases, 6 owner/projection cases, and 6 operational-progress cases |
+| Python static checks | Ruff passed; mypy passed for 92 source files; Bandit passed |
+| Console | 305 tests passed; TypeScript, ESLint, production build, and strict UI boundary passed |
+| Generated API types | Refreshed from current OpenAPI; the canonical ACK-path type test passed both Vitest and direct strict TypeScript compilation |
+| Distribution | Wheel and sdist built; 91 shipped Python modules matched source bytes; shared database helper present in both artifacts |
+| Clean installation | Minimal SDK footprint and full-install application construction passed |
+| Installed recording smoke | Delivery/ACK, repeated migration, CLI help, and unchanged-byte retention preview passed |
+| Patch hygiene | `git diff --check` passed; dependency declarations and lockfiles unchanged |
+
+Regression evidence lives in `tests/uns/test_scoped_websocket_auth.py`, `tests/uns/test_persistence_entrypoints.py`, `tests/uns/test_obligation_projection.py`, and `tests/uns/test_operational_progress.py`. The owner tests create twelve actual coalesced notifications and exercise successive promotion, complete exhaustion, root replay, and registered MCP/HTTP parity. The WebSocket tests cover both Bearer and browser-subprotocol authentication, assert unchanged durable state/audit on rejected commands, and preserve stream reads. Restoring the original WebSocket ACK handler in an isolated regression control caused all eight lower-scope rejection cases to fail as expected.
+
+The two legacy MCP response-shape failures observed in the base commit's GitHub CI are covered by the existing `tests/agsignal_mcp/test_runtime_bound_reads.py` tests and pass in this run. Legacy no-runtime ACK responses retain their original two-field shape; runtime-bound responses include the canonical obligation projection.
+
+Local verification used Python 3.12.14 and temporary SQLite databases. The executor's default asyncio loop stalled an unrelated minimal TestClient request and the MCP child-process test; a temporary **test-virtualenv-only** uvloop policy for parent and child interpreters allowed the unchanged tests to run. No event-loop workaround was added to repository or package code. The full run retained two framework deprecation warnings; Bandit and packaging also emitted existing non-failing annotation/license warnings.
+
+These results establish local behavior. They do not establish real-provider receipt, human comprehension, PostgreSQL operation, production load capacity, or deployment of this commit. Hosted CI and the Python 3.11/3.13 matrix are separate checks.

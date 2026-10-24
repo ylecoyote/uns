@@ -14,6 +14,7 @@ from notification.adapters import (
     SlackConfig,
 )
 from notification.service import SimpleAdapterRegistry
+from uns.database import is_in_memory_database_url
 from uns.runtime import Runtime
 
 _default: Runtime | None = None
@@ -53,21 +54,10 @@ def configured_adapters() -> SimpleAdapterRegistry:
     return registry
 
 
-def is_in_memory_database_url(url: str) -> bool:
-    """Return True when the database URL points to volatile in-memory storage."""
-    normalized = url.strip().lower()
-    return (
-        not normalized
-        or normalized in {"sqlite://", "sqlite:///:memory:"}
-        or ":memory:" in normalized
-        or "mode=memory" in normalized
-    )
-
-
 def ensure_daemon_persistence_configured(*, allow_in_memory: bool = False) -> str:
     """Validate that daemon startup has an explicit persistent database or opt-in volatile flag."""
-    raw_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
-    env_allow = value("ALLOW_IN_MEMORY", "false").lower() in {"1", "true", "yes", "on"}
+    raw_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "")).strip()
+    env_allow = value("ALLOW_IN_MEMORY", "false").strip().lower() in {"1", "true", "yes", "on"}
     if is_in_memory_database_url(raw_url) and not (allow_in_memory or env_allow):
         raise RuntimeError(
             "Refusing to start the UNS daemon with volatile in-memory storage. "
@@ -82,7 +72,7 @@ def build_runtime(*, require_persistent: bool = False) -> Runtime:
     if require_persistent:
         url = ensure_daemon_persistence_configured()
     else:
-        url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://"))
+        url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://")).strip() or "sqlite://"
     runtime = Runtime(
         url,
         adapters=configured_adapters(),

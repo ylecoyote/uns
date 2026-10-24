@@ -3,7 +3,159 @@
  */
 
 export interface paths {
-    "/v1/notifications/{notification_id}/ack": {
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Notification
+         * @description HTTP adapter — delegates to agsignal.signaling.send_signal.
+         *
+         *     Translates typed signaling errors to HTTP responses:
+         *     - :class:`ValidationError` -> 422 validation_error
+         *     - :class:`AuditPersistenceError` -> 503 audit_persistence_failed
+         *
+         *     The websocket dispatch (replay store, connection manager, fanout
+         *     publisher) is performed in this route layer after the signaling call
+         *     succeeds because the websocket runtime state is FastAPI-app-scoped
+         *     transport infrastructure that does not belong in the service layer.
+         */
+        post: operations["send_notification_api_v1_notifications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simulate Notification
+         * @description HTTP adapter — delegates to agsignal.signaling.simulate_signal.
+         *
+         *     Translates typed signaling errors to HTTP responses:
+         *     - :class:`ValidationError` -> 422 validation_error
+         */
+        post: operations["simulate_notification_api_v1_notifications_simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Delivery Status
+         * @description Return persisted delivery status for a notification.
+         */
+        get: operations["get_delivery_status_api_v1_notifications__notification_id__delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dlq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dlq
+         * @description List visible dead-lettered delivery failures.
+         */
+        get: operations["list_dlq_api_v1_dlq_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dlq/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Dlq Entry
+         * @description Remove a visible DLQ entry after external remediation.
+         */
+        delete: operations["remove_dlq_entry_api_v1_dlq__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Channel Health
+         * @description Return runtime channel health without changing process readiness.
+         */
+        get: operations["get_channel_health_api_v1_channels_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/policies/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reload Policies
+         * @description Reload notification policies from YAML files.
+         */
+        post: operations["reload_policies_api_v1_policies_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/ack": {
         parameters: {
             query?: never;
             header?: never;
@@ -14,31 +166,21 @@ export interface paths {
         put?: never;
         /**
          * Acknowledge Notification
-         * @description Acknowledge a notification.
+         * @description HTTP adapter — delegates to agsignal.signaling.acknowledge.
          *
-         *     This endpoint allows users to acknowledge receipt of a notification.
-         *     The operation is idempotent - acknowledging an already-acked notification
-         *     returns success without error.
-         *
-         *     Args:
-         *         notification_id: UUID of the notification to acknowledge
-         *         request: Optional ack request body with acked_by and metadata
-         *
-         *     Returns:
-         *         AckResponse with the acknowledgment details
-         *
-         *     Raises:
-         *         HTTPException 404: If notification is not found
-         *         HTTPException 409: If the status transition is invalid
+         *     Translates typed signaling errors to HTTP responses:
+         *     - ``KeyError`` -> 404 not_found
+         *     - :class:`InvalidAckTransitionError` -> 409 invalid_transition
+         *     - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
          */
-        post: operations["acknowledge_notification_v1_notifications__notification_id__ack_post"];
+        post: operations["acknowledge_notification_api_v1_notifications__notification_id__ack_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/notifications/{notification_id}/dismiss": {
+    "/api/v1/notifications/{notification_id}/dismiss": {
         parameters: {
             query?: never;
             header?: never;
@@ -49,30 +191,21 @@ export interface paths {
         put?: never;
         /**
          * Dismiss Notification
-         * @description Dismiss a notification.
+         * @description HTTP adapter — delegates to agsignal.signaling.dismiss.
          *
-         *     Dismissal indicates the operator saw the notification but chose not to
-         *     formally acknowledge it. This is a terminal state.
-         *
-         *     Args:
-         *         notification_id: UUID of the notification to dismiss
-         *         request: Optional dismiss request body with dismissed_by and metadata
-         *
-         *     Returns:
-         *         AckResponse with the dismissal details
-         *
-         *     Raises:
-         *         HTTPException 404: If notification is not found
-         *         HTTPException 409: If the status transition is invalid
+         *     Translates typed signaling errors to HTTP responses:
+         *     - ``KeyError`` -> 404 not_found
+         *     - :class:`InvalidAckTransitionError` -> 409 invalid_transition
+         *     - :class:`AuditPersistenceError` -> 503 ack_audit_persistence_failed
          */
-        post: operations["dismiss_notification_v1_notifications__notification_id__dismiss_post"];
+        post: operations["dismiss_notification_api_v1_notifications__notification_id__dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/notifications/{notification_id}": {
+    "/api/v1/notifications/{notification_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -81,21 +214,9 @@ export interface paths {
         };
         /**
          * Get Notification Status
-         * @description Get the status of a notification.
-         *
-         *     Returns notification details including the current acknowledgment status.
-         *     If the notification is not found, returns a response with found=False.
-         *
-         *     Note: The engine only stores ack state, not full notification details.
-         *     So this endpoint returns ack state info only.
-         *
-         *     Args:
-         *         notification_id: UUID of the notification
-         *
-         *     Returns:
-         *         NotificationStatusResponse with ack status
+         * @description HTTP adapter — delegates to agsignal.queries.get_notification_status.
          */
-        get: operations["get_notification_status_v1_notifications__notification_id__get"];
+        get: operations["get_notification_status_api_v1_notifications__notification_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -104,7 +225,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/notifications/{notification_id}/ack-status": {
+    "/api/v1/notifications/{notification_id}/ack-status": {
         parameters: {
             query?: never;
             header?: never;
@@ -113,18 +234,9 @@ export interface paths {
         };
         /**
          * Get Ack Status
-         * @description Get the acknowledgment status of a notification.
-         *
-         *     Returns just the ack status for a notification.
-         *     Returns null ack_status if the notification is not being tracked.
-         *
-         *     Args:
-         *         notification_id: UUID of the notification
-         *
-         *     Returns:
-         *         AckStatusResponse with the current ack status
+         * @description HTTP adapter — delegates to agsignal.queries.get_ack_status.
          */
-        get: operations["get_ack_status_v1_notifications__notification_id__ack_status_get"];
+        get: operations["get_ack_status_api_v1_notifications__notification_id__ack_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -253,26 +365,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health Check
-         * @description Liveness probe (legacy path). Returns 200 once the process is up.
-         */
-        get: operations["health_check_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -280,11 +372,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Healthz
-         * @description Liveness probe (Kubernetes convention).
-         */
-        get: operations["healthz_healthz_get"];
+        /** Health */
+        get: operations["health_healthz_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -293,18 +382,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ready": {
+    "/health": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Ready
-         * @description Readiness probe — confirms persistence layer is reachable.
-         */
-        get: operations["ready_ready_get"];
+        /** Health */
+        get: operations["health_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -320,11 +406,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Readyz
-         * @description Readiness probe (Kubernetes convention). Same payload as /ready.
-         */
-        get: operations["readyz_readyz_get"];
+        /** Ready */
+        get: operations["ready_readyz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ready */
+        get: operations["ready_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -406,6 +506,29 @@ export interface components {
             notification_id: string;
             /** @description Current ack status (null if not tracked) */
             ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Obligation Owner Id
+             * @description Canonical delivery and response owner ID
+             */
+            obligation_owner_id?: string | null;
+            /** @description Effective acknowledgment status, including inherited owner status */
+            effective_ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Ack Inherited
+             * @description Whether acknowledgment state is inherited from a deduplication owner
+             * @default false
+             */
+            ack_inherited: boolean;
+            /**
+             * Obligation Resolution Status
+             * @description Whether the canonical owner was resolved; null for legacy or missing records
+             */
+            obligation_resolution_status?: ("RESOLVED" | "UNRESOLVED") | null;
+            /**
+             * Obligation Resolution Error
+             * @description Reason canonical owner resolution failed; null when resolved
+             */
+            obligation_resolution_error?: ("CYCLE" | "MISSING_TARGET" | "GROUP_MISMATCH") | null;
         };
         /**
          * AuditEvent
@@ -454,6 +577,40 @@ export interface components {
          */
         AuditEventType: "notification.created" | "delivery.started" | "delivery.channel_attempted" | "delivery.succeeded" | "delivery.failed" | "delivery.deduplicated" | "delivery.rate_limited" | "ack.pending" | "ack.received" | "ack.dismissed" | "ack.timed_out" | "escalation.triggered";
         /**
+         * AutonomyContextRequest
+         * @description Producer-supplied autonomy context.
+         */
+        AutonomyContextRequest: {
+            /** @description Current autonomy mode */
+            autonomy_mode: components["schemas"]["AutonomyMode"];
+            /**
+             * Agent Id
+             * Format: uuid
+             * @description Agent identifier for attribution
+             */
+            agent_id: string;
+            /**
+             * Plan Id
+             * @description Optional plan identifier
+             */
+            plan_id?: string | null;
+            /**
+             * Decision Snapshot Id
+             * @description Optional decision snapshot identifier
+             */
+            decision_snapshot_id?: string | null;
+            /**
+             * Execution Snapshot Id
+             * @description Optional execution snapshot identifier
+             */
+            execution_snapshot_id?: string | null;
+            /**
+             * Skip Snapshot Id
+             * @description Optional skip snapshot identifier
+             */
+            skip_snapshot_id?: string | null;
+        };
+        /**
          * AutonomyContextResponse
          * @description Autonomy context in responses.
          */
@@ -493,6 +650,120 @@ export interface components {
          */
         Channel: "SLACK" | "EMAIL" | "WEBSOCKET" | "PAGERDUTY";
         /**
+         * ChannelHealth
+         * @description Current health state for one delivery channel.
+         */
+        ChannelHealth: {
+            channel: components["schemas"]["Channel"];
+            /** @default HEALTHY */
+            status: components["schemas"]["ChannelHealthStatus"];
+            /**
+             * Consecutive Failures
+             * @default 0
+             */
+            consecutive_failures: number;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Last Failure At */
+            last_failure_at?: string | null;
+            /** Last Failure Reason */
+            last_failure_reason?: string | null;
+        };
+        /**
+         * ChannelHealthStatus
+         * @description Runtime health status for a delivery channel.
+         * @enum {string}
+         */
+        ChannelHealthStatus: "HEALTHY" | "DEGRADED" | "UNAVAILABLE";
+        /**
+         * ChannelHealthSummary
+         * @description Aggregate channel-health summary for runtime observability.
+         */
+        ChannelHealthSummary: {
+            status: components["schemas"]["ChannelHealthStatus"];
+            /** Total Channels */
+            total_channels: number;
+            /** Healthy Channels */
+            healthy_channels?: components["schemas"]["Channel"][];
+            /** Degraded Channels */
+            degraded_channels?: components["schemas"]["Channel"][];
+            /** Unavailable Channels */
+            unavailable_channels?: components["schemas"]["Channel"][];
+            /** Channels */
+            channels?: components["schemas"]["ChannelHealth"][];
+        };
+        /**
+         * DLQEntry
+         * @description Serializable failed-notification record.
+         */
+        DLQEntry: {
+            /**
+             * Entry Id
+             * Format: uuid
+             */
+            entry_id?: string;
+            /**
+             * Notification Id
+             * Format: uuid
+             */
+            notification_id: string;
+            /** Notification Type */
+            notification_type: string;
+            /** Intent */
+            intent: string;
+            /** Source */
+            source: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at?: string;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * DLQListResponse
+         * @description HTTP response for DLQ inspection.
+         */
+        DLQListResponse: {
+            /**
+             * Depth
+             * @description Current DLQ depth
+             */
+            depth: number;
+            /**
+             * Items
+             * @description DLQ entries, newest first
+             */
+            items: components["schemas"]["DLQEntry"][];
+        };
+        /**
+         * DLQRemoveResponse
+         * @description HTTP response for DLQ entry removal.
+         */
+        DLQRemoveResponse: {
+            /**
+             * Entry Id
+             * Format: uuid
+             * @description Removed DLQ entry identifier
+             */
+            entry_id: string;
+            /**
+             * Removed
+             * @description Whether the entry was removed
+             */
+            removed: boolean;
+            /**
+             * Depth
+             * @description Current DLQ depth after removal
+             */
+            depth: number;
+        };
+        /**
          * DeliveryAttempt
          * @description Single channel delivery attempt.
          */
@@ -527,6 +798,67 @@ export interface components {
             } | null;
         };
         /**
+         * DeliveryAuditItem
+         * @description Single persisted delivery audit entry.
+         */
+        DeliveryAuditItem: {
+            /**
+             * Audit Id
+             * Format: uuid
+             * @description Audit record identifier
+             */
+            audit_id: string;
+            /** @description Delivery outcome for this attempt */
+            status: components["schemas"]["DeliveryStatus"];
+            /**
+             * Channels Attempted
+             * @description Channels attempted
+             */
+            channels_attempted: components["schemas"]["Channel"][];
+            /**
+             * Channels Succeeded
+             * @description Channels that succeeded
+             */
+            channels_succeeded: components["schemas"]["Channel"][];
+            /**
+             * Channels Failed
+             * @description Channels that failed
+             */
+            channels_failed: components["schemas"]["Channel"][];
+            /**
+             * Error Message
+             * @description Delivery error if present
+             */
+            error_message?: string | null;
+            /**
+             * Policy Config Id
+             * @description Policy config used for routing
+             */
+            policy_config_id?: string | null;
+            /**
+             * Policy Config Hash
+             * @description Exact policy config hash used
+             */
+            policy_config_hash?: string | null;
+            /**
+             * Policy Evaluation Id
+             * @description Policy evaluation identifier
+             */
+            policy_evaluation_id?: string | null;
+            /**
+             * Delivered At
+             * Format: date-time
+             * @description Delivery attempt timestamp
+             */
+            delivered_at: string;
+            /**
+             * Audit Created At
+             * Format: date-time
+             * @description Audit persistence timestamp
+             */
+            audit_created_at: string;
+        };
+        /**
          * DeliveryMode
          * @description Delivery reliability semantics.
          *
@@ -548,6 +880,61 @@ export interface components {
          */
         DeliveryStatus: "PENDING" | "DELIVERED" | "SUCCESS" | "FAILED" | "DEDUPLICATED" | "RATE_LIMITED";
         /**
+         * DeliveryStatusResponse
+         * @description HTTP response for persisted delivery status.
+         */
+        DeliveryStatusResponse: {
+            /**
+             * Notification Id
+             * Format: uuid
+             * @description Notification identifier
+             */
+            notification_id: string;
+            /**
+             * Notification Type
+             * @description Namespaced signal type
+             */
+            notification_type: string;
+            /** @description Latest persisted delivery status */
+            delivery_status: components["schemas"]["DeliveryStatus"];
+            /**
+             * Channels Attempted
+             * @description Channels attempted in latest audit
+             */
+            channels_attempted: components["schemas"]["Channel"][];
+            /**
+             * Channels Succeeded
+             * @description Channels that succeeded
+             */
+            channels_succeeded: components["schemas"]["Channel"][];
+            /**
+             * Channels Failed
+             * @description Channels that failed
+             */
+            channels_failed: components["schemas"]["Channel"][];
+            /**
+             * Error Message
+             * @description Latest delivery error
+             */
+            error_message?: string | null;
+            /**
+             * Delivered At
+             * Format: date-time
+             * @description Latest delivery attempt timestamp
+             */
+            delivered_at: string;
+            /**
+             * Audit Count
+             * @description Number of persisted delivery audits
+             */
+            audit_count: number;
+            /**
+             * Audits
+             * @description Delivery audits newest first
+             */
+            audits: components["schemas"]["DeliveryAuditItem"][];
+        };
+        /**
          * DeliveryTimelineListResponse
          * @description Paginated list of delivery timelines.
          */
@@ -561,6 +948,10 @@ export interface components {
          * @description Full delivery timeline for a notification.
          */
         DeliveryTimelineResponse: {
+            /** Runtime State */
+            runtime_state?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Notification Id
              * Format: uuid
@@ -678,27 +1069,6 @@ export interface components {
          */
         EnforcementType: "guard" | "isolation" | "test" | "exception";
         /**
-         * ErrorResponse
-         * @description Standard error response.
-         */
-        ErrorResponse: {
-            /**
-             * Error
-             * @description Error type
-             */
-            error: string;
-            /**
-             * Message
-             * @description Error message
-             */
-            message: string;
-            /**
-             * Notification Id
-             * @description Related notification ID
-             */
-            notification_id?: string | null;
-        };
-        /**
          * EvidenceLink
          * @description Link to evidence for an invariant.
          */
@@ -815,6 +1185,27 @@ export interface components {
             last_updated: string;
         };
         /**
+         * NotificationErrorResponse
+         * @description Standard error response for notification-write endpoints.
+         */
+        NotificationErrorResponse: {
+            /**
+             * Error
+             * @description Error type
+             */
+            error: string;
+            /**
+             * Message
+             * @description Error message
+             */
+            message: string;
+            /**
+             * Notification Id
+             * @description Related notification ID
+             */
+            notification_id?: string | null;
+        };
+        /**
          * NotificationIntent
          * @description Classification of notification urgency and handling requirements.
          *
@@ -858,6 +1249,29 @@ export interface components {
             /** @description Current ack status */
             ack_status?: components["schemas"]["AckStatus"] | null;
             /**
+             * Obligation Owner Id
+             * @description Canonical delivery and response owner ID
+             */
+            obligation_owner_id?: string | null;
+            /** @description Effective acknowledgment status, including inherited owner status */
+            effective_ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Ack Inherited
+             * @description Whether acknowledgment state is inherited from a deduplication owner
+             * @default false
+             */
+            ack_inherited: boolean;
+            /**
+             * Obligation Resolution Status
+             * @description Whether the canonical owner was resolved; null for legacy or missing records
+             */
+            obligation_resolution_status?: ("RESOLVED" | "UNRESOLVED") | null;
+            /**
+             * Obligation Resolution Error
+             * @description Reason canonical owner resolution failed; null when resolved
+             */
+            obligation_resolution_error?: ("CYCLE" | "MISSING_TARGET" | "GROUP_MISMATCH") | null;
+            /**
              * Require Ack
              * @description Whether ack is required
              */
@@ -895,6 +1309,50 @@ export interface components {
              */
             total_count?: number | null;
         };
+        /**
+         * PolicyReloadRequest
+         * @description Request body for reloading YAML notification policies.
+         */
+        PolicyReloadRequest: {
+            /**
+             * Policy Dir
+             * @description Directory containing YAML policy files
+             * @default config/notification_policies
+             */
+            policy_dir: string;
+        };
+        /**
+         * PolicyReloadResponse
+         * @description HTTP response for policy reload operations.
+         */
+        PolicyReloadResponse: {
+            /**
+             * Loaded Count
+             * @description Number of policy files loaded
+             */
+            loaded_count: number;
+            /**
+             * Persisted Count
+             * @description Number of policies newly persisted
+             */
+            persisted_count: number;
+            /**
+             * Policy Count
+             * @description Number of policies active after reload
+             */
+            policy_count: number;
+            /**
+             * Notification Types
+             * @description Registered notification types
+             */
+            notification_types: string[];
+        };
+        /**
+         * Priority
+         * @description Notification priority levels.
+         * @enum {string}
+         */
+        Priority: "HIGH" | "NORMAL" | "LOW";
         /**
          * ResolutionContext
          * @description Context used for policy resolution.
@@ -937,6 +1395,212 @@ export interface components {
              */
             reason?: string | null;
         };
+        /**
+         * SendNotificationRequest
+         * @description HTTP request for sending an AGSignal notification.
+         */
+        SendNotificationRequest: {
+            /**
+             * Notification Type
+             * @description Namespaced signal type
+             */
+            notification_type: string;
+            /** @description Signal intent */
+            intent: components["schemas"]["NotificationIntent"];
+            /**
+             * Title
+             * @description Signal title
+             */
+            title: string;
+            /**
+             * Message
+             * @description Signal body
+             */
+            message: string;
+            /**
+             * Source
+             * @description Producer identifier
+             */
+            source: string;
+            /** @description Required autonomy context */
+            autonomy_context: components["schemas"]["AutonomyContextRequest"];
+            /**
+             * Irreversible
+             * @description Whether the action is irreversible
+             * @default false
+             */
+            irreversible: boolean;
+            /**
+             * Metadata
+             * @description Additional JSON metadata
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Correlation Id
+             * @description Optional trace correlation ID
+             */
+            correlation_id?: string | null;
+            /** @description Optional delivery mode override */
+            delivery_mode?: components["schemas"]["DeliveryMode"] | null;
+            /**
+             * Require Ack
+             * @description Optional acknowledgment override
+             */
+            require_ack?: boolean | null;
+            /** @description Optional priority override */
+            priority?: components["schemas"]["Priority"] | null;
+            /**
+             * Dedup Key
+             * @description Optional deduplication key
+             */
+            dedup_key?: string | null;
+            /**
+             * Idempotency Key
+             * @description Producer retry key scoped by source
+             */
+            idempotency_key?: string | null;
+        };
+        /**
+         * SendNotificationResponse
+         * @description HTTP response for an accepted AGSignal notification.
+         */
+        SendNotificationResponse: {
+            /**
+             * Notification Id
+             * Format: uuid
+             * @description Notification identifier
+             */
+            notification_id: string;
+            /** @description Delivery outcome */
+            status: components["schemas"]["DeliveryStatus"];
+            /**
+             * Channels Attempted
+             * @description Router-derived channels attempted
+             */
+            channels_attempted: components["schemas"]["Channel"][];
+            /**
+             * Channels Succeeded
+             * @description Channels that succeeded
+             */
+            channels_succeeded: components["schemas"]["Channel"][];
+            /**
+             * Channels Failed
+             * @description Channels that failed
+             */
+            channels_failed: components["schemas"]["Channel"][];
+            /**
+             * Require Ack
+             * @description Whether the signal requires acknowledgment
+             */
+            require_ack: boolean;
+            /** @description Current acknowledgment status when tracked */
+            ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Obligation Owner Id
+             * @description Canonical delivery and response owner ID (differs when deduplicated or handed off)
+             */
+            obligation_owner_id?: string | null;
+            /** @description Effective acknowledgment status, including inherited deduplication owner status */
+            effective_ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Ack Inherited
+             * @description Whether the effective acknowledgment status is inherited from a deduplication owner
+             * @default false
+             */
+            ack_inherited: boolean;
+            /**
+             * Obligation Resolution Status
+             * @description Whether the canonical owner was resolved; null for legacy or missing records
+             */
+            obligation_resolution_status?: ("RESOLVED" | "UNRESOLVED") | null;
+            /**
+             * Obligation Resolution Error
+             * @description Reason canonical owner resolution failed; null when resolved
+             */
+            obligation_resolution_error?: ("CYCLE" | "MISSING_TARGET" | "GROUP_MISMATCH") | null;
+            /**
+             * Idempotency Key
+             * @description Producer idempotency key when supplied
+             */
+            idempotency_key?: string | null;
+            /**
+             * Idempotent Replay
+             * @description Whether this response was replayed from a previous producer request
+             * @default false
+             */
+            idempotent_replay: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Timestamp the notification was created (assigned by the SDK at signal acceptance)
+             */
+            created_at: string;
+            /**
+             * Message
+             * @description Acceptance summary
+             */
+            message: string;
+        };
+        /**
+         * SimulateNotificationResponse
+         * @description HTTP response for a simulated AGSignal notification.
+         */
+        SimulateNotificationResponse: {
+            /**
+             * Notification Id
+             * Format: uuid
+             * @description Preview notification identifier
+             */
+            notification_id: string;
+            /**
+             * Simulated
+             * @description Whether delivery was simulated
+             */
+            simulated: boolean;
+            /** @description Simulated delivery outcome */
+            status: components["schemas"]["DeliveryStatus"];
+            /**
+             * Channels Attempted
+             * @description Router-derived channels
+             */
+            channels_attempted: components["schemas"]["Channel"][];
+            /** @description Resolved delivery mode */
+            delivery_mode: components["schemas"]["DeliveryMode"];
+            /**
+             * Require Ack
+             * @description Whether the signal would require acknowledgment
+             */
+            require_ack: boolean;
+            /** @description Always null because simulation has no ack side effect */
+            ack_status?: components["schemas"]["AckStatus"] | null;
+            /**
+             * Dedup Key
+             * @description Resolved deduplication key
+             */
+            dedup_key: string;
+            /**
+             * Dedup Window Seconds
+             * @description Resolved deduplication window when configured
+             */
+            dedup_window_seconds?: number | null;
+            /**
+             * Policy Source
+             * @description Whether routing came from policy or defaults
+             */
+            policy_source: string;
+            /**
+             * Warnings
+             * @description Human-readable simulation caveats
+             */
+            warnings: string[];
+            /**
+             * Message
+             * @description Simulation summary
+             */
+            message: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -959,7 +1623,208 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    acknowledge_notification_v1_notifications__notification_id__ack_post: {
+    send_notification_api_v1_notifications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendNotificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendNotificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_notification_api_v1_notifications_simulate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendNotificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulateNotificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delivery_status_api_v1_notifications__notification_id__delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dlq_api_v1_dlq_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DLQListResponse"];
+                };
+            };
+        };
+    };
+    remove_dlq_entry_api_v1_dlq__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DLQRemoveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_channel_health_api_v1_channels_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelHealthSummary"];
+                };
+            };
+        };
+    };
+    reload_policies_api_v1_policies_reload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyReloadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyReloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_notification_api_v1_notifications__notification_id__ack_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -989,7 +1854,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["NotificationErrorResponse"];
                 };
             };
             /** @description Invalid status transition */
@@ -998,7 +1863,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["NotificationErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1012,7 +1877,7 @@ export interface operations {
             };
         };
     };
-    dismiss_notification_v1_notifications__notification_id__dismiss_post: {
+    dismiss_notification_api_v1_notifications__notification_id__dismiss_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1042,7 +1907,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["NotificationErrorResponse"];
                 };
             };
             /** @description Invalid status transition */
@@ -1051,7 +1916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json": components["schemas"]["NotificationErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1065,7 +1930,7 @@ export interface operations {
             };
         };
     };
-    get_notification_status_v1_notifications__notification_id__get: {
+    get_notification_status_api_v1_notifications__notification_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1096,7 +1961,7 @@ export interface operations {
             };
         };
     };
-    get_ack_status_v1_notifications__notification_id__ack_status_get: {
+    get_ack_status_api_v1_notifications__notification_id__ack_status_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1393,7 +2258,7 @@ export interface operations {
             };
         };
     };
-    health_check_health_get: {
+    health_healthz_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1415,7 +2280,7 @@ export interface operations {
             };
         };
     };
-    healthz_healthz_get: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1437,7 +2302,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    ready_readyz_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1459,7 +2324,7 @@ export interface operations {
             };
         };
     };
-    readyz_readyz_get: {
+    ready_ready_get: {
         parameters: {
             query?: never;
             header?: never;

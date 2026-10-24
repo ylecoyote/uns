@@ -95,6 +95,19 @@ def _configured_credentials(connection: HTTPConnection) -> list[tuple[str, str, 
     return [(key, subject, scopes) for key, subject, scopes in specs if key]
 
 
+def require_principal_scope(principal: WritePrincipal, required_scope: str) -> WritePrincipal:
+    """Authorize one command for an authenticated principal on any transport."""
+    if required_scope not in principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "insufficient_scope",
+                "message": f"Credential principal '{principal.subject}' lacks required '{required_scope}' authority.",
+            },
+        )
+    return principal
+
+
 def _authenticate(
     connection: HTTPConnection,
     supplied_key: str | None,
@@ -128,15 +141,7 @@ def _authenticate(
             headers={"WWW-Authenticate": "Bearer"},
         )
     principal = WritePrincipal(subject=matched_subject, scopes=frozenset(matched_scopes))
-    if required_scope not in principal.scopes:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": "insufficient_scope",
-                "message": f"Credential principal '{principal.subject}' lacks required '{required_scope}' authority.",
-            },
-        )
-    return principal
+    return require_principal_scope(principal, required_scope)
 
 
 def _header_key(connection: HTTPConnection) -> str | None:

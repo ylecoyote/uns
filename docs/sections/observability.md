@@ -130,13 +130,14 @@ Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}
 
 ### Authenticated Readiness Probe (`GET /ready` and `GET /readyz`)
 
-Unlike `/health`, the readiness probe requires a valid operator credential (`Authorization: Bearer <UNS_API_KEY>` or `X-UNS-API-Key`) and verifies both Core and Console readiness:
+Unlike `/health`, the readiness probe requires an authenticated credential with observer scope (included in the operator key and every scoped key) and verifies both Core and Console readiness:
 
 ```json
 {
   "status": "ready",
   "service": "uns",
   "version": "0.1.0",
+  "persistence_mode": "persistent",
   "channels_configured": {
     "slack": true,
     "pagerduty": false,
@@ -145,11 +146,38 @@ Unlike `/health`, the readiness probe requires a valid operator credential (`Aut
   "policy_count": 4,
   "dlq_depth": 0,
   "read_model_adapter": "SQLAlchemyReadModelAdapter",
-  "audit_logger": "SQLAlchemyAuditStore"
+  "audit_logger": "SQLAlchemyAuditStore",
+  "operational_progress": {
+    "pending_count": 0,
+    "oldest_pending_age_seconds": null,
+    "oldest_due_attempt_lateness_seconds": null,
+    "overdue_ack_count": 0,
+    "pending_callback_count": 0,
+    "oldest_callback_retry_age_seconds": null,
+    "unresolved_failure_count": 0,
+    "unknown_attempt_count": 0
+  }
 }
 ```
 
 If the SQLite/SQLAlchemy database connection fails, `/readyz` returns `"status": "not_ready"` with `"error"`.
+
+`persistence_mode` distinguishes `persistent` storage from explicitly selected `in_memory` operation. The canonical runtime supplies `operational_progress` with these definitions:
+
+| Field | Meaning |
+| --- | --- |
+| `pending_count` | Pending dispatch owners. Coalesced followers do not add another dispatch obligation. |
+| `oldest_pending_age_seconds` | Time since the oldest retained `ACCEPTED` event for a pending dispatch owner, including owners waiting for a future retry. Replay does not reset original acceptance age. |
+| `oldest_due_attempt_lateness_seconds` | Time since the earliest dispatch eligibility among pending owners with no live lease: the later of `next_attempt` and lease expiry. Future backoff and active delivery leases do not count as lateness. |
+| `overdue_ack_count` | Notifications still awaiting acknowledgment whose deadline has elapsed. The timeout worker should settle these. |
+| `pending_callback_count` | Terminal-event callbacks still pending with attempts remaining. Includes callbacks waiting for backoff or a lease. |
+| `oldest_callback_retry_age_seconds` | Time since the earliest callback retry or lease expiry that is already due, among callbacks with attempts remaining. This is retry lateness, not total event age. |
+| `unresolved_failure_count` | Retained unresolved dead-letter histories; also used as `dlq_depth`. |
+| `unknown_attempt_count` | Retained `CHANNEL_ATTEMPT_RESULT` observations whose `metadata.provider_outcome` is `UNKNOWN`. Counts observations, not unique notifications; a later successful replay does not erase earlier uncertainty. |
+
+Age/lateness fields are `null` when no matching timestamp exists. Unknown-attempt evidence can decrease when its history is archived and pruned; the count does not infer missing provider results from interrupted attempts. Progress uses SQL aggregates returning one summary row, and readiness reuses the failure count without loading dead-letter histories. Database work still depends on retained data and indexes.
+
+These values report operational progress and uncertainty. They do not automatically change readiness status; operators should set alert thresholds for growing age, overdue acknowledgments, callback lateness, and unresolved failures.
 
 ### Authenticated Prometheus Metrics (`GET /metrics`)
 

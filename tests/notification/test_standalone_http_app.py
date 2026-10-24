@@ -143,6 +143,7 @@ def test_standalone_app_metadata_and_routes_are_agsignal_native(
     monkeypatch: MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("AGSIGNAL_ENABLE_DOCS", "true")
+    monkeypatch.setenv("UNS_ALLOW_IN_MEMORY", "true")
     client = _client()
     from agsignal.app import create_app
 
@@ -241,6 +242,7 @@ def test_channel_health_summary_is_separate_from_ready_status() -> None:
 
 
 def test_app_does_not_create_redis_fanout_by_default(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("UNS_ALLOW_IN_MEMORY", "true")
     monkeypatch.delenv("UNS_WEBSOCKET_REDIS_ENABLED", raising=False)
 
     from agsignal.app import create_app
@@ -259,6 +261,7 @@ def test_app_creates_redis_fanout_when_enabled(monkeypatch: MonkeyPatch) -> None
             self.urls.append(url)
             return FakeRedisList()
 
+    monkeypatch.setenv("UNS_ALLOW_IN_MEMORY", "true")
     monkeypatch.setenv("UNS_WEBSOCKET_REDIS_ENABLED", "true")
     monkeypatch.setenv("UNS_REDIS_URL", "redis://example/0")
     factory = RedisFactory()
