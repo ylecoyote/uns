@@ -32,11 +32,17 @@ class RecordingAdapter(BaseAdapter):
         return HealthCheckResult(AdapterStatus.HEALTHY)
 
 
-def signal():
-    return SendNotificationRequest(
-        notification_type="security.test", intent="SAFETY", title="test", message="test",
-        source="test", autonomy_context={"agent_id": str(uuid4()), "autonomy_mode": "LIVE"},
-    )
+def signal(**overrides):
+    payload = {
+        "notification_type": "security.test",
+        "intent": "SAFETY",
+        "title": "test",
+        "message": "test",
+        "source": "test",
+        "autonomy_context": {"agent_id": str(uuid4()), "autonomy_mode": "LIVE"},
+    }
+    payload.update(overrides)
+    return SendNotificationRequest(**payload)
 
 
 @pytest.fixture
@@ -266,3 +272,172 @@ async def test_mcp_reads_stay_bound_to_server_runtime(isolated_stores, tool, lat
         assert not result.isError
         body = json.loads(result.content[0].text)
         assert {item["notification_id"] for item in body["items"]} == {identifiers[0]}
+
+
+def test_scoped_credentials_enforce_least_privilege(configured):
+    app, _, _ = configured
+    app.state.uns_producer_api_key = "producer-key"
+    app.state.uns_producer_api_principal = "wyredeck-producer"
+    app.state.uns_responder_api_key = "responder-key"
+    app.state.uns_responder_api_principal = "oncall-responder"
+    app.state.uns_observer_api_key = "observer-key"
+    app.state.uns_observer_api_principal = "console-observer"
+
+    client = TestClient(app)
+    producer_headers = {"Authorization": "Bearer producer-key"}
+    responder_headers = {"Authorization": "Bearer responder-key"}
+    observer_headers = {"Authorization": "Bearer observer-key"}
+    admin_headers = {"Authorization": "Bearer test-key"}
+
+    # Producer can submit and simulate, and read status, but cannot ack or invoke admin routes
+    sent = client.post(
+        "/api/v1/notifications",
+        json=signal(require_ack=True).model_dump(mode="json"),
+        headers=producer_headers,
+    )
+    assert sent.status_code == 202
+    nid = sent.json()["notification_id"]
+
+    sim = client.post(
+        "/api/v1/notifications/simulate",
+        json=signal().model_dump(mode="json"),
+        headers=producer_headers,
+    )
+    assert sim.status_code == 200
+    assert client.get(f"/api/v1/notifications/{nid}", headers=producer_headers).status_code == 200
+    assert (
+        client.post(f"/api/v1/notifications/{nid}/ack", json={}, headers=producer_headers).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/api/v1/policies/reload", json={"policy_dir": "config/notification_policies"}, headers=producer_headers
+        ).status_code
+        == 403
+    )
+    assert client.delete(f"/api/v1/dlq/{nid}", headers=producer_headers).status_code == 403
+    assert (
+        client.post(f"/api/v1/runtime/notifications/{nid}/replay", headers=producer_headers).status_code
+        == 403
+    )
+
+    # Observer can read status, Console, and /readyz, but cannot send, ack, or administer
+    assert client.get("/readyz", headers=observer_headers).status_code == 200
+    assert client.get("/ui/audit", headers=observer_headers).status_code == 200
+    assert (
+        client.post(
+            "/api/v1/notifications",
+            json=signal().model_dump(mode="json"),
+            headers=observer_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(f"/api/v1/notifications/{nid}/ack", json={}, headers=observer_headers).status_code
+        == 403
+    )
+
+    # Responder can acknowledge and read, but cannot submit or administer
+    assert (
+        client.post(
+            "/api/v1/notifications",
+            json=signal().model_dump(mode="json"),
+            headers=responder_headers,
+        ).status_code
+        == 403
+    )
+    acked = client.post(
+        f"/api/v1/notifications/{nid}/ack",
+        json={"acked_by": "oncall-responder"},
+        headers=responder_headers,
+    )
+    assert acked.status_code == 200
+    assert acked.json()["acked_by"] == "oncall-responder"
+
+    # Admin key still has full access
+    assert client.get("/readyz", headers=admin_headers).status_code == 200
+
+
+def test_deduplicated_follower_exposes_structured_obligation_owner_and_inherited_ack(configured):
+    app, _, _ = configured
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+
+    owner_resp = client.post(
+        "/api/v1/notifications",
+        json=signal(require_ack=True, dedup_key="wyredeck-provider-degraded").model_dump(mode="json"),
+    )
+    assert owner_resp.status_code == 202
+    owner_body = owner_resp.json()
+    owner_id = owner_body["notification_id"]
+    assert owner_body["obligation_owner_id"] == owner_id
+    assert owner_body["effective_ack_status"] == "PENDING"
+    assert owner_body["ack_inherited"] is False
+
+    follower_resp = client.post(
+        "/api/v1/notifications",
+        json=signal(require_ack=True, dedup_key="wyredeck-provider-degraded").model_dump(mode="json"),
+    )
+    assert follower_resp.status_code == 202
+    follower_body = follower_resp.json()
+    follower_id = follower_body["notification_id"]
+    assert follower_body["status"] == "DEDUPLICATED"
+    assert follower_body["ack_status"] is None
+    assert follower_body["obligation_owner_id"] == owner_id
+    assert follower_body["effective_ack_status"] == "PENDING"
+    assert follower_body["ack_inherited"] is True
+
+    # Acknowledge the canonical owner and verify follower status reflects inherited ACKED state
+    ack_resp = client.post(
+        f"/api/v1/notifications/{owner_id}/ack",
+        json={"acked_by": "verified-operator"},
+    )
+    assert ack_resp.status_code == 200
+
+    follower_status = client.get(f"/api/v1/notifications/{follower_id}").json()
+    assert follower_status["ack_status"] is None
+    assert follower_status["obligation_owner_id"] == owner_id
+    assert follower_status["effective_ack_status"] == "ACKED"
+    assert follower_status["ack_inherited"] is True
+
+    follower_ack_status = client.get(f"/api/v1/notifications/{follower_id}/ack-status").json()
+    assert follower_ack_status["ack_status"] is None
+    assert follower_ack_status["obligation_owner_id"] == owner_id
+    assert follower_ack_status["effective_ack_status"] == "ACKED"
+    assert follower_ack_status["ack_inherited"] is True
+
+
+def test_daemon_startup_requires_explicit_persistence_or_in_memory_flag(monkeypatch, tmp_path):
+    from uns.config import ensure_daemon_persistence_configured
+
+    monkeypatch.delenv("UNS_DATABASE_URL", raising=False)
+    monkeypatch.delenv("AGSIGNAL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("UNS_ALLOW_IN_MEMORY", raising=False)
+    monkeypatch.delenv("AGSIGNAL_ALLOW_IN_MEMORY", raising=False)
+
+    with pytest.raises(RuntimeError, match="Refusing to start the UNS daemon with volatile in-memory storage"):
+        ensure_daemon_persistence_configured()
+
+    assert ensure_daemon_persistence_configured(allow_in_memory=True) == "sqlite://"
+
+    db_url = f"sqlite:///{tmp_path / 'uns.db'}"
+    monkeypatch.setenv("UNS_DATABASE_URL", db_url)
+    assert ensure_daemon_persistence_configured() == db_url
+
+
+def test_readyz_reports_persistence_mode_and_operational_progress(configured):
+    app, _, _ = configured
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+    ready = client.get("/readyz")
+    assert ready.status_code == 200
+    body = ready.json()
+    assert body["persistence_mode"] == "persistent"
+    progress = body["operational_progress"]
+    assert set(progress) >= {
+        "pending_count",
+        "oldest_pending_age_seconds",
+        "overdue_ack_count",
+        "pending_callback_count",
+        "oldest_callback_retry_age_seconds",
+        "unresolved_failure_count",
+    }

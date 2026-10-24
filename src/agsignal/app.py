@@ -43,7 +43,10 @@ import uvicorn
 from fastapi import Depends, FastAPI
 
 from agsignal._in_memory import InMemoryRedisList
-from agsignal.api.auth import configure_cors, require_write_principal
+from agsignal.api.auth import (
+    configure_cors,
+    require_authenticated_observer,
+)
 from agsignal.api.observability import ObservabilityMiddleware
 from agsignal.api.routes_notification import router as ack_router
 from agsignal.api.routes_ui import router as ui_router
@@ -313,8 +316,8 @@ def create_app(
             "version": __version__,
         }
 
-    @app.get("/ready", tags=["system"], dependencies=[Depends(require_write_principal)])
-    @app.get("/readyz", tags=["system"], dependencies=[Depends(require_write_principal)])
+    @app.get("/ready", tags=["system"], dependencies=[Depends(require_authenticated_observer)])
+    @app.get("/readyz", tags=["system"], dependencies=[Depends(require_authenticated_observer)])
     async def ready() -> dict[str, Any]:
         from agsignal.api.read_models import get_read_model_adapter
         from notification.audit import get_audit_logger
@@ -326,9 +329,13 @@ def create_app(
             if runtime is not None:
                 read_model_adapter = type(app.state.read_model_adapter).__name__
                 audit_logger_type = type(runtime.audit_store).__name__
+                persistence_mode = runtime.persistence_mode
+                operational_progress = runtime.operational_progress()
             else:
                 read_model_adapter = type(get_read_model_adapter()).__name__
                 audit_logger_type = type(get_audit_logger()).__name__
+                persistence_mode = "in_memory"
+                operational_progress = None
         except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
             return {
                 "status": "not_ready",
@@ -336,29 +343,44 @@ def create_app(
                 "version": __version__,
                 "error": str(exc),
             }
-        return {
+        payload: dict[str, Any] = {
             "status": "ready",
             "service": "uns",
             "version": __version__,
+            "persistence_mode": persistence_mode,
             "channels_configured": _channel_readiness(),
             "policy_count": len(runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()),
             "dlq_depth": app.state.dlq_service.depth(),
             "read_model_adapter": read_model_adapter,
             "audit_logger": audit_logger_type,
         }
+        if operational_progress is not None:
+            payload["operational_progress"] = operational_progress
+        return payload
 
     return app
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     """Run the unified AGSignal HTTP server."""
     import argparse
 
-    from uns.config import value
+    from uns.config import ensure_daemon_persistence_configured, value
     parser = argparse.ArgumentParser(description="UNS notification and acknowledgment service")
     parser.add_argument("--host", default=value("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(value("PORT", "8000")))
-    args = parser.parse_args()
+    parser.add_argument(
+        "--in-memory",
+        action="store_true",
+        help="Allow volatile in-memory SQLite storage for local demo or test runs",
+    )
+    args = parser.parse_args(argv)
+    if args.in_memory:
+        os.environ["UNS_ALLOW_IN_MEMORY"] = "true"
+    try:
+        ensure_daemon_persistence_configured(allow_in_memory=args.in_memory)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
     host, port = args.host, args.port
     uvicorn.run("uns.app:app", host=host, port=port, reload=False)
 

@@ -29,7 +29,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from agsignal.api.auth import WritePrincipal, require_read_principal, require_write_principal
+from agsignal.api.auth import (
+    WritePrincipal,
+    require_admin_principal,
+    require_producer_principal,
+    require_read_principal,
+)
 from agsignal.responses import (
     AutonomyContextRequest,
     DeliveryAuditItem,
@@ -76,7 +81,7 @@ ops_router = APIRouter(prefix="/api/v1", tags=["operations"], dependencies=[Depe
 async def send_notification(
     http_request: Request,
     request: SendNotificationRequest,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SendNotificationResponse:
     """HTTP adapter — delegates to agsignal.signaling.send_signal.
 
@@ -177,7 +182,7 @@ async def send_notification(
 @router.post("/simulate", response_model=SimulateNotificationResponse)
 async def simulate_notification(
     request: SendNotificationRequest, http_request: Request,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SimulateNotificationResponse:
     """HTTP adapter — delegates to agsignal.signaling.simulate_signal.
 
@@ -266,7 +271,7 @@ async def list_dlq(request: Request) -> DLQListResponse:
 @ops_router.delete("/dlq/{entry_id}", response_model=DLQRemoveResponse)
 async def remove_dlq_entry(
     request: Request, entry_id: UUID,
-    principal: WritePrincipal = Depends(require_write_principal),
+    principal: WritePrincipal = Depends(require_admin_principal),
 ) -> DLQRemoveResponse:
     """Remove a visible DLQ entry after external remediation."""
     runtime = getattr(request.app.state, "runtime", None)
@@ -303,7 +308,7 @@ async def get_channel_health(request: Request) -> ChannelHealthSummary:
 async def reload_policies(
     reload_request: PolicyReloadRequest,
     http_request: Request,
-    _principal: WritePrincipal = Depends(require_write_principal),
+    _principal: WritePrincipal = Depends(require_admin_principal),
 ) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
     import os

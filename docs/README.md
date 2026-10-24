@@ -20,7 +20,7 @@
    - [Product Contract](PRODUCT.md) — Core boundaries, obligation semantics, and safety posture
    - [Architecture](ARCHITECTURE.md) — Durable SQLite outbox (`uns.Runtime`), policy engine, and transport topology
    - [Delivery Semantics](sections/delivery-semantics.md) — Idempotency, deduplication windows, fallback, and ACK lifecycles
-   - [Policy Lifecycle](sections/policy-lifecycle.md) — `DRAFT` → `SHADOW` → `ACTIVE` → `DEPRECATED` → `ARCHIVED` governance
+   - [Policy Lifecycle](sections/policy-lifecycle.md) — Policy version states (`DRAFT`, `PREVIEW`, `ACTIVE`, `RETIRED`), autonomy modes (`PREVIEW`, `SHADOW`, `LIVE`), and change proposals (`PROPOSED`, `APPROVED`, `APPLIED`)
    - [Security Model](SECURITY-MODEL.md) — Authentication, principal binding, and Console/MCP security boundaries
 
 2. **Deployment & Operations**

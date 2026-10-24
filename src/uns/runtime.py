@@ -151,8 +151,15 @@ class Runtime:
         callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> None:
         options: dict[str, Any] = {}
+        is_in_memory = (
+            database_url in ("sqlite://", "sqlite:///:memory:")
+            or ":memory:" in database_url
+            or "mode=memory" in database_url
+        )
         if database_url in ("sqlite://", "sqlite:///:memory:"):
             options = {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
+        self.database_url = database_url
+        self.persistence_mode = "in_memory" if is_in_memory else "persistent"
         self.engine = create_engine(database_url, **options)
         migrate_runtime_schema(self.engine, create_tables=create_tables)
         self.sessions = sessionmaker(self.engine)
@@ -195,6 +202,27 @@ class Runtime:
         record = replace(record, audit_created_at=datetime.fromtimestamp(self.clock(), UTC))
         session.add(delivery_audit_row(record))
 
+    def _resolve_obligation_owner(
+        self, session: Session, row: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Follow deduplication owner and successor lineage to the canonical obligation row."""
+        current = row
+        seen = {str(row["id"])}
+        for _ in range(10):
+            next_id = current.get("dedup_owner_id") or current.get("dedup_successor_id")
+            if not next_id or str(next_id) in seen:
+                break
+            seen.add(str(next_id))
+            candidate = (
+                session.execute(select(work).where(work.c.id == str(next_id)))
+                .mappings()
+                .first()
+            )
+            if candidate is None:
+                break
+            current = dict(candidate)
+        return current
+
     def get(self, notification_id: UUID | str) -> dict[str, Any]:
         with self.sessions() as session:
             row = (
@@ -204,7 +232,13 @@ class Runtime:
             )
             if row is None:
                 raise KeyError(str(notification_id))
-            return dict(row)
+            result = dict(row)
+            owner = self._resolve_obligation_owner(session, result)
+            inherited = str(owner["id"]) != str(result["id"])
+            result["obligation_owner_id"] = str(owner["id"])
+            result["effective_ack_status"] = owner["ack_status"] if inherited else result["ack_status"]
+            result["ack_inherited"] = inherited
+            return result
 
     def events(self, notification_id: UUID | str) -> list[dict[str, Any]]:
         with self.sessions() as session:
@@ -223,6 +257,8 @@ class Runtime:
         row = self.get(notification_id)
         n = Notification.model_validate(row["notification"])
         result = NotificationResult.model_validate(row["outcome"])
+        owner_id = row.get("obligation_owner_id") or row["id"]
+        effective_ack = row.get("effective_ack_status")
         return SendNotificationResponse(
             notification_id=n.notification_id,
             status=DeliveryStatus(row["status"]),
@@ -231,6 +267,9 @@ class Runtime:
             channels_failed=result.channels_failed,
             require_ack=bool(n.require_ack),
             ack_status=AckStatus(row["ack_status"]) if row["ack_status"] else None,
+            obligation_owner_id=UUID(str(owner_id)),
+            effective_ack_status=AckStatus(effective_ack) if effective_ack else None,
+            ack_inherited=bool(row.get("ack_inherited", False)),
             idempotent_replay=replay,
             created_at=n.created_at,
             message=(
@@ -1111,3 +1150,53 @@ class Runtime:
             if changed:
                 self._event(session, str(notification_id), "FAILURE_RESOLVED", {"actor": actor})
             return bool(changed)
+
+    def operational_progress(self) -> dict[str, Any]:
+        """Summarize outbox, acknowledgment, callback, and dead-letter progress."""
+        now = self.clock()
+        with self.sessions() as session:
+            pending_rows = list(
+                session.execute(
+                    select(work.c.next_attempt).where(
+                        work.c.status == "PENDING",
+                        work.c.dedup_owner_id.is_(None),
+                    )
+                ).scalars()
+            )
+            overdue_acks = list(
+                session.execute(
+                    select(work.c.deadline).where(
+                        work.c.ack_status == "PENDING",
+                        work.c.deadline <= now,
+                    )
+                ).scalars()
+            )
+            pending_callbacks = list(
+                session.execute(
+                    select(events.c.callback_until).where(
+                        events.c.callback_pending.is_(True),
+                        events.c.callback_attempts < 3,
+                    )
+                ).scalars()
+            )
+            dead_letter_count = len(
+                list(
+                    session.execute(
+                        select(work.c.id).where(work.c.dead_letter.is_(True))
+                    ).scalars()
+                )
+            )
+        due_pending = [ float(ts) for ts in pending_rows if ts is not None and float(ts) <= now ]
+        due_callbacks = [ float(ts) for ts in pending_callbacks if ts is not None and float(ts) <= now ]
+        return {
+            "pending_count": len(pending_rows),
+            "oldest_pending_age_seconds": (
+                round(max(0.0, now - min(due_pending)), 3) if due_pending else None
+            ),
+            "overdue_ack_count": len(overdue_acks),
+            "pending_callback_count": len(pending_callbacks),
+            "oldest_callback_retry_age_seconds": (
+                round(max(0.0, now - min(due_callbacks)), 3) if due_callbacks else None
+            ),
+            "unresolved_failure_count": dead_letter_count,
+        }
