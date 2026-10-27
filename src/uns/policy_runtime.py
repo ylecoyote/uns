@@ -88,7 +88,9 @@ class PolicyRuntime:
             )
         policy = registry.get_sync(notification.notification_type)
         policy_hash = notification.policy_config_hash or compute_policy_content_hash(
-            policy.model_dump(mode="json") if policy else {"defaults_version": 1}
+            policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+            if policy
+            else {"defaults_version": 1}
         )
         payload = notification.model_dump(mode="json")
         effective = {

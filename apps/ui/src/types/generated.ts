@@ -2437,8 +2437,8 @@ export interface operations {
             query: {
                 /** @description The notification type to resolve */
                 notification_type: string;
-                /** @description The notification intent */
-                intent: components["schemas"]["NotificationIntent"];
+                /** @description The notification intent (defaults to active policy intent when registered) */
+                intent?: components["schemas"]["NotificationIntent"] | null;
                 /** @description The autonomy mode */
                 autonomy_mode: components["schemas"]["AutonomyMode"];
                 /** @description Whether the action is irreversible */
@@ -2504,6 +2504,8 @@ export interface operations {
                 notification_type?: string | null;
                 /** @description Filter by policy lifecycle status */
                 status?: components["schemas"]["PolicyStatus"] | null;
+                /** @description Maximum revisions to return */
+                limit?: number;
             };
             header?: never;
             path?: never;

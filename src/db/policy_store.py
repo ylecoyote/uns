@@ -196,8 +196,10 @@ class SQLAlchemyPolicyStore:
         return self._session_factory()
 
     @staticmethod
-    def _hydrate_policy(session: Session, row: PersistedNotificationPolicy) -> NotificationPolicy:
-        saved = session.get(NotificationPolicyContent, row.policy_id)
+    def _hydrate_policy_row(
+        row: PersistedNotificationPolicy,
+        saved: NotificationPolicyContent | None,
+    ) -> NotificationPolicy:
         if saved is None:
             return _row_to_policy(row)
         # Never resurrect serialized ACTIVE status from a subsequently retired
@@ -209,6 +211,69 @@ class SQLAlchemyPolicyStore:
                 "config_hash": row.content_hash,
             }
         )
+
+    @classmethod
+    def _hydrate_policy(cls, session: Session, row: PersistedNotificationPolicy) -> NotificationPolicy:
+        saved = session.get(NotificationPolicyContent, row.policy_id)
+        return cls._hydrate_policy_row(row, saved)
+
+    def list_revisions(
+        self,
+        *,
+        notification_type: str | None = None,
+        status: PolicyStatus | str | None = None,
+        limit: int = 200,
+    ) -> list[tuple[PersistedNotificationPolicy, NotificationPolicy]]:
+        """Return persisted policy rows and hydrated policies in a single read-only query."""
+        from sqlalchemy.exc import OperationalError
+
+        status_value = status.value if isinstance(status, PolicyStatus) else status
+        with self._get_session() as session:
+            try:
+                stmt = select(
+                    PersistedNotificationPolicy, NotificationPolicyContent
+                ).outerjoin(
+                    NotificationPolicyContent,
+                    NotificationPolicyContent.policy_id == PersistedNotificationPolicy.policy_id,
+                )
+                if notification_type:
+                    stmt = stmt.where(
+                        PersistedNotificationPolicy.notification_type == notification_type
+                    )
+                if status_value is not None:
+                    stmt = stmt.where(PersistedNotificationPolicy.status == status_value)
+                stmt = stmt.order_by(
+                    PersistedNotificationPolicy.notification_type.asc(),
+                    PersistedNotificationPolicy.created_at.desc(),
+                    PersistedNotificationPolicy.updated_at.desc(),
+                    PersistedNotificationPolicy.version.desc(),
+                    PersistedNotificationPolicy.policy_id.desc(),
+                ).limit(limit)
+                joined_rows = session.execute(stmt).all()
+                return [
+                    (row, self._hydrate_policy_row(row, saved))
+                    for row, saved in joined_rows
+                ]
+            except OperationalError:
+                session.rollback()
+                fallback_stmt = select(PersistedNotificationPolicy)
+                if notification_type:
+                    fallback_stmt = fallback_stmt.where(
+                        PersistedNotificationPolicy.notification_type == notification_type
+                    )
+                if status_value is not None:
+                    fallback_stmt = fallback_stmt.where(
+                        PersistedNotificationPolicy.status == status_value
+                    )
+                fallback_stmt = fallback_stmt.order_by(
+                    PersistedNotificationPolicy.notification_type.asc(),
+                    PersistedNotificationPolicy.created_at.desc(),
+                    PersistedNotificationPolicy.updated_at.desc(),
+                    PersistedNotificationPolicy.version.desc(),
+                    PersistedNotificationPolicy.policy_id.desc(),
+                ).limit(limit)
+                legacy_rows = session.execute(fallback_stmt).scalars().all()
+                return [(row, _row_to_policy(row)) for row in legacy_rows]
 
     def save_policy(self, policy: NotificationPolicy) -> PolicySaveResult:
         """Persist and activate one policy atomically with its runtime revision."""
@@ -260,11 +325,21 @@ class SQLAlchemyPolicyStore:
         content_hash = compute_policy_content_hash(
             policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
         )
-        duplicate = session.execute(
-            select(PersistedNotificationPolicy).where(
-                PersistedNotificationPolicy.content_hash == content_hash
+        duplicate = (
+            session.execute(
+                select(PersistedNotificationPolicy)
+                .where(
+                    PersistedNotificationPolicy.notification_type == policy.notification_type,
+                    PersistedNotificationPolicy.content_hash == content_hash,
+                )
+                .order_by(
+                    PersistedNotificationPolicy.created_at.desc(),
+                    PersistedNotificationPolicy.policy_id.desc(),
+                )
             )
-        ).scalar_one_or_none()
+            .scalars()
+            .first()
+        )
         if duplicate is not None:
             if (
                 duplicate.status == PolicyStatus.RETIRED.value
@@ -373,20 +448,51 @@ class SQLAlchemyPolicyStore:
         if policy.status not in (PolicyStatus.ACTIVE, PolicyStatus.PREVIEW):
             return None
 
-        current = session.execute(
-            select(PersistedNotificationPolicy).where(
-                PersistedNotificationPolicy.notification_type == policy.notification_type,
-                PersistedNotificationPolicy.status == policy.status.value,
+        current_rows = (
+            session.execute(
+                select(PersistedNotificationPolicy)
+                .where(
+                    PersistedNotificationPolicy.notification_type == policy.notification_type,
+                    PersistedNotificationPolicy.status == policy.status.value,
+                )
+                .order_by(
+                    PersistedNotificationPolicy.created_at.desc(),
+                    PersistedNotificationPolicy.policy_id.desc(),
+                )
             )
-        ).scalar_one_or_none()
-        if current is None:
+            .scalars()
+            .all()
+        )
+        promoted_rows: list[PersistedNotificationPolicy] = []
+        if policy.status == PolicyStatus.ACTIVE:
+            promoted_rows = list(
+                session.execute(
+                    select(PersistedNotificationPolicy)
+                    .where(
+                        PersistedNotificationPolicy.notification_type == policy.notification_type,
+                        PersistedNotificationPolicy.version == policy.version,
+                        PersistedNotificationPolicy.status.in_(
+                            (PolicyStatus.PREVIEW.value, PolicyStatus.DRAFT.value)
+                        ),
+                    )
+                    .order_by(
+                        PersistedNotificationPolicy.created_at.desc(),
+                        PersistedNotificationPolicy.policy_id.desc(),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        rows_to_retire = [*current_rows, *promoted_rows]
+        if not rows_to_retire:
             return None
 
-        current.status = PolicyStatus.RETIRED.value
-        current.is_active = False
-        current.retired_at = now
-        current.updated_at = now
-        return current.policy_id
+        for item in rows_to_retire:
+            item.status = PolicyStatus.RETIRED.value
+            item.is_active = False
+            item.retired_at = now
+            item.updated_at = now
+        return rows_to_retire[0].policy_id
 
 
 def _status_sort_key(status: str) -> int:

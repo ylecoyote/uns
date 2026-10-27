@@ -30,7 +30,18 @@ type SessionChannelMessage =
       readonly scopes: readonly ConsoleScope[];
       readonly persistenceMode: string | null;
     }
-  | { readonly type: 'UNS_SESSION_CLEAR' };
+  | {
+      readonly type: 'UNS_SESSION_SYNC';
+      readonly credential: string;
+      readonly subject: string | null;
+      readonly scopes: readonly ConsoleScope[];
+      readonly persistenceMode: string | null;
+    }
+  | { readonly type: 'UNS_SESSION_CLEAR' }
+  | {
+      readonly type: 'UNS_SESSION_EXPIRE';
+      readonly credential: string;
+    };
 
 const VALID_SCOPES: ReadonlySet<string> = new Set(['observer', 'responder', 'producer', 'admin']);
 const CHANNEL_NAME = 'uns_console_session';
@@ -79,6 +90,36 @@ function handleChannelMessage(event: MessageEvent<unknown>) {
         scopes: normalizeScopes(Array.isArray(data.scopes) ? data.scopes : undefined),
         persistenceMode: typeof data.persistenceMode === 'string' ? data.persistenceMode : null,
         expired: false,
+      });
+    }
+    return;
+  }
+
+  if (data.type === 'UNS_SESSION_SYNC') {
+    if (typeof data.credential === 'string' && data.credential) {
+      updateSession({
+        credential: data.credential,
+        subject: typeof data.subject === 'string' ? data.subject : null,
+        scopes: normalizeScopes(Array.isArray(data.scopes) ? data.scopes : undefined),
+        persistenceMode: typeof data.persistenceMode === 'string' ? data.persistenceMode : null,
+        expired: false,
+      });
+    }
+    return;
+  }
+
+  if (data.type === 'UNS_SESSION_EXPIRE') {
+    if (
+      typeof data.credential === 'string' &&
+      data.credential &&
+      session.credential === data.credential
+    ) {
+      updateSession({
+        credential: null,
+        subject: null,
+        scopes: [],
+        persistenceMode: null,
+        expired: true,
       });
     }
     return;
@@ -145,8 +186,9 @@ function updateSession(next: ConsoleSession) {
 }
 
 export function startConsoleSession(credential: string, metadata?: ConsoleSessionMetadata) {
+  const normalized = credential.trim() || credential;
   const next: ConsoleSession = {
-    credential,
+    credential: normalized,
     subject: metadata?.subject ?? null,
     scopes: normalizeScopes(metadata?.scopes),
     persistenceMode: metadata?.persistenceMode ?? null,
@@ -157,8 +199,8 @@ export function startConsoleSession(credential: string, metadata?: ConsoleSessio
   if (channel !== null) {
     try {
       const message: SessionChannelMessage = {
-        type: 'UNS_SESSION_GRANT',
-        credential: next.credential!,
+        type: 'UNS_SESSION_SYNC',
+        credential: normalized,
         subject: next.subject,
         scopes: next.scopes,
         persistenceMode: next.persistenceMode,
@@ -185,9 +227,22 @@ export function clearConsoleSession(options?: { broadcast?: boolean }) {
   }
 }
 
-export function expireConsoleSession(expected: ConsoleSession) {
+export function expireConsoleSession(expected?: ConsoleSession | string) {
+  const target =
+    typeof expected === 'string'
+      ? expected.trim()
+      : expected && typeof expected === 'object'
+        ? expected.credential
+        : session.credential;
+  const matches =
+    typeof expected === 'string'
+      ? Boolean(target && session.credential === target)
+      : expected && typeof expected === 'object'
+        ? session === expected && session.credential !== null
+        : session.credential !== null;
+
   // A late response from an older session must not sign out a newer one.
-  if (session === expected && session.credential !== null) {
+  if (matches && target) {
     updateSession({
       credential: null,
       subject: null,
@@ -195,6 +250,18 @@ export function expireConsoleSession(expected: ConsoleSession) {
       persistenceMode: null,
       expired: true,
     });
+    const channel = ensureBroadcastChannel();
+    if (channel !== null) {
+      try {
+        const message: SessionChannelMessage = {
+          type: 'UNS_SESSION_EXPIRE',
+          credential: target,
+        };
+        channel.postMessage(message);
+      } catch {
+        // Ignore BroadcastChannel errors.
+      }
+    }
   }
 }
 

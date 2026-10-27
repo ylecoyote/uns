@@ -456,7 +456,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
     vi.resetAllMocks();
   });
 
-  it('auto-populates and inspects when ?notification_type= query param is present', async () => {
+  it('auto-populates and inspects with catalog-resolved intent when ?notification_type= query param is present', async () => {
     render(
       <MemoryRouter initialEntries={['/policy?notification_type=trading.order_placed']}>
         <PolicyInspectorPage />
@@ -467,12 +467,15 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
       expect(api.fetchEffectivePolicy).toHaveBeenCalledWith(
         expect.objectContaining({
           notification_type: 'trading.order_placed',
+          intent: 'GOVERNANCE',
+          autonomy_mode: 'LIVE',
         }),
         expect.anything()
       );
     });
 
     expect(screen.getByTestId('notification-type-input')).toHaveValue('trading.order_placed');
+    expect(screen.getByTestId('intent-select')).toHaveValue('GOVERNANCE');
   });
 
   it('populates inspector and simulator when clicking a row in the Active Policies Catalog', async () => {
@@ -727,6 +730,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
     ).not.toBeInTheDocument();
 
     // Reset filter to ALL and click PREVIEW revision to load into Inspector & Simulator
+    // Policy lifecycle status PREVIEW must not be conflated with AutonomyMode PREVIEW
     fireEvent.click(screen.getByTestId('policy-status-filter-ALL'));
     fireEvent.click(
       screen.getByTestId('policy-revision-row-trading.order_placed-2.1.0')
@@ -737,7 +741,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
         {
           notification_type: 'trading.order_placed',
           intent: 'GOVERNANCE',
-          autonomy_mode: 'PREVIEW',
+          autonomy_mode: 'LIVE',
           irreversible: false,
         },
         expect.anything()
@@ -747,6 +751,6 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
     expect(screen.getByTestId('sim-notification-type-input')).toHaveValue(
       'trading.order_placed'
     );
-    expect(screen.getByTestId('sim-autonomy-mode-select')).toHaveValue('PREVIEW');
+    expect(screen.getByTestId('sim-autonomy-mode-select')).toHaveValue('LIVE');
   });
 });

@@ -16,7 +16,7 @@ from notification.policies import (
     get_policy_registry,
 )
 
-_HASH_EXCLUDED_FIELDS = {"description"}
+_HASH_EXCLUDED_FIELDS = {"description", "config_id", "config_hash"}
 
 
 def load_policy_from_yaml(
@@ -39,8 +39,13 @@ def load_policy_from_yaml(
     if "notification_type" not in data:
         raise ValueError(f"Policy YAML missing notification_type: {policy_path}")
 
-    policy = NotificationPolicy.from_dict(data).model_copy(
-        update={"config_hash": compute_policy_content_hash(data)}
+    parsed = NotificationPolicy.from_dict(data)
+    policy = parsed.model_copy(
+        update={
+            "config_hash": compute_policy_content_hash(
+                parsed.model_dump(mode="json", exclude={"config_id", "config_hash"})
+            )
+        }
     )
     if registry is not None:
         registry.register(policy)
@@ -80,11 +85,30 @@ def load_runtime_registry_from_directory(path: str | Path) -> tuple[int, PolicyR
 def compute_policy_content_hash(data: dict[str, Any]) -> str:
     """Return a stable SHA-256 hash for policy semantics.
 
-    Human-only metadata such as `description` is intentionally excluded so copy
-    edits do not create a new semantic policy version.
+    Human-only metadata such as `description` and persistence identity fields
+    (`config_id`, `config_hash`) are excluded so copy edits or hydration do not
+    create a different semantic policy hash.
     """
-    semantic_data = {
-        key: value for key, value in data.items() if key not in _HASH_EXCLUDED_FIELDS
-    }
+    if "notification_type" in data and "policies" not in data:
+        try:
+            if (
+                isinstance(data.get("channels"), dict)
+                or isinstance(data.get("require_ack"), dict)
+                or "delivery_mode_by_autonomy" in data
+            ):
+                normalized = NotificationPolicy.from_dict(data)
+            else:
+                normalized = NotificationPolicy.model_validate(data)
+            semantic_data = normalized.model_dump(
+                mode="json", exclude={"config_id", "config_hash"}
+            )
+        except Exception:
+            semantic_data = {
+                key: value for key, value in data.items() if key not in _HASH_EXCLUDED_FIELDS
+            }
+    else:
+        semantic_data = {
+            key: value for key, value in data.items() if key not in _HASH_EXCLUDED_FIELDS
+        }
     payload = json.dumps(semantic_data, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

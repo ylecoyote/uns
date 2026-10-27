@@ -233,6 +233,28 @@ class ReadModelAdapter(ABC):
 # =============================================================================
 
 
+_AUDIT_EVENT_STAGE_RANK: dict[str, int] = {
+    "notification.created": 10,
+    "delivery.started": 20,
+    "delivery.channel_attempted": 30,
+    "delivery.deduplicated": 40,
+    "delivery.rate_limited": 40,
+    "delivery.failed": 40,
+    "delivery.succeeded": 40,
+    "ack.pending": 50,
+    "escalation.triggered": 60,
+    "ack.received": 70,
+    "ack.dismissed": 70,
+    "ack.timed_out": 70,
+}
+
+
+def _audit_event_sort_key(event: AuditEvent) -> tuple[datetime, int, str]:
+    """Deterministic descending sort key for merged audit events."""
+    stage_rank = _AUDIT_EVENT_STAGE_RANK.get(event.event_type, 35)
+    return (event.event_time, stage_rank, str(event.audit_id))
+
+
 class InMemoryReadModelAdapter(ReadModelAdapter):
     """In-memory read model adapter for local demo and testing.
 
@@ -479,20 +501,35 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         limit: int = 25,
     ) -> PaginatedResult:
         """Get paginated list of delivery summaries from in-memory store."""
-        # Get all delivery audits and filter
-        all_records = self._audit_store.delivery_audits
+        # Deduplicate by notification_id using the latest audit record per notification
+        latest_by_notification: dict[UUID, tuple[tuple[datetime, int, int], AuditRecord]] = {}
+        for idx, record in enumerate(self._audit_store.delivery_audits):
+            rank = (
+                record.audit_created_at,
+                0 if record.status == DeliveryStatus.PENDING else 1,
+                idx,
+            )
+            existing = latest_by_notification.get(record.notification_id)
+            if existing is None or rank >= existing[0]:
+                latest_by_notification[record.notification_id] = (rank, record)
+        deduped_records = [pair[1] for pair in latest_by_notification.values()]
 
-        # Filter records
-        filtered = [r for r in all_records if self._matches_delivery_filter(r, filter_criteria)]
+        # Filter deduplicated records
+        filtered = [
+            r for r in deduped_records if self._matches_delivery_filter(r, filter_criteria)
+        ]
 
         # Sort by created_at descending (most recent first)
-        filtered.sort(key=lambda r: r.notification_created_at, reverse=True)
+        filtered.sort(
+            key=lambda r: (r.notification_created_at, r.audit_created_at, str(r.audit_id)),
+            reverse=True,
+        )
 
         # Apply pagination
         offset = self._decode_cursor(cursor)
         total_count = len(filtered)
         page = filtered[offset : offset + limit]
-        has_more = offset + limit < total_count
+        has_more = (offset + limit < total_count) and (offset + limit <= 10_000)
 
         # Convert to summaries
         items = [self._audit_record_to_delivery_summary(r) for r in page]
@@ -565,14 +602,14 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                     continue
                 all_events.append(event)
 
-        # Sort by event_time descending
-        all_events.sort(key=lambda e: e.event_time, reverse=True)
+        # Sort by event_time descending with deterministic lifecycle stage tie-breaker
+        all_events.sort(key=_audit_event_sort_key, reverse=True)
 
         # Apply pagination
         offset = self._decode_cursor(cursor)
         total_count = len(all_events)
         page = all_events[offset : offset + limit]
-        has_more = offset + limit < total_count
+        has_more = (offset + limit < total_count) and (offset + limit <= 10_000)
 
         return PaginatedResult(
             items=page,
@@ -641,16 +678,40 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
         limit: int = 25,
     ) -> PaginatedResult:
         """Get paginated list of delivery summaries from database."""
-        from sqlalchemy import func, select
+        from sqlalchemy import case, func, select
 
         from db.models import NotificationAuditRecord
 
         session = self._get_session()
         try:
-            # Build query
-            stmt = select(NotificationAuditRecord)
+            # Deduplicate by notification_id, selecting the latest audit row per notification
+            # before applying status/channel filters, counting, or paginating.
+            status_rank = case(
+                (NotificationAuditRecord.status == "PENDING", 0),
+                else_=1,
+            )
+            ranked = (
+                select(
+                    NotificationAuditRecord.id.label("latest_id"),
+                    func.row_number()
+                    .over(
+                        partition_by=NotificationAuditRecord.notification_id,
+                        order_by=(
+                            NotificationAuditRecord.created_at.desc(),
+                            status_rank.desc(),
+                            NotificationAuditRecord.id.desc(),
+                        ),
+                    )
+                    .label("rn"),
+                )
+                .subquery("ranked_delivery_audits")
+            )
+            stmt = select(NotificationAuditRecord).join(
+                ranked,
+                (NotificationAuditRecord.id == ranked.c.latest_id) & (ranked.c.rn == 1),
+            )
 
-            # Apply filters
+            # Apply filters on the latest row per notification_id
             if filter_criteria.start_time:
                 stmt = stmt.where(
                     NotificationAuditRecord.notification_created_at >= filter_criteria.start_time
@@ -684,13 +745,17 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                     session.get_bind().dialect.name,
                 ))
 
-            # Count total
+            # Count total unique matching notifications
             count_stmt = select(func.count()).select_from(stmt.subquery())
             total_count = session.execute(count_stmt).scalar() or 0
 
             # Apply ordering and pagination
             offset = self._decode_cursor(cursor)
-            stmt = stmt.order_by(NotificationAuditRecord.notification_created_at.desc())
+            stmt = stmt.order_by(
+                NotificationAuditRecord.notification_created_at.desc(),
+                NotificationAuditRecord.created_at.desc(),
+                NotificationAuditRecord.id.desc(),
+            )
             stmt = stmt.offset(offset).limit(limit)
 
             results = session.execute(stmt).scalars().all()
@@ -713,7 +778,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 for r in results
             ]
 
-            has_more = offset + limit < total_count
+            has_more = (offset + limit < total_count) and (offset + limit <= 10_000)
 
             return PaginatedResult(
                 items=items,
@@ -729,16 +794,24 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
         notification_id: UUID,
     ) -> DeliveryTimeline | None:
         """Get full delivery timeline for a specific notification."""
-        from sqlalchemy import select
+        from sqlalchemy import case, select
 
         from db.models import NotificationAuditRecord
 
         session = self._get_session()
         try:
+            status_rank = case(
+                (NotificationAuditRecord.status == "PENDING", 0),
+                else_=1,
+            )
             stmt = (
                 select(NotificationAuditRecord)
                 .where(NotificationAuditRecord.notification_id == notification_id)
-                .order_by(NotificationAuditRecord.created_at.desc())
+                .order_by(
+                    NotificationAuditRecord.created_at.desc(),
+                    status_rank.desc(),
+                    NotificationAuditRecord.id.desc(),
+                )
                 .limit(1)
             )
             result = session.execute(stmt).scalar_one_or_none()
@@ -870,9 +943,10 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 )
                 delivery_results = (
                     session.execute(
-                        delivery_stmt.order_by(NotificationAuditRecord.created_at.desc()).limit(
-                            fetch_limit
-                        )
+                        delivery_stmt.order_by(
+                            NotificationAuditRecord.created_at.desc(),
+                            NotificationAuditRecord.id.desc(),
+                        ).limit(fetch_limit)
                     )
                     .scalars()
                     .all()
@@ -965,7 +1039,11 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
                 ack_results = (
                     session.execute(
-                        ack_stmt.order_by(AckAuditRecordDB.created_at.desc()).limit(fetch_limit)
+                        ack_stmt.order_by(
+                            AckAuditRecordDB.created_at.desc(),
+                            AckAuditRecordDB.acked_at.desc(),
+                            AckAuditRecordDB.id.desc(),
+                        ).limit(fetch_limit)
                     ).all()
                 )
 
@@ -991,6 +1069,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                             skip_snapshot_id=context.skip_snapshot_id if context else None,
                             correlation_id=context.correlation_id if context else None,
                             payload={
+                                **(r.ack_metadata if isinstance(r.ack_metadata, dict) else {}),
                                 "old_status": r.old_status,
                                 "new_status": r.new_status,
                                 "acked_by": r.acked_by,
@@ -1000,12 +1079,12 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                         )
                     )
 
-            # Sort by event_time descending
-            all_events.sort(key=lambda e: e.event_time, reverse=True)
+            # Sort by event_time descending with deterministic lifecycle stage tie-breaker
+            all_events.sort(key=_audit_event_sort_key, reverse=True)
 
             # Apply pagination
             page = all_events[offset : offset + limit]
-            has_more = offset + limit < total_count
+            has_more = (offset + limit < total_count) and (offset + limit <= 10_000)
 
             return PaginatedResult(
                 items=page,

@@ -166,6 +166,40 @@ describe('AuditFilters', () => {
         })
       );
     });
+
+    it('preserves typed text inputs when event type or autonomy mode select changes and guards invalid dates', () => {
+      const mockOnChange = vi.fn();
+
+      render(
+        <AuditFilters
+          filters={defaultFilters}
+          onFiltersChange={mockOnChange}
+        />
+      );
+
+      fireEvent.change(screen.getByTestId('notification-id-input'), {
+        target: { value: 'typed-notif-id' },
+      });
+      fireEvent.change(screen.getByTestId('agent-id-input'), {
+        target: { value: 'typed-agent-id' },
+      });
+      fireEvent.change(screen.getByTestId('start-time-input'), {
+        target: { value: 'not-a-valid-date' },
+      });
+
+      fireEvent.change(screen.getByTestId('event-type-select'), {
+        target: { value: 'ack.received' },
+      });
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event_type: 'ack.received',
+          notification_id: 'typed-notif-id',
+          agent_id: 'typed-agent-id',
+          start_time: undefined,
+        })
+      );
+    });
   });
 
   describe('Clear Filters', () => {

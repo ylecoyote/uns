@@ -30,6 +30,7 @@ from sqlalchemy import (
     Table,
     case,
     create_engine,
+    event,
     func,
     insert,
     select,
@@ -157,9 +158,24 @@ class Runtime:
         is_in_memory = is_in_memory_database_url(database_url)
         if is_in_memory:
             options = {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
+        elif database_url.startswith("sqlite"):
+            options = {"connect_args": {"timeout": 30.0}}
         self.database_url = database_url
         self.persistence_mode = "in_memory" if is_in_memory else "persistent"
         self.engine = create_engine(database_url, **options)
+        if self.engine.dialect.name == "sqlite":
+
+            @event.listens_for(self.engine, "connect")
+            def _configure_sqlite_connection(dbapi_connection: Any, _record: Any) -> None:
+                cursor = dbapi_connection.cursor()
+                try:
+                    cursor.execute("PRAGMA busy_timeout=30000")
+                    if not is_in_memory:
+                        cursor.execute("PRAGMA journal_mode=WAL")
+                        cursor.execute("PRAGMA synchronous=NORMAL")
+                finally:
+                    cursor.close()
+
         migrate_runtime_schema(self.engine, create_tables=create_tables)
         self.sessions = sessionmaker(self.engine)
         self.audit_store = SQLAlchemyAuditStore(self.sessions)

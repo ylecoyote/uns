@@ -359,6 +359,113 @@ describe('DeliveriesDetailPage', () => {
     expect(ownerCta).toHaveTextContent('View & Acknowledge Canonical Owner');
   });
 
+  it('maps inherited effective_ack_status to matching badge class and resets transient responder state on route change', async () => {
+    startConsoleSession('responder-key', {
+      subject: 'responder-user',
+      scopes: ['observer', 'responder'],
+      auth_mode: 'required',
+    });
+
+    const canonicalOwnerId = '999e4567-e89b-12d3-a456-426614174999';
+    const followerId = mockDeliveryTimeline.notification_id;
+
+    // 1. Render canonical owner first, type note & open inline confirmation
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimeline,
+            notification_id: canonicalOwnerId,
+            runtime_state: {
+              delivery_status: 'DELIVERED',
+              effective_status: 'DELIVERED',
+              ack_status: 'PENDING',
+              effective_ack_status: 'PENDING',
+              require_ack: true,
+              obligation_owner_id: canonicalOwnerId,
+              obligation_resolution_status: 'PENDING',
+              dead_letter: false,
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimeline,
+            notification_id: followerId,
+            status: 'DEDUPLICATED',
+            runtime_state: {
+              delivery_status: 'DEDUPLICATED',
+              effective_status: 'DELIVERED',
+              ack_status: 'PENDING',
+              effective_ack_status: 'TIMED_OUT',
+              ack_inherited: true,
+              require_ack: true,
+              obligation_owner_id: canonicalOwnerId,
+              obligation_resolution_status: 'TIMED_OUT',
+              dead_letter: false,
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimeline,
+            notification_id: canonicalOwnerId,
+            runtime_state: {
+              delivery_status: 'DELIVERED',
+              effective_status: 'DELIVERED',
+              ack_status: 'PENDING',
+              effective_ack_status: 'PENDING',
+              require_ack: true,
+              obligation_owner_id: canonicalOwnerId,
+              obligation_resolution_status: 'PENDING',
+              dead_letter: false,
+            },
+          }),
+      });
+
+    renderWithRouter(canonicalOwnerId);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('responder-action-bar')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('responder-note-input'), {
+      target: { value: 'Draft note before navigation' },
+    });
+    fireEvent.click(screen.getByTestId('ack-btn'));
+    expect(screen.getByTestId('inline-response-confirmation')).toBeInTheDocument();
+
+    // Navigate to deduplicated follower -> verify inherited TIMED_OUT gets tag-response-fail
+    // and then navigate back to canonical owner via canonical-owner-link
+    render(
+      <MemoryRouter initialEntries={[`/deliveries/${followerId}`]}>
+        <Routes>
+          <Route path="/deliveries/:notificationId" element={<DeliveriesDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('inherited-ack-status')).toBeInTheDocument();
+    });
+
+    const inheritedBadge = screen
+      .getByTestId('inherited-ack-status')
+      .querySelector('.badge');
+    expect(inheritedBadge).toHaveClass('tag-response-fail');
+
+    fireEvent.click(screen.getByTestId('canonical-owner-link'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('responder-note-input').pop()).toHaveValue('');
+    });
+  });
+
   it('allows responder to acknowledge canonical pending notification with note and refreshes timeline', async () => {
     startConsoleSession('responder-key', {
       subject: 'responder-user',

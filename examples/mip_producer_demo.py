@@ -376,12 +376,20 @@ async def run_http_demo(
     ) as client:
         loaded_types: list[str] = []
         if reload_policies:
-            target_dir = str((policy_dir or DEFAULT_MIP_POLICY_DIR).resolve())
+            reload_payload: dict[str, Any] = (
+                {"policy_dir": str(policy_dir.resolve())} if policy_dir is not None else {}
+            )
             reload_resp = await client.post(
                 "/api/v1/policies/reload",
-                json={"policy_dir": target_dir},
+                json=reload_payload,
                 headers=admin_headers,
             )
+            if reload_resp.status_code == 422 and reload_payload:
+                reload_resp = await client.post(
+                    "/api/v1/policies/reload",
+                    json={},
+                    headers=admin_headers,
+                )
             reload_resp.raise_for_status()
             loaded_types = reload_resp.json().get("notification_types", [])
 
@@ -533,8 +541,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--policy-dir",
         type=Path,
-        default=DEFAULT_MIP_POLICY_DIR,
-        help="Path to MIP YAML policies directory (default: examples/policies/mip-uns).",
+        default=None,
+        help="Path to MIP YAML policies directory (default: examples/policies/mip-uns in local mode).",
     )
     parser.add_argument(
         "--database-url",

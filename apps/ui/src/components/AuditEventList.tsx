@@ -121,6 +121,31 @@ function formatResponseDuration(startIso: string, endIso: string): string {
   return `${mins}m ${String(secs).padStart(2, '0')}s`;
 }
 
+function getLifecyclePhaseRank(eventType: AuditEventType): number {
+  switch (eventType) {
+    case 'notification.created':
+      return 0;
+    case 'delivery.started':
+      return 1;
+    case 'delivery.channel_attempted':
+      return 2;
+    case 'delivery.rate_limited':
+    case 'delivery.deduplicated':
+    case 'delivery.succeeded':
+    case 'delivery.failed':
+      return 3;
+    case 'ack.pending':
+      return 4;
+    case 'ack.received':
+    case 'ack.dismissed':
+    case 'ack.timed_out':
+    case 'escalation.triggered':
+      return 5;
+    default:
+      return 6;
+  }
+}
+
 function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleRow[] {
   const groups = new Map<string, AuditEvent[]>();
   for (const event of events) {
@@ -134,11 +159,15 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
 
   const rows: NotificationLifecycleRow[] = [];
   for (const [notificationId, group] of groups.entries()) {
-    // Sort chronological ascending inside the group to derive lifecycle stages
-    const sorted = [...group].sort(
-      (a, b) => Date.parse(a.event_time) - Date.parse(b.event_time)
-    );
-    const primary = sorted[0];
+    // Sort chronological ascending inside the group with deterministic lifecycle phase rank tie-breaker
+    const sorted = [...group].sort((a, b) => {
+      const timeDiff = Date.parse(a.event_time) - Date.parse(b.event_time);
+      if (!Number.isNaN(timeDiff) && timeDiff !== 0) {
+        return timeDiff;
+      }
+      return getLifecyclePhaseRank(a.event_type) - getLifecyclePhaseRank(b.event_type);
+    });
+    const primary = sorted.find((e) => Boolean(e.notification_type)) ?? sorted[0];
 
     const startedEvent =
       sorted.find(
@@ -146,7 +175,7 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
           e.event_type === 'delivery.started' ||
           e.event_type === 'notification.created' ||
           e.event_type === 'delivery.channel_attempted'
-      ) ?? primary;
+      ) ?? null;
 
     const deliveredEvents = sorted.filter(
       (e) =>
@@ -183,8 +212,10 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
         responseEvent.event_type === 'ack.received' ||
         responseEvent.event_type === 'ack.dismissed'
       ) {
-        const baselineIso = deliveredEvent?.event_time ?? startedEvent.event_time;
-        timeToRespondLabel = formatResponseDuration(baselineIso, responseEvent.event_time);
+        const baselineIso = deliveredEvent?.event_time ?? startedEvent?.event_time ?? null;
+        timeToRespondLabel = baselineIso
+          ? formatResponseDuration(baselineIso, responseEvent.event_time)
+          : '—';
       }
     }
 
@@ -207,8 +238,17 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
 function summarizeDeliveryMeta(event: AuditEvent | null): string | null {
   if (!event) return null;
   const payload = event.payload ?? {};
-  if (Array.isArray(payload.channels_succeeded) && payload.channels_succeeded.length > 0) {
-    return `${payload.channels_succeeded.join(', ')}`;
+  const succeeded = Array.isArray(payload.channels_succeeded)
+    ? payload.channels_succeeded
+    : [];
+  const failed = Array.isArray(payload.channels_failed)
+    ? payload.channels_failed
+    : [];
+  if (succeeded.length > 0 && failed.length > 0) {
+    return `${succeeded.join(', ')} (failed: ${failed.join(', ')})`;
+  }
+  if (succeeded.length > 0) {
+    return `${succeeded.join(', ')}`;
   }
   if (typeof payload.error_message === 'string' && payload.error_message) {
     return payload.error_message;
@@ -226,6 +266,12 @@ function summarizeResponseMeta(event: AuditEvent | null): string | null {
     return payload.acked_by;
   }
   if (typeof payload.actor === 'string' && payload.actor) {
+    if (
+      event.event_type === 'ack.timed_out' &&
+      payload.actor === 'uns-timeout-worker'
+    ) {
+      return null;
+    }
     return payload.actor;
   }
   return null;
@@ -313,7 +359,7 @@ export function AuditEventList({
                           </div>
                         </>
                       ) : (
-                        <span className="timestamp">—</span>
+                        <span className="timestamp">Prior to window</span>
                       )}
                     </td>
 
@@ -330,6 +376,12 @@ export function AuditEventList({
                             {deliveryMeta ? ` · ${deliveryMeta}` : ''}
                           </div>
                         </>
+                      ) : row.responseEvent &&
+                        (row.responseEvent.event_type === 'ack.received' ||
+                          row.responseEvent.event_type === 'ack.dismissed' ||
+                          row.responseEvent.event_type === 'ack.timed_out' ||
+                          row.responseEvent.event_type === 'escalation.triggered') ? (
+                        <span className="timestamp">Prior to window</span>
                       ) : (
                         <span className="badge tag-delivery-pending">Pending</span>
                       )}

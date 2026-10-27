@@ -45,6 +45,9 @@ export {
 export {
   fetchEffectivePolicy,
   fetchActivePolicies,
+  getActivePolicies,
+  fetchPolicyRevisions,
+  getPolicyRevisions,
   simulateNotification,
   sendTestNotification,
   reloadPolicies,
@@ -69,6 +72,8 @@ export {
   decodeInvariantsList,
   decodeInvariantsSummary,
   decodeEffectivePolicy,
+  decodeActivePoliciesList,
+  decodePolicyRevisionsList,
   // Error handling
   ContractDriftError,
   assertDecode,

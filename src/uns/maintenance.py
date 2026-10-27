@@ -25,7 +25,18 @@ from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import Connection, Engine, Table, create_engine, exists, func, inspect, or_, select
+from sqlalchemy import (
+    Connection,
+    Engine,
+    Table,
+    create_engine,
+    event,
+    exists,
+    func,
+    inspect,
+    or_,
+    select,
+)
 from sqlalchemy.engine import make_url
 
 from db.models import AckAuditRecord, NotificationAuditRecord
@@ -223,6 +234,7 @@ def maintain(
         "archive": {"path": str(archive)} if archive is not None else None,
     }
     with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA busy_timeout=30000")
         if apply:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
         _schema_check(connection)
@@ -369,7 +381,18 @@ def main(argv: list[str] | None = None) -> None:
         parser.error("Retention is validated for SQLite only")
     if not url.database or not Path(url.database).is_file():
         parser.error("Retention requires an existing SQLite database file")
-    engine = create_engine(url)
+    engine = create_engine(url, connect_args={"timeout": 30.0})
+
+    @event.listens_for(engine, "connect")
+    def _configure_sqlite_connection(dbapi_connection: Any, _record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cursor.close()
+
     try:
         report = maintain(
             engine,

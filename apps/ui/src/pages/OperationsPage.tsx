@@ -105,7 +105,9 @@ function joinDeadLetters(
     runtimeByNotificationId.set(rt.notification_id, rt);
   }
 
+  const matchedNotificationIds = new Set<string>();
   const rows: JoinedDeadLetterRow[] = dlqItems.map((entry) => {
+    matchedNotificationIds.add(entry.notification_id);
     const rt = runtimeByNotificationId.get(entry.notification_id);
     const meta = entry.metadata ?? {};
     const attempts =
@@ -138,6 +140,52 @@ function joinDeadLetters(
       is_legacy_dlq_entry: entry.entry_id !== entry.notification_id,
     };
   });
+
+  for (const rt of runtimeDeadLetters) {
+    if (matchedNotificationIds.has(rt.notification_id)) {
+      continue;
+    }
+    matchedNotificationIds.add(rt.notification_id);
+    const outcome = (rt.outcome ?? {}) as Record<string, unknown>;
+    const rtRecord = rt as unknown as Record<string, unknown>;
+    const notificationType =
+      (typeof rtRecord.notification_type === 'string' && rtRecord.notification_type) ||
+      (typeof outcome.notification_type === 'string' && outcome.notification_type) ||
+      'runtime.dead_letter';
+    const intent =
+      (typeof rtRecord.intent === 'string' && rtRecord.intent) ||
+      (typeof outcome.intent === 'string' && outcome.intent) ||
+      'OPERATIONAL';
+    const source =
+      (typeof rtRecord.source === 'string' && rtRecord.source) ||
+      (typeof outcome.source === 'string' && outcome.source) ||
+      'runtime';
+    const reason =
+      (typeof rtRecord.reason === 'string' && rtRecord.reason) ||
+      (typeof outcome.reason === 'string' && outcome.reason) ||
+      'guaranteed_delivery_exhausted';
+    const createdAt =
+      (typeof rtRecord.created_at === 'string' && rtRecord.created_at) ||
+      (typeof outcome.created_at === 'string' && outcome.created_at) ||
+      '';
+
+    rows.push({
+      entry_id: rt.notification_id,
+      notification_id: rt.notification_id,
+      notification_type: notificationType,
+      intent,
+      source,
+      reason,
+      created_at: createdAt,
+      attempts: rt.attempts ?? null,
+      cycle: rt.cycle ?? null,
+      cycle_attempts: rt.cycle_attempts ?? null,
+      outcome_summary: extractOutcomeSummary(rt, outcome),
+      replay_blocked_by: rt.replay_blocked_by ?? null,
+      replay_block_reason: rt.replay_block_reason ?? null,
+      is_legacy_dlq_entry: false,
+    });
+  }
 
   // Deterministic sort: created_at DESC, entry_id ASC
   rows.sort((a, b) => {
@@ -193,8 +241,15 @@ export function OperationsPage() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const autoRefreshRef = useRef(autoRefresh);
+  autoRefreshRef.current = autoRefresh;
 
   const fetchSnapshot = useCallback(async (isInitial = false) => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -243,54 +298,84 @@ export function OperationsPage() {
       }));
     }
 
-    if (dlqRes.status === 'fulfilled') {
+    const dlqErrors: string[] = [];
+    if (dlqRes.status === 'rejected') {
+      const err = dlqRes.reason;
+      dlqErrors.push(
+        err instanceof Error ? err.message : 'Unable to fetch dead-letter queue'
+      );
+    }
+    if (runtimeDlqRes.status === 'rejected') {
+      const err = runtimeDlqRes.reason;
+      dlqErrors.push(
+        err instanceof Error
+          ? err.message
+          : 'Unable to fetch runtime dead-letter eligibility'
+      );
+    }
+
+    if (dlqRes.status === 'fulfilled' || runtimeDlqRes.status === 'fulfilled') {
+      const dlqItems = dlqRes.status === 'fulfilled' ? (dlqRes.value.items ?? []) : [];
       const runtimeItems =
         runtimeDlqRes.status === 'fulfilled' ? runtimeDlqRes.value : [];
-      const joined = joinDeadLetters(dlqRes.value.items ?? [], runtimeItems);
+      const joined = joinDeadLetters(dlqItems, runtimeItems);
+      const depth =
+        dlqRes.status === 'fulfilled'
+          ? Math.max(dlqRes.value.depth ?? joined.length, joined.length)
+          : joined.length;
       setDlqState({
         rows: joined,
-        depth: dlqRes.value.depth ?? joined.length,
-        error: null,
+        depth,
+        error: dlqErrors.length > 0 ? dlqErrors.join(' | ') : null,
       });
     } else {
-      const err = dlqRes.reason;
       setDlqState((prev) => ({
         ...prev,
-        error: err instanceof Error ? err.message : 'Unable to fetch dead-letter queue',
+        error: dlqErrors.join(' | '),
       }));
     }
 
     setLastUpdated(new Date().toLocaleTimeString());
     setIsLoading(false);
     setIsRefreshing(false);
+
+    if (mountedRef.current && autoRefreshRef.current) {
+      pollTimeoutRef.current = setTimeout(() => {
+        if (!mountedRef.current || !autoRefreshRef.current) return;
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+          void fetchSnapshot(false);
+        }
+      }, POLL_INTERVAL_MS);
+    }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const scheduleNext = () => {
-      if (cancelled || !autoRefresh) return;
-      pollTimeoutRef.current = setTimeout(async () => {
-        if (cancelled) return;
-        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-          await fetchSnapshot(false);
-        }
-        scheduleNext();
-      }, POLL_INTERVAL_MS);
-    };
-
-    void fetchSnapshot(true).then(() => {
-      scheduleNext();
-    });
+    mountedRef.current = true;
+    void fetchSnapshot(true);
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
       abortControllerRef.current?.abort();
     };
-  }, [autoRefresh, fetchSnapshot]);
+  }, [fetchSnapshot]);
+
+  useEffect(() => {
+    if (!autoRefresh && pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    } else if (autoRefresh && !pollTimeoutRef.current && !isLoading && !isRefreshing) {
+      pollTimeoutRef.current = setTimeout(() => {
+        if (!mountedRef.current || !autoRefreshRef.current) return;
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+          void fetchSnapshot(false);
+        }
+      }, POLL_INTERVAL_MS);
+    }
+  }, [autoRefresh, fetchSnapshot, isLoading, isRefreshing]);
 
   async function handleExecuteAction(action: ConfirmingOperatorAction) {
     if (submittingEntryId) return;

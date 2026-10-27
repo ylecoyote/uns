@@ -205,6 +205,102 @@ describe('AuditTimeline', () => {
       expect(screen.queryByTestId('audit-lifecycle-table')).not.toBeInTheDocument();
       expect(screen.getByTestId('audit-event-list')).not.toHaveClass('audit-stream-hidden');
     });
+
+    it('renders Prior to window and — duration for partial-page ack.received slices, sorts equal timestamps by lifecycle phase rank, and filters internal timeout worker actor', async () => {
+      const partialPagePayload = {
+        items: [
+          // 1. Only ack.received in window (no started or delivered events in slice)
+          {
+            audit_id: 'audit-ack-only',
+            event_type: 'ack.received',
+            event_time: '2026-01-23T12:10:00Z',
+            notification_id: 'notif-ack-only',
+            notification_type: 'safety.halt',
+            autonomy_context: {
+              autonomy_mode: 'LIVE',
+              agent_id: '123e4567-e89b-12d3-a456-426614174002',
+            },
+            payload: {
+              acked_by: 'oncall-sre',
+            },
+          },
+          // 2. Equal-timestamp events delivered out of phase order + mixed channel success/failure + internal timeout worker
+          {
+            audit_id: 'audit-timeout',
+            event_type: 'ack.timed_out',
+            event_time: '2026-01-23T12:00:00Z',
+            notification_id: 'notif-same-ts',
+            notification_type: 'ops.degraded',
+            autonomy_context: {
+              autonomy_mode: 'LIVE',
+              agent_id: '223e4567-e89b-12d3-a456-426614174002',
+            },
+            payload: {
+              actor: 'uns-timeout-worker',
+            },
+          },
+          {
+            audit_id: 'audit-delivered-mixed',
+            event_type: 'delivery.succeeded',
+            event_time: '2026-01-23T12:00:00Z',
+            notification_id: 'notif-same-ts',
+            notification_type: 'ops.degraded',
+            autonomy_context: {
+              autonomy_mode: 'LIVE',
+              agent_id: '223e4567-e89b-12d3-a456-426614174002',
+            },
+            payload: {
+              channels_succeeded: ['SLACK'],
+              channels_failed: ['EMAIL'],
+            },
+          },
+          {
+            audit_id: 'audit-created',
+            event_type: 'notification.created',
+            event_time: '2026-01-23T12:00:00Z',
+            notification_id: 'notif-same-ts',
+            notification_type: '',
+            autonomy_context: {
+              autonomy_mode: 'LIVE',
+              agent_id: '223e4567-e89b-12d3-a456-426614174002',
+            },
+            payload: {},
+          },
+        ],
+        pagination: {
+          next_cursor: null,
+          has_more: false,
+          total_count: 4,
+        },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(partialPagePayload),
+      });
+
+      render(<AuditTimeline />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('audit-lifecycle-row-notif-ack-only')).toBeInTheDocument();
+      });
+
+      const ackOnlyRow = screen.getByTestId('audit-lifecycle-row-notif-ack-only');
+      // Started and Delivered columns both show "Prior to window", not "Pending" or "Acknowledged"
+      expect(ackOnlyRow).toHaveTextContent('Prior to window');
+      expect(ackOnlyRow).not.toHaveTextContent('Pending');
+      // Time to respond is '—' rather than a fabricated '0s'
+      expect(ackOnlyRow).toHaveTextContent('—');
+      expect(ackOnlyRow).not.toHaveTextContent('0s');
+
+      const sameTsRow = screen.getByTestId('audit-lifecycle-row-notif-same-ts');
+      // Non-empty notification_type carrier chosen even though notification.created sorted first
+      expect(sameTsRow).toHaveTextContent('ops.degraded');
+      expect(sameTsRow).toHaveTextContent('Created');
+      expect(sameTsRow).toHaveTextContent('SLACK (failed: EMAIL)');
+      expect(sameTsRow).toHaveTextContent('Ack Timeout');
+      expect(sameTsRow).not.toHaveTextContent('uns-timeout-worker');
+    });
   });
 
   describe('API Integration', () => {
