@@ -345,6 +345,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ui/policies/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List notification policy revisions
+         * @description Return stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).
+         */
+        get: operations["list_policy_revisions_ui_policies_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ui/invariants": {
         parameters: {
             query?: never;
@@ -1460,6 +1480,110 @@ export interface components {
             notification_types: string[];
         };
         /**
+         * PolicyRevisionListResponse
+         * @description Catalog of notification routing policy revisions across lifecycle statuses.
+         */
+        PolicyRevisionListResponse: {
+            /** Items */
+            items?: components["schemas"]["PolicyRevisionSummary"][];
+            /**
+             * Total Count
+             * @description Total number of policy revisions
+             */
+            total_count: number;
+        };
+        /**
+         * PolicyRevisionSummary
+         * @description Summary of a persisted notification routing policy revision for governance and lineage.
+         */
+        PolicyRevisionSummary: {
+            /**
+             * Policy Id
+             * @description Persisted policy revision identifier
+             */
+            policy_id?: string | null;
+            /**
+             * Notification Type
+             * @description Policy notification_type identifier
+             */
+            notification_type: string;
+            /**
+             * Version
+             * @description Policy version
+             */
+            version: string;
+            /**
+             * Status
+             * @description Lifecycle status (ACTIVE, DRAFT, PREVIEW, RETIRED)
+             */
+            status: string;
+            /**
+             * Config Hash
+             * @description Semantic policy content hash
+             */
+            config_hash?: string | null;
+            /**
+             * Previous Version Id
+             * @description Previous policy version ID in lifecycle lineage
+             */
+            previous_version_id?: string | null;
+            /** @description Default notification intent */
+            intent?: components["schemas"]["NotificationIntent"] | null;
+            /**
+             * Channels
+             * @description Default LIVE channels
+             */
+            channels?: components["schemas"]["Channel"][];
+            /** @description Default LIVE delivery mode */
+            delivery_mode?: components["schemas"]["DeliveryMode"] | null;
+            /**
+             * Require Ack
+             * @description Default LIVE ack requirement
+             */
+            require_ack?: boolean | null;
+            /**
+             * Ack Timeout Minutes
+             * @description Default LIVE ack timeout in minutes
+             */
+            ack_timeout_minutes?: number | null;
+            /**
+             * Ack Timeout Seconds
+             * @description Default LIVE ack timeout in seconds
+             */
+            ack_timeout_seconds?: number | null;
+            /**
+             * Dedup Window Seconds
+             * @description Deduplication window in seconds
+             */
+            dedup_window_seconds: number;
+            /**
+             * Created At
+             * @description When the policy revision was created
+             */
+            created_at?: string | null;
+            /**
+             * Updated At
+             * @description When the policy revision was last updated
+             */
+            updated_at?: string | null;
+            /**
+             * Activated At
+             * @description When the policy revision became ACTIVE
+             */
+            activated_at?: string | null;
+            /**
+             * Retired At
+             * @description When the policy revision was retired
+             */
+            retired_at?: string | null;
+        };
+        /**
+         * PolicyStatus
+         * @description Lifecycle status for notification routing policies.
+         * @enum {string}
+         */
+        PolicyStatus: "DRAFT" | "PREVIEW" | "ACTIVE" | "RETIRED";
+        /**
          * Priority
          * @description Notification priority levels.
          * @enum {string}
@@ -2369,6 +2493,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivePolicyListResponse"];
+                };
+            };
+        };
+    };
+    list_policy_revisions_ui_policies_revisions_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by notification_type */
+                notification_type?: string | null;
+                /** @description Filter by policy lifecycle status */
+                status?: components["schemas"]["PolicyStatus"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyRevisionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

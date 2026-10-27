@@ -16,12 +16,30 @@ import type {
   EffectivePolicyResponse,
   PolicyInspectorParams,
   PolicyReloadResponsePayload,
+  PolicyRevisionListResponse,
+  PolicyRevisionsFilter,
   SendNotificationRequestPayload,
   SendNotificationResponsePayload,
   SimulateNotificationResponsePayload,
 } from '../types/api';
 import { apiGet, apiRootRequest, type RequestOptions } from './client';
-import { decodeEffectivePolicy, decodeWithMode } from './validators';
+import {
+  ContractDriftError,
+  PolicyRevisionListResponseSchema,
+  decodeEffectivePolicy,
+  decodeWithMode,
+  type DecodeResult,
+} from './validators';
+
+function decodePolicyRevisions(
+  data: unknown
+): DecodeResult<PolicyRevisionListResponse> {
+  const result = PolicyRevisionListResponseSchema.safeParse(data);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return { success: false, error: new ContractDriftError(result.error, data) };
+}
 
 /**
  * Fetch effective policy for the given parameters
@@ -59,6 +77,32 @@ export async function fetchActivePolicies(
   options?: RequestOptions
 ): Promise<ActivePolicyListResponse> {
   return apiGet<ActivePolicyListResponse>('/policies/active', undefined, options);
+}
+
+/**
+ * Fetch stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).
+ */
+export async function fetchPolicyRevisions(
+  filters?: PolicyRevisionsFilter,
+  options?: RequestOptions
+): Promise<PolicyRevisionListResponse> {
+  const params: Record<string, string | undefined> = {};
+  if (filters?.notification_type) {
+    params.notification_type = filters.notification_type;
+  }
+  if (filters?.status) {
+    params.status = filters.status;
+  }
+  const data = await apiGet<PolicyRevisionListResponse>(
+    '/policies/revisions',
+    Object.keys(params).length > 0 ? params : undefined,
+    options
+  );
+  return decodeWithMode(
+    decodePolicyRevisions,
+    data,
+    'GET /ui/policies/revisions'
+  ) as PolicyRevisionListResponse;
 }
 
 /**

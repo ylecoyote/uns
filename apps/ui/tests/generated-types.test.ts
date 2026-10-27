@@ -47,6 +47,22 @@ describe("generated types", () => {
     expectTypeOf<ActivePolicyListResponse["total_count"]>().toBeNumber();
   });
 
+  it("includes the /ui/policies/revisions endpoint and PolicyRevisionListResponse / PolicyRevisionSummary schemas", () => {
+    expectTypeOf<paths["/ui/policies/revisions"]>().toBeObject();
+    expectTypeOf<
+      components["schemas"]["PolicyRevisionSummary"]["notification_type"]
+    >().toBeString();
+    expectTypeOf<
+      components["schemas"]["PolicyRevisionSummary"]["version"]
+    >().toBeString();
+    expectTypeOf<
+      components["schemas"]["PolicyRevisionSummary"]["status"]
+    >().toBeString();
+    expectTypeOf<
+      components["schemas"]["PolicyRevisionListResponse"]["total_count"]
+    >().toBeNumber();
+  });
+
   it("includes updated RuntimeDeliveryState lineage and bounded event fields", () => {
     expectTypeOf<RuntimeDeliveryState>().toEqualTypeOf<
       components["schemas"]["RuntimeDeliveryState"]

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Link, useInRouterContext, useLocation } from 'react-router-dom';
 import {
   fetchActivePolicies,
+  fetchPolicyRevisions,
   reloadPolicies,
   sendTestNotification,
   simulateNotification,
@@ -31,12 +32,27 @@ import type {
   AutonomyMode,
   NotificationIntent,
   PolicyInspectorParams,
+  PolicyLifecycleStatus,
   PolicyReloadResponsePayload,
+  PolicyRevisionSummary,
   SendNotificationResponsePayload,
   SimulateNotificationResponsePayload,
 } from '../types/api';
 
 const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
+
+function getPolicyStatusBadgeClass(status: string): string {
+  switch (status.toUpperCase()) {
+    case 'ACTIVE':
+      return 'badge tag-delivery-ok';
+    case 'DRAFT':
+    case 'PREVIEW':
+      return 'badge tag-delivery-pending';
+    case 'RETIRED':
+    default:
+      return 'badge badge-default';
+  }
+}
 
 function RouterQueryNotificationTypeSync({
   onSelectType,
@@ -66,10 +82,16 @@ export function PolicyInspectorPage() {
 
   const { result, loading, error, inspect, clear } = usePolicyInspector();
 
-  // Active policy catalog state
+  // Active policy catalog & revision history state
   const [activePolicies, setActivePolicies] = useState<ActivePolicySummary[]>([]);
+  const [policyRevisions, setPolicyRevisions] = useState<PolicyRevisionSummary[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [revisionsError, setRevisionsError] = useState<string | null>(null);
+  const [catalogView, setCatalogView] = useState<'all' | 'active' | 'revisions'>('all');
+  const [revisionStatusFilter, setRevisionStatusFilter] = useState<
+    'ALL' | PolicyLifecycleStatus
+  >('ALL');
 
   // External selection sync for PolicyInspectorForm
   const [externalSelection, setExternalSelection] =
@@ -106,17 +128,37 @@ export function PolicyInspectorPage() {
   const [reloadError, setReloadError] = useState<string | null>(null);
 
   const loadCatalog = useCallback(async () => {
-    if (typeof fetchActivePolicies !== 'function') return;
+    const hasActiveLoader = typeof fetchActivePolicies === 'function';
+    const hasRevisionsLoader = typeof fetchPolicyRevisions === 'function';
+    if (!hasActiveLoader && !hasRevisionsLoader) return;
+
     setCatalogLoading(true);
     setCatalogError(null);
+    setRevisionsError(null);
+
     try {
-      const response = await fetchActivePolicies();
-      if (response && Array.isArray(response.items)) {
-        setActivePolicies(response.items);
+      if (hasActiveLoader) {
+        const response = await fetchActivePolicies();
+        if (response && Array.isArray(response.items)) {
+          setActivePolicies(response.items);
+        }
       }
     } catch (err) {
       setCatalogError(
         err instanceof Error ? err.message : 'Unable to load active policies.'
+      );
+    }
+
+    try {
+      if (hasRevisionsLoader) {
+        const revisionsResponse = await fetchPolicyRevisions();
+        if (revisionsResponse && Array.isArray(revisionsResponse.items)) {
+          setPolicyRevisions(revisionsResponse.items);
+        }
+      }
+    } catch (err) {
+      setRevisionsError(
+        err instanceof Error ? err.message : 'Unable to load policy revisions.'
       );
     } finally {
       setCatalogLoading(false);
@@ -425,8 +467,63 @@ export function PolicyInspectorPage() {
         </div>
       </section>
 
+      {/* Catalog / Revision Governance View Bar when policies or revisions exist */}
+      {(activePolicies.length > 0 || policyRevisions.length > 0) && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 24px',
+            background: 'var(--color-surface)',
+            borderBottom: '1px solid var(--color-divider)',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--color-neutral-700)',
+            }}
+          >
+            Policy Governance Workspace
+          </span>
+          <div className="seg" role="group" aria-label="Policy catalog view" data-testid="policy-catalog-view-toggle">
+            <button
+              type="button"
+              className={`seg-opt ${catalogView === 'all' ? 'active' : ''}`}
+              onClick={() => setCatalogView('all')}
+              data-testid="policy-view-all-btn"
+            >
+              All Views
+            </button>
+            <button
+              type="button"
+              className={`seg-opt ${catalogView === 'active' ? 'active' : ''}`}
+              onClick={() => setCatalogView('active')}
+              data-testid="policy-view-active-btn"
+            >
+              Active Catalog ({activePolicies.length})
+            </button>
+            <button
+              type="button"
+              className={`seg-opt ${catalogView === 'revisions' ? 'active' : ''}`}
+              onClick={() => setCatalogView('revisions')}
+              data-testid="policy-view-revisions-btn"
+            >
+              Revision History &amp; Lineage ({policyRevisions.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Active Policies Catalog Table */}
-      {activePolicies.length > 0 && (
+      {activePolicies.length > 0 && catalogView !== 'revisions' && (
         <section
           data-testid="active-policies-section"
           style={{ borderBottom: '2px solid var(--color-divider)' }}
@@ -503,7 +600,144 @@ export function PolicyInspectorPage() {
         </section>
       )}
 
-      {catalogLoading && activePolicies.length === 0 && (
+      {/* Policy Revision History & Lineage Table */}
+      {(policyRevisions.length > 0 || catalogView === 'revisions') &&
+        catalogView !== 'active' && (
+          <section
+            data-testid="policy-revisions-section"
+            style={{ borderBottom: '2px solid var(--color-divider)' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 24px',
+                background: 'var(--color-surface)',
+                borderBottom: '1px solid var(--color-divider)',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: '14px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  Policy Revision History &amp; Lineage ({policyRevisions.length})
+                </h2>
+                <span style={{ fontSize: '12px', color: 'var(--color-neutral-700)' }}>
+                  Inspect ACTIVE, PREVIEW, DRAFT, and RETIRED revisions — click any row to load into Inspector &amp; Simulator
+                </span>
+              </div>
+
+              <div
+                className="seg"
+                role="group"
+                aria-label="Filter revisions by lifecycle status"
+                data-testid="policy-revision-status-filter"
+              >
+                {(['ALL', 'ACTIVE', 'PREVIEW', 'DRAFT', 'RETIRED'] as const).map(
+                  (statusOpt) => (
+                    <button
+                      key={statusOpt}
+                      type="button"
+                      className={`seg-opt ${
+                        revisionStatusFilter === statusOpt ? 'active' : ''
+                      }`}
+                      onClick={() => setRevisionStatusFilter(statusOpt)}
+                      data-testid={`policy-status-filter-${statusOpt}`}
+                    >
+                      {statusOpt}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {revisionsError && (
+              <p className="field-error" style={{ padding: '0 24px' }}>
+                {revisionsError}
+              </p>
+            )}
+
+            <div className="table-container">
+              <table className="data-table" data-testid="policy-revisions-table">
+                <thead>
+                  <tr>
+                    <th>Notification Type</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                    <th>Config Hash</th>
+                    <th>Default Intent</th>
+                    <th>Routing Channels</th>
+                    <th>Delivery Mode</th>
+                    <th>Require ACK</th>
+                    <th>Dedup Window</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {policyRevisions
+                    .filter(
+                      (rev) =>
+                        revisionStatusFilter === 'ALL' ||
+                        rev.status.toUpperCase() === revisionStatusFilter
+                    )
+                    .map((rev) => (
+                      <tr
+                        key={`${rev.notification_type}-${rev.version}-${rev.status}-${rev.config_hash ?? ''}`}
+                        onClick={() =>
+                          applyPolicySelection(
+                            rev.notification_type,
+                            rev.intent ?? 'OPERATIONAL',
+                            rev.status.toUpperCase() === 'PREVIEW' ? 'PREVIEW' : 'LIVE'
+                          )
+                        }
+                        style={{ cursor: 'pointer' }}
+                        data-testid={`policy-revision-row-${rev.notification_type}-${rev.version}`}
+                      >
+                        <td className="monospace">
+                          <strong>{rev.notification_type}</strong>
+                        </td>
+                        <td className="monospace">{rev.version}</td>
+                        <td>
+                          <span
+                            className={getPolicyStatusBadgeClass(rev.status)}
+                            data-testid={`policy-revision-status-${rev.notification_type}-${rev.version}`}
+                          >
+                            {rev.status}
+                          </span>
+                        </td>
+                        <td
+                          className="monospace"
+                          title={rev.config_hash ?? undefined}
+                        >
+                          {rev.config_hash ? rev.config_hash.slice(0, 12) : '-'}
+                        </td>
+                        <td>{rev.intent ?? 'SDK Default'}</td>
+                        <td>{rev.channels.join(', ') || 'SDK Default'}</td>
+                        <td>{rev.delivery_mode ?? 'SDK Default'}</td>
+                        <td>
+                          {rev.require_ack === null
+                            ? 'SDK Default'
+                            : rev.require_ack
+                              ? 'Yes'
+                              : 'No'}
+                        </td>
+                        <td className="timestamp">{rev.dedup_window_seconds}s</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+      {catalogLoading && activePolicies.length === 0 && policyRevisions.length === 0 && (
         <div style={{ padding: '12px 24px', fontSize: '12px' }}>
           Loading active policy catalog…
         </div>

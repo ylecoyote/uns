@@ -91,6 +91,8 @@ from agsignal.responses import (
     InvariantStatus,
     InvariantSummaryResponse,
     PaginationInfo,
+    PolicyRevisionListResponse,
+    PolicyRevisionSummary,
     ResolutionContext,
     ResolutionSource,
     ResolutionStep,
@@ -105,6 +107,7 @@ from notification.models import (
     DeliveryStatus,
     NotificationIntent,
 )
+from notification.policies import PolicyStatus
 
 logger = get_structured_logger(__name__)
 
@@ -348,6 +351,177 @@ async def list_active_policies(
 
 
 @router.get(
+    "/policies/revisions",
+    response_model=PolicyRevisionListResponse,
+    summary="List notification policy revisions",
+    description="Return stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).",
+)
+async def list_policy_revisions(
+    http_request: Request,
+    notification_type: str | None = Query(
+        default=None, description="Filter by notification_type"
+    ),
+    policy_status: PolicyStatus | None = Query(
+        default=None, alias="status", description="Filter by policy lifecycle status"
+    ),
+) -> PolicyRevisionListResponse:
+    """Return stored notification policy revisions across lifecycle statuses."""
+    from sqlalchemy import select
+
+    from db.models.policy import PersistedNotificationPolicy
+    from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
+    from notification.policy_loader import compute_policy_content_hash
+
+    log_endpoint_call(
+        logger,
+        "list_policy_revisions",
+        notification_type=notification_type,
+        status=policy_status.value if policy_status else None,
+    )
+    runtime = getattr(http_request.app.state, "runtime", None)
+    policy_store = getattr(http_request.app.state, "policy_store", None)
+    if policy_store is None and runtime is not None:
+        policy_store = runtime.policy_runtime.store
+
+    items: list[PolicyRevisionSummary] = []
+    if policy_store is not None:
+        policy_store.ensure_snapshot_schema()
+        with policy_store._get_session() as session:
+            stmt = select(PersistedNotificationPolicy)
+            if notification_type:
+                stmt = stmt.where(
+                    PersistedNotificationPolicy.notification_type == notification_type
+                )
+            if policy_status is not None:
+                stmt = stmt.where(
+                    PersistedNotificationPolicy.status == policy_status.value
+                )
+            stmt = stmt.order_by(
+                PersistedNotificationPolicy.notification_type.asc(),
+                PersistedNotificationPolicy.version.desc(),
+                PersistedNotificationPolicy.updated_at.desc(),
+            )
+            rows = session.execute(stmt).scalars().all()
+            for row in rows:
+                policy = policy_store._hydrate_policy(session, row)
+                default_intent = policy.intent or NotificationIntent.OPERATIONAL
+                channels = policy.get_channels_for_mode(
+                    AutonomyMode.LIVE, default_intent
+                ) or list(policy.channels)
+                delivery_mode = (
+                    policy.get_delivery_mode_for_mode(
+                        AutonomyMode.LIVE, default_intent
+                    )
+                    if policy.intent
+                    else policy.delivery_mode
+                )
+                require_ack = policy.get_require_ack_for_mode(
+                    AutonomyMode.LIVE, policy.intent
+                )
+                ack_timeout_minutes = (
+                    policy.get_ack_timeout_minutes_for_mode(
+                        AutonomyMode.LIVE, default_intent
+                    )
+                    if policy.intent
+                    else policy.ack_timeout_minutes
+                )
+                ack_timeout_seconds = (
+                    ack_timeout_minutes * 60
+                    if ack_timeout_minutes is not None
+                    else None
+                )
+                dedup_window_seconds = (
+                    policy.dedup_window_seconds
+                    if policy.dedup_window_seconds is not None
+                    else DEFAULT_DEDUP_WINDOW_SECONDS
+                )
+                config_hash = row.content_hash or policy.config_hash or compute_policy_content_hash(
+                    policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+                )
+                items.append(
+                    PolicyRevisionSummary(
+                        policy_id=row.policy_id,
+                        notification_type=row.notification_type,
+                        version=row.version,
+                        status=row.status,
+                        config_hash=config_hash,
+                        previous_version_id=row.previous_version_id,
+                        intent=policy.intent,
+                        channels=channels,
+                        delivery_mode=delivery_mode,
+                        require_ack=require_ack,
+                        ack_timeout_minutes=ack_timeout_minutes,
+                        ack_timeout_seconds=ack_timeout_seconds,
+                        dedup_window_seconds=dedup_window_seconds,
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                        activated_at=row.activated_at,
+                        retired_at=row.retired_at,
+                    )
+                )
+    else:
+        registry = get_policy_registry()
+        candidates = list(registry.get_all().values())
+        if notification_type:
+            candidates = [
+                p for p in candidates if p.notification_type == notification_type
+            ]
+        if policy_status is not None:
+            candidates = [p for p in candidates if p.status == policy_status]
+        candidates.sort(key=lambda p: p.version, reverse=True)
+        candidates.sort(key=lambda p: p.notification_type)
+        for policy in candidates:
+            default_intent = policy.intent or NotificationIntent.OPERATIONAL
+            channels = policy.get_channels_for_mode(
+                AutonomyMode.LIVE, default_intent
+            ) or list(policy.channels)
+            delivery_mode = (
+                policy.get_delivery_mode_for_mode(AutonomyMode.LIVE, default_intent)
+                if policy.intent
+                else policy.delivery_mode
+            )
+            require_ack = policy.get_require_ack_for_mode(
+                AutonomyMode.LIVE, policy.intent
+            )
+            ack_timeout_minutes = (
+                policy.get_ack_timeout_minutes_for_mode(
+                    AutonomyMode.LIVE, default_intent
+                )
+                if policy.intent
+                else policy.ack_timeout_minutes
+            )
+            ack_timeout_seconds = (
+                ack_timeout_minutes * 60 if ack_timeout_minutes is not None else None
+            )
+            dedup_window_seconds = (
+                policy.dedup_window_seconds
+                if policy.dedup_window_seconds is not None
+                else DEFAULT_DEDUP_WINDOW_SECONDS
+            )
+            config_hash = policy.config_hash or compute_policy_content_hash(
+                policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+            )
+            items.append(
+                PolicyRevisionSummary(
+                    policy_id=policy.config_id,
+                    notification_type=policy.notification_type,
+                    version=policy.version,
+                    status=policy.status.value,
+                    config_hash=config_hash,
+                    previous_version_id=None,
+                    intent=policy.intent,
+                    channels=channels,
+                    delivery_mode=delivery_mode,
+                    require_ack=require_ack,
+                    ack_timeout_minutes=ack_timeout_minutes,
+                    ack_timeout_seconds=ack_timeout_seconds,
+                    dedup_window_seconds=dedup_window_seconds,
+                )
+            )
+    return PolicyRevisionListResponse(items=items, total_count=len(items))
+
+
+@router.get(
     "/invariants",
     response_model=InvariantListResponse,
     responses={
@@ -492,6 +666,8 @@ __all__ = [
     "InvariantStatus",
     "InvariantSummaryResponse",
     "PaginationInfo",
+    "PolicyRevisionListResponse",
+    "PolicyRevisionSummary",
     "ResolutionContext",
     "ResolutionSource",
     "ResolutionStep",
