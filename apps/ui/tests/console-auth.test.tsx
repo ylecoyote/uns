@@ -51,7 +51,7 @@ describe('Console access', () => {
     await connect();
     await screen.findByTestId('audit-event-list');
 
-    expect(mockFetch.mock.calls[0][0]).toContain('/ui/audit?limit=1');
+    expect(mockFetch.mock.calls[0][0]).toContain('/ui/session');
     expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(2);
     for (const [url, options] of mockFetch.mock.calls) {
       expect(url).not.toContain(key);
@@ -61,6 +61,55 @@ describe('Console access', () => {
     }
     expect(writeStorage).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain(key);
+  });
+
+  it('renders READ-ONLY badge and subject for an observer-only key', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ subject: 'uns-observer', scopes: ['observer'], persistence_mode: 'persistent' }),
+      })
+      .mockImplementation(async () => success());
+    render(<App />);
+    await connect();
+    expect(screen.getByTestId('capability-pill-read-only')).toHaveTextContent('READ-ONLY');
+    expect(screen.getByTestId('session-subject')).toHaveTextContent('(uns-observer)');
+  });
+
+  it('renders both RESPONDER and PRODUCER pills for a dual-scope non-admin key', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          subject: 'dual-principal',
+          scopes: ['observer', 'producer', 'responder'],
+          persistence_mode: 'persistent',
+        }),
+      })
+      .mockImplementation(async () => success());
+    render(<App />);
+    await connect();
+    expect(screen.getByTestId('capability-pill-responder')).toHaveTextContent('RESPONDER');
+    expect(screen.getByTestId('capability-pill-producer')).toHaveTextContent('PRODUCER');
+    expect(screen.queryByTestId('capability-pill-operator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('session-subject')).toHaveTextContent('(dual-principal)');
+  });
+
+  it('renders OPERATOR badge and subject for an admin key', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          subject: 'agsignal-api-key',
+          scopes: ['admin', 'observer', 'producer', 'responder'],
+          persistence_mode: 'persistent',
+        }),
+      })
+      .mockImplementation(async () => success());
+    render(<App />);
+    await connect();
+    expect(screen.getByTestId('capability-pill-operator')).toHaveTextContent('OPERATOR');
+    expect(screen.getByTestId('session-subject')).toHaveTextContent('(agsignal-api-key)');
   });
 
   it('shows progress and lets an operator cancel a delayed check', async () => {

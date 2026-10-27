@@ -11,7 +11,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { PolicyInspectorPage } from '../src/pages/PolicyInspectorPage';
+import { clearConsoleSession, startConsoleSession } from '../src/auth/session';
 import * as api from '../src/api/policies';
 
 // Mock the API module
@@ -423,5 +425,206 @@ describe('ResolutionTraceDisplay', () => {
     expect(screen.getAllByText('Mode Override').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Policy Base').length).toBeGreaterThan(0);
     expect(screen.getAllByText('SDK Default').length).toBeGreaterThan(0);
+  });
+});
+
+describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test Send, Reload)', () => {
+  beforeEach(() => {
+    clearConsoleSession();
+    vi.mocked(api.fetchEffectivePolicy).mockResolvedValue(mockEffectivePolicyResponse);
+    vi.mocked(api.fetchActivePolicies).mockResolvedValue({
+      total_count: 1,
+      items: [
+        {
+          notification_type: 'trading.order_placed',
+          version: '1.0.0',
+          status: 'ACTIVE',
+          intent: 'GOVERNANCE',
+          channels: ['SLACK', 'EMAIL'],
+          delivery_mode: 'GUARANTEED',
+          require_ack: true,
+          ack_timeout_minutes: 60,
+          ack_timeout_seconds: 3600,
+          dedup_window_seconds: 300,
+        },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    clearConsoleSession();
+    vi.resetAllMocks();
+  });
+
+  it('auto-populates and inspects when ?notification_type= query param is present', async () => {
+    render(
+      <MemoryRouter initialEntries={['/policy?notification_type=trading.order_placed']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(api.fetchEffectivePolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notification_type: 'trading.order_placed',
+        }),
+        expect.anything()
+      );
+    });
+
+    expect(screen.getByTestId('notification-type-input')).toHaveValue('trading.order_placed');
+  });
+
+  it('populates inspector and simulator when clicking a row in the Active Policies Catalog', async () => {
+    startConsoleSession('producer-key', {
+      subject: 'producer-user',
+      scopes: ['observer', 'producer'],
+      auth_mode: 'required',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/policy']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('active-policy-row-trading.order_placed')
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('active-policy-row-trading.order_placed'));
+
+    await waitFor(() => {
+      expect(api.fetchEffectivePolicy).toHaveBeenCalledWith(
+        {
+          notification_type: 'trading.order_placed',
+          intent: 'GOVERNANCE',
+          autonomy_mode: 'LIVE',
+          irreversible: false,
+        },
+        expect.anything()
+      );
+    });
+
+    expect(screen.getByTestId('sim-notification-type-input')).toHaveValue(
+      'trading.order_placed'
+    );
+  });
+
+  it('allows producer to run dry-run Simulate and dispatch a tagged [TEST] live notification', async () => {
+    startConsoleSession('producer-key', {
+      subject: 'producer-user',
+      scopes: ['observer', 'producer'],
+      auth_mode: 'required',
+    });
+
+    vi.mocked(api.simulateNotification).mockResolvedValue({
+      notification_id: '55555555-5555-4555-8555-555555555555',
+      simulated: true,
+      status: 'DELIVERED',
+      channels_attempted: ['SLACK'],
+      delivery_mode: 'GUARANTEED',
+      require_ack: true,
+      dedup_key: 'sim-dedup',
+      dedup_window_seconds: 300,
+      policy_source: 'policy',
+      warnings: [],
+      message: 'Simulated routing preview',
+    });
+
+    const dispatchedId = '77777777-7777-4777-8777-777777777777';
+    vi.mocked(api.sendTestNotification).mockResolvedValue({
+      notification_id: dispatchedId,
+      status: 'PENDING',
+      channels_attempted: ['SLACK'],
+      channels_succeeded: [],
+      channels_failed: [],
+      require_ack: true,
+      created_at: '2026-01-23T04:00:00Z',
+      message: 'pending',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/policy']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByTestId('sim-notification-type-input'), {
+      target: { value: 'trading.order_placed' },
+    });
+    fireEvent.change(screen.getByTestId('sim-title-input'), {
+      target: { value: 'Order placement check' },
+    });
+
+    // 1. Dry-run Simulate
+    fireEvent.click(screen.getByTestId('simulate-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('simulation-result-card')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('sim-result-channels')).toHaveTextContent('SLACK');
+    expect(screen.getByTestId('sim-result-delivery-mode')).toHaveTextContent('GUARANTEED');
+
+    // 2. Tagged Live Test Send with inline confirmation
+    fireEvent.click(screen.getByTestId('initiate-test-send-btn'));
+    expect(screen.getByTestId('confirm-test-send-panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('confirm-test-send-btn'));
+
+    await waitFor(() => {
+      expect(api.sendTestNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notification_type: 'trading.order_placed',
+          title: '[TEST] Order placement check',
+          metadata: {
+            source: 'uns_console_policy_test',
+            triggered_by: 'producer-user',
+          },
+        })
+      );
+    });
+
+    expect(screen.getByTestId('test-send-delivery-link')).toHaveAttribute(
+      'href',
+      `/deliveries/${dispatchedId}`
+    );
+  });
+
+  it('allows admin to atomically reload policies from server directory and refreshes catalog', async () => {
+    startConsoleSession('admin-key', {
+      subject: 'operator-admin',
+      scopes: ['observer', 'admin'],
+      auth_mode: 'required',
+    });
+
+    vi.mocked(api.reloadPolicies).mockResolvedValue({
+      loaded_count: 3,
+      persisted_count: 3,
+      policy_count: 3,
+      notification_types: ['ops.alert', 'safety.halt', 'trading.order_placed'],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/policy']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('initiate-policy-reload-btn'));
+    expect(screen.getByTestId('policy-reload-confirm-panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('confirm-policy-reload-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('policy-reload-result')).toBeInTheDocument();
+    });
+
+    expect(api.reloadPolicies).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('policy-reload-result')).toHaveTextContent(
+      '3 loaded, 3 persisted, 3 active'
+    );
   });
 });

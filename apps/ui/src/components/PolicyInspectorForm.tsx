@@ -8,13 +8,21 @@
  * - irreversible: Checkbox for irreversible flag
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NotificationIntent, AutonomyMode, PolicyInspectorParams } from '../types/api';
+
+export interface PolicyExternalSelection {
+  notification_type: string;
+  intent?: NotificationIntent | null;
+  autonomy_mode?: AutonomyMode;
+  seq: number;
+}
 
 interface PolicyInspectorFormProps {
   onInspect: (params: PolicyInspectorParams) => void;
   onClear: () => void;
   loading: boolean;
+  externalSelection?: PolicyExternalSelection | null;
 }
 
 const INTENT_OPTIONS: { value: NotificationIntent; label: string; description: string }[] = [
@@ -30,12 +38,29 @@ const AUTONOMY_MODE_OPTIONS: { value: AutonomyMode; label: string; description: 
   { value: 'LIVE', label: 'Live', description: 'Full production routing' },
 ];
 
-export function PolicyInspectorForm({ onInspect, onClear, loading }: PolicyInspectorFormProps) {
+export function PolicyInspectorForm({
+  onInspect,
+  onClear,
+  loading,
+  externalSelection,
+}: PolicyInspectorFormProps) {
   const [notificationType, setNotificationType] = useState('');
   const [intent, setIntent] = useState<NotificationIntent>('INFORMATIONAL');
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('PREVIEW');
   const [irreversible, setIrreversible] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!externalSelection) return;
+    setNotificationType(externalSelection.notification_type);
+    if (externalSelection.intent) {
+      setIntent(externalSelection.intent);
+    }
+    if (externalSelection.autonomy_mode) {
+      setAutonomyMode(externalSelection.autonomy_mode);
+    }
+    setValidationError(null);
+  }, [externalSelection]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -3,9 +3,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { DeliveriesDetailPage } from '../src/pages/DeliveriesDetailPage';
+import { clearConsoleSession, startConsoleSession } from '../src/auth/session';
 import {
   mockDeliveryTimeline,
   mockDeliveryTimelineFailed,
@@ -27,10 +28,12 @@ function renderWithRouter(notificationId: string) {
 
 describe('DeliveriesDetailPage', () => {
   beforeEach(() => {
+    clearConsoleSession();
     mockFetch.mockReset();
   });
 
   afterEach(() => {
+    clearConsoleSession();
     vi.clearAllMocks();
   });
 
@@ -261,5 +264,342 @@ describe('DeliveriesDetailPage', () => {
     const channelsSection = screen.getByTestId('channels-section');
     expect(channelsSection).toHaveTextContent('SLACK');
     expect(channelsSection).toHaveTextContent('EMAIL');
+  });
+
+  it('renders obligation lineage, bounded runtime events, truncation notice, and policy deep-link for observer', async () => {
+    startConsoleSession('observer-key', {
+      subject: 'observer-user',
+      scopes: ['observer'],
+      auth_mode: 'required',
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimeline,
+          runtime_state: {
+            delivery_status: 'DELIVERED',
+            effective_status: 'DELIVERED',
+            ack_status: 'PENDING',
+            effective_ack_status: 'PENDING',
+            require_ack: true,
+            obligation_owner_id: mockDeliveryTimeline.notification_id,
+            obligation_resolution_status: 'PENDING',
+            deadline: 1800000000,
+            dead_letter: false,
+            events: [
+              {
+                id: 'evt-12345678-0001',
+                notification_id: mockDeliveryTimeline.notification_id,
+                kind: 'notification.dispatched',
+                at: 1700000000,
+                payload: { status: 'DELIVERED', channel: 'SLACK' },
+              },
+            ],
+            events_total_count: 150,
+            events_truncated: true,
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimeline.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('runtime-events-section')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('responder-action-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('events-truncated-notice')).toHaveTextContent(
+      'Showing most recent 100 of 150 runtime events.'
+    );
+    expect(screen.getByTestId('policy-deep-link')).toHaveAttribute(
+      'href',
+      `/policy?notification_type=${encodeURIComponent(mockDeliveryTimeline.notification_type)}`
+    );
+  });
+
+  it('enforces canonical owner navigation for deduplicated followers instead of remote ack', async () => {
+    startConsoleSession('responder-key', {
+      subject: 'responder-user',
+      scopes: ['observer', 'responder'],
+      auth_mode: 'required',
+    });
+
+    const canonicalOwnerId = '999e4567-e89b-12d3-a456-426614174999';
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimeline,
+          status: 'DEDUPLICATED',
+          runtime_state: {
+            delivery_status: 'DEDUPLICATED',
+            effective_status: 'DELIVERED',
+            ack_status: 'PENDING',
+            effective_ack_status: 'PENDING',
+            require_ack: true,
+            obligation_owner_id: canonicalOwnerId,
+            ack_inherited: false,
+            obligation_resolution_status: 'PENDING',
+            dead_letter: false,
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimeline.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('deduplicated-follower-banner')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('responder-action-bar')).not.toBeInTheDocument();
+    const ownerCta = screen.getByTestId('canonical-owner-ack-cta');
+    expect(ownerCta).toHaveAttribute('href', `/deliveries/${canonicalOwnerId}`);
+    expect(ownerCta).toHaveTextContent('View & Acknowledge Canonical Owner');
+  });
+
+  it('allows responder to acknowledge canonical pending notification with note and refreshes timeline', async () => {
+    startConsoleSession('responder-key', {
+      subject: 'responder-user',
+      scopes: ['observer', 'responder'],
+      auth_mode: 'required',
+    });
+
+    // Initial load: PENDING
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimeline,
+          runtime_state: {
+            delivery_status: 'DELIVERED',
+            effective_status: 'DELIVERED',
+            ack_status: 'PENDING',
+            effective_ack_status: 'PENDING',
+            require_ack: true,
+            obligation_owner_id: mockDeliveryTimeline.notification_id,
+            obligation_resolution_status: 'PENDING',
+            dead_letter: false,
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimeline.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('responder-action-bar')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('responder-note-input'), {
+      target: { value: 'Investigated and mitigated' },
+    });
+    fireEvent.click(screen.getByTestId('ack-btn'));
+
+    expect(screen.getByTestId('inline-response-confirmation')).toBeInTheDocument();
+
+    // POST /api/v1/notifications/{id}/ack response + subsequent GET /ui/deliveries/{id} refetch
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            notification_id: mockDeliveryTimeline.notification_id,
+            ack_status: 'ACKED',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimeline,
+            runtime_state: {
+              delivery_status: 'DELIVERED',
+              effective_status: 'DELIVERED',
+              ack_status: 'ACKED',
+              effective_ack_status: 'ACKED',
+              require_ack: true,
+              obligation_owner_id: mockDeliveryTimeline.notification_id,
+              obligation_resolution_status: 'ACKED',
+              actor: 'responder-user',
+              responded_at: 1700000123,
+              response_metadata: { note: 'Investigated and mitigated' },
+              dead_letter: false,
+            },
+          }),
+      });
+
+    fireEvent.click(screen.getByTestId('confirm-response-btn'));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    const ackCall = mockFetch.mock.calls[1];
+    expect(ackCall[0]).toContain(
+      `/api/v1/notifications/${mockDeliveryTimeline.notification_id}/ack`
+    );
+    expect(ackCall[1].method).toBe('POST');
+    expect(JSON.parse(ackCall[1].body)).toEqual({
+      metadata: { note: 'Investigated and mitigated' },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('responder-action-bar')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('responder-user')).toBeInTheDocument();
+    expect(screen.getByTestId('responder-note-display')).toHaveTextContent(
+      'Investigated and mitigated'
+    );
+  });
+
+  it('gracefully recovers from 409 Conflict by auto-refreshing timeline and showing resolved banner', async () => {
+    startConsoleSession('responder-key', {
+      subject: 'responder-user',
+      scopes: ['observer', 'responder'],
+      auth_mode: 'required',
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimeline,
+          runtime_state: {
+            delivery_status: 'DELIVERED',
+            effective_status: 'DELIVERED',
+            ack_status: 'PENDING',
+            effective_ack_status: 'PENDING',
+            require_ack: true,
+            obligation_owner_id: mockDeliveryTimeline.notification_id,
+            obligation_resolution_status: 'PENDING',
+            dead_letter: false,
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimeline.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('responder-action-bar')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('dismiss-btn'));
+
+    // Return 409 Conflict on dismiss, then return already-ACKED state on refetch
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: () =>
+          Promise.resolve({
+            detail: 'Notification already acknowledged by another responder',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimeline,
+            runtime_state: {
+              delivery_status: 'DELIVERED',
+              effective_status: 'DELIVERED',
+              ack_status: 'ACKED',
+              effective_ack_status: 'ACKED',
+              require_ack: true,
+              obligation_owner_id: mockDeliveryTimeline.notification_id,
+              obligation_resolution_status: 'ACKED',
+              actor: 'colleague-oncall',
+              dead_letter: false,
+            },
+          }),
+      });
+
+    fireEvent.click(screen.getByTestId('confirm-response-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('conflict-recovered-banner')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('conflict-recovered-banner')).toHaveTextContent(
+      'Notification already acknowledged by another responder'
+    );
+    expect(screen.getByText('colleague-oncall')).toBeInTheDocument();
+  });
+
+  it('allows admin operator to replay or resolve an exhausted dead-letter delivery inline', async () => {
+    startConsoleSession('admin-key', {
+      subject: 'operator-admin',
+      scopes: ['observer', 'responder', 'producer', 'admin'],
+      auth_mode: 'required',
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimelineFailed,
+          runtime_state: {
+            delivery_status: 'FAILED',
+            effective_status: 'FAILED',
+            ack_status: null,
+            dead_letter: true,
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimelineFailed.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('operator-recovery-bar')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('detail-replay-btn'));
+    expect(screen.getByTestId('inline-recovery-confirmation')).toBeInTheDocument();
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            notification_id: mockDeliveryTimelineFailed.notification_id,
+            status: 'PENDING',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            ...mockDeliveryTimelineFailed,
+            status: 'PENDING',
+            runtime_state: {
+              delivery_status: 'PENDING',
+              effective_status: 'PENDING',
+              ack_status: null,
+              dead_letter: false,
+            },
+          }),
+      });
+
+    fireEvent.click(screen.getByTestId('confirm-recovery-btn'));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    const replayCall = mockFetch.mock.calls[1];
+    expect(replayCall[0]).toContain(
+      `/api/v1/runtime/notifications/${mockDeliveryTimelineFailed.notification_id}/replay`
+    );
+    expect(replayCall[1].method).toBe('POST');
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('operator-recovery-bar')).not.toBeInTheDocument();
+    });
   });
 });

@@ -17,8 +17,11 @@ export {
   ApiError,
   apiGet,
   apiRequest,
+  apiRootRequest,
+  apiRootRequestWithStatus,
   buildQueryString,
   filterToParams,
+  type ApiStatusResult,
   type RequestOptions,
   type QueryParams,
   type QueryParamValue,
@@ -31,10 +34,31 @@ export { getAuditEvents, fetchAuditEvents } from './audit';
 export { fetchInvariants, fetchInvariantsSummary } from './invariants';
 
 // Deliveries API exports
-export { getDeliveries, getDeliveryTimeline } from './deliveries';
+export {
+  getDeliveries,
+  getDeliveryTimeline,
+  acknowledgeNotification,
+  dismissNotification,
+} from './deliveries';
 
 // Policies API exports
-export { fetchEffectivePolicy } from './policies';
+export {
+  fetchEffectivePolicy,
+  fetchActivePolicies,
+  simulateNotification,
+  sendTestNotification,
+  reloadPolicies,
+} from './policies';
+
+// Operations & DLQ Recovery API exports
+export {
+  getReadyz,
+  getChannelHealth,
+  getDlqEntries,
+  getRuntimeDeadLetters,
+  replayNotification,
+  resolveDlqEntry,
+} from './operations';
 
 // Contract validators - for runtime drift detection
 export {

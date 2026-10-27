@@ -6,5 +6,6 @@
 
 export * from './AuditTimeline';
 export * from './InvariantsPage';
+export * from './OperationsPage';
 export * from './PlaceholderPage';
 export * from './PolicyInspectorPage';

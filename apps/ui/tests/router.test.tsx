@@ -47,6 +47,10 @@ describe('Route Constants', () => {
     expect(ROUTES.POLICY).toBe('/policy');
   });
 
+  it('defines OPERATIONS route', () => {
+    expect(ROUTES.OPERATIONS).toBe('/operations');
+  });
+
   it('defines INVARIANTS route', () => {
     expect(ROUTES.INVARIANTS).toBe('/invariants');
   });
@@ -65,6 +69,7 @@ describe('Route Configs', () => {
     expect(configPaths).toContain(ROUTES.AUDIT);
     expect(configPaths).toContain(ROUTES.DELIVERIES);
     expect(configPaths).toContain(ROUTES.POLICY);
+    expect(configPaths).toContain(ROUTES.OPERATIONS);
     expect(configPaths).toContain(ROUTES.INVARIANTS);
   });
 
@@ -85,6 +90,11 @@ describe('Route Configs', () => {
 
   it('marks POLICY as implemented', () => {
     const config = getRouteConfig(ROUTES.POLICY);
+    expect(config?.implemented).toBe(true);
+  });
+
+  it('marks OPERATIONS as implemented', () => {
+    const config = getRouteConfig(ROUTES.OPERATIONS);
     expect(config?.implemented).toBe(true);
   });
 

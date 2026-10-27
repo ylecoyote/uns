@@ -21,6 +21,9 @@ export const ROUTES = {
   /** Policy inspector - effective policy viewer */
   POLICY: '/policy',
 
+  /** Operations & dead-letter recovery workspace */
+  OPERATIONS: '/operations',
+
   /** Invariants viewer - system invariants */
   INVARIANTS: '/invariants',
 } as const;
@@ -70,18 +73,25 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
     navOrder: 2,
   },
   {
+    path: ROUTES.OPERATIONS,
+    title: 'Operations',
+    description: 'Operational telemetry and dead-letter recovery',
+    implemented: true,
+    navOrder: 3,
+  },
+  {
     path: ROUTES.INVARIANTS,
     title: 'Invariants',
     description: 'System invariants viewer',
     implemented: true,
-    navOrder: 3,
+    navOrder: 4,
   },
   {
     path: ROUTES.AUDIT,
     title: 'Audit',
     description: 'Audit event stream viewer',
     implemented: true,
-    navOrder: 4,
+    navOrder: 5,
   },
 ];
 
