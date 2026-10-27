@@ -339,15 +339,13 @@ async def reload_policies(
                 detail="policy_dir must reside within the configured UNS_POLICY_DIR",
             )
     else:
+        temp_base = Path(tempfile.gettempdir()).resolve()
         allowed_roots = [
             Path.cwd().resolve(),
             Path(__file__).resolve().parents[2],
-            Path(tempfile.gettempdir()).resolve(),
+            temp_base,
+            temp_base.parent,
         ]
-        for extra_tmp in ("/tmp", "/private/tmp", "/private/var/folders"):
-            extra_path = Path(extra_tmp)
-            if extra_path.exists():
-                allowed_roots.append(extra_path.resolve())
         if not any(
             resolved_dir == root or root in resolved_dir.parents for root in allowed_roots
         ):
