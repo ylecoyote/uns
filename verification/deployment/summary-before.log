@@ -6,16 +6,16 @@ plugins: cov-7.1.0, asyncio-1.4.0, anyio-4.15.1, platformdirs-4.13.5
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collected 11 items / 10 deselected / 1 selected
 
-tests/agsignal/api/test_deployed_audit_projection.py F                   [100%]
+tests/uns/api/test_deployed_audit_projection.py F                   [100%]
 
 =================================== FAILURES ===================================
 ____________ test_invariant_summary_timestamp_has_explicit_timezone ____________
-tests/agsignal/api/test_deployed_audit_projection.py:87: in test_invariant_summary_timestamp_has_explicit_timezone
+tests/uns/api/test_deployed_audit_projection.py:87: in test_invariant_summary_timestamp_has_explicit_timezone
     assert result.last_updated.endswith('+00:00')
 E   AssertionError: assert False
 E    +  where False = <built-in method endswith of str object at 0x11364a790>('+00:00')
 E    +    where <built-in method endswith of str object at 0x11364a790> = '2026-10-20T23:31:02.871616'.endswith
 E    +      where '2026-10-20T23:31:02.871616' = InvariantSummaryResponse(total_count=8, by_severity={'HIGH': 6, 'MEDIUM': 2, 'LOW': 0}, by_enforcement_type={'guard': ...: 0}, by_status={'active': 8, 'inactive': 0}, exceptions_requiring_review=0, last_updated='2026-10-20T23:31:02.871616').last_updated
 =========================== short test summary info ============================
-FAILED tests/agsignal/api/test_deployed_audit_projection.py::test_invariant_summary_timestamp_has_explicit_timezone
+FAILED tests/uns/api/test_deployed_audit_projection.py::test_invariant_summary_timestamp_has_explicit_timezone
 ======================= 1 failed, 10 deselected in 0.44s =======================

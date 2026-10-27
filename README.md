@@ -50,7 +50,7 @@ Simulation has no side effects. Acceptance means recoverable pending work. Deliv
 - [Testing and acceptance](docs/TESTING.md)
 - [Migration and provenance](docs/MIGRATION.md)
 
-`examples/policies/mip-uns` and `config/notification_policies` contain sample policies, not mandatory runtime defaults. Existing `agsignal`, `notification`, and `agsignal_mcp` imports remain available. New integrations use `uns.Client` and `uns.Runtime` with the `full` extra. The legacy low-level `NotificationSDK` resolves policy and needs an explicit delivery handler; without one it returns PENDING and attempts no channels.
+`examples/policies/mip-uns` and `config/notification_policies` contain sample policies, not mandatory runtime defaults. Existing `uns`, `notification`, and `uns_mcp` imports remain available. New integrations use `uns.Client` and `uns.Runtime` with the `full` extra. The legacy low-level `NotificationSDK` resolves policy and needs an explicit delivery handler; without one it returns PENDING and attempts no channels.
 
 ## Verification & Provenance
 

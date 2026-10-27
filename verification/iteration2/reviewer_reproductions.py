@@ -11,9 +11,9 @@ from pathlib import Path
 import pytest
 from sqlalchemy import event, select, update
 
-from agsignal.responses import SendNotificationRequest
-from agsignal_mcp import tools as mcp_tools
-from agsignal_mcp.runtime import RuntimeState
+from uns.responses import SendNotificationRequest
+from uns_mcp import tools as mcp_tools
+from uns_mcp.runtime import RuntimeState
 from notification.adapters.base import (
     AdapterStatus,
     BaseAdapter,
@@ -420,7 +420,7 @@ async def test_f06b_deliver_callbacks_starves_overdue_retry_across_ticks_under_f
 
 
 # ---------------------------------------------------------------------------
-# F-07: Direct agsignal_mcp.tools functions and RuntimeState(runtime=...) ignore Runtime
+# F-07: Direct uns_mcp.tools functions and RuntimeState(runtime=...) ignore Runtime
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_f07_direct_mcp_tools_and_runtime_state_ignore_durable_runtime(env):

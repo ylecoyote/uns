@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-UNS (Unified Notification Service, package `uns` / `agsignal`) is pre-1.0 software. Security fixes are provided for the latest `0.1.x` release line on `main`.
+UNS (Unified Notification Service, package `uns` / `uns`) is pre-1.0 software. Security fixes are provided for the latest `0.1.x` release line on `main`.
 
 | Version | Supported |
 | :--- | :--- |

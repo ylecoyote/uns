@@ -1,8 +1,8 @@
-# AGSignal Console Scope — Responder & Operator Console
+# UNS Console Scope — Responder & Operator Console
 
 ## Design Philosophy
 
-AGSignal Console (UNS Console) began in v1 as a **read-first "flight instruments" dashboard**, not an unconstrained control cockpit, establishing observability and audit trust before introducing operational mutations. It has since evolved into a capability-gated **Responder & Operator Console** that pairs read-first flight-instrument telemetry with strictly scoped, backend-enforced responder, producer, and operator actions across six primary surfaces.
+UNS Console (UNS Console) began in v1 as a **read-first "flight instruments" dashboard**, not an unconstrained control cockpit, establishing observability and audit trust before introducing operational mutations. It has since evolved into a capability-gated **Responder & Operator Console** that pairs read-first flight-instrument telemetry with strictly scoped, backend-enforced responder, producer, and operator actions across six primary surfaces.
 
 ## v1 Constraints (Historical Baseline & Permanent Boundaries)
 

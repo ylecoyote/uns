@@ -1,7 +1,7 @@
-"""Smoke test AGSignal's generic host-application adapter boundary.
+"""Smoke test UNS's generic host-application adapter boundary.
 
 The smoke proves that a host application can emit a governance signal through
-AGSignal public imports without shipping application-specific integration code.
+UNS public imports without shipping application-specific integration code.
 
 Usage:
     python scripts/smoke_app_adapter_proving.py
@@ -20,19 +20,6 @@ for import_path in (REPO_ROOT / "src", REPO_ROOT):
     if path_text not in sys.path:
         sys.path.insert(0, path_text)
 
-from agsignal.integrations import (  # noqa: E402
-    AppEvidenceContext,
-    AppSignalAdapter,
-    AppSignalRequest,
-    DefaultAppSignalContextProvider,
-)
-from agsignal.models import (  # noqa: E402
-    AutonomyMode,
-    DeliveryStatus,
-    NotificationResult,
-    SignalIntent,
-)
-from agsignal.sdk import SignalClient  # noqa: E402
 from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine  # noqa: E402
 from notification.audit import (  # noqa: E402
     InMemoryAuditStore,
@@ -40,6 +27,19 @@ from notification.audit import (  # noqa: E402
     create_ack_audit_record,
 )
 from notification.models import AckStatus, Notification  # noqa: E402
+from uns.integrations import (  # noqa: E402
+    AppEvidenceContext,
+    AppSignalAdapter,
+    AppSignalRequest,
+    DefaultAppSignalContextProvider,
+)
+from uns.models import (  # noqa: E402
+    AutonomyMode,
+    DeliveryStatus,
+    NotificationResult,
+    SignalIntent,
+)
+from uns.sdk import SignalClient  # noqa: E402
 
 
 def build_proving_request(agent_id: UUID) -> AppSignalRequest:
@@ -138,7 +138,7 @@ def run_smoke() -> dict[str, Any]:
 
 def main() -> None:
     result = run_smoke()
-    print("AGSignal app adapter proving smoke passed")
+    print("UNS app adapter proving smoke passed")
     for key, value in result.items():
         print(f"{key}: {value}")
 

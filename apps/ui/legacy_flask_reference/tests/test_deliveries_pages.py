@@ -18,10 +18,6 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from agsignal.api.read_models import (
-    InMemoryReadModelAdapter,
-    configure_read_model_adapter,
-)
 from apps.ui.app import create_ui_app
 from notification.audit import (
     AuditRecord,
@@ -30,6 +26,10 @@ from notification.audit import (
 from notification.models import (
     Channel,
     DeliveryStatus,
+)
+from uns.api.read_models import (
+    InMemoryReadModelAdapter,
+    configure_read_model_adapter,
 )
 
 # =============================================================================

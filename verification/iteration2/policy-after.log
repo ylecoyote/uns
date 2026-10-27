@@ -12,10 +12,10 @@ tests/uns/test_policy_changes.py ......                                  [ 38%]
 tests/uns/test_runtime.py ................                               [ 50%]
 tests/uns/test_cross_transport_acceptance.py .                           [ 51%]
 tests/db/test_policy_store.py .......                                    [ 56%]
-tests/agsignal_mcp/test_lifecycle.py .....                               [ 60%]
+tests/uns_mcp/test_lifecycle.py .....                               [ 60%]
 tests/notification/test_standalone_http_app.py ......................... [ 79%]
 ....                                                                     [ 82%]
-tests/agsignal/api/test_app_startup.py .......................           [100%]
+tests/uns/api/test_app_startup.py .......................           [100%]
 
 =============================== warnings summary ===============================
 ../../..<workspace>/uns-remediation/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1

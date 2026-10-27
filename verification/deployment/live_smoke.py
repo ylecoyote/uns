@@ -56,7 +56,7 @@ def decode(result):
 
 async def websockets_smoke():
     token=base64.urlsafe_b64encode(ENV['UNS_API_KEY'].encode()).decode().rstrip('=')
-    async with websockets.connect('ws://127.0.0.1:18080/ws/agents/'+AGENT,subprotocols=['agsignal.v1','bearer.'+token],origin='http://localhost:5173') as ws:
+    async with websockets.connect('ws://127.0.0.1:18080/ws/agents/'+AGENT,subprotocols=['uns.v1','bearer.'+token],origin='http://localhost:5173') as ws:
         check('WebSocket authenticated connection',json.loads(await ws.recv())['type']=='connected')
         payload=request('websocket',notification_type='smoke.informational',intent='INFORMATIONAL',delivery_mode='BEST_EFFORT',require_ack=False)
         r=call('POST','/api/v1/notifications',202,json=payload)
@@ -167,7 +167,7 @@ def main():
     callbacks=[json.loads(line) for line in (ROOT/'data/callbacks.jsonl').read_text().splitlines()]
     check('Callback retries retain event identity',any(e['notification_id']==timeout['notification_id'] and e['attempt']==2 for e in callbacks))
     subprocess.run(['docker','stop','-t','10','uns-smoke-e759'],check=True,capture_output=True)
-    seed="from runtime_profile import make_runtime; from agsignal.responses import SendNotificationRequest; import json,sys; r=make_runtime(); n=r.accept(SendNotificationRequest(**json.load(sys.stdin)),principal='smoke-operator'); print(n.notification_id); r.engine.dispose()"
+    seed="from runtime_profile import make_runtime; from uns.responses import SendNotificationRequest; import json,sys; r=make_runtime(); n=r.accept(SendNotificationRequest(**json.load(sys.stdin)),principal='smoke-operator'); print(n.notification_id); r.engine.dispose()"
     result=subprocess.run(['docker','run','--rm','-i','--env-file',str(ROOT/'service.env'),'--mount',f'type=bind,src={ROOT}/profile,dst=/profile,readonly','--mount',f'type=bind,src={ROOT}/data,dst=/data','uns:local-smoke','python','-c',seed],input=json.dumps(request('restart')),capture_output=True,text=True,check=True)
     pending=result.stdout.strip()
     subprocess.run(['docker','start','uns-smoke-e759'],check=True,capture_output=True)

@@ -14,7 +14,6 @@ import pytest
 from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import sessionmaker
 
-from agsignal.responses import SendNotificationRequest
 from db.models import Base, PersistedNotificationPolicy
 from db.policy_store import SQLAlchemyPolicyStore
 from notification.models import Channel, DeliveryMode, NotificationIntent
@@ -25,6 +24,7 @@ from notification.policies import (
     configure_policy_registry,
 )
 from notification.sdk import NotificationSDK
+from uns.responses import SendNotificationRequest
 
 
 def policy(version="1", **changes):
@@ -199,7 +199,7 @@ def test_legacy_rows_migrate_without_global_registry_authority(database):
 
 def child_environment(url):
     env = {
-        key: value for key, value in os.environ.items() if not key.startswith(("UNS_", "AGSIGNAL_"))
+        key: value for key, value in os.environ.items() if not key.startswith("UNS_")
     }
     return {
         **env,
@@ -250,7 +250,7 @@ import json, os, sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from uns.policy_runtime import PolicyRuntime
-from agsignal.responses import SendNotificationRequest
+from uns.responses import SendNotificationRequest
 p = PolicyRuntime(sessionmaker(create_engine(os.environ["UNS_DATABASE_URL"])))
 print("ready", flush=True)
 req = SendNotificationRequest.model_validate(json.loads(sys.stdin.readline()))
@@ -392,8 +392,8 @@ def test_two_database_runtimes_do_not_share_authority(database, tmp_path):
 async def test_simulation_uses_authority_without_acceptance_side_effects(database):
     from sqlalchemy import func, select
 
-    from agsignal.signaling import simulate_signal
     from db.models import NotificationAuditRecord, NotificationPolicySnapshot
+    from uns.signaling import simulate_signal
 
     _, sessions = database
     store = SQLAlchemyPolicyStore(sessions)
@@ -463,8 +463,8 @@ def test_custom_websocket_target_key_reserved_but_inert_metadata_preserved(datab
 
 
 async def test_effective_policy_query_matches_mode_specific_runtime_resolution(database):
-    from agsignal.queries import get_effective_policy
     from notification.models import AutonomyMode
+    from uns.queries import get_effective_policy
 
     _, sessions = database
     SQLAlchemyPolicyStore(sessions).save_snapshot(
@@ -486,7 +486,7 @@ async def test_effective_policy_query_matches_mode_specific_runtime_resolution(d
     )
     assert preview.effective.delivery_mode == actual.delivery_mode
     assert preview.effective.ack_timeout_minutes == actual.ack_timeout_minutes
-    from agsignal.signaling import simulate_signal
+    from uns.signaling import simulate_signal
 
     allowed = await simulate_signal(
         request=request(delivery_mode="BEST_EFFORT", require_ack=True),
@@ -587,8 +587,8 @@ print("complete", flush=True)
 
 
 async def test_effective_policy_unconfigured_channels_and_no_ack_match_runtime(database):
-    from agsignal.queries import get_effective_policy
     from notification.models import AutonomyMode
+    from uns.queries import get_effective_policy
 
     _, sessions = database
     configured = policy().model_copy(
@@ -635,7 +635,7 @@ def test_real_runtime_intake_and_separate_process_activation_share_commit_order(
             "-c",
             """
 import json, os, sys
-from agsignal.responses import SendNotificationRequest
+from uns.responses import SendNotificationRequest
 from uns.runtime import Runtime
 runtime = Runtime(os.environ["UNS_DATABASE_URL"])
 original = runtime.policy_runtime.resolve

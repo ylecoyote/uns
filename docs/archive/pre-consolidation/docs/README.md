@@ -1,11 +1,11 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-# AGSignal Documentation
+# UNS Documentation
 
-This directory contains the technical documentation for AGSignal, the governance
+This directory contains the technical documentation for UNS, the governance
 signaling control plane for autonomous agents.
 
-AGSignal turns notifications, acknowledgments, timeouts, and delivery failures
+UNS turns notifications, acknowledgments, timeouts, and delivery failures
 into durable governance signals. The current Python runtime is still exposed
 through the historical `notification.*` package and UNS-compatible terminology
 while the public product API stabilizes.
@@ -13,35 +13,35 @@ while the public product API stabilizes.
 ## Task Navigation
 
 Start from the task you need to complete, not from the implementation package
-name. Public docs lead with AGSignal terminology; `notification.*`, `UNS_*`, and
+name. Public docs lead with UNS terminology; `notification.*`, `UNS_*`, and
 UNS/MIP names appear only where they describe compatibility, provenance, or
 sample content.
 
 | Task | Start Here | Then Read |
 |------|------------|-----------|
-| **Evaluate AGSignal** | [Root README](../README.md) | [Architecture](ARCHITECTURE.md), [API Reference](API.md) |
+| **Evaluate UNS** | [Root README](../README.md) | [Architecture](ARCHITECTURE.md), [API Reference](API.md) |
 | **Quickstart: send a signal** | [Root README Quick Start](../README.md#quick-start) | [API Reference](API.md), [Running the Service](../README.md#running-the-service) |
 | **Configure policies** | [Policy Lifecycle](sections/policy-lifecycle.md) | [MIP UNS Sample Policy Pack](../examples/policies/mip-uns/README.md), [Delivery Semantics](sections/delivery-semantics.md) |
 | **Integrate an app** | [Integration Modes](sections/integration-modes.md) | [API Host App Boundary](API.md#host-app-boundary), [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) |
 | **Operate and audit** | [Observability](sections/observability.md) | [Delivery Semantics](sections/delivery-semantics.md), [WebSocket Replay Smoke](testing/websocket-replay-smoke.md), [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) |
-| **Extend AGSignal** | [Architecture](ARCHITECTURE.md) | [API Reference](API.md), [Architecture Decisions](#architecture-decisions) |
+| **Extend UNS** | [Architecture](ARCHITECTURE.md) | [API Reference](API.md), [Architecture Decisions](#architecture-decisions) |
 | **Verify implementation** | [Testing Guides](#testing-guides) | [Architecture Decisions](#architecture-decisions), [UNS Provenance](uns/README.md) |
 
 ## Document Inventory
 
 | Document | Description |
 |----------|-------------|
-| [../README.md](../README.md) | AGSignal product overview, boundary, terminology, and quick start |
+| [../README.md](../README.md) | UNS product overview, boundary, terminology, and quick start |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Core runtime architecture, components, and data flow |
 | [API.md](API.md) | API reference for the current SDK, models, and interfaces |
-| [uns/README.md](uns/README.md) | Historical UNS extraction materials and AGSignal terminology mapping |
+| [uns/README.md](uns/README.md) | Historical UNS extraction materials and UNS terminology mapping |
 
 ### Architecture Decisions
 
 | Decision | Description |
 |----------|-------------|
 | [Generic App Adapter Boundary](decisions/2026-05-06-app-adapter-boundary.md) | Host-application integration facade without MIP coupling |
-| [UNS Taxonomy](decisions/2026-05-06-uns-taxonomy.md) | Keeps `docs/uns/` as provenance while AGSignal remains the public product identity |
+| [UNS Taxonomy](decisions/2026-05-06-uns-taxonomy.md) | Keeps `docs/uns/` as provenance while UNS remains the public product identity |
 | [WebSocket Redis Fanout](decisions/2026-05-06-websocket-redis-fanout.md) | Optional Redis pub/sub fanout, per-agent channels, and MIP donor comparison |
 | [WebSocket Replay Read Model](decisions/2026-05-06-websocket-replay-read-model.md) | Reconnect replay payload persistence and Redis boundary |
 
@@ -60,7 +60,7 @@ Detailed documentation for specific subsystems:
 
 | Guide | Description |
 |-------|-------------|
-| [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) | AGSignal-native smoke for host app evidence integration |
+| [App Adapter Proving Smoke](testing/app-adapter-proving-smoke.md) | UNS-native smoke for host app evidence integration |
 | [WebSocket Redis Fanout Smoke](testing/websocket-redis-fanout-smoke.md) | Real Redis smoke for cross-instance WebSocket fanout |
 | [WebSocket Replay Smoke](testing/websocket-replay-smoke.md) | Reconnect replay smoke for missed WebSocket notifications |
 
@@ -94,7 +94,7 @@ documentation set.
 
 ## Reading Guide
 
-**New to AGSignal?** Use the **Evaluate AGSignal** and **Quickstart: send a
+**New to UNS?** Use the **Evaluate UNS** and **Quickstart: send a
 signal** rows above.
 
 **Implementing delivery logic or policies?** Use **Configure policies** first,
@@ -102,7 +102,7 @@ then follow the delivery semantics links for reliability behavior.
 
 **Integrating with external systems?** Use **Integrate an app** for the generic
 host boundary. MIP-shaped adapters are optional proving/sample code, not the
-AGSignal Core public facade.
+UNS Core public facade.
 
 **Setting up monitoring?** Use **Operate and audit** for health, audit, DLQ,
 WebSocket replay, and fanout guidance.
@@ -116,10 +116,10 @@ public claim tied to shipped behavior, sample assets, or explicit limitations.
 
 | Term | Meaning |
 |------|---------|
-| AGSignal | The product and repository identity. |
+| UNS | The product and repository identity. |
 | AGS | Agent Governance Signaling, the product category. |
 | Governance signal | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
-| AGSignal Core | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
+| UNS Core | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
 | UNS Core | Historical extraction name for the notification runtime from MIP; use for provenance or compatibility only. |
 
 ### Notification Intents
@@ -186,7 +186,7 @@ When adding or updating documentation:
 
 | Term | Meaning |
 |------|---------|
-| AGSignal | Top-level product and repository identity |
+| UNS | Top-level product and repository identity |
 | UNS | Historical extraction/runtime name; avoid as the public product lead |
 | ATP | Autonomous Trading Platform (external system) |
 | Intent | Notification classification (SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL) |

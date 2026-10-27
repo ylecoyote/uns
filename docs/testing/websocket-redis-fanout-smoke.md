@@ -1,11 +1,11 @@
 # WebSocket Redis Fanout Smoke
 
-This smoke verifies AGSignal's optional Redis-backed WebSocket fanout with a
-real Redis server and two AGSignal app instances.
+This smoke verifies UNS's optional Redis-backed WebSocket fanout with a
+real Redis server and two UNS app instances.
 
 ## What It Proves
 
-The smoke starts two in-process AGSignal FastAPI apps with Redis fanout enabled:
+The smoke starts two in-process UNS FastAPI apps with Redis fanout enabled:
 
 1. A consumer app accepts a WebSocket connection for one agent.
 2. A producer app accepts `POST /api/v1/notifications` for that same agent.
@@ -16,7 +16,7 @@ The smoke starts two in-process AGSignal FastAPI apps with Redis fanout enabled:
    HTTP response from the producer app.
 
 The smoke also checks that the two app instances have different generated
-fanout origin IDs. Origin IDs are required because AGSignal sends locally first
+fanout origin IDs. Origin IDs are required because UNS sends locally first
 and publishes Redis only for other processes.
 
 ## What It Does Not Prove
@@ -67,13 +67,13 @@ to inspect manually, pass an explicit prefix:
 
 ```bash
 python scripts/smoke_websocket_redis_fanout.py \
-  --channel-prefix agsignal:smoke:websocket:manual
+  --channel-prefix uns:smoke:websocket:manual
 ```
 
 ## Expected Output
 
 ```text
-AGSignal WebSocket Redis fanout smoke passed
+UNS WebSocket Redis fanout smoke passed
 agent_id: ...
 notification_id: ...
 channel_prefix: ...

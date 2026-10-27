@@ -10,7 +10,7 @@ Linear: TBD
 
 ## Context
 
-PRD §1.2.4 and §2.5 lock AGSignal as a pre-execution-first control plane with a
+PRD §1.2.4 and §2.5 lock UNS as a pre-execution-first control plane with a
 two-layer Decision Engine (`decide()` pure + `evaluate()` impure wrapper). PRD
 M2.4 names the default — fail-closed for SAFETY/GOVERNANCE, configurable for
 OPERATIONAL/INFORMATIONAL — but does not specify the mechanics. PRD M1.5 has
@@ -39,7 +39,7 @@ engine must not synthesize approval workflow state.
 
 Configuration lives in **policy YAML with global defaults**. Each
 `GovernancePolicy` MAY declare a `fail_mode:` block; if absent, the engine
-falls back to the AGSignal global config defaults from §1. SAFETY and
+falls back to the UNS global config defaults from §1. SAFETY and
 GOVERNANCE policies MAY tighten (always DENY) but MUST NOT loosen below DENY.
 OPERATIONAL/INFORMATIONAL policies MAY override in either direction. Override
 attempts that violate the SAFETY/GOVERNANCE floor are rejected at policy load.
@@ -91,7 +91,7 @@ Yes. Every fail-mode decision emits an OPERATIONAL notification with
 `dedup_key = engine_failure_<type>:<policy_id>` and a per-(type, policy)
 suppression window (default 60 s) so that a flapping attribute source does not
 flood the operator channel. Fail-mode rate (per-minute) is a first-class metric
-(`agsignal_engine_fail_mode_total{type,intent,policy_id}`), and sustained
+(`uns_engine_fail_mode_total{type,intent,policy_id}`), and sustained
 elevation triggers commercial Enterprise-Dashboards alerting (out of OSS
 scope). The OPERATIONAL notification is distinct from the user-facing DENY
 that the caller receives.
@@ -126,7 +126,7 @@ Per-evaluation degraded mode in v1 OSS core: each `evaluate()` independently
 attempts the full path and falls into fail-mode on failure. Rationale:
 simplest semantics, no shared state, no health check coordination. Sustained
 fail-mode rates surface through the §5 metric and through the
-`AGSignal_FAIL_MODE_RATE_HIGH` operator alert; manual remediation (config
+`UNS_FAIL_MODE_RATE_HIGH` operator alert; manual remediation (config
 fix, attribute-source restart) is the v1 recovery path.
 
 A circuit-breaker pattern (open the circuit on a per-attribute-source error
@@ -168,7 +168,7 @@ plugin), not a fail-mode behavior.
 - Commercial plugin surface gains a clean opportunity: circuit-breaker
   dashboards, durable fail-mode metrics, and break-glass override flows are
   natural Enterprise-Dashboards / Break-Glass features that consume the
-  OSS-emitted `agsignal_engine_fail_mode_total` metric and `fail_mode=true`
+  OSS-emitted `uns_engine_fail_mode_total` metric and `fail_mode=true`
   audit entries.
 - Hot-reload last-known-good behavior creates an observability requirement:
   policy authors must monitor the OPERATIONAL "policy quarantined"

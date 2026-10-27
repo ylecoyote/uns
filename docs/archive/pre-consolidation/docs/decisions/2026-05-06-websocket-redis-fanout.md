@@ -10,8 +10,8 @@ Linear: MIP-245
 
 ## Context
 
-AGSignal needs live WebSocket delivery for connected agent clients and optional
-cross-process fanout when more than one AGSignal process is serving WebSocket
+UNS needs live WebSocket delivery for connected agent clients and optional
+cross-process fanout when more than one UNS process is serving WebSocket
 connections. Redis is already used by the notification package for runtime
 coordination, but Redis must not become a required dependency for local
 single-process WebSocket delivery.
@@ -30,19 +30,19 @@ The original MIP implementation influenced this design:
 - The MIP subscriber used synchronous Redis `pubsub.listen()` inside an asyncio
   task. That shape is not copied because it can block the event loop.
 
-The AGSignal extraction had already added direct local WebSocket delivery and a
+The UNS extraction had already added direct local WebSocket delivery and a
 Redis publisher. That differs from MIP: MIP delivered through Redis, while
-AGSignal now sends locally first and publishes for other processes.
+UNS now sends locally first and publishes for other processes.
 
 ## Decision
 
-AGSignal WebSocket Redis fanout uses per-agent Redis channels and origin
+UNS WebSocket Redis fanout uses per-agent Redis channels and origin
 suppression:
 
 - Local delivery remains available without Redis.
-- When Redis fanout is enabled, AGSignal publishes each WebSocket envelope to
+- When Redis fanout is enabled, UNS publishes each WebSocket envelope to
   `{UNS_WEBSOCKET_REDIS_CHANNEL}:agent:{agent_id}`.
-- Each AGSignal process has a generated `origin_id`.
+- Each UNS process has a generated `origin_id`.
 - The publisher stamps outgoing Redis envelopes with its `origin_id`.
 - The subscriber ignores envelopes whose `origin_id` matches the current
   process, preventing same-instance duplicate delivery.
@@ -74,11 +74,11 @@ does not match the donor implementation's per-agent routing.
 
 This is the accepted design. It preserves local operation, follows the useful
 part of MIP's per-agent Redis channel model, and adds origin suppression to
-avoid duplicate delivery caused by AGSignal's direct local send path.
+avoid duplicate delivery caused by UNS's direct local send path.
 
 ## Consequences
 
-- Redis remains an optional runtime adapter, not an AGSignal core domain
+- Redis remains an optional runtime adapter, not an UNS core domain
   dependency.
 - Single-process deployments continue to deliver WebSocket notifications without
   Redis.

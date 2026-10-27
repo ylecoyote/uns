@@ -2,7 +2,7 @@
 """Generate a machine-readable contract snapshot for /ui endpoints.
 
 This script extracts JSON schemas from the Pydantic models in
-``agsignal.responses`` and generates a deterministic contract snapshot
+``uns.responses`` and generates a deterministic contract snapshot
 file at:
     docs/ui/contracts/ui-contracts.json
 
@@ -35,14 +35,7 @@ sys.path.insert(0, str(src_path))
 
 
 def get_enum_definitions() -> dict[str, list[str]]:
-    """Extract enum definitions from notification.models and agsignal.responses."""
-    from agsignal.responses import (
-        AuditEventType,
-        EnforcementType,
-        InvariantSeverity,
-        InvariantStatus,
-        ResolutionSource,
-    )
+    """Extract enum definitions from notification.models and uns.responses."""
     from notification.models import (
         AckStatus,
         AutonomyMode,
@@ -51,6 +44,13 @@ def get_enum_definitions() -> dict[str, list[str]]:
         DeliveryStatus,
         NotificationIntent,
         Priority,
+    )
+    from uns.responses import (
+        AuditEventType,
+        EnforcementType,
+        InvariantSeverity,
+        InvariantStatus,
+        ResolutionSource,
     )
 
     enums = {
@@ -74,7 +74,7 @@ def get_enum_definitions() -> dict[str, list[str]]:
 
 def get_response_schemas() -> dict[str, dict[str, Any]]:
     """Extract JSON schemas from Pydantic response models."""
-    from agsignal.responses import (
+    from uns.responses import (
         AuditEvent,
         AuditEventListResponse,
         AutonomyContextResponse,
@@ -94,7 +94,7 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         ResolutionContext,
         ResolutionStep,
     )
-    from agsignal.responses import (
+    from uns.responses import (
         UIErrorResponse as ErrorResponse,
     )
 

@@ -1,4 +1,4 @@
-"""Tests for AGSignal-native policy learning primitives."""
+"""Tests for UNS-native policy learning primitives."""
 
 from __future__ import annotations
 
@@ -92,8 +92,8 @@ def test_delta_transition_returns_new_copy_and_preserves_history() -> None:
 def test_transition_history_caps_to_configured_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When AGSIGNAL_TRANSITION_HISTORY_LIMIT is set, oldest entries are dropped."""
-    monkeypatch.setenv("AGSIGNAL_TRANSITION_HISTORY_LIMIT", "2")
+    """When UNS_TRANSITION_HISTORY_LIMIT is set, oldest entries are dropped."""
+    monkeypatch.setenv("UNS_TRANSITION_HISTORY_LIMIT", "2")
 
     delta = _delta()
     delta = delta.transition_to(DeltaState.SHADOW, actor="learner")
@@ -112,7 +112,7 @@ def test_transition_history_uncapped_when_limit_is_zero(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Setting the limit to 0 explicitly disables capping (operator opt-out)."""
-    monkeypatch.setenv("AGSIGNAL_TRANSITION_HISTORY_LIMIT", "0")
+    monkeypatch.setenv("UNS_TRANSITION_HISTORY_LIMIT", "0")
 
     delta = _delta()
     delta = delta.transition_to(DeltaState.SHADOW, actor="learner")

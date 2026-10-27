@@ -1,6 +1,6 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-# Policy Engine Migration: MIP → AGSignal Core
+# Policy Engine Migration: MIP → UNS Core
 
 **Date:** 2026-04-22
 **Status:** Planning
@@ -10,7 +10,7 @@
 ---
 
 > Historical note: this document was written during the UNS extraction phase.
-> In current product terminology, UNS maps to AGSignal Core. Remaining UNS
+> In current product terminology, UNS maps to UNS Core. Remaining UNS
 > references below are provenance references to the source PRD and migration
 > language, not the public product name.
 
@@ -118,7 +118,7 @@ collapse these into the main repository.
 
 ---
 
-## What Needs to Change for AGSignal Core
+## What Needs to Change for UNS Core
 
 ### 1. Decouple from trading-specific policy types
 
@@ -147,7 +147,7 @@ async migration debt:
 # Migration requires converting %s params to :named params and RealDictCursor to mappings()
 ```
 
-**Fix:** AGSignal Core already uses async SQLAlchemy. Port repository.py to use the existing
+**Fix:** UNS Core already uses async SQLAlchemy. Port repository.py to use the existing
 `src/db/` stack. `async_repository.py` in MIP is already partway there — use it
 as the starting point, not `repository.py`.
 
@@ -159,7 +159,7 @@ as the starting point, not `repository.py`.
 - `RiskPolicyParamsV1` (position sizing, volatility limits)
 - `ExecutionPolicyParamsV1` (gating thresholds)
 
-**Fix:** Replace with AGSignal Core notification policy schemas. The `PolicyConfigEnvelope`
+**Fix:** Replace with UNS Core notification policy schemas. The `PolicyConfigEnvelope`
 wrapper pattern (generic envelope + typed payload) is correct — just swap the
 payload types. New policy types needed:
 
@@ -185,7 +185,7 @@ hardcoded in the loader.
 ### Current MIP-254 implementation notes
 
 MIP-254 is being implemented in narrow parity slices rather than one large port.
-The first AGSignal-native slice preserves the MIP enforcement boundary:
+The first UNS-native slice preserves the MIP enforcement boundary:
 
 - ACTIVE policies are the only policies eligible for runtime enforcement.
 - PREVIEW policies are loaded through an explicit shadow/simulation path.
@@ -197,7 +197,7 @@ The first AGSignal-native slice preserves the MIP enforcement boundary:
 Detailed implementation notes for this slice are kept in the local internal
 docs archive, not the public documentation set.
 
-The second slice ports the MIP delta state machine into AGSignal-neutral
+The second slice ports the MIP delta state machine into UNS-neutral
 learning primitives:
 
 - `PolicyDelta` models proposed field-level policy changes without trading
@@ -222,7 +222,7 @@ The third slice ports the reusable shadow and guard primitives:
 Detailed implementation notes for this slice are kept in the local internal
 docs archive, not the public documentation set.
 
-The fourth slice ports the donor repository behavior into AGSignal's sync
+The fourth slice ports the donor repository behavior into UNS's sync
 SQLAlchemy style:
 
 - `SQLAlchemyPolicyLearningStore` creates, fetches, lists, and transitions
@@ -259,11 +259,11 @@ docs archive, not the public documentation set.
 ### Phase 2 — Port the core policy engine with generalized types
 
 1. Create generic `PolicyConfigEnvelope` and `PolicyName` registry
-2. Define AGSignal Core-specific policy payload schemas (routing, delivery, rate limits, ack)
-3. Adapt `async_repository.py` to AGSignal Core db stack (preferred over `repository.py`)
+2. Define UNS Core-specific policy payload schemas (routing, delivery, rate limits, ack)
+3. Adapt `async_repository.py` to UNS Core db stack (preferred over `repository.py`)
 4. Adapt `async_loader.py` with generic typed loader
 
-### Phase 3 — Wire into AGSignal Core service layer
+### Phase 3 — Wire into UNS Core service layer
 
 1. Hook policy loading into `NotificationService` / `DeliveryEngine`
 2. Add hot-reload support (already planned in historical UNS PRD Phase 2)
@@ -294,4 +294,4 @@ docs archive, not the public documentation set.
 - `learning_schemas.py` is labeled Phase 17.3 in MIP — it was built late in the
   project lifecycle and is the most mature piece
 - The `web/components/policy-learning/` directory in MIP has the UI for the
-  learning approval workflow — worth reviewing when building the AGSignal Core admin UI
+  learning approval workflow — worth reviewing when building the UNS Core admin UI

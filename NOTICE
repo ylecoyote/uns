@@ -1,8 +1,8 @@
-AGSignal
-Copyright 2026 AGSignal Maintainers
+UNS
+Copyright 2026 UNS Maintainers
 
 This product is licensed under the Apache License, Version 2.0.
 
-AGSignal includes interfaces to open source dependencies listed in
+UNS includes interfaces to open source dependencies listed in
 pyproject.toml and apps/ui/package.json. Those dependencies remain governed by
 their own licenses.

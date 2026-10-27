@@ -40,7 +40,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from agsignal.responses import AckResponse, SendNotificationRequest, SendNotificationResponse
 from db.audit_store import SQLAlchemyAuditStore, delivery_audit_row
 from db.models import AckAuditRecord as AckRow
 from db.models import Base
@@ -62,6 +61,7 @@ from notification.service import (
 )
 from uns.database import is_in_memory_database_url
 from uns.policy_runtime import PolicyRuntime
+from uns.responses import AckResponse, SendNotificationRequest, SendNotificationResponse
 from uns.schema import migrate_runtime_schema
 
 log = logging.getLogger(__name__)

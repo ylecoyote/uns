@@ -1,5 +1,5 @@
 """
-AGSignal Core compatibility package
+UNS Core compatibility package
 
 A control-plane notification and acknowledgment service that:
 - MUST NOT block execution loops

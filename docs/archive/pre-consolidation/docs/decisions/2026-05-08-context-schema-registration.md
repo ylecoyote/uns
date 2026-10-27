@@ -23,7 +23,7 @@ checked. ADR-004 §3 separates `PluginLifecycle` from the contract Protocols, so
 ContextSchema registration must compose cleanly with plugins that opt out of
 lifecycle.
 
-The PRD non-negotiables: AGSignal core has zero domain field names (§12.2);
+The PRD non-negotiables: UNS core has zero domain field names (§12.2);
 multi-domain coexistence is required (§10.1 §1; M3.4 AC2); deny-by-default is
 locked (ADR-007 §3); the Pydantic v2 + async FastAPI runtime is locked (§9.5,
 HARD-04). This ADR locks ContextSchema mechanics inside that envelope.
@@ -33,7 +33,7 @@ HARD-04). This ADR locks ContextSchema mechanics inside that envelope.
 ### 1. Schema definition format: Pydantic v2 model (`ContextSchema = type[BaseModel]`)
 
 Domain plugins declare a `ContextSchema` as a Pydantic v2 `BaseModel` subclass.
-AGSignal core treats the class as the canonical definition; field names, types,
+UNS core treats the class as the canonical definition; field names, types,
 nested models, and `Field(...)` constraints are the schema. Pydantic v2's
 Rust-core validator gives both the load-time field-existence checks and the
 evaluate-time capsule validation in one mechanism — no separate JSON Schema
@@ -204,7 +204,7 @@ caller side, not by composing schemas in YAML.
 Names are case-sensitive bare identifiers (`[a-zA-Z_][a-zA-Z0-9_-]*`).
 Reserved names: `default` (the engine's null-schema fallback for callers that
 opt out of validation — see decision 8); names beginning with `_` are reserved
-for AGSignal core extensions.
+for UNS core extensions.
 
 Multi-tenancy semantics (one engine instance per tenant vs. one shared
 multi-domain engine) is a deployment choice, not a schema choice. The PRD
@@ -215,7 +215,7 @@ trading and treasury) doesn't need two engine instances.
 
 ### 8. Schema-aware tooling (Consequences, partial in v1)
 
-The Pydantic-v2-based schema lets `agsignal lint policy <file.yaml>` (a v1
+The Pydantic-v2-based schema lets `uns lint policy <file.yaml>` (a v1
 must-have for the policy author DX) emit field-not-in-schema errors,
 type-incompatible-operator errors, and JSON Schema export for IDE plugins.
 The v1 OSS CLI ships the lint subcommand (gating policy promotion from
@@ -246,12 +246,12 @@ context capsules; dataclasses provide zero of the required validation.
 `pydantic.dataclasses` is a viable middle ground but offers no advantage
 over `BaseModel` for this surface.
 
-### Custom AGSignal `ContextSchemaDef` DSL
+### Custom UNS `ContextSchemaDef` DSL
 
 Rejected. Inventing a new schema language is a perpetual liability — every
 type system feature (unions, literals, regex constraints, nested models)
 re-invents Pydantic. Authors already learn Pydantic for `DecisionRecord`,
-`AuditEntry`, and the rest of `agsignal.contracts` (ADR-004 §7); adding a
+`AuditEntry`, and the rest of `uns.contracts` (ADR-004 §7); adding a
 parallel surface for ContextSchema doubles the cognitive load with no
 material benefit.
 
@@ -294,7 +294,7 @@ forces upstream code to handle parsing explicitly, with the
 Rejected for v1 OSS. A v1-vs-v2 schema migration layer is a real feature for
 long-running deployments, but it requires either a versioned-context
 adapter Protocol (premature) or domain-specific migration code (which
-defeats AGSignal's domain-agnostic invariant). Defer to a commercial plugin
+defeats UNS's domain-agnostic invariant). Defer to a commercial plugin
 once demand is concrete; current v1 invariant is "one active schema per
 name."
 
@@ -316,12 +316,12 @@ ADR without further open questions on the schema surface.
 
 **Policy-author DX.** Compliance officers writing YAML get load-time errors
 ("field `notional` not in schema `trading` — did you mean `notional_usd`?")
-instead of production fail-mode DENY surprises. The `agsignal lint policy`
+instead of production fail-mode DENY surprises. The `uns lint policy`
 command (decision 8) becomes the gating tool for DRAFT→PREVIEW promotion;
 PRD M1.5's policy lifecycle is stronger as a result. IDE plugin authors
 get JSON Schema export for free.
 
-**Multi-domain story.** A single AGSignal engine can host trading + treasury +
+**Multi-domain story.** A single UNS engine can host trading + treasury +
 healthcare schemas with one map and per-policy `context_schema:` binding
 (decision 7). The PRD §10.1 success criterion "two distinct domain plugins
 integrated" has an unambiguous mechanical contract: each plugin registers
@@ -357,7 +357,7 @@ field, accelerating root-cause for caller-side bugs.
 core to invent a schema; it must declare one (or opt into the reserved
 `default` no-schema name, which disables M3.4 validation and is intended
 only for prototyping). Plugins that need versioned migration today must
-upgrade their callers; they cannot rely on AGSignal to bridge.
+upgrade their callers; they cannot rely on UNS to bridge.
 
 **v1 → v2 evolution path.** When the §2.2 v2+ `AgentGovernor` Protocol
 extracts from the adapter shape, ContextSchema becomes a method on that

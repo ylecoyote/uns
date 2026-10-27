@@ -6,12 +6,12 @@ import pytest
 from fastapi.testclient import TestClient
 from tests.uns.test_delivery_remediation import request
 
-from agsignal.app import create_app
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel
 from notification.policies import PolicyRegistry, configure_policy_registry
 from notification.rate_limiting import configure_rate_limiter
 from notification.service import SimpleAdapterRegistry
+from uns.app import create_app
 from uns.runtime import Runtime
 
 
@@ -35,7 +35,7 @@ class RecordingAdapter(BaseAdapter):
 
 @pytest.fixture
 def state(tmp_path, monkeypatch):
-    for name in ("UNS_POLICY_DIR", "AGSIGNAL_POLICY_DIR"):
+    for name in ("UNS_POLICY_DIR", "UNS_POLICY_DIR"):
         monkeypatch.delenv(name, raising=False)
     configure_policy_registry(registry=PolicyRegistry())
     configure_rate_limiter({})
@@ -182,7 +182,7 @@ async def test_readyz_uses_counts_without_loading_dead_letter_histories(state, m
 
     monkeypatch.setattr(runtime, "dead_letters", reject_history_loading)
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "progress-test-key"
+    app.state.uns_api_key = "progress-test-key"
     with TestClient(app, headers={"Authorization": "Bearer progress-test-key"}) as client:
         response = client.get("/readyz")
     assert response.status_code == 200

@@ -5,8 +5,8 @@ import asyncio
 
 from recording_runtime import make_runtime
 
-from agsignal_mcp.factory import create_mcp_server
-from agsignal_mcp.transports.stdio import _serve, runtime_config
+from uns_mcp.factory import create_mcp_server
+from uns_mcp.transports.stdio import _serve, runtime_config
 
 
 def main() -> None:

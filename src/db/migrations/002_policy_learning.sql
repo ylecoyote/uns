@@ -1,4 +1,4 @@
--- AGSignal policy learning persistence.
+-- UNS policy learning persistence.
 -- Standalone schema; intentionally no donor schema dependency.
 
 CREATE TABLE IF NOT EXISTS policy_deltas (

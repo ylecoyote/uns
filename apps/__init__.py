@@ -1,5 +1,5 @@
-"""Apps package for AGSignal.
+"""Apps package for UNS.
 
-Contains standalone applications that consume AGSignal services:
+Contains standalone applications that consume UNS services:
 - ui: Read-only dashboard for monitoring governance signals
 """

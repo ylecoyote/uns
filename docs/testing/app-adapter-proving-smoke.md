@@ -1,20 +1,20 @@
 # App Adapter Proving Smoke
 
-This smoke verifies AGSignal's generic host-application adapter boundary.
+This smoke verifies UNS's generic host-application adapter boundary.
 
 ## What It Proves
 
-The smoke uses AGSignal public imports:
+The smoke uses UNS public imports:
 
-- `agsignal.sdk.SignalClient`
-- `agsignal.models.SignalIntent`
-- `agsignal.integrations.AppSignalAdapter`
-- `agsignal.integrations.AppEvidenceContext`
+- `uns.sdk.SignalClient`
+- `uns.models.SignalIntent`
+- `uns.integrations.AppSignalAdapter`
+- `uns.integrations.AppEvidenceContext`
 
 It runs one host-app style safety event through the generic app adapter boundary
 and verifies:
 
-1. The event emits an AGSignal signal through the SDK path.
+1. The event emits an UNS signal through the SDK path.
 2. App-owned evidence IDs are carried into `AutonomyContext`.
 3. The same evidence IDs are copied into notification metadata under
    `app_evidence`.
@@ -40,7 +40,7 @@ python scripts/smoke_app_adapter_proving.py
 ## Expected Output
 
 ```text
-AGSignal app adapter proving smoke passed
+UNS app adapter proving smoke passed
 agent_id: ...
 notification_id: ...
 status: SUCCESS

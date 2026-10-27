@@ -2,7 +2,7 @@
 
 ## Identity and access
 
-HTTP reads and mutations require the configured operator API key by default. Only `/health` and `/healthz` expose minimal unauthenticated liveness. Readiness, metrics, runtime inspection, notification state, policies and console data are protected. Configure `UNS_API_KEY` and `UNS_API_PRINCIPAL`; existing AGSIGNAL-prefixed aliases remain compatible.
+HTTP reads and mutations require the configured operator API key by default. Only `/health` and `/healthz` expose minimal unauthenticated liveness. Readiness, metrics, runtime inspection, notification state, policies and console data are protected. Configure `UNS_API_KEY` and `UNS_API_PRINCIPAL`.
 
 The primary `UNS_API_KEY` grants full operator authority (`admin`, `producer`, `responder`, `observer`). For deployments where independent applications, ACK bots, or dashboards should not hold administrative authority (`POST /api/v1/policies/reload`, `DELETE /api/v1/dlq/{id}`, `POST /api/v1/runtime/notifications/{id}/replay`), UNS supports optional capability-scoped credentials:
 
@@ -23,7 +23,7 @@ ACK/DISMISS attribution derives from the verified principal. Payload identities 
 
 ## WebSocket and MCP
 
-WebSocket connections authenticate and require `observer` scope before acceptance. This scope permits stream reads and notification replay. Native clients can use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` in the subprotocol header; the server echoes only `agsignal.v1`, never the credential-bearing protocol. Tokens in query strings are rejected.
+WebSocket connections authenticate and require `observer` scope before acceptance. This scope permits stream reads and notification replay. Native clients can use a Bearer header. Browser clients offer `uns.v1` and `bearer.<base64url(UTF8(key))>` in the subprotocol header; the server echoes only `uns.v1`, never the credential-bearing protocol. Tokens in query strings are rejected.
 
 Every WebSocket ACK or DISMISS command separately checks the authenticated principal's `responder` scope, which the full operator/admin credential also grants. This uses the same capability enforcement as HTTP responses and the same durable Runtime and verified actor. Producer and observer credentials cannot mutate notification response state through WebSockets. An out-of-scope command returns an error frame with `type: "error"` and `error: "insufficient_scope"`, leaves response state and audit history unchanged, and keeps the authorized read stream open.
 

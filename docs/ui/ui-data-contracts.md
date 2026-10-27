@@ -23,7 +23,7 @@ A machine-readable JSON schema snapshot of these contracts is available at:
 
 - **[contracts/ui-contracts.json](contracts/ui-contracts.json)** - JSON Schema bundle with all endpoint schemas, enum definitions, and endpoint metadata
 
-This snapshot is generated deterministically from the Pydantic models in `src/agsignal/api/routes_ui.py` via `scripts/generate_ui_contracts.py`. Regenerate it when contracts change.
+This snapshot is generated deterministically from the Pydantic models in `src/uns/api/routes_ui.py` via `scripts/generate_ui_contracts.py`. Regenerate it when contracts change.
 
 ## Design Principles
 
@@ -550,7 +550,7 @@ GET /ui/audit?notification_id={notification_id}
 
 | Type | Description |
 |------|-------------|
-| `notification.created` | Notification submitted to AGSignal |
+| `notification.created` | Notification submitted to UNS |
 | `delivery.started` | Delivery attempt initiated |
 | `delivery.channel_attempted` | Individual channel attempt |
 | `delivery.succeeded` | Delivery completed successfully |

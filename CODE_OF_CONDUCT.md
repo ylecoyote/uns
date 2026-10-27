@@ -1,6 +1,6 @@
 # Code of Conduct
 
-AGSignal project spaces should stay professional, technical, and safe for
+UNS project spaces should stay professional, technical, and safe for
 contributors.
 
 ## Expected Behavior

@@ -2,7 +2,7 @@
 
 # Architecture
 
-This document describes the architecture of the AGSignal Core.
+This document describes the architecture of the UNS Core.
 
 > **Related Documentation:**
 > - [API Reference](API.md) - Complete API documentation
@@ -13,9 +13,9 @@ This document describes the architecture of the AGSignal Core.
 
 ## Overview
 
-AGSignal Core is the **runtime HITL Approval Control Plane** for AI agents — a neutral, vendor-portable primitive that runs between agent decision logic and the action's side effects. It provides pre-execution authorization (not in-execution enforcement, not post-execution review) and complements cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) via Stack Bridge plugins.
+UNS Core is the **runtime HITL Approval Control Plane** for AI agents — a neutral, vendor-portable primitive that runs between agent decision logic and the action's side effects. It provides pre-execution authorization (not in-execution enforcement, not post-execution review) and complements cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) via Stack Bridge plugins.
 
-> **Note:** AGSignal Core is ATP-agnostic, framework-agnostic, and cloud-agnostic. The core SDK, decision engine, approval workflow, and delivery pipeline function independently of any specific trading platform, agent framework (LangGraph / AutoGen / CrewAI), or cloud provider. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation, and [`../uns/positioning-vs-cloud-stacks.md`](../uns/positioning-vs-cloud-stacks.md) for the full competitive positioning.
+> **Note:** UNS Core is ATP-agnostic, framework-agnostic, and cloud-agnostic. The core SDK, decision engine, approval workflow, and delivery pipeline function independently of any specific trading platform, agent framework (LangGraph / AutoGen / CrewAI), or cloud provider. See [Integration Modes](sections/integration-modes.md) for details on standalone vs. integrated operation, and [`../uns/positioning-vs-cloud-stacks.md`](../uns/positioning-vs-cloud-stacks.md) for the full competitive positioning.
 
 The control plane provides:
 
@@ -436,9 +436,9 @@ else:
 
 ## Integration Points
 
-AGSignal Core uses protocol-based interfaces for external integration. These protocols allow AGSignal Core to remain ATP-agnostic while supporting rich integration with external systems.
+UNS Core uses protocol-based interfaces for external integration. These protocols allow UNS Core to remain ATP-agnostic while supporting rich integration with external systems.
 
-> **Note:** All integration points are optional. AGSignal Core functions in standalone mode with default implementations. See [Integration Modes](sections/integration-modes.md) for detailed integration options.
+> **Note:** All integration points are optional. UNS Core functions in standalone mode with default implementations. See [Integration Modes](sections/integration-modes.md) for detailed integration options.
 
 ### Context Provider Protocol
 
@@ -473,11 +473,11 @@ Can be synchronous (testing) or queue-based (RQ, Celery) for production.
 
 ### WebSocket Connections
 
-AGSignal Core does NOT manage WebSocket connections. The `WebSocketAdapter` accepts an injected connection manager. Connection lifecycle (establishment, authentication, reconnection) is the responsibility of the integrating system.
+UNS Core does NOT manage WebSocket connections. The `WebSocketAdapter` accepts an injected connection manager. Connection lifecycle (establishment, authentication, reconnection) is the responsibility of the integrating system.
 
 ## Configuration Architecture
 
-AGSignal Core uses singleton pattern with configure functions:
+UNS Core uses singleton pattern with configure functions:
 
 ```python
 # Policy Registry

@@ -12,8 +12,8 @@ Linear: TBD
 
 PRD M7 locks the three governance MCP tools (`check_policy` READ-only, `request_approval`
 WRITE-durable, `log_decision_reasoning` WRITE-LOG) but defers transport selection to this
-ADR (M7.4, §11 ADR-006). AGSignal v1 is pre-execution-first (PRD §1.2.4); the MCP surface
-is how agent runtimes consult it before side-effecting actions. AGSignal core is async
+ADR (M7.4, §11 ADR-006). UNS v1 is pre-execution-first (PRD §1.2.4); the MCP surface
+is how agent runtimes consult it before side-effecting actions. UNS core is async
 FastAPI + Pydantic v2 (PRD §9.5; HARD-04) — an HTTP-shaped transport composes cleanly.
 
 The MCP ecosystem consolidated since the PRD landed. The 2025-03-26 spec **deprecated
@@ -37,10 +37,10 @@ it requires a client-launches-subprocess topology and precludes remote agent acc
 ### 2. Multi-transport: stdio (local dev) + Streamable HTTP (production)
 
 v1 ships **two transports** with disjoint use cases. **stdio** is a developer-experience
-and single-process-embedding convenience (MCP-spec semantics: client launches AGSignal
+and single-process-embedding convenience (MCP-spec semantics: client launches UNS
 as a subprocess; OS process boundary is the trust boundary). **Streamable HTTP** is the
 only supported production transport. Operators choose at startup via
-`AGSIGNAL_MCP_TRANSPORT=stdio|http` (default `http`). All three tools work identically
+`UNS_MCP_TRANSPORT=stdio|http` (default `http`). All three tools work identically
 across both transports — the tool contract (ADR-004) is transport-agnostic. No tool is
 transport-restricted.
 
@@ -50,10 +50,10 @@ transport-restricted.
   resolution still flows through the configured `IdentityProvider` (ADR-004 §1) when
   `request_approval` is invoked, preserving the ADR-005 trust posture at the tool layer.
 - **Streamable HTTP**: **OAuth 2.1 + PKCE + Resource Indicators (RFC 8707)** per current
-  MCP spec. AGSignal acts as an OAuth 2.1 Resource Server — validates bearer tokens,
+  MCP spec. UNS acts as an OAuth 2.1 Resource Server — validates bearer tokens,
   never issues them. Operators bring their own authorization server (Auth0, Okta, Azure
   AD, Keycloak, or self-hosted). A fallback **static bearer token** mode
-  (`AGSIGNAL_MCP_AUTH=bearer-static`) is documented as the weakest option, intended for
+  (`UNS_MCP_AUTH=bearer-static`) is documented as the weakest option, intended for
   closed-network deployments only. mTLS is supported as an additive layer underneath
   OAuth 2.1 (defense-in-depth) but is not required by default.
 
@@ -63,8 +63,8 @@ is not supported.
 ### 4. TLS requirements
 
 - **stdio**: N/A (no network surface).
-- **Streamable HTTP**: **TLS required by default**. AGSignal refuses to bind a plaintext
-  listener unless `AGSIGNAL_MCP_TLS=disabled` is set explicitly (dev-only opt-out, e.g.,
+- **Streamable HTTP**: **TLS required by default**. UNS refuses to bind a plaintext
+  listener unless `UNS_MCP_TLS=disabled` is set explicitly (dev-only opt-out, e.g.,
   for local TLS-terminating proxy setups). The MCP spec mandates HTTPS for OAuth 2.1
   endpoints; this default matches. Cert provisioning is the operator's responsibility
   (typical: TLS termination at the ingress / sidecar).
@@ -87,38 +87,38 @@ tool-call results are never silently dropped.
 
 ### 6. Discovery
 
-- **Streamable HTTP**: **`AGSIGNAL_MCP_URL` environment variable** is the v1 contract
-  (e.g., `https://agsignal.example/mcp`). AGSignal exposes the **MCP-spec-mandated
+- **Streamable HTTP**: **`UNS_MCP_URL` environment variable** is the v1 contract
+  (e.g., `https://uns.example/mcp`). UNS exposes the **MCP-spec-mandated
   Protected Resource Metadata (RFC 9728)** at `/.well-known/oauth-protected-resource`
   for client auto-discovery of authorization server, scopes, and resource identifier.
-  No AGSignal-specific `.well-known/mcp` manifest is added — the spec-standard PRM
+  No UNS-specific `.well-known/mcp` manifest is added — the spec-standard PRM
   document is the contract.
 - **stdio**: caller-provided launch command + args (standard MCP stdio config).
 
 ### 7. Tool authorization scope
 
-All three tools share the OAuth 2.1 resource indicator `agsignal-mcp` but declare
+All three tools share the OAuth 2.1 resource indicator `uns-mcp` but declare
 distinct scopes for least-privilege tokens:
 
-- `agsignal:policy:read` — `check_policy` only
-- `agsignal:approval:write` — `request_approval` only (implies `:read`)
-- `agsignal:audit:write` — `log_decision_reasoning` only
+- `uns:policy:read` — `check_policy` only
+- `uns:approval:write` — `request_approval` only (implies `:read`)
+- `uns:audit:write` — `log_decision_reasoning` only
 
-A read-only dashboard preflighting decisions gets `agsignal:policy:read`; a full agent
+A read-only dashboard preflighting decisions gets `uns:policy:read`; a full agent
 runtime gets all three. The 2025-11-25 spec's Step-Up Authorization flow is supported:
-invoking `request_approval` with only `agsignal:policy:read` returns 403 + a
+invoking `request_approval` with only `uns:policy:read` returns 403 + a
 `WWW-Authenticate` challenge naming the missing scope. stdio bypasses scoping (no token
 concept); the launching process has implicit access to all tools.
 
 ### 8. MCP spec version compatibility
 
-v1.0 targets the **2025-11-25 MCP protocol revision** as canonical. AGSignal advertises
+v1.0 targets the **2025-11-25 MCP protocol revision** as canonical. UNS advertises
 supported revisions in `InitializeResult` per spec; v1.0 declares `2025-11-25` and
 accepts initialization from `2025-06-18` for backward compatibility (auth shape is
 identical between the two). The 2024-11-05 HTTP+SSE transport is **not supported** —
 clients pinned to that revision must update their SDK.
 
-Forward-compat: AGSignal pins MCP-spec compatibility per minor release. Optional-feature
+Forward-compat: UNS pins MCP-spec compatibility per minor release. Optional-feature
 revisions absorb in a minor release; breaking revisions trigger a parallel-version
 window (n and n-1 supported simultaneously) for one minor release. The MCP team's
 2026-roadmap commitment to "no new transports this cycle, evolve the existing transport"
@@ -141,20 +141,20 @@ makes this manageable at v1.0 scope.
 - **TLS optional by default.** Default-off TLS makes the insecure path the easy path;
   operators opt out explicitly so the easy path stays secure. Aligned with the MCP-spec
   HTTPS mandate for OAuth 2.1 endpoints.
-- **AGSignal-specific `.well-known/mcp` manifest.** The MCP spec already standardizes
-  PRM at `/.well-known/oauth-protected-resource` (RFC 9728); a second AGSignal-shaped
+- **UNS-specific `.well-known/mcp` manifest.** The MCP spec already standardizes
+  PRM at `/.well-known/oauth-protected-resource` (RFC 9728); a second UNS-shaped
   manifest fragments discovery.
 
 ## Consequences
 
-**Operator deployment topology.** Production runs AGSignal behind a TLS-terminating
+**Operator deployment topology.** Production runs UNS behind a TLS-terminating
 ingress and exposes `/mcp` as the single MCP endpoint. The OAuth authorization server
-is operator-supplied; AGSignal documents reference configurations for Auth0, Okta,
-Azure AD, and self-hosted Keycloak. Local-dev uses `AGSIGNAL_MCP_TRANSPORT=stdio` and
+is operator-supplied; UNS documents reference configurations for Auth0, Okta,
+Azure AD, and self-hosted Keycloak. Local-dev uses `UNS_MCP_TRANSPORT=stdio` and
 skips auth-server bring-up. Per-tool rate limits and scope tiers (§5, §7) give
 operators least-privilege levers without per-client custom code.
 
-**Agent-client integration.** Clients configure `AGSIGNAL_MCP_URL` plus an OAuth client
+**Agent-client integration.** Clients configure `UNS_MCP_URL` plus an OAuth client
 (CIMD-published metadata preferred per current spec; DCR acceptable as fallback). The
 three tool calls and their async-at-the-boundary contracts (ADR-004) work identically
 in stdio and Streamable HTTP — agent code developed against stdio in CI deploys

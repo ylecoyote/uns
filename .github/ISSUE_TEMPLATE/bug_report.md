@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a reproducible AGSignal defect
+about: Report a reproducible UNS defect
 title: ""
 labels: bug
 assignees: ""
@@ -18,7 +18,7 @@ Describe the problem and the expected behavior.
 
 ## Environment
 
-- AGSignal version or commit:
+- UNS version or commit:
 - Python version:
 - Deployment mode:
 - Relevant extras installed:

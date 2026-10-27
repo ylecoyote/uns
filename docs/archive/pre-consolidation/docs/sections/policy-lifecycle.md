@@ -2,7 +2,7 @@
 
 # Policy Lifecycle
 
-This document describes the lifecycle, loading, versioning, and application of notification policies in the AGSignal Core.
+This document describes the lifecycle, loading, versioning, and application of notification policies in the UNS Core.
 
 ## Overview
 
@@ -39,7 +39,7 @@ Database-backed loading now exposes explicit lifecycle boundaries:
 
 ### State Lifecycle Management
 
-The DRAFT, PREVIEW, ACTIVE, and RETIRED states are the AGSignal lifecycle
+The DRAFT, PREVIEW, ACTIVE, and RETIRED states are the UNS lifecycle
 contract for persisted policies.
 
 - ACTIVE policies are runtime-enforced.
@@ -109,7 +109,7 @@ registry.load_from_dict(policies_data)
 
 ### Singleton Pattern
 
-AGSignal Core uses a global singleton registry:
+UNS Core uses a global singleton registry:
 
 ```python
 from notification.policies import PolicyRegistry, get_policy_registry, set_policy_registry
@@ -304,7 +304,7 @@ When no policy exists, these defaults apply:
 
 ### Deduplication Keys
 
-AGSignal Core uses SHA256 hashing for deduplication keys (not policy identification):
+UNS Core uses SHA256 hashing for deduplication keys (not policy identification):
 
 ```python
 import hashlib

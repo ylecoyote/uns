@@ -51,7 +51,7 @@ def test_memory_url_classification_uses_database_semantics(url, in_memory):
     ],
 )
 def test_mcp_write_guard_uses_same_memory_classification(monkeypatch, database_url):
-    from agsignal_mcp.transports.stdio import runtime_config
+    from uns_mcp.transports.stdio import runtime_config
 
     monkeypatch.setenv("UNS_DATABASE_URL", database_url)
     # HTTP's explicit demo opt-in must not relax the MCP write contract.
@@ -66,7 +66,7 @@ def service_environment():
     env = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("UNS_", "AGSIGNAL_")) and key != "DATABASE_URL"
+        if not key.startswith("UNS_") and key != "DATABASE_URL"
     }
     source_root = str(Path(__file__).resolve().parents[2] / "src")
     env["PYTHONPATH"] = os.pathsep.join(filter(None, [source_root, env.get("PYTHONPATH")]))
@@ -85,7 +85,7 @@ def service_process(tmp_path, env, script, *args):
     )
 
 
-@pytest.mark.parametrize("module", ["uns.app", "agsignal.app"])
+@pytest.mark.parametrize("module", ["uns.app", "uns.app"])
 @pytest.mark.parametrize("database_url", [None, "", "sqlite+pysqlite://"])
 def test_asgi_entrypoint_refuses_implicit_volatile_storage(
     tmp_path, service_environment, module, database_url
@@ -102,7 +102,7 @@ def test_asgi_entrypoint_refuses_implicit_volatile_storage(
     assert "Refusing to start the UNS daemon with volatile in-memory storage" in result.stderr
 
 
-@pytest.mark.parametrize("module", ["uns.app", "agsignal.app"])
+@pytest.mark.parametrize("module", ["uns.app", "uns.app"])
 def test_asgi_entrypoint_accepts_explicit_memory_opt_in(tmp_path, service_environment, module):
     service_environment["UNS_ALLOW_IN_MEMORY"] = "true"
     service_environment["UNS_DATABASE_URL"] = "sqlite+pysqlite://"
@@ -121,7 +121,7 @@ def test_asgi_entrypoint_accepts_explicit_memory_opt_in(tmp_path, service_enviro
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("database_variable", ["UNS_DATABASE_URL", "AGSIGNAL_DATABASE_URL", "DATABASE_URL"])
+@pytest.mark.parametrize("database_variable", ["UNS_DATABASE_URL", "UNS_DATABASE_URL", "DATABASE_URL"])
 def test_asgi_entrypoint_preserves_persistent_database_aliases(
     tmp_path, service_environment, database_variable
 ):
@@ -146,7 +146,7 @@ def test_cli_refuses_missing_database_before_starting_uvicorn(tmp_path, service_
         service_environment,
         """
         import uvicorn
-        from agsignal.app import main
+        from uns.app import main
         def unexpected_server(*args, **kwargs):
             raise AssertionError("Uvicorn must not start without explicit persistence")
         uvicorn.run = unexpected_server
@@ -166,7 +166,7 @@ def test_cli_memory_flag_reaches_guarded_asgi_factory(tmp_path, service_environm
         """
         import importlib
         import uvicorn
-        from agsignal.app import main
+        from uns.app import main
         def inspect_server(target, **kwargs):
             module, attribute = target.split(":")
             app = getattr(importlib.import_module(module), attribute)
@@ -184,7 +184,7 @@ def test_explicit_embedded_memory_runtime_remains_supported(tmp_path, service_en
         tmp_path,
         service_environment,
         """
-        from agsignal.app import create_app
+        from uns.app import create_app
         from uns.config import build_runtime
         runtime = build_runtime()
         app = create_app(runtime=runtime)

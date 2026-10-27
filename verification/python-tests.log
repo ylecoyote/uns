@@ -22,7 +22,7 @@
 ....................................................                     [100%]
 =============================== warnings summary ===============================
 tests/ui_contract/test_ui_contracts.py::TestDeliveriesListContract::test_filter_params_accepted
-  /private/tmp/uns-consolidation-20261020/src/agsignal/api/read_models.py:665: SADeprecationWarning: Type object <class 'sqlalchemy.sql.sqltypes.JSON'> does not include operator 'contains_op' in its operator classes.  Using built-in operators (not including custom or overridden operators) outside of a type's stated operator classes is deprecated and will raise InvalidRequestError in a future release
+  /private/tmp/uns-consolidation-20261020/src/uns/api/read_models.py:665: SADeprecationWarning: Type object <class 'sqlalchemy.sql.sqltypes.JSON'> does not include operator 'contains_op' in its operator classes.  Using built-in operators (not including custom or overridden operators) outside of a type's stated operator classes is deprecated and will raise InvalidRequestError in a future release
     NotificationAuditRecord.channels_attempted.contains(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
@@ -31,39 +31,39 @@ _______________ coverage: platform darwin, python 3.12.9-final-0 _______________
 
 Name                                            Stmts   Miss  Cover
 -------------------------------------------------------------------
-src/agsignal/__init__.py                           22      4    82%
-src/agsignal/_in_memory.py                         23     11    52%
-src/agsignal/adapters.py                            2      0   100%
-src/agsignal/api/__init__.py                        0      0   100%
-src/agsignal/api/auth.py                           55      6    89%
-src/agsignal/api/observability.py                 173     13    92%
-src/agsignal/api/read_models.py                   354     19    95%
-src/agsignal/api/routes_notification.py            93     28    70%
-src/agsignal/api/routes_ui.py                      50      1    98%
-src/agsignal/app.py                               164     23    86%
-src/agsignal/deduplication.py                       2      0   100%
-src/agsignal/errors.py                              8      0   100%
-src/agsignal/governance/__init__.py                 0      0   100%
-src/agsignal/governance/decision_record.py         45      0   100%
-src/agsignal/governance/errors.py                  24      0   100%
-src/agsignal/governance/operators.py               78      9    88%
-src/agsignal/governance/policy_dsl.py              36      0   100%
-src/agsignal/governance/policy_loader.py           50      3    94%
-src/agsignal/integrations.py                        2      0   100%
-src/agsignal/interfaces.py                          3      0   100%
-src/agsignal/models.py                              4      0   100%
-src/agsignal/policies.py                            3      0   100%
-src/agsignal/queries.py                           139     11    92%
-src/agsignal/rate_limiting.py                       2      0   100%
-src/agsignal/responses.py                         275      0   100%
-src/agsignal/sdk.py                                 6      0   100%
-src/agsignal/signaling.py                          95     12    87%
-src/agsignal_mcp/__init__.py                       14      9    36%
-src/agsignal_mcp/factory.py                        84     23    73%
-src/agsignal_mcp/runtime.py                        23      0   100%
-src/agsignal_mcp/tools.py                         160     31    81%
-src/agsignal_mcp/transports/__init__.py             0      0   100%
-src/agsignal_mcp/transports/stdio.py                8      3    62%
+src/uns/__init__.py                           22      4    82%
+src/uns/_in_memory.py                         23     11    52%
+src/uns/adapters.py                            2      0   100%
+src/uns/api/__init__.py                        0      0   100%
+src/uns/api/auth.py                           55      6    89%
+src/uns/api/observability.py                 173     13    92%
+src/uns/api/read_models.py                   354     19    95%
+src/uns/api/routes_notification.py            93     28    70%
+src/uns/api/routes_ui.py                      50      1    98%
+src/uns/app.py                               164     23    86%
+src/uns/deduplication.py                       2      0   100%
+src/uns/errors.py                              8      0   100%
+src/uns/governance/__init__.py                 0      0   100%
+src/uns/governance/decision_record.py         45      0   100%
+src/uns/governance/errors.py                  24      0   100%
+src/uns/governance/operators.py               78      9    88%
+src/uns/governance/policy_dsl.py              36      0   100%
+src/uns/governance/policy_loader.py           50      3    94%
+src/uns/integrations.py                        2      0   100%
+src/uns/interfaces.py                          3      0   100%
+src/uns/models.py                              4      0   100%
+src/uns/policies.py                            3      0   100%
+src/uns/queries.py                           139     11    92%
+src/uns/rate_limiting.py                       2      0   100%
+src/uns/responses.py                         275      0   100%
+src/uns/sdk.py                                 6      0   100%
+src/uns/signaling.py                          95     12    87%
+src/uns_mcp/__init__.py                       14      9    36%
+src/uns_mcp/factory.py                        84     23    73%
+src/uns_mcp/runtime.py                        23      0   100%
+src/uns_mcp/tools.py                         160     31    81%
+src/uns_mcp/transports/__init__.py             0      0   100%
+src/uns_mcp/transports/stdio.py                8      3    62%
 src/db/__init__.py                                  5      0   100%
 src/db/audit_store.py                              63      6    90%
 src/db/models/__init__.py                           6      0   100%

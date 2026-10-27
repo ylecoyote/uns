@@ -1,6 +1,6 @@
-"""Prometheus metrics for AGSignal.
+"""Prometheus metrics for UNS.
 
-Defines the metric objects exposed at ``/metrics`` on both AGSignal apps,
+Defines the metric objects exposed at ``/metrics`` on both UNS apps,
 plus the FastAPI middleware that records HTTP request volume and latency
 without entangling with the structured-logging :class:`ObservabilityMiddleware`.
 
@@ -10,7 +10,7 @@ Instrumentation is intentionally narrow:
   (the route's ``path`` attribute, not the raw URL — preventing cardinality
   explosion on path parameters like notification UUIDs).
 - Domain layer: signals and deliveries are counted at their canonical entry
-  points (see ``notification.routes`` and ``agsignal.signaling``).
+  points (see ``notification.routes`` and ``uns.signaling``).
 
 The ``/metrics`` endpoint requires the configured API key. Prometheus scrapers
 must send the same bearer credential as other authenticated HTTP clients.
@@ -30,33 +30,33 @@ from prometheus_client import (
 )
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from agsignal.api.auth import require_write_principal
+from uns.api.auth import require_write_principal
 
 # ---------------------------------------------------------------------------
 # Metric definitions
 # ---------------------------------------------------------------------------
 
 http_requests_total = Counter(
-    "agsignal_http_requests_total",
-    "Total HTTP requests received by AGSignal",
+    "uns_http_requests_total",
+    "Total HTTP requests received by UNS",
     labelnames=("method", "path_template", "status_code"),
 )
 
 http_request_duration_seconds = Histogram(
-    "agsignal_http_request_duration_seconds",
+    "uns_http_request_duration_seconds",
     "HTTP request duration in seconds",
     labelnames=("method", "path_template"),
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
 )
 
 signals_received_total = Counter(
-    "agsignal_signals_received_total",
-    "Total governance signals received by AGSignal",
+    "uns_signals_received_total",
+    "Total governance signals received by UNS",
     labelnames=("intent", "autonomy_mode", "transport"),
 )
 
 deliveries_total = Counter(
-    "agsignal_deliveries_total",
+    "uns_deliveries_total",
     "Total channel delivery attempts by status",
     labelnames=("channel", "status"),
 )

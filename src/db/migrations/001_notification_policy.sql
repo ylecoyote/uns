@@ -1,4 +1,4 @@
--- AGSignal Core policy persistence schema.
+-- UNS Core policy persistence schema.
 -- This migration intentionally uses unqualified table names so standalone
 -- deployments can choose their own database/schema boundary.
 

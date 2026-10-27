@@ -43,7 +43,7 @@ async def test_running_mcp_process_observes_new_active_snapshot(tmp_path):
     environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("UNS_", "AGSIGNAL_")) and key != "DATABASE_URL"
+        if not key.startswith("UNS_") and key != "DATABASE_URL"
     }
     environment.update(
         UNS_DATABASE_URL=url,
@@ -51,7 +51,7 @@ async def test_running_mcp_process_observes_new_active_snapshot(tmp_path):
         PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src"),
     )
     parameters = StdioServerParameters(
-        command=sys.executable, args=["-m", "agsignal_mcp.transports.stdio"], env=environment
+        command=sys.executable, args=["-m", "uns_mcp.transports.stdio"], env=environment
     )
     async with stdio_client(parameters) as (read, write), ClientSession(read, write) as client:
         await client.initialize()

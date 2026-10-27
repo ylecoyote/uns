@@ -1,11 +1,11 @@
-# AGSignal Console Read Models
+# UNS Console Read Models
 
-This document describes the read model adapters that connect AGSignal Console
+This document describes the read model adapters that connect UNS Console
 endpoints to the underlying persistence and audit stores.
 
 ## Overview
 
-AGSignal Console requires read-only access to:
+UNS Console requires read-only access to:
 - **Delivery timelines** - History of notification deliveries and channel attempts
 - **Audit events** - Detailed audit trail of delivery and acknowledgment events
 - **Policy resolution** - Real-time policy resolution (already functional via PolicyRegistry)
@@ -21,13 +21,13 @@ The read model adapters provide an abstraction layer between the HTTP endpoints 
 **For local demo (no database required):**
 ```bash
 # In-memory storage, data lost on restart
-uvicorn agsignal.app:app --reload
+uvicorn uns.app:app --reload
 ```
 
 **For production (with database persistence):**
 ```bash
 export DATABASE_URL="postgresql://user:pass@localhost/uns"
-uvicorn agsignal.app:app
+uvicorn uns.app:app
 ```
 
 The application automatically configures the appropriate storage backend at startup based on the `DATABASE_URL` environment variable. See [Configuration](#configuration) for details.
@@ -53,7 +53,7 @@ The application automatically configures the appropriate storage backend at star
 
 ### InMemoryReadModelAdapter
 
-**Location:** `src/agsignal/api/read_models.py`
+**Location:** `src/uns/api/read_models.py`
 
 In-memory adapter suitable for local development and demos.
 
@@ -71,7 +71,7 @@ In-memory adapter suitable for local development and demos.
 
 **Example:**
 ```python
-from agsignal.api.read_models import (
+from uns.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
@@ -87,7 +87,7 @@ configure_read_model_adapter(adapter)
 
 ### SQLAlchemyReadModelAdapter
 
-**Location:** `src/agsignal/api/read_models.py`
+**Location:** `src/uns/api/read_models.py`
 
 Database-backed adapter for production deployments.
 
@@ -104,7 +104,7 @@ Database-backed adapter for production deployments.
 
 **Example:**
 ```python
-from agsignal.api.read_models import (
+from uns.api.read_models import (
     create_sqlalchemy_adapter,
     configure_read_model_adapter,
 )
@@ -173,21 +173,21 @@ The application automatically configures persistence at startup via `configure_p
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | SQLAlchemy database URL | Not set (uses in-memory) |
-| `AGSIGNAL_CREATE_TABLES` | Create tables on startup (`UNS_CREATE_TABLES` compatibility alias is also supported) | `true` |
+| `UNS_CREATE_TABLES` | Create tables on startup (`UNS_CREATE_TABLES` compatibility alias is also supported) | `true` |
 
 **Local Demo Mode (no DATABASE_URL):**
 ```bash
 # Uses shared in-memory storage
 # Data is NOT persisted across restarts
-uvicorn agsignal.app:app --reload
+uvicorn uns.app:app --reload
 ```
 
 **Production Mode (DATABASE_URL set):**
 ```bash
 # Uses SQLAlchemy with PostgreSQL
 export DATABASE_URL="postgresql://user:pass@localhost/uns"
-export AGSIGNAL_CREATE_TABLES="true"
-uvicorn agsignal.app:app
+export UNS_CREATE_TABLES="true"
+uvicorn uns.app:app
 ```
 
 ### Manual Configuration
@@ -196,11 +196,11 @@ For custom setups or testing, you can configure adapters manually:
 
 ```python
 # Create app without automatic persistence config
-from agsignal.app import create_app
+from uns.app import create_app
 app = create_app(skip_persistence_config=True)
 
 # Then configure manually
-from agsignal.api.read_models import (
+from uns.api.read_models import (
     create_sqlalchemy_adapter,
     configure_read_model_adapter,
 )
@@ -233,7 +233,7 @@ from notification.audit import (
     InMemoryAuditStore,
     configure_audit_logger,
 )
-from agsignal.api.read_models import (
+from uns.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
@@ -289,7 +289,7 @@ from notification.models import (
     DeliveryMode,
     AutonomyMode,
 )
-from agsignal.api.read_models import (
+from uns.api.read_models import (
     InMemoryReadModelAdapter,
     DeliveryFilter,
 )

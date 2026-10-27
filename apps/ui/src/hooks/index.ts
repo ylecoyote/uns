@@ -1,5 +1,5 @@
 /**
- * Custom hooks exports for AGSignal Console.
+ * Custom hooks exports for UNS Console.
  *
  * Export all custom React hooks from this index.
  */

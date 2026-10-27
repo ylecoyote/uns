@@ -1,12 +1,12 @@
 # Integration Modes
 
-This document describes how UNS (and the underlying AGSignal Core library) operates across canonical runtime transports and low-level SDK integration modes, clarifying the separation between core notification obligations, durable outbox persistence, and optional host-platform integrations.
+This document describes how UNS (and the underlying UNS Core library) operates across canonical runtime transports and low-level SDK integration modes, clarifying the separation between core notification obligations, durable outbox persistence, and optional host-platform integrations.
 
 ## Overview
 
-UNS (`uns.Runtime` and `uns.Client`, built on **AGSignal Core**) is designed as an **ATP-agnostic** (Autonomous Trading Platform agnostic) notification and acknowledgment governance service. The durable runtime, HTTP/MCP transports, and core delivery pipeline function independently of any specific trading platform or external host system.
+UNS (`uns.Runtime` and `uns.Client`, built on **UNS Core**) is designed as an **ATP-agnostic** (Autonomous Trading Platform agnostic) notification and acknowledgment governance service. The durable runtime, HTTP/MCP transports, and core delivery pipeline function independently of any specific trading platform or external host system.
 
-**Key Principle:** AGSignal Core does NOT require ATP to function. ATP integration is one of several optional integration modes.
+**Key Principle:** UNS Core does NOT require ATP to function. ATP integration is one of several optional integration modes.
 
 ### Canonical Transport vs. Low-Level SDK Modes
 
@@ -16,7 +16,7 @@ UNS provides two layers of integration:
    - **Recommended for all production and multi-process deployments.**
    - Persists accepted obligations, policy provenance (`uns_resolution`), deduplication claims (`uns_dedup`), leased channel attempts, and recovery events (`uns_events`) in a shared relational database (`UNS_DATABASE_URL`).
    - Background worker loops (`await runtime.worker()`) handle leased retries, acknowledgment timeout sweeps (`TIMED_OUT`), and at-least-once terminal callback delivery (`deliver_callbacks`).
-2. **Low-Level In-Process Pipeline (`notification.sdk.NotificationSDK` / `agsignal.SignalClient`):**
+2. **Low-Level In-Process Pipeline (`notification.sdk.NotificationSDK` / `uns.SignalClient`):**
    - Provides protocol-based in-process policy resolution and adapter orchestration.
    - **Important Remediation Contract:** Calling `NotificationSDK()` without configuring a `delivery_handler` only evaluates policy and returns `DeliveryStatus.PENDING`—it does **not** perform external channel delivery. For durable delivery, use `uns.Runtime` and `uns.Client`.
 
@@ -29,17 +29,17 @@ UNS provides two layers of integration:
 | **Runtime** | `uns.runtime` | Transactional outbox, leased channel dispatch, deduplication, ACK state machine, DLQ, and callback worker |
 | **Client** | `uns.client` | Principal-bound async client (`send`, `simulate`) sharing a `Runtime` |
 | **PolicyRuntime** | `uns.policy_runtime` | Revision-checked durable ACTIVE policy resolver and override guard |
-| **HTTP Service** | `agsignal.app` / `uns.app` | Unified FastAPI server mounting `/api/v1/*`, `/v1/notifications/*`, `/ui/*`, and `/ws/agents/{agent_id}` |
-| **MCP Server** | `agsignal_mcp.factory` | Trusted-local stdio MCP server (`uns-mcp`) with read-only default and write-enabled recovery worker |
+| **HTTP Service** | `uns.app` / `uns.app` | Unified FastAPI server mounting `/api/v1/*`, `/v1/notifications/*`, `/ui/*`, and `/ws/agents/{agent_id}` |
+| **MCP Server** | `uns_mcp.factory` | Trusted-local stdio MCP server (`uns-mcp`) with read-only default and write-enabled recovery worker |
 | **Retention CLI** | `uns.maintenance` | Explicit, bounded operational pruning and verified JSON archival (`uns-maintain`) |
 
-### AGSignal Core (ATP-Agnostic)
+### UNS Core (ATP-Agnostic)
 
 The following low-level pipeline components are self-contained and require no external platform dependencies:
 
 | Component | Module | Description |
 |-----------|--------|-------------|
-| **NotificationSDK** | `notification.sdk` | Low-level policy/handler facade (aliased as `agsignal.SignalClient`) |
+| **NotificationSDK** | `notification.sdk` | Low-level policy/handler facade (aliased as `uns.SignalClient`) |
 | **PolicyRegistry** | `notification.policies` | Routing policy management |
 | **DeliveryService** | `notification.service` | Delivery service (orchestrates the channel adapter pipeline) |
 | **Channel Adapters** | `notification.adapters` | Slack, Email, PagerDuty, and WebSocket delivery |
@@ -48,18 +48,18 @@ The following low-level pipeline components are self-contained and require no ex
 | **AcknowledgmentEngine** | `notification.acknowledgment` | Low-level ACK lifecycle state helper |
 | **AuditLogger** | `notification.audit` | Compliance logging protocol and SQLAlchemy/in-memory stores |
 
-These components use **protocol-based interfaces** (`notification.interfaces`) that allow external systems to inject implementations via dependency injection without coupling AGSignal Core to specific platforms.
+These components use **protocol-based interfaces** (`notification.interfaces`) that allow external systems to inject implementations via dependency injection without coupling UNS Core to specific platforms.
 
 ### Integration Points (Optional)
 
-AGSignal Core defines protocols for optional integration with external systems:
+UNS Core defines protocols for optional integration with external systems:
 
 | Protocol | Purpose | Default Implementation |
 |----------|---------|------------------------|
 | `NotificationContextProvider` | Provides autonomy context | `DefaultContextProvider` |
 | `AcknowledgmentCallback` | Receives ack events | `NoOpAcknowledgmentCallback` |
 
-External systems (including ATP) implement these protocols to integrate with AGSignal Core, or pass an async `callback` coroutine directly to `uns.Runtime(..., callback=...)` for durable at-least-once terminal event callbacks (`ACKED`, `DISMISSED`, `TIMED_OUT`).
+External systems (including ATP) implement these protocols to integrate with UNS Core, or pass an async `callback` coroutine directly to `uns.Runtime(..., callback=...)` for durable at-least-once terminal event callbacks (`ACKED`, `DISMISSED`, `TIMED_OUT`).
 
 ## Integration Modes
 
@@ -71,7 +71,7 @@ Use `uns.Runtime` and `uns.Client` when embedding UNS directly inside a Python a
 import asyncio
 from uuid import uuid4
 
-from agsignal.responses import AutonomyContextRequest, SendNotificationRequest
+from uns.responses import AutonomyContextRequest, SendNotificationRequest
 from notification.adapters import SlackAdapter, SlackConfig
 from notification.models import AutonomyMode, NotificationIntent
 from notification.service import SimpleAdapterRegistry
@@ -195,7 +195,7 @@ result = sdk.send_safety(
 
 ### Mode 2: Context Provider Integration
 
-AGSignal Core receives autonomy context from an external provider, while delivery and acknowledgment tracking remain internal.
+UNS Core receives autonomy context from an external provider, while delivery and acknowledgment tracking remain internal.
 
 **Use Cases:**
 - Systems with centralized agent state management
@@ -234,7 +234,7 @@ result = sdk.send_operational(
 
 ### Mode 3: Full External Integration (e.g., ATP)
 
-AGSignal Core integrates with an external platform that provides both context and acknowledgment handling. For durable at-least-once callbacks in `uns.Runtime`, pass an async `callback` function to `Runtime(..., callback=...)`.
+UNS Core integrates with an external platform that provides both context and acknowledgment handling. For durable at-least-once callbacks in `uns.Runtime`, pass an async `callback` function to `Runtime(..., callback=...)`.
 
 **Use Cases:**
 - Autonomous trading platforms (ATP)
@@ -268,7 +268,7 @@ result = sdk.send_safety(
 
 ### Mode 4: Generic App Adapter Boundary
 
-AGSignal also ships a small host-application boundary under `notification.integrations` (re-exported via `agsignal.integrations`) for applications that want a structured facade rather than constructing raw requests from every governor, circuit breaker, or evidence-producing component.
+UNS also ships a small host-application boundary under `notification.integrations` (re-exported via `uns.integrations`) for applications that want a structured facade rather than constructing raw requests from every governor, circuit breaker, or evidence-producing component.
 
 This boundary is generic by design. It is **not MIP-specific** and does not import host application domain models.
 
@@ -309,9 +309,9 @@ Use this mode when the host application owns governor hooks, circuit-breaker sta
 
 ## Component Ownership
 
-### AGSignal Core Components
+### UNS Core Components
 
-These components are maintained as part of UNS / AGSignal Core and have no external platform dependencies:
+These components are maintained as part of UNS / UNS Core and have no external platform dependencies:
 
 ```
 src/
@@ -321,11 +321,11 @@ src/
 │   ├── policy_runtime.py   # Durable ACTIVE policy authority & override enforcement
 │   ├── maintenance.py      # Explicit retention & verified archive CLI (uns-maintain)
 │   └── migrate.py          # Idempotent additive schema bootstrap (uns-migrate)
-├── agsignal/
+├── uns/
 │   ├── app.py              # Unified FastAPI HTTP + Console + WebSocket factory
 │   ├── signaling.py        # Transport-shared send/simulate/ack/dismiss service
 │   └── queries.py          # Read-model queries for /ui/* and MCP
-├── agsignal_mcp/
+├── uns_mcp/
 │   ├── factory.py          # FastMCP server factory & lifespan worker management
 │   └── tools.py            # 16 MCP tool implementations
 └── notification/
@@ -358,13 +358,13 @@ These components are owned by the integrating system (e.g., ATP):
 | Custom WebSocket Manager | ATP / Integrator | `WebSocketConnectionManager` protocol |
 | Host App Signal Adapter | Integrator | `notification.integrations.AppSignalAdapter` boundary |
 
-**Important:** In low-level library mode, AGSignal Core does NOT own or maintain external WebSocket connection management. The `WebSocketAdapter` in `notification.adapters` accepts a `connection_manager` injected at configuration time. When running the unified HTTP server (`uns`), `agsignal.app:create_app` registers `uns.websocket.WebSocketDeliveryAdapter` wired to the server's authenticated `/ws/agents/{agent_id}` endpoint.
+**Important:** In low-level library mode, UNS Core does NOT own or maintain external WebSocket connection management. The `WebSocketAdapter` in `notification.adapters` accepts a `connection_manager` injected at configuration time. When running the unified HTTP server (`uns`), `uns.app:create_app` registers `uns.websocket.WebSocketDeliveryAdapter` wired to the server's authenticated `/ws/agents/{agent_id}` endpoint.
 
 ## WebSocket Considerations
 
-### AGSignal Core WebSocket Adapter
+### UNS Core WebSocket Adapter
 
-The low-level AGSignal Core `WebSocketAdapter` is responsible for:
+The low-level UNS Core `WebSocketAdapter` is responsible for:
 - Formatting notifications for WebSocket delivery
 - Sending messages through an injected connection manager
 - Returning explicit failure when no active agent socket is connected (in durable `WebSocketDeliveryAdapter`)
@@ -399,7 +399,7 @@ class MyWebSocketManager:
     def get_connection_count(self) -> int:
         return 0
 
-# Inject into AGSignal Core adapter
+# Inject into UNS Core adapter
 adapter = WebSocketAdapter(
     config=WebSocketConfig(),
     connection_manager=MyWebSocketManager(),
@@ -408,18 +408,18 @@ adapter = WebSocketAdapter(
 
 ### ATP WebSocket Assumptions
 
-When low-level AGSignal Core is integrated with an external host such as ATP:
+When low-level UNS Core is integrated with an external host such as ATP:
 
 1. **Connection Management**: The host's WebSocket manager handles connections (or uses the unified `uns` server's `/ws/agents/{agent_id}` endpoint).
 2. **Authentication**: Handled before socket acceptance (`require_websocket_principal` in unified HTTP mode).
 3. **Reconnection**: Client/integrator implements reconnection and replay-cursor resumption.
 4. **Message Routing**: Messages route to the target `agent_id`.
 
-AGSignal Core assumes any injected connection manager implements the `WebSocketConnectionManager` protocol: `broadcast()`, `send_to_user()`, `send_to_agent()`, and `get_connection_count()`.
+UNS Core assumes any injected connection manager implements the `WebSocketConnectionManager` protocol: `broadcast()`, `send_to_user()`, `send_to_agent()`, and `get_connection_count()`.
 
 ## Default Implementations
 
-AGSignal Core provides default implementations for standalone low-level operation:
+UNS Core provides default implementations for standalone low-level operation:
 
 ### DefaultContextProvider
 
@@ -495,21 +495,21 @@ This pattern ensures:
 
 ## Summary
 
-| Aspect | AGSignal Core / UNS Runtime | External Integration |
+| Aspect | UNS Core / UNS Runtime | External Integration |
 |--------|-----------------------------|---------------------|
-| **Durable Outbox & Leases** | `uns.Runtime` (AGSignal Core owned) | - |
-| **Notification Delivery** | AGSignal Core owned | - |
-| **Policy Resolution** | AGSignal Core owned (`PolicyRuntime`) | - |
-| **Deduplication** | AGSignal Core owned (`uns_dedup`) | - |
-| **Rate Limiting** | AGSignal Core owned | - |
-| **Acknowledgment Tracking** | AGSignal Core owned | - |
+| **Durable Outbox & Leases** | `uns.Runtime` (UNS Core owned) | - |
+| **Notification Delivery** | UNS Core owned | - |
+| **Policy Resolution** | UNS Core owned (`PolicyRuntime`) | - |
+| **Deduplication** | UNS Core owned (`uns_dedup`) | - |
+| **Rate Limiting** | UNS Core owned | - |
+| **Acknowledgment Tracking** | UNS Core owned | - |
 | **Context Provider** | Protocol defined | Implementation owned by integrator |
 | **Ack Callbacks** | Protocol / `Runtime.callback` defined | Implementation owned by integrator |
 | **App Adapter Boundary** | Generic facade defined | Host wiring owned by integrator |
 | **WebSocket Connections** | Built-in `/ws/agents/{id}` or injected | External manager owned by integrator |
 | **Agent State** | - | Owned by integrator |
 
-**UNS / AGSignal Core is a self-contained notification and acknowledgment service.** Integration with ATP or other platforms is achieved through `uns.Runtime` / `uns.Client`, HTTP/MCP transports, or protocol-based dependency injection—never hard platform dependencies.
+**UNS / UNS Core is a self-contained notification and acknowledgment service.** Integration with ATP or other platforms is achieved through `uns.Runtime` / `uns.Client`, HTTP/MCP transports, or protocol-based dependency injection—never hard platform dependencies.
 
 ## Related Documentation
 

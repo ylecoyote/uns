@@ -1,4 +1,4 @@
-title = "AGSignal gitleaks configuration"
+title = "UNS gitleaks configuration"
 
 [extend]
 useDefault = true

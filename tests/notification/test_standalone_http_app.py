@@ -1,4 +1,4 @@
-"""Tests for the standalone AGSignal HTTP application."""
+"""Tests for the standalone UNS HTTP application."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def _client(
 ) -> TestClient:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     app = create_app(
         skip_persistence_config=True,
@@ -106,8 +106,8 @@ def _client(
         channel_health_tracker=channel_health_tracker,
         audit_store=audit_store,
     )
-    app.state.agsignal_api_key = "test-key"
-    app.state.agsignal_api_principal = "risk-operator"
+    app.state.uns_api_key = "test-key"
+    app.state.uns_api_principal = "risk-operator"
     return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
@@ -139,13 +139,13 @@ def _notification() -> Notification:
     )
 
 
-def test_standalone_app_metadata_and_routes_are_agsignal_native(
+def test_standalone_app_metadata_and_routes_are_uns_native(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("AGSIGNAL_ENABLE_DOCS", "true")
+    monkeypatch.setenv("UNS_ENABLE_DOCS", "true")
     monkeypatch.setenv("UNS_ALLOW_IN_MEMORY", "true")
     client = _client()
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     response = client.get("/openapi.json")
 
@@ -183,7 +183,7 @@ def test_readyz_aliases_ready() -> None:
 
 
 def test_metrics_endpoint_returns_prometheus_format() -> None:
-    """AGSignal Core exposes /metrics in Prometheus exposition format."""
+    """UNS Core exposes /metrics in Prometheus exposition format."""
     client = _client()
 
     response = client.get("/metrics")
@@ -192,9 +192,9 @@ def test_metrics_endpoint_returns_prometheus_format() -> None:
     assert response.headers["content-type"].startswith("text/plain")
     body = response.text
     for metric_name in (
-        "agsignal_http_requests_total",
-        "agsignal_signals_received_total",
-        "agsignal_deliveries_total",
+        "uns_http_requests_total",
+        "uns_signals_received_total",
+        "uns_deliveries_total",
     ):
         assert metric_name in body
 
@@ -202,8 +202,8 @@ def test_metrics_endpoint_returns_prometheus_format() -> None:
 def test_standalone_app_disables_interactive_docs_by_default(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """AGSignal Core does not expose /docs, /redoc, or /openapi.json by default."""
-    monkeypatch.delenv("AGSIGNAL_ENABLE_DOCS", raising=False)
+    """UNS Core does not expose /docs, /redoc, or /openapi.json by default."""
+    monkeypatch.delenv("UNS_ENABLE_DOCS", raising=False)
     client = _client()
 
     for path in ("/docs", "/redoc", "/openapi.json"):
@@ -245,7 +245,7 @@ def test_app_does_not_create_redis_fanout_by_default(monkeypatch: MonkeyPatch) -
     monkeypatch.setenv("UNS_ALLOW_IN_MEMORY", "true")
     monkeypatch.delenv("UNS_WEBSOCKET_REDIS_ENABLED", raising=False)
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     app = create_app(redis_client_factory=ExplodingRedisFactory())
 
@@ -266,7 +266,7 @@ def test_app_creates_redis_fanout_when_enabled(monkeypatch: MonkeyPatch) -> None
     monkeypatch.setenv("UNS_REDIS_URL", "redis://example/0")
     factory = RedisFactory()
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     app = create_app(redis_client_factory=factory)
 
@@ -416,12 +416,12 @@ def test_send_signal_delivers_to_connected_websocket_agent() -> None:
 def test_send_signal_publishes_optional_websocket_fanout() -> None:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     app = create_app(skip_persistence_config=True)
     fanout = CapturingFanout()
     app.state.websocket_fanout = fanout
-    app.state.agsignal_api_key = "test-key"
+    app.state.uns_api_key = "test-key"
     client = TestClient(app, headers={"Authorization": "Bearer test-key"})
     payload = _payload()
     agent_id = uuid4()
@@ -443,10 +443,10 @@ def test_send_signal_publishes_optional_websocket_fanout() -> None:
 def test_send_signal_records_websocket_replay_payload() -> None:
     configure_ack_engine(storage=InMemoryAckStorage())
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     app = create_app(skip_persistence_config=True)
-    app.state.agsignal_api_key = "test-key"
+    app.state.uns_api_key = "test-key"
     client = TestClient(app, headers={"Authorization": "Bearer test-key"})
     payload = _payload()
     agent_id = uuid4()
@@ -770,7 +770,7 @@ def test_oversized_metadata_rejected() -> None:
     import pytest
     from pydantic import ValidationError as PydanticValidationError
 
-    from agsignal.responses import AckRequest
+    from uns.responses import AckRequest
 
     with pytest.raises(PydanticValidationError, match="metadata must not exceed"):
         AckRequest(metadata={"blob": "x" * 70_000})

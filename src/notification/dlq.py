@@ -1,4 +1,4 @@
-"""Dead-letter queue support for visible AGSignal delivery failures."""
+"""Dead-letter queue support for visible UNS delivery failures."""
 
 from __future__ import annotations
 

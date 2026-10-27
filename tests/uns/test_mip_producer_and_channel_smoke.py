@@ -31,9 +31,9 @@ from scripts.opt_in_channel_smoke import (
     main as smoke_main,
 )
 
-from agsignal.app import create_app
 from notification.adapters.base import DeliveryResult
 from notification.models import Channel, Notification
+from uns.app import create_app
 from uns.runtime import Runtime
 
 
@@ -139,8 +139,8 @@ async def test_mip_producer_http_demo_requires_api_key(
     for var in (
         "UNS_PRODUCER_API_KEY",
         "UNS_API_KEY",
-        "AGSIGNAL_PRODUCER_API_KEY",
-        "AGSIGNAL_API_KEY",
+        "UNS_PRODUCER_API_KEY",
+        "UNS_API_KEY",
     ):
         monkeypatch.delenv(var, raising=False)
 

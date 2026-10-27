@@ -19,7 +19,7 @@ the bottom with the resolving commit SHA.
 
 **Surfaced during:** Phase 3 Task 8 (2026-05-08).
 
-**Observation:** `agsignal.signaling.send_signal` (the canonical
+**Observation:** `uns.signaling.send_signal` (the canonical
 service-layer write function established in Phase 2) does not perform
 actual channel delivery. It uses
 `NotificationSDK(delivery_handler=_capture_delivery)` where the handler
@@ -34,7 +34,7 @@ DLQ-on-failure wiring live in the legacy
 
 **Why this is debt:** the new service layer's name (`send_signal`)
 implies it sends. The legacy path's name (`dispatch_notification`) is
-internal. External callers reach for `agsignal.signaling.send_signal`
+internal. External callers reach for `uns.signaling.send_signal`
 expecting full delivery; they get accept-only behavior. The transport
 surface (HTTP `/api/v1/notifications/send`, MCP `send_signal` tool)
 papers over this — those routes/tools today only need accept-only — but
@@ -43,14 +43,14 @@ when a caller wants delivery confirmation, they'll be surprised.
 **Fix shape (when picked up):**
 
 1. Decide whether to unify in-place (move `dispatch_notification`
-   logic into `agsignal.signaling.send_signal`) or to keep the layered
+   logic into `uns.signaling.send_signal`) or to keep the layered
    shape (have `send_signal` call into `dispatch_notification` with the
    right channel and DLQ wiring threaded through).
 2. Re-introduce the `dlq_service` parameter on `send_signal` with real
    behavior: on `GUARANTEED`-mode delivery failure, push to DLQ.
 3. Add a `delivery_handler` parameter so callers can opt out of channel
    dispatch (the simulate path needs this).
-4. Update the existing `tests/agsignal/test_signaling.py` to cover
+4. Update the existing `tests/uns/test_signaling.py` to cover
    delivery-failure → DLQ-push, mirroring the legacy
    `tests/notification/test_service.py` coverage.
 5. Update the HTTP route and MCP tool to thread `dlq_service` through.
@@ -71,8 +71,8 @@ delivery code into a stable home, making this unification land cleanly.
 
 **Surfaced during:** Phase 3 final review (2026-05-08).
 
-**Observation:** `agsignal.queries.list_invariants` at
-`src/agsignal/queries.py:571-591` catches `Exception` and falls through
+**Observation:** `uns.queries.list_invariants` at
+`src/uns/queries.py:571-591` catches `Exception` and falls through
 to an empty `InvariantListResponse(items=[], ...)` response with HTTP
 status 200, after recording an error metric against the
 `/ui/invariants` endpoint string.

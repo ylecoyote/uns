@@ -1,4 +1,4 @@
-"""Generic host-application integration boundary for AGSignal."""
+"""Generic host-application integration boundary for UNS."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from notification.sdk import NotificationSDK
 
 
 class AppEvidenceContext(BaseModel):
-    """Optional host-application evidence references carried by AGSignal."""
+    """Optional host-application evidence references carried by UNS."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -59,18 +59,18 @@ class AppEvidenceContext(BaseModel):
 
 
 class AppSignalRequest(BaseModel):
-    """Host-application request for sending an AGSignal signal."""
+    """Host-application request for sending an UNS signal."""
 
     model_config = ConfigDict(frozen=True)
 
     notification_type: str = Field(description="Namespaced signal type", min_length=1)
-    intent: NotificationIntent = Field(description="AGSignal intent")
+    intent: NotificationIntent = Field(description="UNS intent")
     title: str = Field(description="Signal title", min_length=1)
     message: str = Field(description="Signal body", min_length=1)
     source: str = Field(description="Host application producer identifier", min_length=1)
     autonomy_context: AutonomyContext | None = Field(
         default=None,
-        description="Optional fully resolved AGSignal autonomy context",
+        description="Optional fully resolved UNS autonomy context",
     )
     evidence: AppEvidenceContext | None = Field(
         default=None,
@@ -90,7 +90,7 @@ class AppSignalRequest(BaseModel):
 
 @runtime_checkable
 class AppSignalContextProvider(Protocol):
-    """Protocol implemented by host applications that resolve AGSignal context."""
+    """Protocol implemented by host applications that resolve UNS context."""
 
     def build_context(self, request: AppSignalRequest) -> AutonomyContext: ...
 
@@ -107,7 +107,7 @@ class DefaultAppSignalContextProvider:
         self._agent_id = agent_id
 
     def build_context(self, request: AppSignalRequest) -> AutonomyContext:
-        """Resolve an AGSignal AutonomyContext from request/default app state."""
+        """Resolve an UNS AutonomyContext from request/default app state."""
         if request.autonomy_context is not None:
             return request.autonomy_context
         if self._agent_id is None:
@@ -128,7 +128,7 @@ class AppSignalAdapter:
     """Thin host-application facade over NotificationSDK.
 
     This adapter owns no host domain behavior. It only translates the generic
-    boundary request into an AGSignal SDK call.
+    boundary request into an UNS SDK call.
     """
 
     def __init__(
@@ -140,7 +140,7 @@ class AppSignalAdapter:
         self._context_provider = context_provider or DefaultAppSignalContextProvider()
 
     def send(self, request: AppSignalRequest) -> NotificationResult:
-        """Send a host-application signal through the AGSignal SDK."""
+        """Send a host-application signal through the UNS SDK."""
         context = self._context_provider.build_context(request)
         metadata = dict(request.metadata)
         if request.evidence is not None:

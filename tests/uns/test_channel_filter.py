@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from agsignal.api.read_models import DeliveryFilter, SQLAlchemyReadModelAdapter
 from db.audit_store import SQLAlchemyAuditStore
 from db.models import Base
 from notification.audit import create_audit_record
@@ -19,6 +18,7 @@ from notification.models import (
     NotificationIntent,
     NotificationResult,
 )
+from uns.api.read_models import DeliveryFilter, SQLAlchemyReadModelAdapter
 
 
 def test_sqlite_filter_matches_channel_anywhere_in_array():
@@ -51,8 +51,8 @@ def test_sqlite_filter_matches_channel_anywhere_in_array():
 def test_postgresql_membership_compiles_to_jsonb_array_containment():
     from sqlalchemy.dialects import postgresql
 
-    from agsignal.api.read_models import _channel_membership
     from db.models import NotificationAuditRecord
+    from uns.api.read_models import _channel_membership
 
     predicate = _channel_membership(
         NotificationAuditRecord.channels_attempted, Channel.SLACK, "postgresql"
@@ -63,8 +63,8 @@ def test_postgresql_membership_compiles_to_jsonb_array_containment():
 
 
 def test_unknown_dialect_fails_explicitly_instead_of_substring_matching():
-    from agsignal.api.read_models import _channel_membership
     from db.models import NotificationAuditRecord
+    from uns.api.read_models import _channel_membership
 
     with pytest.raises(ValueError, match="not implemented"):
         _channel_membership(NotificationAuditRecord.channels_attempted, Channel.SLACK, "unknown")

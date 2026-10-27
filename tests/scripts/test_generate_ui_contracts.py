@@ -204,7 +204,7 @@ class TestSchemas:
         Phase 3 Task 1 renamed ``ErrorResponse`` (the routes_ui flavor) to
         ``UIErrorResponse`` because two structurally incompatible
         ``ErrorResponse`` classes coexisted; both moved to
-        :mod:`agsignal.responses` under disambiguated names.
+        :mod:`uns.responses` under disambiguated names.
         """
         schemas = contract_data["schemas"]
         assert "UIErrorResponse" in schemas

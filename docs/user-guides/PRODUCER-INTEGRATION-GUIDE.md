@@ -24,7 +24,7 @@ import asyncio
 from typing import Any
 from uuid import uuid4
 
-from agsignal.responses import AutonomyContextRequest, SendNotificationRequest
+from uns.responses import AutonomyContextRequest, SendNotificationRequest
 from notification.adapters import EmailAdapter, EmailConfig, SlackAdapter, SlackConfig
 from notification.models import AutonomyMode, NotificationIntent
 from notification.service import SimpleAdapterRegistry

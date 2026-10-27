@@ -10,12 +10,12 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select, update
 
-from agsignal.responses import SendNotificationRequest
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel, DeliveryStatus
 from notification.policies import PolicyRegistry, configure_policy_registry
 from notification.rate_limiting import configure_rate_limiter
 from notification.service import SimpleAdapterRegistry
+from uns.responses import SendNotificationRequest
 from uns.runtime import Conflict, Runtime, dedup, work
 
 

@@ -1,8 +1,8 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-# AGSignal vs Cloud-Native Agent Governance Stacks
+# UNS vs Cloud-Native Agent Governance Stacks
 
-**Complementary positioning analysis for AGSignal v1.0**
+**Complementary positioning analysis for UNS v1.0**
 
 | Field | Value |
 |---|---|
@@ -14,9 +14,9 @@
 
 ## Thesis
 
-The agent governance category has shifted from "single product" to "multi-layer stack." Every major cloud vendor (Microsoft, AWS, Google) now ships an agent-governance stack. Every major agent framework (LangGraph, AutoGen, CrewAI) ships HITL ergonomics. **None of them ship a neutral, runtime, durable approval primitive that composes cleanly with the others.** That gap is AGSignal's market.
+The agent governance category has shifted from "single product" to "multi-layer stack." Every major cloud vendor (Microsoft, AWS, Google) now ships an agent-governance stack. Every major agent framework (LangGraph, AutoGen, CrewAI) ships HITL ergonomics. **None of them ship a neutral, runtime, durable approval primitive that composes cleanly with the others.** That gap is UNS's market.
 
-This document maps the cloud-vendor stacks layer-by-layer and shows where AGSignal fits. It is the positioning briefing — *not* a competitive teardown. AGSignal sells *with* these stacks, not *against* them.
+This document maps the cloud-vendor stacks layer-by-layer and shows where UNS fits. It is the positioning briefing — *not* a competitive teardown. UNS sells *with* these stacks, not *against* them.
 
 ---
 
@@ -24,14 +24,14 @@ This document maps the cloud-vendor stacks layer-by-layer and shows where AGSign
 
 Microsoft's [Cloud Adoption Framework for AI agents](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ai-agents/governance-security-across-organization) lays out a useful canonical four-layer model. Other clouds and OSS stacks map onto the same layers:
 
-| Layer | What it does | Microsoft | AWS | Google | AGSignal |
+| Layer | What it does | Microsoft | AWS | Google | UNS |
 |---|---|---|---|---|---|
 | **1. Data governance & compliance** | Translates regulations into technical controls; data residency; retention; PII | Purview Compliance Manager + Purview APIs | Macie + DLP + Glue Data Catalog + Compliance reports | DLP + Cloud Data Catalog + Assured Workloads | **Out** (consumes vendor stack via plugins) |
 | **2. Agent observability** | Inventory, behavioral visibility, cost tracking | Agent 365 + Defender for Cloud + Azure Monitor + Application Insights | CloudWatch + AgentCore observability + Cost Explorer | Cloud Monitoring + Vertex AI Model Monitoring | **Adjacent** — emits to vendor stack via AuditHook |
 | **3. Agent security** | Threat protection, RBAC, red teaming, content safety | Defender AI threat protection + Content Safety + AI Red Teaming Agent + Sentinel | GuardDuty + Bedrock Guardrails + IAM + Detective | Sensitive Data Protection + Cloud Armor + Security Command Center | **Out** (sibling concern; ExecutionGate handles inline enforcement) |
-| **4. Agent development** | Frameworks, SDKs, protocols | Microsoft Agent Framework + Foundry SDK + MCP + A2A | Bedrock Agents SDK + AgentCore + AWS SDK | Agent Builder + Vertex AI ADK + Agentspace + MCP | **Out** — AGSignal is callable from any framework |
+| **4. Agent development** | Frameworks, SDKs, protocols | Microsoft Agent Framework + Foundry SDK + MCP + A2A | Bedrock Agents SDK + AgentCore + AWS SDK | Agent Builder + Vertex AI ADK + Agentspace + MCP | **Out** — UNS is callable from any framework |
 
-This is the *governance stack*. AGSignal does not compete with any of these layers.
+This is the *governance stack*. UNS does not compete with any of these layers.
 
 **The missing fifth layer**, present in zero of the cloud-vendor stacks: a runtime primitive for `REQUIRE_APPROVAL → notification → human ACK → resume callback`.
 
@@ -70,7 +70,7 @@ That's the gap.
 
 **What AWS has shipped:**
 - **Bedrock AgentCore** — agent runtime with policy/permissions evaluation
-- **Cedar policy language** for fine-grained authorization (notable: AGSignal evaluated Cedar in ADR-002 and chose custom DSL for v1; convergence with Cedar via plugin is plausible v2+)
+- **Cedar policy language** for fine-grained authorization (notable: UNS evaluated Cedar in ADR-002 and chose custom DSL for v1; convergence with Cedar via plugin is plausible v2+)
 - **AWS IAM** for agent identity (managed-identity pattern via IRSA / IAM Roles for Service Accounts)
 - **Amazon Bedrock Guardrails** for input/output filtering
 - **AWS Verified Permissions** for managed Cedar evaluation
@@ -81,7 +81,7 @@ That's the gap.
 - A neutral, framework-agnostic runtime approval primitive
 - Cross-cloud audit federation
 
-**AWS's HITL story is the Step Functions callback-token pattern** — referenced in AGSignal ADR-001 as Pattern B. It's well-documented and proven, but it's a workflow primitive, not a governance-native HITL layer. AWS-native customers building HITL approval typically wire up Step Functions + Lambda + EventBridge + custom UI. **AGSignal as a Step-Functions-callback-compatible layer compresses that to a single primitive.**
+**AWS's HITL story is the Step Functions callback-token pattern** — referenced in UNS ADR-001 as Pattern B. It's well-documented and proven, but it's a workflow primitive, not a governance-native HITL layer. AWS-native customers building HITL approval typically wire up Step Functions + Lambda + EventBridge + custom UI. **UNS as a Step-Functions-callback-compatible layer compresses that to a single primitive.**
 
 ### Google Cloud Vertex AI
 
@@ -115,7 +115,7 @@ These are essential for developer ergonomics. They don't substitute for an enter
 - They lack the policy/audit/notification integration that enterprise compliance demands
 - They emit framework-specific events, not portable governance signals
 
-**AGSignal calls into these frameworks' HITL primitives, not the other way around.** The `WorkflowOrchestrator` Protocol (5-method contract per ADR-004) provides a portable abstraction over Temporal signals, Step Functions callback tokens, Restate awakeables, Airflow HITL operators, and framework-native interrupts.
+**UNS calls into these frameworks' HITL primitives, not the other way around.** The `WorkflowOrchestrator` Protocol (5-method contract per ADR-004) provides a portable abstraction over Temporal signals, Step Functions callback tokens, Restate awakeables, Airflow HITL operators, and framework-native interrupts.
 
 ### Workflow vendors (Temporal, Restate, Orkes Conductor, Step Functions)
 
@@ -126,7 +126,7 @@ These are durable workflow engines with HITL patterns:
 - **Orkes Conductor** — workflow-native human approval steps
 - **AWS Step Functions** — callback token pattern
 
-Same gap as framework HITL: workflow-primitive, not governance-native. AGSignal v1.0 OSS core ships a lightweight built-in WorkflowOrchestrator (in-memory, non-durable across restart) for non-regulated deployments; commercial DurableWorkflow plugin maps to Temporal or Restate when durability matters.
+Same gap as framework HITL: workflow-primitive, not governance-native. UNS v1.0 OSS core ships a lightweight built-in WorkflowOrchestrator (in-memory, non-durable across restart) for non-regulated deployments; commercial DurableWorkflow plugin maps to Temporal or Restate when durability matters.
 
 ### Specialized HITL / approval-workflow products
 
@@ -149,7 +149,7 @@ Across the cloud-vendor stacks, every governance layer has a credible commercial
 - ✅ Sandboxing / execution gates (AGT KernelSpace, AgentCore execution boundaries, Vertex AI restrictions)
 - ✅ Compliance documentation pipelines (Purview, Audit Manager, Compliance Reports)
 
-These are the layers AGSignal does not need to build. Each cloud-vendor stack is good enough at its own layer; the value AGSignal provides is *not* re-implementing them.
+These are the layers UNS does not need to build. Each cloud-vendor stack is good enough at its own layer; the value UNS provides is *not* re-implementing them.
 
 ---
 
@@ -173,19 +173,19 @@ Production teams working around this gap (per Stage 2 research):
 - LangGraph interrupts + manual state management
 - Cloud-vendor SDKs + glue code
 
-This is the AGSignal market.
+This is the UNS market.
 
 ---
 
-## AGSignal's exact niche
+## UNS's exact niche
 
-| Layer | Cloud-vendor responsibility | AGSignal responsibility |
+| Layer | Cloud-vendor responsibility | UNS responsibility |
 |---|---|---|
 | 1. Data governance & compliance | Purview / Macie / DLP | Article 14 + GDPR 22 commercial Compliance Templates plugin |
 | 2. Agent observability | Agent 365 / CloudWatch / Cloud Monitoring | Three-stream audit emitted into vendor stack via AuditHook plugins |
 | 3. Agent security | Defender / GuardDuty / Cloud Armor | Out of scope (ExecutionGate handles inline enforcement; commercial Break-Glass adds dual-key emergency override) |
-| 4. Agent development | Agent Framework / Bedrock SDK / Vertex Builder | AGSignal SDKs (Python, TypeScript) + MCP governance tools |
-| **5. Runtime HITL approval (NEW)** | **Not provided** | **AGSignal core: REQUIRE_APPROVAL → notification → ACK → resume + three-stream audit** |
+| 4. Agent development | Agent Framework / Bedrock SDK / Vertex Builder | UNS SDKs (Python, TypeScript) + MCP governance tools |
+| **5. Runtime HITL approval (NEW)** | **Not provided** | **UNS core: REQUIRE_APPROVAL → notification → ACK → resume + three-stream audit** |
 
 ---
 
@@ -201,55 +201,55 @@ agent.tool_call(args)
    ▼
 AGT PolicyEvaluator.evaluate(args)  ─── ALLOW ──► proceed
    │
-   ▼ DENY-with-approval-possible (custom AGT outcome) OR REQUIRE_APPROVAL via AGSignal MCP tool
-agsignal.governance.evaluate(policy, context)
+   ▼ DENY-with-approval-possible (custom AGT outcome) OR REQUIRE_APPROVAL via UNS MCP tool
+uns.governance.evaluate(policy, context)
    │
    ▼ REQUIRE_APPROVAL
-agsignal Approval Workflow ──► Slack notification (or Teams via Microsoft Stack Bridge plugin)
+uns Approval Workflow ──► Slack notification (or Teams via Microsoft Stack Bridge plugin)
    │
    ▼ Human ACK
-AGSignal callback ──► agent resume
+UNS callback ──► agent resume
 
 Audit trail emitted to:
-   ├─ Defender for Cloud (via AGSignal AuditHook → Microsoft Stack Bridge plugin)
+   ├─ Defender for Cloud (via UNS AuditHook → Microsoft Stack Bridge plugin)
    ├─ Sentinel
-   └─ AGSignal Decision/Approval/Delivery streams (preserved as authoritative HITL forensic record)
+   └─ UNS Decision/Approval/Delivery streams (preserved as authoritative HITL forensic record)
 ```
 
-The Microsoft Stack Bridge plugin (commercial) consumes Entra Agent ID for `IdentityProvider` hook and emits to Defender + Sentinel via `AuditHook` Protocol. **AGSignal becomes a first-class citizen of the Microsoft governance stack without forcing the customer to abandon their existing Microsoft investments.**
+The Microsoft Stack Bridge plugin (commercial) consumes Entra Agent ID for `IdentityProvider` hook and emits to Defender + Sentinel via `AuditHook` Protocol. **UNS becomes a first-class citizen of the Microsoft governance stack without forcing the customer to abandon their existing Microsoft investments.**
 
 ### With AWS
 
 Customer running Bedrock AgentCore + Cedar policy:
 
-- AGSignal core emits Decision/Approval/Delivery audit to CloudTrail via AWS Stack Bridge plugin
+- UNS core emits Decision/Approval/Delivery audit to CloudTrail via AWS Stack Bridge plugin
 - IdentityProvider hook resolves identity from AWS IAM (or AWS Verified Permissions)
 - Approval callback registered as Step Functions task token; human approval via Slack/Email/PagerDuty channel adapters
-- Cedar policy evaluation continues in AgentCore; AGSignal handles the HITL approval layer that AgentCore doesn't ship
+- Cedar policy evaluation continues in AgentCore; UNS handles the HITL approval layer that AgentCore doesn't ship
 
 ### With Google
 
 Customer running Vertex AI + Agentspace:
 
-- AGSignal emits to Cloud Audit Logs via GCP Stack Bridge plugin
+- UNS emits to Cloud Audit Logs via GCP Stack Bridge plugin
 - IdentityProvider hook resolves identity from Google Cloud IAM
-- Tool governance handled by Vertex; HITL approval handled by AGSignal
+- Tool governance handled by Vertex; HITL approval handled by UNS
 - Channel adapters route notifications to Google Chat in addition to Slack/Email/PagerDuty
 
 ### With framework-only (LangGraph + Temporal, no cloud governance stack)
 
 Customer running LangGraph agents on Temporal, no major cloud governance stack:
 
-- AGSignal core's lightweight built-in WorkflowOrchestrator (in-memory) sufficient for v0.4–v0.5 prototyping
+- UNS core's lightweight built-in WorkflowOrchestrator (in-memory) sufficient for v0.4–v0.5 prototyping
 - Commercial DurableWorkflow plugin swaps in Temporal as the orchestrator backend for production
-- LangGraph `interrupt()` calls AGSignal MCP tools (`request_approval`, `check_policy`, `log_decision_reasoning`)
-- AGSignal handles the audit, callback, and identity primitives the framework alone doesn't provide
+- LangGraph `interrupt()` calls UNS MCP tools (`request_approval`, `check_policy`, `log_decision_reasoning`)
+- UNS handles the audit, callback, and identity primitives the framework alone doesn't provide
 
 ---
 
 ## Differentiation summary
 
-| | Cloud-vendor stacks (Microsoft / AWS / Google) | Framework HITL (LangGraph / AutoGen / CrewAI) | Workflow tools (Temporal / Restate / Step Functions) | **AGSignal** |
+| | Cloud-vendor stacks (Microsoft / AWS / Google) | Framework HITL (LangGraph / AutoGen / CrewAI) | Workflow tools (Temporal / Restate / Step Functions) | **UNS** |
 |---|---|---|---|---|
 | Cloud-agnostic | No | N/A | Yes | **Yes** |
 | Framework-agnostic | Adapter-only | Framework-locked | Yes | **Yes** |
@@ -266,7 +266,7 @@ Customer running LangGraph agents on Temporal, no major cloud governance stack:
 
 Honest enumeration:
 
-1. **Microsoft adds runtime HITL.** The most likely competitive response. AGT is iterating fast; community contributors are pushing PRs to harden enforcement (per the LangChain Reddit thread). Mitigation: ship faster on the cloud-agnostic complementary positioning. Once AGSignal is the de facto neutral primitive, even Microsoft customers may prefer it for cross-cloud or framework-agnostic deployments.
+1. **Microsoft adds runtime HITL.** The most likely competitive response. AGT is iterating fast; community contributors are pushing PRs to harden enforcement (per the LangChain Reddit thread). Mitigation: ship faster on the cloud-agnostic complementary positioning. Once UNS is the de facto neutral primitive, even Microsoft customers may prefer it for cross-cloud or framework-agnostic deployments.
 
 2. **AWS or Google ships a Bedrock-AgentCore-Approval / Vertex-Approval product.** Plausible. Same mitigation: cloud-agnostic neutrality is the moat. Customers running multi-cloud agent fleets need a layer that doesn't lock them in.
 
@@ -274,11 +274,11 @@ Honest enumeration:
 
 4. **HumanSignal expands into runtime agent governance.** Adjacent but unlikely; their core is data-labeling-and-evaluation, not runtime control plane. Worth monitoring; brand disambiguation matters in the meantime.
 
-5. **The category itself doesn't materialize fast enough for AGSignal v1.0 to find buyers.** Real risk. Mitigation: regulatory tailwind (EU AI Act August 2026 deadline) creates urgency; design partners in regulated domains are highest-priority go-to-market.
+5. **The category itself doesn't materialize fast enough for UNS v1.0 to find buyers.** Real risk. Mitigation: regulatory tailwind (EU AI Act August 2026 deadline) creates urgency; design partners in regulated domains are highest-priority go-to-market.
 
 ---
 
-## Strategic implication for AGSignal v1.0
+## Strategic implication for UNS v1.0
 
 Three actionable changes vs Vision B+ as originally drafted:
 
@@ -286,15 +286,15 @@ Three actionable changes vs Vision B+ as originally drafted:
 
 2. **Lead Compliance Templates plugin with EU AI Act Article 14** (operational human oversight) and **GDPR Article 22** (meaningful human intervention) — not Annex IV documentation (Microsoft AGT already automates Annex IV).
 
-3. **Adopt CloudEvents native event schema in v1.0** (revise ADR-002) — AGT uses CloudEvents; for the "complement Microsoft's stack" pitch to be credible at every integration point, AGSignal needs to speak the same envelope format.
+3. **Adopt CloudEvents native event schema in v1.0** (revise ADR-002) — AGT uses CloudEvents; for the "complement Microsoft's stack" pitch to be credible at every integration point, UNS needs to speak the same envelope format.
 
 ---
 
 ## Source artifacts
 
-- PRD v2.0 at `_AGSignal/agent_governance_control_plane_prd.md` (gitignored)
-- 9 architecture decision records at `_AGSignal/docs/decisions/`
-- Vision B+ scope sketch at `_AGSignal/docs/internal/superpowers/specs/2026-05-08-vision-b-plus-design.md`
+- PRD v2.0 at `_UNS/agent_governance_control_plane_prd.md` (gitignored)
+- 9 architecture decision records at `_UNS/docs/decisions/`
+- Vision B+ scope sketch at `_UNS/docs/internal/superpowers/specs/2026-05-08-vision-b-plus-design.md`
 - Stage 2 production-pattern matrix research at same location
 - Stage 2 pre-vs-post execution research at same location
 - Stage 2 competitive landscape (Perplexity Deep Research, May 2026)

@@ -7,12 +7,12 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from agsignal.responses import SendNotificationRequest
-from agsignal.signaling import _resolve_notification
 from db.policy_store import SQLAlchemyPolicyStore
 from notification.models import Channel, DeliveryMode, Notification
 from notification.policies import PolicyOverrideError, PolicyRegistry
 from notification.policy_loader import compute_policy_content_hash
+from uns.responses import SendNotificationRequest
+from uns.signaling import _resolve_notification
 
 if TYPE_CHECKING:
     from notification.service import SimpleAdapterRegistry

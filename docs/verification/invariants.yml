@@ -18,7 +18,7 @@ invariants:
       type: "guard"
       description: "Shared principal-scope check protects HTTP routes and every WebSocket ACK/DISMISS command; observer scope permits stream reads only"
     evidence:
-      - path: "src/agsignal/api/auth.py"
+      - path: "src/uns/api/auth.py"
         note: "require_principal_scope enforces the requested capability on an authenticated principal"
       - path: "src/notification/websocket_runtime.py"
         note: "WebSocket response commands require responder scope before invoking the durable runtime"
@@ -158,11 +158,11 @@ invariants:
       type: "isolation"
       description: "All UI endpoints use GET method only; adapters are read-only"
     evidence:
-      - path: "src/agsignal/api/routes_ui.py"
+      - path: "src/uns/api/routes_ui.py"
         note: "All endpoints use @router.get() decorator"
-      - path: "src/agsignal/api/read_models.py"
+      - path: "src/uns/api/read_models.py"
         note: "ReadModelAdapter ABC defines only get_* methods"
-      - path: "tests/agsignal/api/test_routes_ui_comprehensive.py"
+      - path: "tests/uns/api/test_routes_ui_comprehensive.py"
         note: "Tests verify POST/PUT/PATCH/DELETE return 405"
     owner: "platform-team"
     last_reviewed: "2026-01-23"

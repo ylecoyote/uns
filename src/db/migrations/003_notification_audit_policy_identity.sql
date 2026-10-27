@@ -1,6 +1,6 @@
 -- Add policy evaluation identity to delivery audit records.
 --
--- These nullable fields let AGSignal preserve the exact policy config and
+-- These nullable fields let UNS preserve the exact policy config and
 -- evaluation identifier used for routing when that information is available.
 
 ALTER TABLE notification_audit_records

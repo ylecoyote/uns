@@ -62,7 +62,7 @@ couples write paths and recreates single-table coupling at the crypto layer.
 
 ### 4. Retention defaults
 
-OSS defaults (operator-overridable in `agsignal.yaml`):
+OSS defaults (operator-overridable in `uns.yaml`):
 
 | Stream            | Default retention | Rationale                                           |
 |-------------------|-------------------|-----------------------------------------------------|
@@ -89,9 +89,9 @@ OSS chain as the always-available floor and Merkle as additive non-repudiation.
 
 ### 6. Append-only enforcement: DB-level AND application-level
 
-**DB-level**: `agsignal_app` role granted `INSERT, SELECT` on the four tables;
-`UPDATE, DELETE` revoked. Separate `agsignal_purge` role holds `DELETE` for
-the retention job; `agsignal_migrate` for schema changes.
+**DB-level**: `uns_app` role granted `INSERT, SELECT` on the four tables;
+`UPDATE, DELETE` revoked. Separate `uns_purge` role holds `DELETE` for
+the retention job; `uns_migrate` for schema changes.
 **Application-level**: the audit DAO exposes only `append()` and `query()`;
 no `update()` method. Defense-in-depth — either alone fails: DB-only lets
 in-process bugs attempt UPDATEs that fail confusingly mid-transaction;
@@ -153,7 +153,7 @@ query pattern demonstrably needs them.
 - 7-year Decision/Approval retention creates non-trivial Postgres storage
   growth; high-volume operators should plan for table partitioning (deferred
   to v1.x; not required for v1 correctness).
-- The `agsignal_purge` DB role is a new operational concept that must be
+- The `uns_purge` DB role is a new operational concept that must be
   documented in the deployment guide; misconfiguring it (granting `DELETE` to
   the app role) silently breaks the append-only invariant.
 - Merkle-Audit running in parallel doubles audit-write fan-out; per-entry
@@ -166,7 +166,7 @@ query pattern demonstrably needs them.
 ## References
 
 - PRD §2.7, §13.3, M6, §12.1, §12.4, §14.2.1 —
-  `_AGSignal/agent_governance_control_plane_prd.md`
+  `_UNS/agent_governance_control_plane_prd.md`
 - ADR-002 (Event Schema Format) — `2026-05-08-event-schema-format.md`
 - ADR-005 (Plugin Trust Model) — `2026-05-08-plugin-trust-model.md`
 - ADR-008 (Fail-mode Semantics) — `2026-05-08-fail-mode-semantics.md`

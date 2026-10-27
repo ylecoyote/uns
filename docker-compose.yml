@@ -1,14 +1,14 @@
-# AGSignal local development stack.
+# UNS local development stack.
 #
 # Spins up:
 #   - postgres (data persisted in named volume)
 #   - redis (data persisted in named volume)
-#   - agsignal: unified AGSignal HTTP service (Core write + Console read on 127.0.0.1:8000)
+#   - uns: unified UNS HTTP service (Core write + Console read on 127.0.0.1:8000)
 #
 # Phase 3 unified the two FastAPI apps; reintroduce a split via reverse-proxy
 # routing if needed for production.
 #
-# AGSignal binds to 127.0.0.1 on the host. NOT FOR PRODUCTION — see
+# UNS binds to 127.0.0.1 on the host. NOT FOR PRODUCTION — see
 # docs/DEPLOYMENT.md for the production recipe (reverse proxy, TLS, real
 # secret management, restricted /metrics network exposure, etc.).
 #
@@ -16,25 +16,25 @@
 #   docker compose up --build              # first run: builds image + creates schema
 #   docker compose up                      # subsequent runs
 #
-# After the first successful start, edit the AGSIGNAL_CREATE_TABLES line below
+# After the first successful start, edit the UNS_CREATE_TABLES line below
 # to "false" so subsequent boots do not attempt schema creation.
 
-name: agsignal-dev
+name: uns-dev
 
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: agsignal
-      POSTGRES_PASSWORD: agsignal-dev-only
-      POSTGRES_DB: agsignal
+      POSTGRES_USER: uns
+      POSTGRES_PASSWORD: uns-dev-only
+      POSTGRES_DB: uns
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agsignal -d agsignal"]
+      test: ["CMD-SHELL", "pg_isready -U uns -d uns"]
       interval: 5s
       timeout: 3s
       retries: 10
     volumes:
-      - agsignal-db:/var/lib/postgresql/data
+      - uns-db:/var/lib/postgresql/data
     restart: unless-stopped
 
   redis:
@@ -46,20 +46,20 @@ services:
       timeout: 3s
       retries: 5
     volumes:
-      - agsignal-redis:/data
+      - uns-redis:/data
     restart: unless-stopped
 
-  agsignal:
+  uns:
     build: .
-    image: agsignal:dev
+    image: uns:dev
     environment:
-      DATABASE_URL: postgresql+psycopg2://agsignal:agsignal-dev-only@db:5432/agsignal
-      AGSIGNAL_REDIS_URL: redis://redis:6379/0
-      AGSIGNAL_API_KEY: dev-only-key-rotate-before-real-use
-      AGSIGNAL_API_PRINCIPAL: dev-operator
-      AGSIGNAL_HOST: 0.0.0.0
-      AGSIGNAL_CREATE_TABLES: "true"   # FIRST RUN ONLY — flip to "false" after schema exists
-      AGSIGNAL_ENABLE_DOCS: "true"     # /docs visible in dev only — never in production
+      DATABASE_URL: postgresql+psycopg2://uns:uns-dev-only@db:5432/uns
+      UNS_REDIS_URL: redis://redis:6379/0
+      UNS_API_KEY: dev-only-key-rotate-before-real-use
+      UNS_API_PRINCIPAL: dev-operator
+      UNS_HOST: 0.0.0.0
+      UNS_CREATE_TABLES: "true"   # FIRST RUN ONLY — flip to "false" after schema exists
+      UNS_ENABLE_DOCS: "true"     # /docs visible in dev only — never in production
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -70,7 +70,7 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import json, os, urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Authorization': 'Bearer ' + os.environ['AGSIGNAL_API_KEY']}); result=json.load(urllib.request.urlopen(r, timeout=2)); raise SystemExit(0 if result['status']=='ready' else 1)"
+        - "import json, os, urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Authorization': 'Bearer ' + os.environ['UNS_API_KEY']}); result=json.load(urllib.request.urlopen(r, timeout=2)); raise SystemExit(0 if result['status']=='ready' else 1)"
       interval: 10s
       timeout: 3s
       retries: 30                       # generous so first-run schema creation finishes
@@ -78,5 +78,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  agsignal-db:
-  agsignal-redis:
+  uns-db:
+  uns-redis:

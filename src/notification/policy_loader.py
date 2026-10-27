@@ -1,4 +1,4 @@
-"""YAML policy loading for standalone AGSignal Core extraction."""
+"""YAML policy loading for standalone UNS Core extraction."""
 
 from __future__ import annotations
 

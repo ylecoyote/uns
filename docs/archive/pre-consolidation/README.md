@@ -1,6 +1,6 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-# AGSignal
+# UNS
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -8,11 +8,11 @@
 
 **The neutral approval control plane for AI agents.**
 
-AGSignal is the runtime Human-in-the-Loop primitive — `REQUIRE_APPROVAL → notification → human ACK → resume callback` — that cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) and framework-native HITL features don't ship as a first-class, vendor-portable product. AGSignal complements those stacks; it does not compete with them.
+UNS is the runtime Human-in-the-Loop primitive — `REQUIRE_APPROVAL → notification → human ACK → resume callback` — that cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) and framework-native HITL features don't ship as a first-class, vendor-portable product. UNS complements those stacks; it does not compete with them.
 
 Three correlated audit streams (Decision + Approval + Delivery) provide the forensic substrate for *"who knew what, and when"* — the question EU AI Act Article 14, GDPR Article 22, FINRA Rule 3110, and SEC Rule 15c3-5 all require operationalized at runtime, not just documented after the fact.
 
-Apache 2.0 OSS core. Commercial plugins for crypto, identity, durability, and compliance. Cloud-stack bridges (Microsoft / AWS / GCP) integrate AGSignal into existing governance investments without forcing migration.
+Apache 2.0 OSS core. Commercial plugins for crypto, identity, durability, and compliance. Cloud-stack bridges (Microsoft / AWS / GCP) integrate UNS into existing governance investments without forcing migration.
 
 For full strategic positioning, see [`docs/uns/executive-summary.md`](docs/uns/executive-summary.md), [`docs/uns/walking-deck.md`](docs/uns/walking-deck.md), and the competitive analysis at [`docs/uns/positioning-vs-cloud-stacks.md`](docs/uns/positioning-vs-cloud-stacks.md).
 
@@ -27,9 +27,9 @@ For full strategic positioning, see [`docs/uns/executive-summary.md`](docs/uns/e
 
 ## Product Boundary
 
-AGSignal is the **runtime HITL approval control plane**. It sits between agent decision logic and the action's side effects. Pre-execution authorization — not in-execution enforcement, not post-execution review.
+UNS is the **runtime HITL approval control plane**. It sits between agent decision logic and the action's side effects. Pre-execution authorization — not in-execution enforcement, not post-execution review.
 
-**AGSignal does:**
+**UNS does:**
 
 - Evaluate policy: `evaluate(policy, context) → DecisionRecord` returning `ALLOW | REQUIRE_APPROVAL | DENY`
 - Run the durable approval workflow when the engine returns `REQUIRE_APPROVAL`: notification → human ACK → resume callback (async by default; webhook/polling transport)
@@ -38,14 +38,14 @@ AGSignal is the **runtime HITL approval control plane**. It sits between agent d
 - Provide MCP governance tools (`check_policy`, `request_approval`, `log_decision_reasoning`) for agent runtimes
 - Plug in to the cloud-vendor governance stacks via Stack Bridge plugins (Microsoft / AWS / GCP)
 
-**AGSignal does not:**
+**UNS does not:**
 
 - Execute trades, actions, commands, or any side effect with external impact (caller's responsibility)
 - Sit inline in the data plane / intercept network traffic (that's a separate sibling project, ExecutionGate)
 - Perform post-execution review, reconciliation, or compensation (downstream concern; out of scope)
-- Replace agent identity, policy enforcement, sandboxing, or observability layers cloud vendors provide (AGSignal complements them)
+- Replace agent identity, policy enforcement, sandboxing, or observability layers cloud vendors provide (UNS complements them)
 - Own agent reasoning, LLM safety, or content moderation (that's the agent runtime + Content Safety equivalents)
-- Own framework-specific orchestration (LangGraph interrupts, AutoGen human input modes, etc. — those frameworks call into AGSignal for governance-grade HITL)
+- Own framework-specific orchestration (LangGraph interrupts, AutoGen human input modes, etc. — those frameworks call into UNS for governance-grade HITL)
 
 For positioning vs Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance, and framework-native HITL, see [`docs/uns/positioning-vs-cloud-stacks.md`](docs/uns/positioning-vs-cloud-stacks.md).
 
@@ -53,18 +53,18 @@ For positioning vs Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vert
 
 | Term | Meaning |
 |------|---------|
-| **AGSignal** | The product and repository identity. |
-| **HITL Approval Control Plane** | The product category AGSignal occupies — neutral, runtime, durable Human-in-the-Loop approval primitive that complements (not replaces) cloud-vendor agent-governance stacks. |
-| **AGS** | Agent Governance Signaling — historical category framing from the UNS extraction phase. AGSignal's current category positioning is **neutral HITL approval control plane** vs the broader "agent governance" territory cloud vendors now occupy. |
+| **UNS** | The product and repository identity. |
+| **HITL Approval Control Plane** | The product category UNS occupies — neutral, runtime, durable Human-in-the-Loop approval primitive that complements (not replaces) cloud-vendor agent-governance stacks. |
+| **AGS** | Agent Governance Signaling — historical category framing from the UNS extraction phase. UNS's current category positioning is **neutral HITL approval control plane** vs the broader "agent governance" territory cloud vendors now occupy. |
 | **Governance signal** | A durable, auditable state transition created from a notification, acknowledgment, timeout, or delivery failure. |
-| **AGSignal Core** | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
-| **Signal API** | Public API surface for producers that emit governance events. New integrations should use `agsignal.*`; `notification.*` remains as a compatibility layer. |
-| **AGSignal Console** | The read-first operator UI for delivery timelines, policy inspection, audit history, and invariants. |
+| **UNS Core** | The runtime that routes, delivers, acknowledges, deduplicates, rate-limits, and audits governance signals. |
+| **Signal API** | Public API surface for producers that emit governance events. New integrations should use `uns.*`; `notification.*` remains as a compatibility layer. |
+| **UNS Console** | The read-first operator UI for delivery timelines, policy inspection, audit history, and invariants. |
 | **UNS Core** | Historical extraction name for the notification runtime from MIP. Use this only for provenance or compatibility. |
 
 ## Features
 
-### AGSignal Core Runtime
+### UNS Core Runtime
 
 - **Multi-channel delivery:** Slack, Email, WebSocket, PagerDuty
 - **Intent-based routing:** SAFETY, GOVERNANCE, OPERATIONAL, INFORMATIONAL
@@ -81,32 +81,32 @@ For positioning vs Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vert
 
 - **Policy lifecycle:** DRAFT → PREVIEW → ACTIVE → RETIRED
 - **YAML policy definitions:** File-based policy configuration with sample policies under `examples/policies/mip-uns`
-- **Demo config compatibility:** `config/notification_policies` remains loadable for local demos and compatibility, but those MIP-derived policies are sample content and not AGSignal Core defaults
+- **Demo config compatibility:** `config/notification_policies` remains loadable for local demos and compatibility, but those MIP-derived policies are sample content and not UNS Core defaults
 - **Policy versioning:** Version and status fields on policy definitions
 - **Database persistence:** `notification_policy` storage with JSON columns and content-hash deduplication
 - **Hot reload:** `POST /api/v1/policies/reload` for runtime refresh without restart
-- **Producer guardrail:** Producers should emit intent and context; AGSignal owns channel routing
+- **Producer guardrail:** Producers should emit intent and context; UNS owns channel routing
 
 ### Governance Feedback Integrations
 
 - **Autonomy context:** PREVIEW, SHADOW, LIVE, agent ID, plan ID, and evidence references
-- **Evidence links:** Decision, execution, and skip snapshot IDs can be attached without AGSignal owning those evidence models
+- **Evidence links:** Decision, execution, and skip snapshot IDs can be attached without UNS owning those evidence models
 - **Governor hooks:** Planned integration points for autonomy-level change notifications
 - **Circuit-breaker hooks:** Planned safety event integrations for engage/recover notification flows
 
 ## MIP Provenance
 
-AGSignal is being extracted from the Market Insights Platform (MIP), where
+UNS is being extracted from the Market Insights Platform (MIP), where
 autonomous trading workflows made the governance problem concrete. MIP’s
 decision transparency work produced external evidence artifacts such as
 DecisionSnapshot, ExecutionSnapshot, SkipSnapshot, slippage attribution, Why UI
-surfaces, and PREVIEW/SHADOW/LIVE autonomy workflows. AGSignal does not own
+surfaces, and PREVIEW/SHADOW/LIVE autonomy workflows. UNS does not own
 those models; it provides the signal layer that records who was notified, what
 was acknowledged, and how that awareness can feed future autonomy decisions.
 
 ### Extraction Phases
 
-1. **Phase 1 (Complete):** AGSignal Core runtime — SDK, delivery pipeline, adapters, deduplication, rate limiting, acknowledgment tracking, audit trail
+1. **Phase 1 (Complete):** UNS Core runtime — SDK, delivery pipeline, adapters, deduplication, rate limiting, acknowledgment tracking, audit trail
 2. **Phase 2 (In Progress):** Policy-driven routing — lifecycle metadata, YAML loader, versioning, DB persistence, hot reload, producer channel guardrails
 3. **Phase 3 (Planned):** Governance feedback adapters — agent governor, autonomy state changes, circuit-breaker hooks
 4. **Phase 4 (Planned):** Integration consolidation — unified API surface, shared DB schema, cross-subsystem contract tests
@@ -115,22 +115,22 @@ was acknowledged, and how that awareness can feed future autonomy decisions.
 
 ### Installation
 
-AGSignal ships a tiered install so producers consuming only the SDK do not
+UNS ships a tiered install so producers consuming only the SDK do not
 pull in the FastAPI / SQL / Redis runtime stack.
 
 ```bash
 # Producer SDK only (pydantic + pyyaml).
-pip install agsignal
+pip install uns
 
-# Self-host both AGSignal Core and Console (HTTP server + persistence + Redis + MCP + adapters).
-pip install 'agsignal[full]'
+# Self-host both UNS Core and Console (HTTP server + persistence + Redis + MCP + adapters).
+pip install 'uns[full]'
 
 # Pick-and-mix individual extras.
-pip install 'agsignal[server]'    # FastAPI + uvicorn + slowapi + prometheus-client
-pip install 'agsignal[redis]'     # Redis-backed idempotency / dedup / DLQ / rate limit
-pip install 'agsignal[sql]'       # SQLAlchemy-backed audit and policy stores
-pip install 'agsignal[mcp]'       # MCP stdio server transport
-pip install 'agsignal[adapters]'  # HTTP-based channel adapters (httpx)
+pip install 'uns[server]'    # FastAPI + uvicorn + slowapi + prometheus-client
+pip install 'uns[redis]'     # Redis-backed idempotency / dedup / DLQ / rate limit
+pip install 'uns[sql]'       # SQLAlchemy-backed audit and policy stores
+pip install 'uns[mcp]'       # MCP stdio server transport
+pip install 'uns[adapters]'  # HTTP-based channel adapters (httpx)
 
 # Local development (test infra + every runtime extra).
 pip install -e '.[dev]'
@@ -141,10 +141,10 @@ deployment posture requires.
 
 ### MCP Server
 
-AGSignal includes a local stdio MCP server for agent clients:
+UNS includes a local stdio MCP server for agent clients:
 
 ```bash
-uv run python -m agsignal_mcp.transports.stdio
+uv run python -m uns_mcp.transports.stdio
 ```
 
 The v1 server is stdio-only. HTTP/SSE transport is a deferred option until a
@@ -152,16 +152,16 @@ hosted integration requires it.
 
 ### Basic Usage
 
-AGSignal Core now provides AGSignal-branded imports while preserving the
+UNS Core now provides UNS-branded imports while preserving the
 historical runtime package. `notification.*` imports remain supported for
 existing users.
 
 ```python
 from uuid import uuid4
 
-from agsignal.models import AutonomyContext, AutonomyMode
-from agsignal.models import GovernanceSignal, SignalIntent
-from agsignal.sdk import SignalClient
+from uns.models import AutonomyContext, AutonomyMode
+from uns.models import GovernanceSignal, SignalIntent
+from uns.sdk import SignalClient
 
 # Create SDK instance
 sdk = SignalClient()
@@ -184,7 +184,7 @@ result = sdk.send_safety(
 print(f"Notification sent: {result.notification_id}")
 ```
 
-`GovernanceSignal` is an AGSignal-branded alias for the current notification
+`GovernanceSignal` is an UNS-branded alias for the current notification
 model, and `SignalIntent` is an alias for `NotificationIntent`. Existing code
 can continue to import `NotificationSDK`, `Notification`, and
 `NotificationIntent` from `notification.*`.
@@ -319,7 +319,7 @@ The delivery service (`DeliveryService`) executes the following pipeline steps:
 ### Signal Client Configuration
 
 ```python
-from agsignal import (
+from uns import (
     LoggingAcknowledgmentCallback,
     PolicyRegistry,
     configure_signal_client,
@@ -334,13 +334,13 @@ client = configure_signal_client(
 ```
 
 `notification.*` imports remain supported for existing integrations; new public
-examples should prefer the AGSignal-branded aliases.
+examples should prefer the UNS-branded aliases.
 
 ### Policy Overrides
 
 ```python
-from agsignal.models import AutonomyMode, Channel, DeliveryMode
-from agsignal.policies import (
+from uns.models import AutonomyMode, Channel, DeliveryMode
+from uns.policies import (
     ModeOverride,
     SignalPolicy,
     configure_policy_registry,
@@ -371,8 +371,8 @@ configure_policy_registry(policies=[policy])
 ### Adapter Configuration
 
 ```python
-from agsignal.adapters import SlackConfig, get_adapter
-from agsignal.models import Channel
+from uns.adapters import SlackConfig, get_adapter
+from uns.models import Channel
 
 # Configure Slack adapter
 config = SlackConfig(
@@ -385,8 +385,8 @@ adapter = get_adapter(Channel.SLACK, config=config)
 ### Rate Limiting
 
 ```python
-from agsignal.models import Channel
-from agsignal.rate_limiting import RateLimitConfig, configure_rate_limiter
+from uns.models import Channel
+from uns.rate_limiting import RateLimitConfig, configure_rate_limiter
 
 # Configure custom rate limits
 config = {
@@ -399,7 +399,7 @@ configure_rate_limiter(config)
 ### Deduplication
 
 ```python
-from agsignal.deduplication import RedisDeduplicationStore, configure_deduplication_engine
+from uns.deduplication import RedisDeduplicationStore, configure_deduplication_engine
 
 # Configure Redis-backed deduplication
 store = RedisDeduplicationStore(redis_client)
@@ -442,7 +442,7 @@ The primary interface for sending governance signals.
 #### AutonomyContext
 
 ```python
-from agsignal.models import AutonomyContext, AutonomyMode
+from uns.models import AutonomyContext, AutonomyMode
 
 context = AutonomyContext(
     autonomy_mode=AutonomyMode.LIVE,      # Required: PREVIEW, SHADOW, or LIVE
@@ -457,7 +457,7 @@ context = AutonomyContext(
 #### Notification
 
 ```python
-from agsignal.models import (
+from uns.models import (
     Notification,
     NotificationIntent,
     DeliveryMode,
@@ -481,7 +481,7 @@ notification = Notification(
 #### NotificationResult
 
 ```python
-from agsignal.models import DeliveryStatus, NotificationResult
+from uns.models import DeliveryStatus, NotificationResult
 
 result = NotificationResult(
     notification_id=notification.notification_id,
@@ -514,11 +514,11 @@ vulnerabilities in public issues; use the private reporting process in
 
 ### HTTP API
 
-AGSignal Core provides an HTTP API via FastAPI:
+UNS Core provides an HTTP API via FastAPI:
 
 ```bash
 # Start the server
-uvicorn agsignal.app:app --host 0.0.0.0 --port 8000
+uvicorn uns.app:app --host 0.0.0.0 --port 8000
 ```
 
 ### Health Check
@@ -527,7 +527,7 @@ The service exposes a `/health` endpoint for load balancer and orchestration hea
 
 ```bash
 curl http://localhost:8000/health
-# Response: {"status": "alive", "service": "agsignal", "version": "..."}
+# Response: {"status": "alive", "service": "uns", "version": "..."}
 ```
 
 > **Note:** The `/health` endpoint returns a liveness payload (status, service, version) for basic liveness checks. For detailed adapter and channel readiness information, see [Observability](docs/sections/observability.md).
@@ -552,11 +552,11 @@ uv run pytest -k "test_safety"
 
 ### Documentation Map
 
-AGSignal documentation is task-routed from [docs/README.md](docs/README.md):
+UNS documentation is task-routed from [docs/README.md](docs/README.md):
 
 | Task | Start Here |
 |------|------------|
-| Evaluate AGSignal | [Product overview](#agsignal), [Architecture](docs/ARCHITECTURE.md) |
+| Evaluate UNS | [Product overview](#uns), [Architecture](docs/ARCHITECTURE.md) |
 | Quickstart: send a signal | [Quick Start](#quick-start), [API Reference](docs/API.md) |
 | Configure policies | [Policy Lifecycle](docs/sections/policy-lifecycle.md), [MIP UNS Sample Policy Pack](examples/policies/mip-uns/README.md) |
 | Integrate an app | [Integration Modes](docs/sections/integration-modes.md), [Host App Boundary](docs/API.md#host-app-boundary) |
@@ -567,7 +567,7 @@ AGSignal documentation is task-routed from [docs/README.md](docs/README.md):
 
 ```
 src/
-├── agsignal/                  # AGSignal canonical public + service-layer surface
+├── uns/                  # UNS canonical public + service-layer surface
 │   ├── app.py                 # Unified FastAPI factory (write + read surfaces)
 │   ├── responses.py           # Pydantic Request/Response DTOs
 │   ├── queries.py             # Read-side service layer
@@ -600,7 +600,7 @@ src/
 │   ├── policy_store.py        # Policy persistence
 │   ├── policy_learning_store.py
 │   └── migrations/            # SQL migrations
-apps/ui/                       # AGSignal Console frontend
+apps/ui/                       # UNS Console frontend
 docs/                          # Task-routed docs, decisions, reports
 examples/policies/mip-uns/     # Canonical MIP-derived sample policy pack
 config/notification_policies/  # Demo/compatibility policy config, not defaults

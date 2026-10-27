@@ -1,4 +1,4 @@
-"""Tests for AGSignal Console package structure.
+"""Tests for UNS Console package structure.
 
 These tests verify that the UI package is properly structured
 and that all expected modules can be imported.

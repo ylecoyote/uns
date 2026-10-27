@@ -14,7 +14,7 @@ The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b451
 
 UNS resolves notification obligations, accepts recoverable work, delivers through configured adapters, and records explicit actor responses or timeouts. It also preserves policy versions and controlled policy-change evidence. It does not execute business actions, authorize them through a complete action-policy engine, intercept traffic or provide cryptographic non-repudiation.
 
-An acknowledgment records an actor response, not human comprehension or permission to execute. Policy approval concerns a configuration proposal. The action-authorization models under `agsignal.governance` remain experimental.
+An acknowledgment records an actor response, not human comprehension or permission to execute. Policy approval concerns a configuration proposal. The action-authorization models under `uns.governance` remain experimental.
 
 ## What changed after adversarial feedback
 
@@ -80,7 +80,7 @@ Response deadlines begin at qualifying delivery. Same-actor/same-state replay re
 |---|---|
 | Owner/follower transitions, cycles, leases, expiry | `src/uns/runtime.py`, `src/notification/service.py`, `src/notification/adapters/`, `tests/uns/test_delivery_remediation.py`, `tests/uns/test_iteration2_runtime.py`, `tests/notification/test_delivery_attempt_evidence.py` |
 | Policy snapshots and linearization | `src/uns/policy_runtime.py`, `src/db/policy_store.py`, `tests/uns/test_policy_authority.py`, `tests/uns/test_policy_read_isolation.py` |
-| Auth, lifecycle and scoped reads | `src/agsignal/api/`, `src/agsignal/queries.py`, `src/agsignal_mcp/`, `tests/uns/test_transport_security.py`, `tests/agsignal_mcp/test_lifecycle.py`, `tests/agsignal_mcp/test_runtime_bound_reads.py` |
+| Auth, lifecycle and scoped reads | `src/uns/api/`, `src/uns/queries.py`, `src/uns_mcp/`, `tests/uns/test_transport_security.py`, `tests/uns_mcp/test_lifecycle.py`, `tests/uns_mcp/test_runtime_bound_reads.py` |
 | Real process policy refresh | `tests/uns/test_cross_transport_acceptance.py` |
 | Retention and migrations | `src/uns/maintenance.py`, `src/uns/schema.py`, `tests/uns/test_maintenance.py` |
 | Console access and dependency changes | `apps/ui/src/auth/`, `apps/ui/src/components/ConsoleSignIn.tsx`, `apps/ui/package-lock.json` |

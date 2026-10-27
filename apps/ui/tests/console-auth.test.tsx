@@ -100,7 +100,7 @@ describe('Console access', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          subject: 'agsignal-api-key',
+          subject: 'uns-api-key',
           scopes: ['admin', 'observer', 'producer', 'responder'],
           persistence_mode: 'persistent',
         }),
@@ -109,7 +109,7 @@ describe('Console access', () => {
     render(<App />);
     await connect();
     expect(screen.getByTestId('capability-pill-operator')).toHaveTextContent('OPERATOR');
-    expect(screen.getByTestId('session-subject')).toHaveTextContent('(agsignal-api-key)');
+    expect(screen.getByTestId('session-subject')).toHaveTextContent('(uns-api-key)');
   });
 
   it('shows progress and lets an operator cancel a delayed check', async () => {

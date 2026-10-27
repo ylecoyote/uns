@@ -11,16 +11,16 @@ The console uses plain operational language and existing table/detail layouts. P
 | Capability | Implementation owner |
 |---|---|
 | Canonical Python client and transactional runtime | `uns.client`, `uns.runtime` |
-| HTTP and existing MCP tools | `agsignal.app`, `agsignal_mcp.factory` using the runtime |
+| HTTP and existing MCP tools | `uns.app`, `uns_mcp.factory` using the runtime |
 | Runtime-scoped policy authority and channel adapters | `uns.policy_runtime`, existing `notification` modules |
 | Versioned policy storage and validated snapshot reload | `db.policy_store`, `notification.routes` |
 | Policy-change records and shadow-evidence gates | `db.policy_learning_store`, `notification.policy_config` |
-| Authenticated delivery/audit/policy console | `apps/ui`, instance-scoped `agsignal.queries` |
+| Authenticated delivery/audit/policy console | `apps/ui`, instance-scoped `uns.queries` |
 | Explicit retention and archive-before-prune | `uns.maintenance` |
 
 ## Explicit boundaries
 
-The authorization rule schemas in `agsignal.governance` are experimental. There is no supported business-action `decide()`/`evaluate()` engine, approval/resume workflow, network enforcement, autonomous optimizer, signed approval, or cryptographically immutable ledger. Normal audit writes append history; explicit administrative archive-and-prune can retire eligible records while retaining a receipt. External provider acknowledgment does not prove human receipt.
+The authorization rule schemas in `uns.governance` are experimental. There is no supported business-action `decide()`/`evaluate()` engine, approval/resume workflow, network enforcement, autonomous optimizer, signed approval, or cryptographically immutable ledger. Normal audit writes append history; explicit administrative archive-and-prune can retire eligible records while retaining a receipt. External provider acknowledgment does not prove human receipt.
 
 Policy approval concerns a proposed configuration change. It does not approve the action described by a notification. Externally supplied shadow evidence requires a trusted evaluator; UNS validates its binding and declared thresholds, not the evaluator's methodology.
 

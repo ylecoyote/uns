@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Propose a focused AGSignal improvement
+about: Propose a focused UNS improvement
 title: ""
 labels: enhancement
 assignees: ""

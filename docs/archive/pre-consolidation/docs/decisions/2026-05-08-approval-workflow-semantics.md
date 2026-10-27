@@ -36,19 +36,19 @@ in PRD M2.3.
 
 ## Decision
 
-**1. Callback retry semantics.** AGSignal retries callback POSTs on transport failure
+**1. Callback retry semantics.** UNS retries callback POSTs on transport failure
 (non-2xx, timeout, connection error) using exponential backoff with jitter. Default
 schedule is 5 attempts over ~10 minutes (e.g., 15s / 45s / 2m / 4m / ~3m), refining the
 PRD §M5.2 hint of 3/10min. Cap and curve are configurable per-deployment but bounded:
 implementations MUST NOT exceed 24 hours of total retry duration without operator opt-in.
-On final exhaustion, AGSignal writes a Delivery Audit failure entry AND a degraded-decision
+On final exhaustion, UNS writes a Delivery Audit failure entry AND a degraded-decision
 marker on the Decision Audit entry; the decision remains queryable via polling (M5.3).
-AGSignal never silently drops an approved decision.
+UNS never silently drops an approved decision.
 
 **2. Callback signing.** HMAC-SHA256 signing is **enabled by default** using the
 Default IdentityProvider's session key (M8.4). Signature is carried in the
-`X-AGSignal-Signature: sha256=<hex>` header over the canonical request body; a
-companion `X-AGSignal-Timestamp` header guards against replay (caller MUST reject
+`X-UNS-Signature: sha256=<hex>` header over the canonical request body; a
+companion `X-UNS-Timestamp` header guards against replay (caller MUST reject
 timestamps outside a configurable skew, default ±5 minutes). Signing MAY be disabled
 at registration time per `callback_url` for trusted-network deployments. Commercial
 JWS-Identity replaces this with signed payload bodies; the Protocol contract is the
@@ -78,7 +78,7 @@ threading-or-event-loop choice into the core API and re-introduce the engine-sid
 waiting we explicitly rejected.
 
 **6. Polling fallback details.** Recommended client poll interval is **5 seconds**
-minimum; AGSignal rate-limits the polling endpoint at **2 req/sec per `decision_id`**
+minimum; UNS rate-limits the polling endpoint at **2 req/sec per `decision_id`**
 (429 on excess). The polling endpoint and the callback POST return **the same
 `DecisionRecord`** and are eventually consistent (callback typically arrives first on
 ACK; polling reflects the same finalized state within one rate-limit window). Polling is
@@ -89,7 +89,7 @@ webhook infrastructure is available.
 `WorkflowOrchestrator` is **non-durable across platform restart** (PRD §2.9). On
 restart, in-flight `PENDING_APPROVAL` decisions are **lost from orchestrator state**
 but **recoverable from the Decision Audit Ledger** (M6.1) by an operator-run reconcile
-job. AGSignal core does **not** auto-replay pending decisions on restart; the documented
+job. UNS core does **not** auto-replay pending decisions on restart; the documented
 fail behavior for non-regulated deployments is "caller MUST treat platform restart as
 decision lost and re-evaluate." Regulated deployments install the commercial
 DurableWorkflow plugin which preserves wait state across restart via Temporal/Restate.
@@ -144,5 +144,5 @@ hardcoded backoff, or unsigned callbacks must update to the contract above. The
 - [AWS Step Functions callback tokens](https://docs.aws.amazon.com/step-functions/latest/dg/callback-task-sample-sqs.html) - canonical task-token retry/timeout pattern
 - [Restate awakeable durability model](https://docs.restate.dev/concepts/durable_building_blocks/) - exactly-once wake-up reference; informs idempotency requirement
 - [HMAC webhook signing best practices (Stripe pattern)](https://stripe.com/docs/webhooks/signatures) - timestamp-plus-signature replay protection precedent
-- Stage 2 production-pattern matrix (`_AGSignal/docs/internal/superpowers/specs/2026-05-08-stage2-production-pattern-matrix.md`) - five-method `WorkflowOrchestrator` Protocol derivation
-- Stage 2 pre-vs-post-execution analysis (`_AGSignal/docs/internal/superpowers/specs/2026-05-08-stage2-pre-vs-post-execution.md`) - control-plane-only viability framing
+- Stage 2 production-pattern matrix (`_UNS/docs/internal/superpowers/specs/2026-05-08-stage2-production-pattern-matrix.md`) - five-method `WorkflowOrchestrator` Protocol derivation
+- Stage 2 pre-vs-post-execution analysis (`_UNS/docs/internal/superpowers/specs/2026-05-08-stage2-pre-vs-post-execution.md`) - control-plane-only viability framing

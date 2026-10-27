@@ -34,7 +34,6 @@ for _import_path in (REPO_ROOT / "src", REPO_ROOT):
     if _path_str not in sys.path:
         sys.path.insert(0, _path_str)
 
-from agsignal.responses import SendNotificationRequest  # noqa: E402
 from db.policy_store import SQLAlchemyPolicyStore  # noqa: E402
 from notification.adapters.base import (  # noqa: E402
     AdapterConfigurationError,
@@ -57,6 +56,7 @@ from notification.models import (  # noqa: E402
 )
 from notification.policies import NotificationPolicy  # noqa: E402
 from notification.service import SimpleAdapterRegistry  # noqa: E402
+from uns.responses import SendNotificationRequest  # noqa: E402
 from uns.runtime import Runtime  # noqa: E402
 
 SMOKE_TAG = "[UNS OPT-IN SMOKE]"
@@ -156,9 +156,9 @@ def inspect_channel_readiness(
     source_env = os.environ if env is None else env
 
     # 1. Slack: UNS_SLACK_WEBHOOK_URL (or UNS_SLACK_BOT_TOKEN + UNS_SLACK_CHANNEL)
-    slack_webhook = _env_get(source_env, "UNS_SLACK_WEBHOOK_URL", "AGSIGNAL_SLACK_WEBHOOK_URL")
-    slack_bot_token = _env_get(source_env, "UNS_SLACK_BOT_TOKEN", "AGSIGNAL_SLACK_BOT_TOKEN")
-    slack_channel = _env_get(source_env, "UNS_SLACK_CHANNEL", "AGSIGNAL_SLACK_CHANNEL")
+    slack_webhook = _env_get(source_env, "UNS_SLACK_WEBHOOK_URL", "UNS_SLACK_WEBHOOK_URL")
+    slack_bot_token = _env_get(source_env, "UNS_SLACK_BOT_TOKEN", "UNS_SLACK_BOT_TOKEN")
+    slack_channel = _env_get(source_env, "UNS_SLACK_CHANNEL", "UNS_SLACK_CHANNEL")
     slack_configured = bool(slack_webhook or (slack_bot_token and slack_channel))
     slack_mode = (
         "webhook"
@@ -175,16 +175,16 @@ def inspect_channel_readiness(
         slack_missing = ["UNS_SLACK_WEBHOOK_URL"]
 
     # 2. Email / SMTP: UNS_SMTP_HOST, UNS_SMTP_FROM, UNS_SMOKE_EMAIL_TO
-    smtp_host = _env_get(source_env, "UNS_SMTP_HOST", "AGSIGNAL_SMTP_HOST")
+    smtp_host = _env_get(source_env, "UNS_SMTP_HOST", "UNS_SMTP_HOST")
     smtp_from = _env_get(
-        source_env, "UNS_SMTP_FROM", "UNS_EMAIL_FROM", "AGSIGNAL_SMTP_FROM", "AGSIGNAL_EMAIL_FROM"
+        source_env, "UNS_SMTP_FROM", "UNS_EMAIL_FROM", "UNS_SMTP_FROM", "UNS_EMAIL_FROM"
     )
     smoke_email_to = _env_get(
         source_env,
         "UNS_SMOKE_EMAIL_TO",
         "UNS_EMAIL_TO",
-        "AGSIGNAL_SMOKE_EMAIL_TO",
-        "AGSIGNAL_EMAIL_TO",
+        "UNS_SMOKE_EMAIL_TO",
+        "UNS_EMAIL_TO",
     )
     email_missing: list[str] = []
     if not smtp_host:
@@ -198,7 +198,7 @@ def inspect_channel_readiness(
 
     # 3. PagerDuty: UNS_PAGERDUTY_ROUTING_KEY
     pd_routing_key = _env_get(
-        source_env, "UNS_PAGERDUTY_ROUTING_KEY", "AGSIGNAL_PAGERDUTY_ROUTING_KEY"
+        source_env, "UNS_PAGERDUTY_ROUTING_KEY", "UNS_PAGERDUTY_ROUTING_KEY"
     )
     pd_configured = bool(pd_routing_key)
     pd_missing = [] if pd_configured else ["UNS_PAGERDUTY_ROUTING_KEY"]
@@ -239,9 +239,9 @@ def build_channel_adapter(
     normalized = channel_name.lower()
 
     if normalized == "slack":
-        webhook_url = _env_get(source_env, "UNS_SLACK_WEBHOOK_URL", "AGSIGNAL_SLACK_WEBHOOK_URL")
-        bot_token = _env_get(source_env, "UNS_SLACK_BOT_TOKEN", "AGSIGNAL_SLACK_BOT_TOKEN")
-        slack_channel = _env_get(source_env, "UNS_SLACK_CHANNEL", "AGSIGNAL_SLACK_CHANNEL")
+        webhook_url = _env_get(source_env, "UNS_SLACK_WEBHOOK_URL", "UNS_SLACK_WEBHOOK_URL")
+        bot_token = _env_get(source_env, "UNS_SLACK_BOT_TOKEN", "UNS_SLACK_BOT_TOKEN")
+        slack_channel = _env_get(source_env, "UNS_SLACK_CHANNEL", "UNS_SLACK_CHANNEL")
         if webhook_url:
             return SlackWebhookSmokeAdapter(webhook_url=webhook_url)
         if bot_token and slack_channel:
@@ -258,20 +258,20 @@ def build_channel_adapter(
         )
 
     if normalized == "email":
-        smtp_host = _env_get(source_env, "UNS_SMTP_HOST", "AGSIGNAL_SMTP_HOST")
+        smtp_host = _env_get(source_env, "UNS_SMTP_HOST", "UNS_SMTP_HOST")
         smtp_from = _env_get(
             source_env,
             "UNS_SMTP_FROM",
             "UNS_EMAIL_FROM",
-            "AGSIGNAL_SMTP_FROM",
-            "AGSIGNAL_EMAIL_FROM",
+            "UNS_SMTP_FROM",
+            "UNS_EMAIL_FROM",
         )
         smoke_to = _env_get(
             source_env,
             "UNS_SMOKE_EMAIL_TO",
             "UNS_EMAIL_TO",
-            "AGSIGNAL_SMOKE_EMAIL_TO",
-            "AGSIGNAL_EMAIL_TO",
+            "UNS_SMOKE_EMAIL_TO",
+            "UNS_EMAIL_TO",
         )
         recipients = [addr.strip() for addr in smoke_to.split(",") if addr.strip()]
         if not (smtp_host and smtp_from and recipients):
@@ -279,9 +279,9 @@ def build_channel_adapter(
                 "Email is not configured; set UNS_SMTP_HOST, UNS_SMTP_FROM, and UNS_SMOKE_EMAIL_TO",
                 channel=Channel.EMAIL,
             )
-        smtp_port = int(_env_get(source_env, "UNS_SMTP_PORT", "AGSIGNAL_SMTP_PORT") or "587")
-        smtp_user = _env_get(source_env, "UNS_SMTP_USER", "AGSIGNAL_SMTP_USER")
-        smtp_password = _env_get(source_env, "UNS_SMTP_PASSWORD", "AGSIGNAL_SMTP_PASSWORD")
+        smtp_port = int(_env_get(source_env, "UNS_SMTP_PORT", "UNS_SMTP_PORT") or "587")
+        smtp_user = _env_get(source_env, "UNS_SMTP_USER", "UNS_SMTP_USER")
+        smtp_password = _env_get(source_env, "UNS_SMTP_PASSWORD", "UNS_SMTP_PASSWORD")
         use_ssl = _env_get(source_env, "UNS_SMTP_USE_SSL").lower() in {"1", "true", "yes", "on"}
         use_tls_raw = _env_get(source_env, "UNS_SMTP_USE_TLS")
         use_tls = (
@@ -305,7 +305,7 @@ def build_channel_adapter(
 
     if normalized == "pagerduty":
         routing_key = _env_get(
-            source_env, "UNS_PAGERDUTY_ROUTING_KEY", "AGSIGNAL_PAGERDUTY_ROUTING_KEY"
+            source_env, "UNS_PAGERDUTY_ROUTING_KEY", "UNS_PAGERDUTY_ROUTING_KEY"
         )
         if not routing_key:
             raise AdapterConfigurationError(

@@ -1,9 +1,9 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-# AGSignal Security Model
+# UNS Security Model
 
-This document describes AGSignal's threat model, trust boundaries, mitigations,
-and explicit non-goals. It is the engineering source-of-truth for what AGSignal
+This document describes UNS's threat model, trust boundaries, mitigations,
+and explicit non-goals. It is the engineering source-of-truth for what UNS
 defends against and what it does **not**. It complements [`SECURITY.md`](../SECURITY.md)
 (vulnerability reporting policy) and [`DEPLOYMENT.md`](DEPLOYMENT.md)
 (operator hardening recipe).
@@ -15,7 +15,7 @@ defends against and what it does **not**. It complements [`SECURITY.md`](../SECU
 
 ## Why an audit-product needs an explicit threat model
 
-AGSignal's central claim is that the audit trail it produces — *who knew, when
+UNS's central claim is that the audit trail it produces — *who knew, when
 they knew, and how the system responded* — is durable and trustworthy. That
 claim only holds if the seams where signals enter, are acknowledged, and are
 queried back are themselves trustworthy. The threats below are the ones that
@@ -26,18 +26,18 @@ implemented in the codebase today, not aspirational.
 
 ## Trust boundaries
 
-AGSignal recognizes the following actors. Each has a different trust posture
+UNS recognizes the following actors. Each has a different trust posture
 and a different blast radius if compromised.
 
 | Actor | Trust | Capabilities | Compromise impact |
 |---|---|---|---|
-| **Operator** | privileged | Owns the AGSignal process(es), configures env vars, holds API keys, has DB credentials. | Total — operator can rewrite history. AGSignal does not defend against the operator. |
-| **API client (write)** | semi-trusted | Authenticates with `AGSIGNAL_API_KEY` via `Authorization: Bearer …`. Posts notifications, acknowledges, dismisses. | Limited to the audit identity attributed to the configured `AGSIGNAL_API_PRINCIPAL`. Cannot impersonate other principals (unless `AGSIGNAL_ALLOW_PRINCIPAL_OVERRIDE=true`). |
+| **Operator** | privileged | Owns the UNS process(es), configures env vars, holds API keys, has DB credentials. | Total — operator can rewrite history. UNS does not defend against the operator. |
+| **API client (write)** | semi-trusted | Authenticates with `UNS_API_KEY` via `Authorization: Bearer …`. Posts notifications, acknowledges, dismisses. | Limited to the audit identity attributed to the configured `UNS_API_PRINCIPAL`. Cannot impersonate other principals (unless `UNS_ALLOW_PRINCIPAL_OVERRIDE=true`). |
 | **API client (read)** | semi-trusted | Authenticates with the same key for read endpoints (`/ui/*`). | Read-only; can enumerate audit history within its access. |
-| **LLM agent (via MCP)** | untrusted | Speaks JSON-RPC over stdio to the AGSignal MCP server in the host's process tree. | By default, can only call read tools. Can call write tools only if the operator has set `MCPRuntimeConfig.read_only=False`, `operator_principal`, and (for delivery) `delivery_confirmation_token`. The agent cannot mint these — they come from outside its context. |
+| **LLM agent (via MCP)** | untrusted | Speaks JSON-RPC over stdio to the UNS MCP server in the host's process tree. | By default, can only call read tools. Can call write tools only if the operator has set `MCPRuntimeConfig.read_only=False`, `operator_principal`, and (for delivery) `delivery_confirmation_token`. The agent cannot mint these — they come from outside its context. |
 | **End user / acknowledger** | variable | Receives a notification through Slack / PagerDuty / email / WebSocket; acknowledges through the Console UI or API. | Their acknowledgment is identity-resolved through the API key path (`acked_by` derived from authenticated principal). |
-| **MIP host application** | variable | Runs AGSignal as embedded control-plane infrastructure; configures policies, adapters, and operator principals. | Same as operator. The host owns the runtime. |
-| **Public network** | hostile | Anything reachable on the wire. | AGSignal is bound to `127.0.0.1` by default; the reverse proxy is the public attack surface. |
+| **MIP host application** | variable | Runs UNS as embedded control-plane infrastructure; configures policies, adapters, and operator principals. | Same as operator. The host owns the runtime. |
+| **Public network** | hostile | Anything reachable on the wire. | UNS is bound to `127.0.0.1` by default; the reverse proxy is the public attack surface. |
 
 ---
 
@@ -52,7 +52,7 @@ Ordered by sensitivity:
    `acked_by` is functionally a forged signature on a governance decision.
 3. **Policy registry** (routing rules, mode overrides). Mutating policies
    silently lets an attacker re-route SAFETY signals to a sink.
-4. **API keys and tokens** (`AGSIGNAL_API_KEY`, `delivery_confirmation_token`).
+4. **API keys and tokens** (`UNS_API_KEY`, `delivery_confirmation_token`).
 5. **Notification content** (potentially sensitive — agent reasoning, user
    identifiers, business state). Lower sensitivity than identity but still
    protected.
@@ -69,14 +69,14 @@ implemented**, status. Severity is product-impact, not CVSS.
 
 ### T1 — Unauthenticated write endpoint
 - **Severity:** Critical
-- **Vector:** Anyone reachable on the AGSignal HTTP listener can POST to
+- **Vector:** Anyone reachable on the UNS HTTP listener can POST to
   `/api/v1/notifications/{id}/ack`.
 - **Mitigation:** All write routes (`/api/v1/notifications/*/ack`,
   `/api/v1/notifications/*/dismiss`) require `Depends(require_write_principal)`.
-  Without `AGSIGNAL_API_KEY` configured, every write returns 503. With it
+  Without `UNS_API_KEY` configured, every write returns 503. With it
   configured, callers must supply `Authorization: Bearer <key>` (or
-  `X-AGSignal-API-Key` / `X-UNS-API-Key` headers); HMAC-compared with timing
-  safety. Source: `src/agsignal/api/auth.py`.
+  `X-UNS-API-Key` / `X-UNS-API-Key` headers); HMAC-compared with timing
+  safety. Source: `src/uns/api/auth.py`.
 - **Status:** ✅ Mitigated.
 
 ### T2 — Audit identity forgery
@@ -86,8 +86,8 @@ implemented**, status. Severity is product-impact, not CVSS.
 - **Mitigation:** `resolve_requested_actor()` rejects any `acked_by` /
   `dismissed_by` that does not match the authenticated `WritePrincipal.subject`,
   returning 403. The override is gated by an explicit
-  `AGSIGNAL_ALLOW_PRINCIPAL_OVERRIDE=true` env, which is **off by default**.
-- **Status:** ✅ Mitigated when `AGSIGNAL_ALLOW_PRINCIPAL_OVERRIDE=false`
+  `UNS_ALLOW_PRINCIPAL_OVERRIDE=true` env, which is **off by default**.
+- **Status:** ✅ Mitigated when `UNS_ALLOW_PRINCIPAL_OVERRIDE=false`
   (the default).
 
 ### T3 — Self-acknowledging agent
@@ -104,7 +104,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   - For `send_signal` with `deliver=True`, an `operator_confirmation_token`
     that matches a pre-shared `delivery_confirmation_token` from the runtime
     config — the LLM cannot mint this.
-  Source: `src/agsignal_mcp/runtime.py`, `src/agsignal_mcp/tools.py`.
+  Source: `src/uns_mcp/runtime.py`, `src/uns_mcp/tools.py`.
 - **Status:** ✅ Mitigated.
 
 ### T4 — CSRF on Console UI
@@ -112,10 +112,10 @@ implemented**, status. Severity is product-impact, not CVSS.
 - **Vector:** A logged-in operator visits a malicious page that triggers a
   cross-origin request to ack a notification.
 - **Mitigation:** `CORSMiddleware` is installed with a closed allowlist
-  (`AGSIGNAL_ALLOWED_ORIGINS`, defaulting to dev-server origins). Methods are
+  (`UNS_ALLOWED_ORIGINS`, defaulting to dev-server origins). Methods are
   restricted to `GET, POST, OPTIONS`; `allow_credentials=False`. Combined with
   Bearer-token auth (which is not automatically attached by browsers cross-
-  origin), CSRF surface is minimal. Source: `src/agsignal/api/auth.py:configure_cors`.
+  origin), CSRF surface is minimal. Source: `src/uns/api/auth.py:configure_cors`.
 - **Status:** ✅ Mitigated.
 
 ### T5 — Replay attack
@@ -139,11 +139,11 @@ implemented**, status. Severity is product-impact, not CVSS.
 - **Mitigation (partial):** Audit-before-commit on every state-changing
   endpoint — the audit row is persisted before the engine state mutates;
   audit failure surfaces as 503 and the state is not advanced. DB credentials
-  for AGSignal should be scoped to INSERT/SELECT on audit tables only (no
-  UPDATE/DELETE). Source: `src/agsignal/api/routes_notification.py`.
+  for UNS should be scoped to INSERT/SELECT on audit tables only (no
+  UPDATE/DELETE). Source: `src/uns/api/routes_notification.py`.
 - **Status:** ⚠ Partially mitigated. **Roadmap:** tamper-evident audit
   chain (Merkle log or signed audit trail) is not implemented in v0.1. An
-  attacker with direct DB write privileges can rewrite history — AGSignal
+  attacker with direct DB write privileges can rewrite history — UNS
   defends against API-level tampering, not against operator-level compromise.
 
 ### T7 — DoS via unbounded queries
@@ -152,13 +152,13 @@ implemented**, status. Severity is product-impact, not CVSS.
   filters and an inflated cursor, forcing the process to load and sort the
   full audit history in memory.
 - **Mitigation:** All read queries push `LIMIT` and `ORDER BY` into SQL
-  (`agsignal/api/read_models.py`); no in-memory full-table sort. Pagination
+  (`uns/api/read_models.py`); no in-memory full-table sort. Pagination
   cursor offset is capped and validated. Combined with auth (T1), only
   authenticated callers can issue these queries. **Plus** an API-level
   rate limiter (slowapi-backed; default 1000/minute per principal or IP)
   is installed on every HTTP route at app startup; runaway clients get
   429 with `Retry-After`. Operators can tighten via
-  `AGSIGNAL_RATE_LIMIT_DEFAULT` or layer per-route limits at the reverse
+  `UNS_RATE_LIMIT_DEFAULT` or layer per-route limits at the reverse
   proxy. Source: `src/notification/rate_limiter.py`.
 - **Status:** ✅ Mitigated.
 
@@ -167,9 +167,9 @@ implemented**, status. Severity is product-impact, not CVSS.
 - **Vector:** Anonymous caller hits `/docs`, `/redoc`, or `/openapi.json`
   and enumerates the full API surface, payload schemas, and parameter names
   to plan an attack.
-- **Mitigation:** All three endpoints are gated behind `AGSIGNAL_ENABLE_DOCS`,
+- **Mitigation:** All three endpoints are gated behind `UNS_ENABLE_DOCS`,
   which defaults to **off**. `DEPLOYMENT.md` also recommends an explicit
-  reverse-proxy block as defense in depth. Source: `src/agsignal/api/app.py`,
+  reverse-proxy block as defense in depth. Source: `src/uns/api/app.py`,
   `src/notification/main.py`.
 - **Status:** ✅ Mitigated by default.
 
@@ -180,7 +180,7 @@ implemented**, status. Severity is product-impact, not CVSS.
   and propagates to log aggregation.
 - **Mitigation (partial):** Structured logging with field allowlists for
   most paths. **Gap:** raw `request.query_params` is logged at INFO in
-  `agsignal/api/observability.py`. Operator must configure log-aggregator
+  `uns/api/observability.py`. Operator must configure log-aggregator
   redaction rules (denylist any field containing `token`, `key`, `secret`,
   `auth`) until the source-side fix lands.
 - **Status:** ⚠ Partially mitigated. **Roadmap:** source-side query-string
@@ -197,7 +197,7 @@ implemented**, status. Severity is product-impact, not CVSS.
 ### T11 — Supply-chain attack on PyPI artifact
 - **Severity:** Critical
 - **Vector:** A compromised maintainer credential (PyPI API token, GitHub
-  access) publishes a malicious `agsignal` release.
+  access) publishes a malicious `uns` release.
 - **Mitigation:** Releases use PyPI Trusted Publishing (OIDC) — no long-lived
   PyPI tokens exist. Sigstore attestations are generated automatically for
   every published artifact (verifiable provenance). Branch protection requires
@@ -210,8 +210,8 @@ implemented**, status. Severity is product-impact, not CVSS.
 - **Severity:** Medium
 - **Vector:** A malicious notification crafted with a controlled URL causes
   an adapter to fetch internal resources.
-- **Mitigation:** Channel adapter URLs (`AGSIGNAL_SLACK_WEBHOOK_URL`,
-  `AGSIGNAL_PAGERDUTY_ROUTING_KEY`, SMTP host) are configured by the operator
+- **Mitigation:** Channel adapter URLs (`UNS_SLACK_WEBHOOK_URL`,
+  `UNS_PAGERDUTY_ROUTING_KEY`, SMTP host) are configured by the operator
   via env vars. Producers and the SDK do **not** accept caller-controlled
   URLs for delivery. Adapters route by `Channel` enum, not free-form URL.
 - **Status:** ✅ Mitigated by design.
@@ -238,25 +238,25 @@ implemented**, status. Severity is product-impact, not CVSS.
 
 ## Explicitly NOT mitigated
 
-The following threats are **out of scope** for v0.1.x. AGSignal does not
+The following threats are **out of scope** for v0.1.x. UNS does not
 attempt to defend against them; operators must address them at a different
 layer.
 
-- **Operator compromise.** If the operator account or `AGSIGNAL_API_KEY` is
+- **Operator compromise.** If the operator account or `UNS_API_KEY` is
   stolen, the attacker has the operator's audit identity. Rotate the key
   promptly. Single-key rotation is not yet online (planned for 0.2.x).
 - **Database compromise.** Audit history is not yet tamper-evident (T6).
   Direct DB write access can rewrite the audit. Restrict DB credentials at
   the platform level.
 - **Network-layer attacks** (TLS interception, DNS hijacking, BGP). The
-  reverse proxy terminates TLS; AGSignal trusts what arrives over the
+  reverse proxy terminates TLS; UNS trusts what arrives over the
   loopback interface.
 - **Side channels** (timing, cache, branch prediction). Out of scope for v0.1.
 - **Insider attacks on the LLM context.** If an attacker can inject prompts
-  into the LLM that controls AGSignal MCP, they can attempt the agent
-  attacks AGSignal does defend against (T3) — but defense against prompt
+  into the LLM that controls UNS MCP, they can attempt the agent
+  attacks UNS does defend against (T3) — but defense against prompt
   injection itself is the host application's responsibility.
-- **Multi-tenant isolation in a single process.** AGSignal is single-tenant
+- **Multi-tenant isolation in a single process.** UNS is single-tenant
   per process. Run separate processes for separate customers/teams. See
   `DEPLOYMENT.md`.
 
@@ -266,13 +266,13 @@ layer.
 
 The mitigations above assume:
 
-- A **reverse proxy terminates TLS** in front of AGSignal. AGSignal binds
+- A **reverse proxy terminates TLS** in front of UNS. UNS binds
   to `127.0.0.1` by default and does not speak TLS itself.
-- The **database** uses access-controlled credentials scoped to the AGSignal
+- The **database** uses access-controlled credentials scoped to the UNS
   application (no superuser).
 - **Redis** is on a private network with `requirepass` set.
 - **Logs** are shipped to a tamper-evident or write-once aggregator.
-- **Operator credentials** (`AGSIGNAL_API_KEY`, DB password, Redis password)
+- **Operator credentials** (`UNS_API_KEY`, DB password, Redis password)
   are managed by a secrets manager — not committed to git, not in shell
   history, not in environment dumps.
 - **CI** runs `pip-audit`, `bandit`, and `gitleaks` on every PR.
@@ -284,7 +284,7 @@ accordingly.
 
 ## Roadmap (security work not yet shipped)
 
-Tracked in the public issue tracker. Operators evaluating AGSignal for
+Tracked in the public issue tracker. Operators evaluating UNS for
 high-stakes deployments should weigh these gaps:
 
 - **Tamper-evident audit chain** — Merkle log or signed audit (gap from T6)

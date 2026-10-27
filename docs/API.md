@@ -17,7 +17,7 @@ Install `uns[full]` from the local wheel or `.[full]` from source. `uns.Runtime(
 - `runtime.dead_letters()`: retained exhausted histories, including `replay_blocked_by` and `replay_block_reason` when recovery is unsafe or redundant.
 - `runtime.resolve_failure(id, actor=...)`: explicitly resolve a retained failure without erasing its FAILED status or audit.
 
-Requests use the existing `agsignal.responses.SendNotificationRequest` model. Legacy domain types remain import-compatible. The low-level `notification.sdk.NotificationSDK` and `agsignal.SignalClient` are policy/handler adapters. Their no-handler result is PENDING, not a successful send.
+Requests use the existing `uns.responses.SendNotificationRequest` model. Legacy domain types remain import-compatible. The low-level `notification.sdk.NotificationSDK` and `uns.SignalClient` are policy/handler adapters. Their no-handler result is PENDING, not a successful send.
 
 ### `uns.Runtime` Constructor & Methods
 
@@ -70,7 +70,7 @@ For example, an HTTP ACK-status read or runtime-bound MCP ACK-status tool can re
 
 When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_status` are null and `ack_inherited` is false, even if an intermediate row contains an ACK. Inspect the error and retained history; an intermediate row is never presented as the canonical owner. Missing-ID MCP reads keep their existing minimal shapes (`found: false` for notification status, or `ack_status: null` for ACK status). The legacy MCP ACK helper without a runtime keeps its two-field response and does not infer owner state.
 
-### `SendNotificationRequest` Schema (`agsignal.responses`)
+### `SendNotificationRequest` Schema (`uns.responses`)
 
 | Field | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
@@ -93,7 +93,7 @@ When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_stat
 
 ## HTTP
 
-`uns.app:app` and `agsignal.app:app` mount the same service. Configure an operator or scoped credential from the matrix below; send `Authorization: Bearer ...` for protected API requests. Existing `AGSIGNAL_*` aliases remain usable.
+`uns.app:app` and `uns.app:app` mount the same service. Configure an operator or scoped credential from the matrix below; send `Authorization: Bearer ...` for protected API requests. Existing `UNS_*` aliases remain usable.
 
 | Method and path | Meaning |
 |---|---|
@@ -118,7 +118,7 @@ By default, all HTTP endpoints except `GET /health` and `GET /healthz` require a
 
 - `Authorization: Bearer <credential>` (recommended)
 - `X-UNS-API-Key: <credential>`
-- `X-AGSignal-API-Key: <credential>`
+- `X-UNS-API-Key: <credential>`
 
 | Configured credential | Capabilities | Principal configuration |
 |---|---|---|
@@ -218,11 +218,11 @@ All `/ui/*` endpoints are strictly read-only (`INV-UI-001`):
 
 ## MCP
 
-`uns-mcp` retains existing stdio tools: simulate_signal, send_signal, get_delivery_status, ack_notification, dismiss_notification, get_notification_status, get_ack_status, list_deliveries, list_audit_events, get_effective_policy, list_invariants, get_invariants_summary, list_dlq, get_channel_health, health, ready. The source registry in `agsignal_mcp.factory.AGSIGNAL_MCP_TOOL_NAMES` is authoritative. Embedded direct read helpers accept `runtime_state=RuntimeState(runtime=runtime)` and use that runtime's durable stores. Omitted dependencies bind to the runtime; explicit injected audit/read adapters remain supported. Legacy helper calls without a runtime retain fixture behavior.
+`uns-mcp` retains existing stdio tools: simulate_signal, send_signal, get_delivery_status, ack_notification, dismiss_notification, get_notification_status, get_ack_status, list_deliveries, list_audit_events, get_effective_policy, list_invariants, get_invariants_summary, list_dlq, get_channel_health, health, ready. The source registry in `uns_mcp.factory.UNS_MCP_TOOL_NAMES` is authoritative. Embedded direct read helpers accept `runtime_state=RuntimeState(runtime=runtime)` and use that runtime's durable stores. Omitted dependencies bind to the runtime; explicit injected audit/read adapters remain supported. Legacy helper calls without a runtime retain fixture behavior.
 
 The factory and CLI default to read-only. `uns-mcp --enable-writes` requires a persistent database, `UNS_API_PRINCIPAL` and `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN`; it owns recovery for the process lifetime. Embedded hosts configure `MCPRuntimeConfig` explicitly. Secrets are supplied through host configuration, not command-line flags. `send_signal` does not label acceptance as delivery. No `check_policy`, `request_approval`, or action-resume tool is implemented.
 
-### Complete MCP Tool Reference (`AGSIGNAL_MCP_TOOL_NAMES`)
+### Complete MCP Tool Reference (`UNS_MCP_TOOL_NAMES`)
 
 | Tool Name | Mode | Input Parameters | Description |
 | :--- | :--- | :--- | :--- |
@@ -240,7 +240,7 @@ The factory and CLI default to read-only. `uns-mcp --enable-writes` requires a p
 | `get_invariants_summary` | Read-Only / Write | *(None)* | Return aggregate invariant counts. |
 | `list_dlq` | Read-Only / Write | *(None)* | Return durable dead-letter depth and items (`{"depth": ..., "items": [...]}`). |
 | `get_channel_health` | Read-Only / Write | *(None)* | Return runtime channel health summary. |
-| `health` | Read-Only / Write | *(None)* | Return MCP process liveness (`{"status": "alive", "service": "agsignal-mcp"}`). |
+| `health` | Read-Only / Write | *(None)* | Return MCP process liveness (`{"status": "alive", "service": "uns-mcp"}`). |
 | `ready` | Read-Only / Write | *(None)* | Return MCP readiness and mode (`mode`, `read_only`). |
 
 ---
@@ -253,7 +253,7 @@ Canonical intake locks the ACTIVE revision in its acceptance transaction; steady
 
 ## WebSocket authentication
 
-Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a Bearer header. Browser clients offer `agsignal.v1` and `bearer.<base64url(UTF8(key))>` subprotocols; the selected protocol is only `agsignal.v1`. Query-string credentials are rejected. Observer-capable credentials can connect and read, but every ACK/DISMISS command separately requires responder or operator capability and uses the verified principal and durable Runtime. A read-capable connection does not grant response authority.
+Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a Bearer header. Browser clients offer `uns.v1` and `bearer.<base64url(UTF8(key))>` subprotocols; the selected protocol is only `uns.v1`. Query-string credentials are rejected. Observer-capable credentials can connect and read, but every ACK/DISMISS command separately requires responder or operator capability and uses the verified principal and durable Runtime. A read-capable connection does not grant response authority.
 
 ### WebSocket Handshake Examples
 
@@ -271,7 +271,7 @@ Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a 
   ```typescript
   const encodedKey = btoa(apiKey).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const ws = new WebSocket(`wss://uns.example.com/ws/agents/${agentId}`, [
-    "agsignal.v1",
+    "uns.v1",
     `bearer.${encodedKey}`,
   ]);
   ```

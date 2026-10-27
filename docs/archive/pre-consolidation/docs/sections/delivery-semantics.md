@@ -2,7 +2,7 @@
 
 # Delivery Semantics
 
-This document provides truth tables and invariants for notification delivery behavior in the AGSignal Core.
+This document provides truth tables and invariants for notification delivery behavior in the UNS Core.
 
 ## Overview
 

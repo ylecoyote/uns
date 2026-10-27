@@ -34,9 +34,9 @@ All Protocols are `typing.Protocol` (structural). Plugins implementing the
 hook tier are bare callables or single-method ABCs.
 
 ```python
-# agsignal.contracts (the public boundary; see decision 7)
+# uns.contracts (the public boundary; see decision 7)
 from typing import Protocol, Literal, runtime_checkable
-from agsignal.contracts import (
+from uns.contracts import (
     DecisionRecord, Identity, OverrideResult, AuditEntry,
     ApprovalContext, WaitHandle, ApprovalStatus, AuditEvent,
 )
@@ -87,7 +87,7 @@ All extension methods return `Awaitable`. PRD §9.5 fixes async FastAPI as
 the runtime; a sync extension surface would force `asyncio.to_thread` on
 every plugin call and re-introduce the engine-side blocking ADR-001 §5
 rejected. Plugin authors needing sync internals call `asyncio.to_thread`
-themselves; AGSignal core does not provide a sync facade. (This matches
+themselves; UNS core does not provide a sync facade. (This matches
 ADR-001 §5: "no OSS sync wrapper ships in v1.0.")
 
 ### 3. Plugin lifecycle
@@ -99,7 +99,7 @@ to implement. Plugins that omit it are loaded directly with no init.
 @runtime_checkable
 class PluginLifecycle(Protocol):
     async def load(self, config: dict) -> None: ...    # post-import, pre-init
-    async def init(self, host: PluginHost) -> None: ...  # AGSignal injects
+    async def init(self, host: PluginHost) -> None: ...  # UNS injects
     async def teardown(self) -> None: ...               # graceful shutdown
 ```
 
@@ -114,16 +114,16 @@ receives the host handle; `teardown` is called on graceful shutdown only
 
 ### 4. Discovery model: explicit registration only in v1.0
 
-`agsignal.yaml` declares plugins explicitly:
+`uns.yaml` declares plugins explicitly:
 
 ```yaml
 plugins:
   identity_provider:
-    module: agsignal_jws_identity
+    module: uns_jws_identity
     class: JWSIdentityProvider
     config: { jwks_url: "https://..." }
   audit_hooks:
-    - module: agsignal_merkle_audit
+    - module: uns_merkle_audit
       class: MerkleAuditHook
 ```
 
@@ -134,12 +134,12 @@ third-party code by file-system presence is the primary supply-chain risk
 the trust model has to address.
 
 When ADR-005 lands, the model is **explicit-overrides-auto**: declared
-plugins in `agsignal.yaml` win over discovered entry points; this is the
+plugins in `uns.yaml` win over discovered entry points; this is the
 forward-compatible stance.
 
 ### 5. Versioning: independent semver per Protocol
 
-Each Protocol versions independently as `agsignal.contracts.OverrideAuthority
+Each Protocol versions independently as `uns.contracts.OverrideAuthority
 @ 1.0`, etc., declared via a class-level `__contract_version__: str`
 attribute. Plugins declare conformance:
 
@@ -149,7 +149,7 @@ class MyAuditHook:
     async def record(self, stream, entry): ...
 ```
 
-AGSignal core validates the declared version against its loaded contract
+UNS core validates the declared version against its loaded contract
 set at plugin `load`. Mismatch is a hard failure (plugin not loaded, error
 logged, OPERATIONAL notification per ADR-008 §5). Backwards compatibility:
 Protocol minor version bumps add optional methods or fields only;
@@ -166,13 +166,13 @@ versioning lets `AuditHook@1.1` ship without touching `OverrideAuthority`.
 | `IdentityProvider`     | **1:1** (one)     | Identity ambiguity is a security smell; one provider resolves all approver identities. |
 
 For 1:N (`AuditHook`), call order is registration order; a hook raising does
-not abort siblings. AGSignal logs the failure per ADR-008 §5 but does not
+not abort siblings. UNS logs the failure per ADR-008 §5 but does not
 fail-mode the originating decision unless the hook is flagged
 `fail_mode_on_error=true` at registration.
 
 ### 7. Plugin-side import boundary
 
-Public API: **`agsignal.contracts`** — the only stable import surface for
+Public API: **`uns.contracts`** — the only stable import surface for
 plugins. It re-exports:
 
 - Data shapes: `DecisionRecord`, `Identity`, `OverrideResult`, `AuditEntry`,
@@ -183,14 +183,14 @@ plugins. It re-exports:
   `IdentityResolutionError`, `ContractVersionMismatch`
 - Host utilities: `PluginHost` (logger + `correlation_id` propagator)
 
-Anything outside `agsignal.contracts` (e.g., `agsignal.engine.internals`,
-`agsignal.workflow.lightweight`) is **internal**; plugins importing it
+Anything outside `uns.contracts` (e.g., `uns.engine.internals`,
+`uns.workflow.lightweight`) is **internal**; plugins importing it
 break across minor versions without warning. Static checkers SHOULD flag
 deep imports from plugin packages.
 
 ### 8. Error handling at the boundary
 
-Plugins raise typed errors from `agsignal.contracts`:
+Plugins raise typed errors from `uns.contracts`:
 
 - `PluginError` — generic plugin failure (base class)
 - `PluginTimeout` — bounded wall-clock cap exceeded (default 5 s for
@@ -215,7 +215,7 @@ the boundary; the engine never receives a raw third-party exception type.
 
 ### Single mega-Protocol covering all extension points
 
-Rejected. A unified `AGSignalPlugin` Protocol would force every plugin
+Rejected. A unified `UNSPlugin` Protocol would force every plugin
 (audit-only, identity-only, override-only) to stub out methods it does not
 care about. The two-tier model (§2.6) explicitly avoids this; per-Protocol
 shapes match the matrix-validated abstractions and stay minimal.
@@ -241,7 +241,7 @@ needs no `load`/`teardown`). Bundling lifecycle into the contract Protocols
 forces empty implementations across the ecosystem. The optional
 `PluginLifecycle` Protocol opts plugins in only when they have state.
 
-### Single global `__agsignal_contract_version__` at v1
+### Single global `__uns_contract_version__` at v1
 
 Rejected. Locking all four extension points to the same semver line means
 adding a method to `AuditHook` forces a major bump on `WorkflowOrchestrator`
@@ -253,16 +253,16 @@ plugin-side declaration) is small.
 
 Rejected. ADR-008's fail-mode reasons are a closed list; plugins raising
 arbitrary string codes would break operator runbook authoring. Typed
-exceptions in `agsignal.contracts` give plugins a finite vocabulary and
+exceptions in `uns.contracts` give plugins a finite vocabulary and
 let static checkers flag misuse.
 
 ## Consequences
 
 **Plugin-author DX.** A v1.0 plugin is roughly 50–150 lines: implement
 one Protocol method, declare `__contract_version__`, register in
-`agsignal.yaml`. No lifecycle code unless the plugin has state. No
+`uns.yaml`. No lifecycle code unless the plugin has state. No
 sync/async bridging — the runtime is async end-to-end. Typed errors
-from `agsignal.contracts` give IDE autocomplete on the failure surface.
+from `uns.contracts` give IDE autocomplete on the failure surface.
 
 **Commercial-plugin development unblocked.** With signatures locked,
 JWS-Identity, SPIFFE-Auth, Merkle-Audit, Break-Glass, and DurableWorkflow
@@ -279,7 +279,7 @@ other three contracts. Auto-discovery (decision 4) reopens in v1.1
 following ADR-005.
 
 **Constraints on plugin code.** Plugins MUST import only from
-`agsignal.contracts`; deep imports break across minor versions. Plugins
+`uns.contracts`; deep imports break across minor versions. Plugins
 SHOULD propagate `correlation_id` and `decision_id` through every
 extension call (PRD M9.4); this is enforced at code review in v1, runtime
 once ADR-005 lands. `AuditHook` 1:N fan-out means a slow audit hook

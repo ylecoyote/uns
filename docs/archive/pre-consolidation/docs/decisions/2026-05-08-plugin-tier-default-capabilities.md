@@ -60,7 +60,7 @@ both must be in force before the first commercial plugin ships.
 
 - **`AuditHook`** is permitted at Community tier by default because it is
   write-only-to-audit, side-effect-free except logging (per M9.A), and
-  adding an audit destination cannot lose the in-AGSignal authoritative
+  adding an audit destination cannot lose the in-UNS authoritative
   audit chain (which always runs; see ADR Audit Ledger Physical Structure
   §5). A misbehaving AuditHook degrades observability for that specific
   destination but cannot corrupt the authoritative streams.
@@ -115,7 +115,7 @@ false`) trigger additional runtime semantics on top of §1 (no implicit
 extension-point access) and §2 (operator must explicitly enumerate every
 permitted extension point per plugin):
 
-**Startup warning.** AGSignal core emits a prominent operator-visible
+**Startup warning.** UNS core emits a prominent operator-visible
 warning at every Local-tier plugin load:
 
 ```
@@ -154,17 +154,17 @@ plugins:
       - AuditHook
 ```
 
-AGSignal core refuses to load any Local-tier plugin missing the
+UNS core refuses to load any Local-tier plugin missing the
 `acknowledge_unsigned: true` flag. This is per-startup friction by design:
 every Local-tier load is a deliberate operator decision.
 
 ### 4. Tier-promotion path
 
 A plugin's trust tier is computed at load time per ADR Plugin Trust Model
-§5 from the manifest, signature verification, and the AGSignal-curated
+§5 from the manifest, signature verification, and the UNS-curated
 `publisher_identity` allowlist. **The tier is not a manifest field.**
 
-Promoting a plugin from Community to Verified requires the AGSignal team to
+Promoting a plugin from Community to Verified requires the UNS team to
 add the plugin's `publisher_identity` (Sigstore-issued OIDC identity) to
 the curated allowlist. **Operators cannot self-promote third-party
 plugins.** This is intentional: the curated allowlist is the social-trust
@@ -173,8 +173,8 @@ component that complements cryptographic provenance — without it,
 emit attestations."
 
 Tier promotions ship via OSS releases (allowlist change is a tracked
-change in the AGSignal repo). Operators may locally override the curated
-allowlist in their `agsignal.yaml` if they want to upgrade a Community-
+change in the UNS repo). Operators may locally override the curated
+allowlist in their `uns.yaml` if they want to upgrade a Community-
 tier plugin to Verified-equivalent in their own deployment, but the upgrade
 is operator-local and recorded in the load manifest as
 `tier_locally_overridden: true`.
@@ -193,7 +193,7 @@ identifies this as the failure mode of light-touch plugin trust models.
 
 Rejected. `OverrideAuthority` is the Plugin Trust Model's most-impactful
 extension point. Verified-tier plugins have cryptographic provenance to a
-known publisher but the AGSignal team does not warrant the publisher's
+known publisher but the UNS team does not warrant the publisher's
 operational security posture. Requiring explicit operator elevation for
 `OverrideAuthority` keeps the Verified-tier blast radius bounded by default
 while preserving the elevation path for trusted commercial vendors (e.g.,
@@ -206,7 +206,7 @@ Rejected. `AuditHook` is the read-mostly side-effect-free extension point
 per M9.A; permitting Community-tier plugins to implement audit destinations
 (for custom observability backends, internal SIEMs, etc.) is the lowest-
 risk extensibility surface. Locking Community plugins out of all extension
-points by default would disincentivize the OSS ecosystem AGSignal aims to
+points by default would disincentivize the OSS ecosystem UNS aims to
 grow, without proportionate security gain.
 
 ### Operator-broad elevation (`elevate_all: true`)
@@ -241,11 +241,11 @@ change defaults" requirement. Compliance auditors can distinguish decisions
 that flowed through cryptographically-attested-and-curated chains from
 those that flowed through operator-elevated or Local-tier code. The OSS
 plugin ecosystem gains a low-friction Community-tier on-ramp (`AuditHook`
-only) without requiring AGSignal-team curation for every contributor.
+only) without requiring UNS-team curation for every contributor.
 
 **Constrains:** Commercial plugin vendors targeting Verified-tier with
 non-`AuditHook` extension points (most plugins) must request
-`publisher_identity` allowlist inclusion via the AGSignal team. Operators
+`publisher_identity` allowlist inclusion via the UNS team. Operators
 deploying Community-tier plugins beyond `AuditHook` must explicitly elevate
 per plugin and per extension point — friction by design. Local-tier plugin
 operators carry documented per-call audit-flag overhead and explicit

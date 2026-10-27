@@ -10,12 +10,12 @@ Linear: MIP-243, MIP-245
 
 ## Context
 
-AGSignal WebSocket clients can reconnect and send a `last_seen` cursor. The
+UNS WebSocket clients can reconnect and send a `last_seen` cursor. The
 original MIP donor docs described pending-notification replay, while the donor
 implementation returned an explicit empty list because it did not have a
 durable WebSocket payload read model.
 
-The existing AGSignal audit rows are not sufficient replay payloads by
+The existing UNS audit rows are not sufficient replay payloads by
 themselves. They preserve delivery outcome, title, source, and attribution, but
 they do not retain the exact WebSocket notification body or reconnect cursor
 shape. Reconstructing replay from audit rows would risk sending partial or
@@ -23,7 +23,7 @@ different payloads from live delivery.
 
 ## Decision
 
-AGSignal records the exact WebSocket payload accepted by
+UNS records the exact WebSocket payload accepted by
 `POST /api/v1/notifications` into a replay read model before live local delivery
 and optional Redis fanout:
 

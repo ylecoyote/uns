@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZipFile
 
-from agsignal.responses import SendNotificationRequest
+from uns.responses import SendNotificationRequest
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel
 from notification.policies import PolicyRegistry, configure_policy_registry

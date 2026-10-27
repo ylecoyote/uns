@@ -2,7 +2,7 @@
 
 # API Reference
 
-This document provides detailed API documentation for the AGSignal Core.
+This document provides detailed API documentation for the UNS Core.
 
 > **Related Documentation:**
 > - [Architecture](ARCHITECTURE.md) - System design and component overview
@@ -12,7 +12,7 @@ This document provides detailed API documentation for the AGSignal Core.
 
 ## Table of Contents
 
-- [AGSignal Public Aliases](#agsignal-public-aliases)
+- [UNS Public Aliases](#uns-public-aliases)
 - [SDK](#sdk)
 - [Models](#models)
 - [Policies](#policies)
@@ -25,44 +25,44 @@ This document provides detailed API documentation for the AGSignal Core.
 
 ---
 
-## AGSignal Public Aliases
+## UNS Public Aliases
 
-AGSignal-branded imports are available for new applications. The current
+UNS-branded imports are available for new applications. The current
 implementation still lives in the historical `notification.*` modules, so these
 aliases are intentionally non-breaking re-exports.
 
 ```python
-from agsignal.models import GovernanceSignal, SignalIntent
-from agsignal.sdk import SignalClient
+from uns.models import GovernanceSignal, SignalIntent
+from uns.sdk import SignalClient
 
 client = SignalClient()
 ```
 
-| AGSignal import | Backed by |
+| UNS import | Backed by |
 |-----------------|-----------|
-| `agsignal.sdk.SignalClient` | `notification.sdk.NotificationSDK` |
-| `agsignal.models.GovernanceSignal` | `notification.models.Notification` |
-| `agsignal.models.SignalIntent` | `notification.models.NotificationIntent` |
-| `agsignal.integrations.AppSignalAdapter` | `notification.integrations.AppSignalAdapter` |
-| `agsignal.integrations.AppSignalRequest` | `notification.integrations.AppSignalRequest` |
-| `agsignal.integrations.AppEvidenceContext` | `notification.integrations.AppEvidenceContext` |
+| `uns.sdk.SignalClient` | `notification.sdk.NotificationSDK` |
+| `uns.models.GovernanceSignal` | `notification.models.Notification` |
+| `uns.models.SignalIntent` | `notification.models.NotificationIntent` |
+| `uns.integrations.AppSignalAdapter` | `notification.integrations.AppSignalAdapter` |
+| `uns.integrations.AppSignalRequest` | `notification.integrations.AppSignalRequest` |
+| `uns.integrations.AppEvidenceContext` | `notification.integrations.AppEvidenceContext` |
 
 Existing `notification.*` imports remain supported.
 
 ### Host App Boundary
 
-Applications that want a generic facade can use `agsignal.integrations`:
+Applications that want a generic facade can use `uns.integrations`:
 
 ```python
-from agsignal.integrations import AppEvidenceContext, AppSignalAdapter, AppSignalRequest
+from uns.integrations import AppEvidenceContext, AppSignalAdapter, AppSignalRequest
 ```
 
-This boundary carries app-owned evidence references into AGSignal without making
-AGSignal own the host application's domain models.
+This boundary carries app-owned evidence references into UNS without making
+UNS own the host application's domain models.
 
 MIP-shaped adapters remain available as sample/proving code at
 `examples/integrations/mip/adapter.py`. They are intentionally not shipped in
-the AGSignal wheel and not exported from the AGSignal-branded public
+the UNS wheel and not exported from the UNS-branded public
 integration facade.
 
 ---
@@ -84,7 +84,7 @@ class NotificationSDK:
     ) -> None
 ```
 
-Main SDK class for sending notifications through AGSignal Core.
+Main SDK class for sending notifications through UNS Core.
 
 #### Constructor Parameters
 
@@ -819,7 +819,7 @@ except DeliveryError as e:
 
 ## UI Endpoints
 
-The UI module (`agsignal.api.routes_ui`) provides read-only HTTP endpoints for the dashboard UI.
+The UI module (`uns.api.routes_ui`) provides read-only HTTP endpoints for the dashboard UI.
 
 > **See Also:** [UI Data Contracts](ui/ui-data-contracts.md) for complete response shapes and filter specifications.
 

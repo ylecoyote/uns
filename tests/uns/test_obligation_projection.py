@@ -12,13 +12,13 @@ from sqlalchemy import update
 from tests.uns import test_delivery_remediation as delivery_fixtures
 from tests.uns.test_delivery_remediation import request
 
-from agsignal.app import create_app
-from agsignal_mcp.factory import create_mcp_server
-from agsignal_mcp.runtime import RuntimeState
-from agsignal_mcp.tools import get_ack_status, get_notification_status
 from notification.models import Channel
 from notification.rate_limiting import RateLimitConfig, configure_rate_limiter
+from uns.app import create_app
 from uns.runtime import work
+from uns_mcp.factory import create_mcp_server
+from uns_mcp.runtime import RuntimeState
+from uns_mcp.tools import get_ack_status, get_notification_status
 
 PROJECTION_FIELDS = (
     "obligation_owner_id",
@@ -31,7 +31,7 @@ PROJECTION_FIELDS = (
 
 @pytest.fixture
 def state(tmp_path, monkeypatch):
-    for name in ("UNS_POLICY_DIR", "AGSIGNAL_POLICY_DIR"):
+    for name in ("UNS_POLICY_DIR", "UNS_POLICY_DIR"):
         monkeypatch.delenv(name, raising=False)
     fixture = delivery_fixtures.state.__wrapped__(tmp_path)
     configure_rate_limiter({Channel.SLACK: RateLimitConfig(tokens_per_second=100, bucket_size=100)})
@@ -46,8 +46,8 @@ def projection(body):
 async def assert_transport_projection(runtime, identifier, expected):
     """Exercise HTTP and registered MCP tools, not only their internal helpers."""
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "projection-test-key"
-    app.state.agsignal_api_principal = "projection-observer"
+    app.state.uns_api_key = "projection-test-key"
+    app.state.uns_api_principal = "projection-observer"
     client = TestClient(app, headers={"Authorization": "Bearer projection-test-key"})
     for suffix in ("", "/ack-status"):
         response = client.get(f"/api/v1/notifications/{identifier}{suffix}")
