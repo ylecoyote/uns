@@ -1,17 +1,17 @@
-"""Standalone HTTP routes for producing AGSignal notifications.
+"""Standalone HTTP routes for producing UNS notifications.
 
 Per Phase 2 Tasks 6/7/8, the write routes (``send_notification`` and
 ``simulate_notification``) are thin HTTP adapters that delegate to
-``agsignal.signaling.*``. The route handlers contain only parameter
+``uns.signaling.*``. The route handlers contain only parameter
 parsing + observability + delegation + error translation. The websocket
 dispatch (replay store, connection manager, fanout publisher) remains in
 the route layer because the websocket runtime state is FastAPI-app-scoped
 and is a transport-layer concern.
 
 Per Phase 3 Task 1, the Pydantic Request/Response DTOs that previously
-lived in this module have been relocated to :mod:`agsignal.responses`.
+lived in this module have been relocated to :mod:`uns.responses`.
 The ``__all__`` re-export block at the bottom preserves the historical
-import path so external callers (notably ``agsignal_mcp.tools``) continue
+import path so external callers (notably ``uns_mcp.tools``) continue
 to work without code changes.
 """
 
@@ -29,26 +29,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from agsignal.api.auth import (
-    WritePrincipal,
-    require_admin_principal,
-    require_producer_principal,
-    require_read_principal,
-)
-from agsignal.responses import (
-    AutonomyContextRequest,
-    DeliveryAuditItem,
-    DeliveryStatusResponse,
-    DLQListResponse,
-    DLQRemoveResponse,
-    PolicyReloadRequest,
-    PolicyReloadResponse,
-    SendNotificationRequest,
-    SendNotificationResponse,
-    SimulateNotificationResponse,
-)
-from agsignal.signaling import send_signal as service_send_signal
-from agsignal.signaling import simulate_signal as service_simulate_signal
 from notification.audit import AuditPersistenceError, AuditRecord, AuditStore
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
 from notification.dlq import DLQService
@@ -65,6 +45,26 @@ from notification.websocket_runtime import (
     WebSocketFanoutEnvelope,
     WebSocketReplayStore,
 )
+from uns.api.auth import (
+    WritePrincipal,
+    require_admin_principal,
+    require_producer_principal,
+    require_read_principal,
+)
+from uns.responses import (
+    AutonomyContextRequest,
+    DeliveryAuditItem,
+    DeliveryStatusResponse,
+    DLQListResponse,
+    DLQRemoveResponse,
+    PolicyReloadRequest,
+    PolicyReloadResponse,
+    SendNotificationRequest,
+    SendNotificationResponse,
+    SimulateNotificationResponse,
+)
+from uns.signaling import send_signal as service_send_signal
+from uns.signaling import simulate_signal as service_simulate_signal
 
 logger = logging.getLogger(__name__)
 _policy_reload_lock = RLock()
@@ -83,7 +83,7 @@ async def send_notification(
     request: SendNotificationRequest,
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SendNotificationResponse:
-    """HTTP adapter — delegates to agsignal.signaling.send_signal.
+    """HTTP adapter — delegates to uns.signaling.send_signal.
 
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
@@ -184,7 +184,7 @@ async def simulate_notification(
     request: SendNotificationRequest, http_request: Request,
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SimulateNotificationResponse:
-    """HTTP adapter — delegates to agsignal.signaling.simulate_signal.
+    """HTTP adapter — delegates to uns.signaling.simulate_signal.
 
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
@@ -315,7 +315,7 @@ async def reload_policies(
     import tempfile
 
     configured_root = getattr(http_request.app.state, "policy_dir", None) or os.environ.get(
-        "UNS_POLICY_DIR", os.environ.get("AGSIGNAL_POLICY_DIR")
+        "UNS_POLICY_DIR", os.environ.get("UNS_POLICY_DIR")
     )
     if reload_request.policy_dir:
         raw_policy_dir = Path(reload_request.policy_dir)
@@ -383,10 +383,10 @@ async def reload_policies(
             policy_count=len(runtime_registry), notification_types=sorted(runtime_registry.list_notification_types()))
 
 
-# Re-export for backward compatibility. agsignal_mcp.tools and any other
+# Re-export for backward compatibility. uns_mcp.tools and any other
 # downstream caller that does ``from notification.routes import
 # SendNotificationRequest`` (etc.) continues to work. Canonical home is
-# ``agsignal.responses``.
+# ``uns.responses``.
 __all__ = [
     "AutonomyContextRequest",
     "DLQListResponse",

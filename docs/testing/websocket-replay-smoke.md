@@ -1,11 +1,11 @@
 # WebSocket Replay Smoke
 
-This smoke verifies AGSignal's reconnect replay contract for standalone
+This smoke verifies UNS's reconnect replay contract for standalone
 WebSocket clients.
 
 ## What It Proves
 
-The smoke starts one in-process AGSignal FastAPI app:
+The smoke starts one in-process UNS FastAPI app:
 
 1. It posts `POST /api/v1/notifications` for an agent while no WebSocket client
    is connected.
@@ -34,7 +34,7 @@ python scripts/smoke_websocket_replay.py
 ## Expected Output
 
 ```text
-AGSignal WebSocket replay smoke passed
+UNS WebSocket replay smoke passed
 agent_id: ...
 notification_id: ...
 replay_available: True

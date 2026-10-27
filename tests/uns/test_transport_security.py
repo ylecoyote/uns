@@ -9,11 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from agsignal.app import create_app
-from agsignal.responses import SendNotificationRequest
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel
 from notification.service import SimpleAdapterRegistry
+from uns.app import create_app
+from uns.responses import SendNotificationRequest
 from uns.runtime import Runtime
 
 
@@ -51,16 +51,16 @@ def configured(tmp_path, monkeypatch):
     from notification.rate_limiting import configure_rate_limiter
     configure_policy_registry(registry=PolicyRegistry())
     configure_rate_limiter({})
-    for name in ("UNS_API_KEY", "AGSIGNAL_API_KEY", "UNS_ALLOW_UNAUTHENTICATED_READS",
-                 "AGSIGNAL_ALLOW_UNAUTHENTICATED_READS", "UNS_POLICY_DIR", "AGSIGNAL_POLICY_DIR"):
+    for name in ("UNS_API_KEY", "UNS_API_KEY", "UNS_ALLOW_UNAUTHENTICATED_READS",
+                 "UNS_ALLOW_UNAUTHENTICATED_READS", "UNS_POLICY_DIR", "UNS_POLICY_DIR"):
         monkeypatch.delenv(name, raising=False)
     adapter = RecordingAdapter()
     registry = SimpleAdapterRegistry()
     registry.register(adapter)
     runtime = Runtime(f"sqlite:///{tmp_path}/security.db", adapters=registry, create_tables=True)
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "test-key"
-    app.state.agsignal_api_principal = "verified-operator"
+    app.state.uns_api_key = "test-key"
+    app.state.uns_api_principal = "verified-operator"
     yield app, runtime, adapter
     runtime.engine.dispose()
 
@@ -103,7 +103,7 @@ def test_legacy_read_mode_does_not_allow_any_mutation(configured):
 
 def test_fixture_only_http_composition_still_requires_write_auth():
     app = create_app(skip_persistence_config=True)
-    app.state.agsignal_api_key = "test-key"
+    app.state.uns_api_key = "test-key"
     client = TestClient(app)
     assert client.post("/api/v1/notifications", json=signal().model_dump(mode="json")).status_code == 401
     assert client.delete(f"/api/v1/dlq/{uuid4()}").status_code == 401
@@ -112,7 +112,7 @@ def test_fixture_only_http_composition_still_requires_write_auth():
 
 def test_unconfigured_read_auth_fails_closed(configured):
     app, _, _ = configured
-    app.state.agsignal_api_key = None
+    app.state.uns_api_key = None
     assert TestClient(app).get("/ui/audit").status_code == 503
 
 
@@ -121,7 +121,7 @@ def test_websocket_uses_verified_actor_and_durable_ack(configured):
     payload = signal()
     accepted = asyncio.run(runtime.send(payload, principal="verified-operator"))
     # Old compatibility flag cannot allow caller attribution spoofing.
-    app.state.agsignal_allow_principal_override = True
+    app.state.uns_allow_principal_override = True
     denied = TestClient(app).post(
         f"/api/v1/notifications/{accepted.notification_id}/ack",
         json={"acked_by": "imposter"}, headers={"Authorization": "Bearer test-key"},
@@ -130,10 +130,10 @@ def test_websocket_uses_verified_actor_and_durable_ack(configured):
     token = base64.urlsafe_b64encode(b"test-key").decode().rstrip("=")
     with TestClient(app).websocket_connect(
         f"/ws/agents/{payload.autonomy_context.agent_id}",
-        subprotocols=["agsignal.v1", f"bearer.{token}"],
+        subprotocols=["uns.v1", f"bearer.{token}"],
         headers={"Origin": "http://localhost:5173"},
     ) as ws:
-        assert ws.accepted_subprotocol == "agsignal.v1"
+        assert ws.accepted_subprotocol == "uns.v1"
         assert ws.receive_json()["type"] == "connected"
         ws.send_json({"type": "ack", "notification_id": str(accepted.notification_id), "acked_by": "imposter"})
         assert ws.receive_json()["error"] == "principal_override_forbidden"
@@ -164,9 +164,9 @@ def test_websocket_rejects_untrusted_origin_and_query_credentials(configured):
 async def test_http_and_mcp_previews_use_durable_policy_authority(configured):
     from mcp.shared.memory import create_connected_server_and_client_session
 
-    from agsignal_mcp.factory import create_mcp_server
     from db.policy_store import SQLAlchemyPolicyStore
     from notification.policies import NotificationPolicy
+    from uns_mcp.factory import create_mcp_server
 
     app, runtime, _ = configured
     policy = NotificationPolicy.from_dict({
@@ -197,7 +197,7 @@ def isolated_stores(tmp_path, monkeypatch):
     from notification.rate_limiting import configure_rate_limiter
 
     configure_rate_limiter({})
-    for name in ("UNS_POLICY_DIR", "AGSIGNAL_POLICY_DIR"):
+    for name in ("UNS_POLICY_DIR", "UNS_POLICY_DIR"):
         monkeypatch.delenv(name, raising=False)
     runtimes = [Runtime(f"sqlite:///{tmp_path}/{label}.db", create_tables=True) for label in ("a", "b")]
     identifiers = []
@@ -212,15 +212,15 @@ def isolated_stores(tmp_path, monkeypatch):
 
 def isolated_app(runtime, label):
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = f"key-{label}"
-    app.state.agsignal_api_principal = f"principal-{label}"
+    app.state.uns_api_key = f"key-{label}"
+    app.state.uns_api_principal = f"principal-{label}"
     return app
 
 
 @pytest.mark.parametrize("later_transport", ["http", "mcp"])
 @pytest.mark.parametrize("path", ["/ui/deliveries", "/ui/audit"])
 def test_http_reads_stay_bound_to_authenticated_app(isolated_stores, path, later_transport):
-    from agsignal_mcp.factory import create_mcp_server
+    from uns_mcp.factory import create_mcp_server
 
     runtimes, identifiers = isolated_stores
     app = isolated_app(runtimes[0], "a")
@@ -235,7 +235,7 @@ def test_http_reads_stay_bound_to_authenticated_app(isolated_stores, path, later
 
 @pytest.mark.parametrize("later_transport", ["http", "mcp"])
 def test_http_timeline_cannot_read_another_runtime(isolated_stores, later_transport):
-    from agsignal_mcp.factory import create_mcp_server
+    from uns_mcp.factory import create_mcp_server
 
     runtimes, identifiers = isolated_stores
     app = isolated_app(runtimes[0], "a")
@@ -259,7 +259,7 @@ async def test_mcp_reads_stay_bound_to_server_runtime(isolated_stores, tool, lat
 
     from mcp.shared.memory import create_connected_server_and_client_session
 
-    from agsignal_mcp.factory import create_mcp_server
+    from uns_mcp.factory import create_mcp_server
 
     runtimes, identifiers = isolated_stores
     server = create_mcp_server(runtime=runtimes[0])
@@ -410,10 +410,10 @@ def test_daemon_startup_requires_explicit_persistence_or_in_memory_flag(monkeypa
     from uns.config import ensure_daemon_persistence_configured
 
     monkeypatch.delenv("UNS_DATABASE_URL", raising=False)
-    monkeypatch.delenv("AGSIGNAL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("UNS_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("UNS_ALLOW_IN_MEMORY", raising=False)
-    monkeypatch.delenv("AGSIGNAL_ALLOW_IN_MEMORY", raising=False)
+    monkeypatch.delenv("UNS_ALLOW_IN_MEMORY", raising=False)
 
     with pytest.raises(RuntimeError, match="Refusing to start the UNS daemon with volatile in-memory storage"):
         ensure_daemon_persistence_configured()

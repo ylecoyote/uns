@@ -23,7 +23,7 @@ within a single `when`, regex semantics for `MATCHES`, error semantics, and
 exactly where the impurity boundary sits. Stage 2 production-pattern research
 confirms OPA and Cedar both keep the policy engine pure-function, but they
 diverge sharply on combination semantics — OPA defaults to deny-overrides,
-Cedar uses an explicit forbid-overrides + permit policy form. AGSignal's DSL
+Cedar uses an explicit forbid-overrides + permit policy form. UNS's DSL
 is its own thing; this ADR locks the internals.
 
 ## Decision

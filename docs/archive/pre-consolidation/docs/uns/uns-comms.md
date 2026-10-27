@@ -1,6 +1,6 @@
 > Historical provenance. Superseded by the current UNS product contract in `docs/PRODUCT.md`. Implementation and market claims below are not current acceptance evidence.
 
-> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to AGSignal Core and UNS Dashboard maps to AGSignal Console.
+> Historical note: This document is preserved from the UNS extraction phase. In current public product terminology, UNS maps to UNS Core and UNS Dashboard maps to UNS Console.
 
 ## Looking for Feedback: UNS (Unified Notification Service for Autonomous Agents)
 

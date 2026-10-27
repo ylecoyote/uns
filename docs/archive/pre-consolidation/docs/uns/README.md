@@ -2,18 +2,18 @@
 
 # Historical UNS Extraction Materials
 
-This folder is intentionally preserved as provenance for the AGSignal migration.
+This folder is intentionally preserved as provenance for the UNS migration.
 In current public product terminology:
 
 | Historical term | Current term |
 |-----------------|--------------|
-| UNS | AGSignal Core |
-| Unified Notification Service | AGSignal Core |
-| UNS Dashboard | AGSignal Console |
+| UNS | UNS Core |
+| Unified Notification Service | UNS Core |
+| UNS Dashboard | UNS Console |
 
 These documents should not be treated as the public product entrypoint. Start
-with the root [AGSignal README](../../README.md) and the main
-[AGSignal Documentation](../README.md) for current terminology and product
+with the root [UNS README](../../README.md) and the main
+[UNS Documentation](../README.md) for current terminology and product
 boundaries.
 
 ## Taxonomy Decision
@@ -28,16 +28,16 @@ Rationale:
 - The folder contains source PRDs, functional specs, technical specs, comms
   drafts, and build-task notes that are useful as migration evidence.
 - Moving the folder would make historical references harder to trace.
-- Public product docs now lead with AGSignal and AGSignal Core, while this folder
+- Public product docs now lead with UNS and UNS Core, while this folder
   is explicitly labeled as provenance.
 
 ## Current Product Boundary
 
-AGSignal Core owns signal routing, delivery, acknowledgments, policy evaluation,
+UNS Core owns signal routing, delivery, acknowledgments, policy evaluation,
 deduplication, rate limiting, audit records, delivery health, and governance
 feedback.
 
-AGSignal Core does not execute actions, block execution loops, replace delivery
+UNS Core does not execute actions, block execution loops, replace delivery
 tools, or own agent reasoning.
 
 ## File Index

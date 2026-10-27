@@ -1,7 +1,7 @@
 """Policy-learning tables (experimental).
 
 Captures policy delta proposals and shadow evaluation results/aggregates that
-feed AGSignal's policy-learning loop. Schema here may evolve more aggressively
+feed UNS's policy-learning loop. Schema here may evolve more aggressively
 than the audit tables; isolating it keeps that churn out of the audit/policy
 modules.
 """
@@ -28,7 +28,7 @@ from db.models._base import Base
 
 
 class PersistedPolicyDelta(Base):
-    """SQLAlchemy model for AGSignal policy learning delta proposals."""
+    """SQLAlchemy model for UNS policy learning delta proposals."""
 
     __tablename__ = "policy_deltas"
 

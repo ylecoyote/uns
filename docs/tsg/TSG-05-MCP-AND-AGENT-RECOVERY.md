@@ -10,25 +10,25 @@
 
 ## 2. Root Cause & Component Mechanics
 
-### 2.1 `uns-mcp` Security & Lifecycle Model (`src/agsignal_mcp/`)
+### 2.1 `uns-mcp` Security & Lifecycle Model (`src/uns_mcp/`)
 1. **Read-Only by Default:** Running `uns-mcp` without `--enable-writes` starts in `mode="stdio-local"` with `read_only=True`. In this mode, `simulate_signal` and read tools (`list_deliveries`, `list_dlq`, `get_notification_status`, etc.) work, while `send_signal(deliver=True)`, `ack_notification`, and `dismiss_notification` are blocked.
 2. **Runtime-Bound Read Helpers (`F-07`):**
-   - Both the FastMCP server tools and direct Python helpers in `agsignal_mcp.tools` accept `runtime_state=RuntimeState(runtime=runtime)` and read directly from that runtime's durable SQLite outbox and audit stores.
+   - Both the FastMCP server tools and direct Python helpers in `uns_mcp.tools` accept `runtime_state=RuntimeState(runtime=runtime)` and read directly from that runtime's durable SQLite outbox and audit stores.
 3. **Write-Enabled Requirements (`uns-mcp --enable-writes`):**
    - `UNS_DATABASE_URL` must point to a file-backed SQLite database (in-memory `sqlite://` and `:memory:` are rejected).
    - `UNS_API_PRINCIPAL` must be set to a non-empty actor identifier.
    - `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` must be set to a non-empty secret.
    - Every `send_signal` call with `deliver=true` must also supply `operator_intent="deliver"` and `operator_confirmation_token` matching `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` (verified via constant-time `hmac.compare_digest`).
 4. **In-Process Recovery Worker (`uns-mcp-worker`):**
-   - When `uns-mcp --enable-writes` starts its FastMCP lifespan (`src/agsignal_mcp/factory.py`), it spawns `asyncio.create_task(runtime.worker(), name="uns-mcp-worker")`.
+   - When `uns-mcp --enable-writes` starts its FastMCP lifespan (`src/uns_mcp/factory.py`), it spawns `asyncio.create_task(runtime.worker(), name="uns-mcp-worker")`.
    - On `SIGINT` or `SIGTERM`, `_serve()` cancels the stdio task and uses `anyio.CancelScope(shield=True)` during lifespan teardown to cancel and join the recovery worker cleanly before disposing the SQLAlchemy engine.
 
 ### 2.2 Agent WebSocket Authentication (`/ws/agents/{agent_id}`)
-Defined in `src/agsignal/api/auth.py`:
+Defined in `src/uns/api/auth.py`:
 - Query-string tokens (`?api_key=...` or `?token=...`) are **never accepted**.
 - If an `Origin` header is present, it must match `UNS_ALLOWED_ORIGINS` (default `http://localhost:5173,http://127.0.0.1:5173`).
 - Native clients pass `Authorization: Bearer <UNS_API_KEY>` (or `X-UNS-API-Key`).
-- Browser clients pass `Sec-WebSocket-Protocol: agsignal.v1, bearer.<base64url_nopad(UNS_API_KEY)>`.
+- Browser clients pass `Sec-WebSocket-Protocol: uns.v1, bearer.<base64url_nopad(UNS_API_KEY)>`.
 
 ---
 
@@ -37,7 +37,7 @@ Defined in `src/agsignal/api/auth.py`:
 ### Step 3.1: Verify MCP environment variables before starting `uns-mcp --enable-writes`
 ```sh
 python3 -c '
-from agsignal_mcp.transports.stdio import runtime_config
+from uns_mcp.transports.stdio import runtime_config
 cfg = runtime_config(enable_writes=True)
 print("MCP Write Config Valid:", cfg.mode, "principal=", cfg.operator_principal)
 '
@@ -70,7 +70,7 @@ Check the exact error string:
 1. **Reason `"Origin is not allowed"`:** Add your frontend/agent origin to `UNS_ALLOWED_ORIGINS` (comma-separated, e.g., `export UNS_ALLOWED_ORIGINS="https://console.example.com"`).
 2. **Reason `"Authentication required"`:**
    - For Python/Node/Go clients: pass `Authorization: Bearer <UNS_API_KEY>` in the handshake headers.
-   - For Browser clients: pass `["agsignal.v1", "bearer.<base64url-unpadded-key>"]` as the `WebSocket` subprotocols argument.
+   - For Browser clients: pass `["uns.v1", "bearer.<base64url-unpadded-key>"]` as the `WebSocket` subprotocols argument.
 
 ---
 

@@ -1,4 +1,4 @@
-"""Tests for standalone AGSignal WebSocket runtime."""
+"""Tests for standalone UNS WebSocket runtime."""
 
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ def _app(
     replay_store: WebSocketReplayStore | None = None,
 ) -> FastAPI:
     app = FastAPI()
-    app.state.agsignal_api_key = "test-key"
-    app.state.agsignal_api_principal = "operator"
+    app.state.uns_api_key = "test-key"
+    app.state.uns_api_principal = "operator"
     app.state.websocket_manager = manager or WebSocketConnectionManager()
     app.state.websocket_replay_store = replay_store or InMemoryWebSocketReplayStore()
     app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
@@ -176,7 +176,7 @@ def test_redis_fanout_publishes_stable_envelope() -> None:
     redis = FakeRedis()
     fanout = RedisWebSocketFanout(
         redis_client=redis,
-        channel_prefix="agsignal:test",
+        channel_prefix="uns:test",
         instance_id="instance-a",
     )
     agent_id = uuid4()
@@ -191,7 +191,7 @@ def test_redis_fanout_publishes_stable_envelope() -> None:
 
     assert delivered is True
     channel, payload = redis.published[0]
-    assert channel == f"agsignal:test:agent:{agent_id}"
+    assert channel == f"uns:test:agent:{agent_id}"
     assert '"type":"notification"' in payload
     assert str(agent_id) in payload
     assert '"origin_id":"instance-a"' in payload
@@ -201,7 +201,7 @@ def test_redis_fanout_failure_degrades_websocket_health_without_raising() -> Non
     tracker = ChannelHealthTracker(failure_threshold=1)
     fanout = RedisWebSocketFanout(
         redis_client=FakeRedis(fail=True),
-        channel_prefix="agsignal:test",
+        channel_prefix="uns:test",
         channel_health_tracker=tracker,
     )
 
@@ -225,7 +225,7 @@ def test_redis_subscriber_forwards_other_instance_message_to_local_agent() -> No
         manager.register(agent_id, "conn-1", websocket)  # type: ignore[arg-type]
         subscriber = RedisWebSocketSubscriber(
             redis_client=FakeRedis(),  # type: ignore[arg-type]
-            channel_prefix="agsignal:test",
+            channel_prefix="uns:test",
             manager=manager,
             origin_id="instance-a",
         )
@@ -256,7 +256,7 @@ def test_redis_subscriber_ignores_same_origin_message() -> None:
         manager.register(agent_id, "conn-1", websocket)  # type: ignore[arg-type]
         subscriber = RedisWebSocketSubscriber(
             redis_client=FakeRedis(),  # type: ignore[arg-type]
-            channel_prefix="agsignal:test",
+            channel_prefix="uns:test",
             manager=manager,
             origin_id="instance-a",
         )
@@ -329,7 +329,7 @@ def test_redis_subscriber_reconnects_after_transient_subscription_failure() -> N
         redis = FailingThenBlockingRedis()
         subscriber = RedisWebSocketSubscriber(
             redis_client=redis,  # type: ignore[arg-type]
-            channel_prefix="agsignal:test",
+            channel_prefix="uns:test",
             manager=manager,
             origin_id="instance-a",
             reconnect_initial_delay_seconds=0.0,

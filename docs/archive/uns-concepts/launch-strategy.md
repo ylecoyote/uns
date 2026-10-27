@@ -98,8 +98,8 @@ not just the repo.
 
 ### 4. Register the category
 
-- **agsignal.dev** — primary domain (lead with this)
-- **agsignal.io** — redirect to .dev, prevent squatting
+- **uns.dev** — primary domain (lead with this)
+- **uns.io** — redirect to .dev, prevent squatting
 - Both secured: 2026-04-22
 
 ### 5. Publish the uns-governance Agent Skill

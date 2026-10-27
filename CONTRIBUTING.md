@@ -40,7 +40,7 @@ pytest
 pytest tests/docs/
 
 # Run with coverage
-pytest tests apps/ui/tests --cov=src/uns --cov=src/agsignal --cov=src/notification --cov=src/db --cov=src/agsignal_mcp
+pytest tests apps/ui/tests --cov=src/uns --cov=src/uns --cov=src/notification --cov=src/db --cov=src/uns_mcp
 
 # Run a specific test file
 pytest tests/uns/test_remediation_runtime.py
@@ -93,16 +93,16 @@ src/
 │   ├── runtime.py          # Transactional outbox, leased dispatch, dedup, ACK & callback worker
 │   ├── client.py           # Principal-bound async Client (send, simulate)
 │   ├── policy_runtime.py   # Revision-locked ACTIVE policy resolver & override guard
-│   ├── config.py           # Environment composition (UNS_* and AGSIGNAL_* aliases)
+│   ├── config.py           # Environment composition (UNS_* and UNS_* aliases)
 │   ├── routes.py           # /api/v1/runtime/* inspection, DLQ, and replay routes
 │   ├── maintenance.py      # Explicit retention & SHA-256 verified archive CLI (uns-maintain)
 │   └── migrate.py          # Idempotent additive schema bootstrap (uns-migrate)
-├── agsignal/               # Unified FastAPI HTTP/WebSocket service & read models
-│   ├── app.py              # Unified FastAPI factory (uns / agsignal CLI entrypoint)
+├── uns/               # Unified FastAPI HTTP/WebSocket service & read models
+│   ├── app.py              # Unified FastAPI factory (uns / uns CLI entrypoint)
 │   ├── signaling.py        # Shared transport signaling service
 │   ├── queries.py          # Read-model queries for /ui/* and MCP
 │   └── api/                # Auth, observability, /v1/notifications/*, and /ui/* routers
-├── agsignal_mcp/           # Model Context Protocol (MCP) server (uns-mcp)
+├── uns_mcp/           # Model Context Protocol (MCP) server (uns-mcp)
 │   ├── factory.py          # FastMCP factory & lifespan recovery worker
 │   ├── tools.py            # 16 MCP tool implementations
 │   └── transports/stdio.py # Trusted-local stdio entrypoint
@@ -140,7 +140,7 @@ Prefer testing against the canonical durable `uns.Runtime` and `uns.Client` (or 
 import pytest
 from uuid import uuid4
 
-from agsignal.responses import AutonomyContextRequest, SendNotificationRequest
+from uns.responses import AutonomyContextRequest, SendNotificationRequest
 from notification.models import AutonomyMode, Channel, NotificationIntent
 from uns import Client, Runtime
 

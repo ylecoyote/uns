@@ -5,7 +5,7 @@ Run from the consolidated repository with its development environment:
 ```sh
 .venv/bin/python -m pytest tests apps/ui/tests
 .venv/bin/ruff check src tests scripts apps
-.venv/bin/mypy -p uns -p agsignal -p notification -p db -p ui_client -p agsignal_mcp
+.venv/bin/mypy -p uns -p uns -p notification -p db -p ui_client -p uns_mcp
 .venv/bin/bandit -q -r src
 .venv/bin/python examples/uns_demo.py
 cd apps/ui
@@ -142,7 +142,7 @@ Base: `7cf5c12c7a25607fff8242b2bdfe115a145dc485`. This follow-up closes the WebS
 
 Regression evidence lives in `tests/uns/test_scoped_websocket_auth.py`, `tests/uns/test_persistence_entrypoints.py`, `tests/uns/test_obligation_projection.py`, and `tests/uns/test_operational_progress.py`. The owner tests create twelve actual coalesced notifications and exercise successive promotion, complete exhaustion, root replay, and registered MCP/HTTP parity. The WebSocket tests cover both Bearer and browser-subprotocol authentication, assert unchanged durable state/audit on rejected commands, and preserve stream reads. Restoring the original WebSocket ACK handler in an isolated regression control caused all eight lower-scope rejection cases to fail as expected.
 
-The two legacy MCP response-shape failures observed in the base commit's GitHub CI are covered by the existing `tests/agsignal_mcp/test_runtime_bound_reads.py` tests and pass in this run. Legacy no-runtime ACK responses retain their original two-field shape; runtime-bound responses include the canonical obligation projection.
+The two legacy MCP response-shape failures observed in the base commit's GitHub CI are covered by the existing `tests/uns_mcp/test_runtime_bound_reads.py` tests and pass in this run. Legacy no-runtime ACK responses retain their original two-field shape; runtime-bound responses include the canonical obligation projection.
 
 Local verification used Python 3.12.14 and temporary SQLite databases. The executor's default asyncio loop stalled an unrelated minimal TestClient request and the MCP child-process test; a temporary **test-virtualenv-only** uvloop policy for parent and child interpreters allowed the unchanged tests to run. No event-loop workaround was added to repository or package code. The full run retained two framework deprecation warnings; Bandit and packaging also emitted existing non-failing annotation/license warnings.
 

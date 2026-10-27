@@ -1,4 +1,4 @@
-"""MIP-shaped adapter templates built on AGSignal's generic app boundary.
+"""MIP-shaped adapter templates built on UNS's generic app boundary.
 
 This module intentionally imports no MIP or ATP runtime code. It preserves the
 MIP integration event shape while leaving all host-owned behavior in the host
@@ -26,7 +26,7 @@ MIPAlertSeverity = Literal["critical", "high", "medium", "low"]
 
 
 class MIPExecutionAlert(BaseModel):
-    """MIP-style execution alert input carried through AGSignal."""
+    """MIP-style execution alert input carried through UNS."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -118,7 +118,7 @@ def _evidence(
 
 
 class MIPSignalAdapter:
-    """MIP-shaped facade over AGSignal's generic app signal adapter."""
+    """MIP-shaped facade over UNS's generic app signal adapter."""
 
     def __init__(self, app_adapter: _AppAdapter | None = None) -> None:
         self._app_adapter = app_adapter or AppSignalAdapter()

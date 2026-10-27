@@ -1,6 +1,6 @@
-# AGSignal Console Observability
+# UNS Console Observability
 
-This document describes the observability instrumentation for AGSignal Console
+This document describes the observability instrumentation for UNS Console
 endpoints, including request metrics, error tracking, structured logging, and
 dashboard/query recommendations.
 
@@ -153,7 +153,7 @@ INFO - UI request completed [request_id=req-abc123 endpoint=/ui/deliveries metho
 ### Using Structured Logger
 
 ```python
-from agsignal.api.observability import get_structured_logger, log_endpoint_call
+from uns.api.observability import get_structured_logger, log_endpoint_call
 
 logger = get_structured_logger(__name__)
 
@@ -266,7 +266,7 @@ For log aggregation systems (e.g., Loki, Elasticsearch):
 The default in-memory collector is suitable for testing:
 
 ```python
-from agsignal.api.observability import configure_metrics_collector, MetricsCollector
+from uns.api.observability import configure_metrics_collector, MetricsCollector
 
 # Use default in-memory collector
 collector = configure_metrics_collector()
@@ -347,7 +347,7 @@ curl -i -H "X-Request-ID: test-123" http://localhost:8000/ui/deliveries | grep X
 ### Testing Metrics Collection
 
 ```python
-from agsignal.api.observability import get_metrics_collector
+from uns.api.observability import get_metrics_collector
 
 # After making requests, inspect collected metrics
 collector = get_metrics_collector()
@@ -367,7 +367,7 @@ print(f"404 errors: {collector.get_error_count('/ui/deliveries/{id}', status_cod
 
 ```bash
 # Run with debug logging enabled
-LOG_LEVEL=DEBUG python -m uvicorn agsignal.app:app
+LOG_LEVEL=DEBUG python -m uvicorn uns.app:app
 
 # Make a request and observe logs
 curl http://localhost:8000/ui/deliveries
@@ -381,10 +381,10 @@ curl http://localhost:8000/ui/deliveries
 
 ```bash
 # Run all observability tests
-pytest tests/agsignal/api/test_observability.py -v
+pytest tests/uns/api/test_observability.py -v
 
 # Run specific test class
-pytest tests/agsignal/api/test_observability.py::TestMetricsForAllEndpoints -v
+pytest tests/uns/api/test_observability.py::TestMetricsForAllEndpoints -v
 ```
 
 ## Related Documentation

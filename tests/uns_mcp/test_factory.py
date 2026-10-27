@@ -1,0 +1,22 @@
+from __future__ import annotations
+
+from uns_mcp import MCPRuntimeConfig
+from uns_mcp.factory import UNS_MCP_TOOL_NAMES, create_mcp_server
+
+
+def test_runtime_config_defaults_to_safe_local_stdio() -> None:
+    config = MCPRuntimeConfig()
+
+    assert config.mode == "stdio-local"
+    assert config.read_only is True
+    assert config.require_delivery_confirmation is True
+    assert config.operator_principal is None
+
+
+def test_factory_declares_v1_signal_tool_names() -> None:
+    create_mcp_server(MCPRuntimeConfig())
+
+    assert "simulate_signal" in UNS_MCP_TOOL_NAMES
+    assert "send_signal" in UNS_MCP_TOOL_NAMES
+    assert "reload_policies" not in UNS_MCP_TOOL_NAMES
+    assert "remove_dlq_entry" not in UNS_MCP_TOOL_NAMES

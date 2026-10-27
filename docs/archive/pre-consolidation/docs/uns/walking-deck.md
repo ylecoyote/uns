@@ -2,7 +2,7 @@
 
 # Walking Deck
 
-**AGSignal — Neutral Approval Control Plane for AI Agents**
+**UNS — Neutral Approval Control Plane for AI Agents**
 
 *(Slide-by-slide narrative)*
 
@@ -10,7 +10,7 @@
 
 ## Slide 1 — Title
 
-**AGSignal**
+**UNS**
 **The Neutral Approval Control Plane for AI Agents**
 
 The runtime human-in-the-loop primitive every team is rebuilding — productized, vendor-portable, audit-grade.
@@ -94,7 +94,7 @@ Demand is concentrated in three places, each with budget today:
 
 ---
 
-## Slide 7 — Introducing AGSignal
+## Slide 7 — Introducing UNS
 
 **The neutral approval control plane.** Plugs into cloud-vendor stacks and framework-native runtimes; doesn't compete with them.
 
@@ -131,7 +131,7 @@ The forensic substrate for "who knew what, and when":
 
 All three correlated by `correlation_id` + `decision_id`. Hash-chain integrity in OSS core; cryptographic Merkle attestation in commercial plugin.
 
-**Approval completion is *not* proof of policy correctness.** AGSignal is the only product that explicitly carves this distinction in the audit substrate.
+**Approval completion is *not* proof of policy correctness.** UNS is the only product that explicitly carves this distinction in the audit substrate.
 
 ---
 
@@ -139,7 +139,7 @@ All three correlated by `correlation_id` + `decision_id`. Hash-chain integrity i
 
 Five load-bearing commitments shape every decision:
 
-1. **Core never participates in execution.** AGSignal is control plane; ExecutionGate and runtime sandboxing are sibling concerns.
+1. **Core never participates in execution.** UNS is control plane; ExecutionGate and runtime sandboxing are sibling concerns.
 2. **Domain-specific governance lives in plugins, not core.** Trading, healthcare, legal each get their own adapter.
 3. **Crypto, identity, durability, compliance live in commercial plugins.** No "enterprise edition" — à la carte instead.
 4. **Approval Workflow is async, callback-driven by default.** Engine never blocks waiting internally.
@@ -162,23 +162,23 @@ Five load-bearing commitments shape every decision:
 
 ## Slide 11 — The Complementary Stance
 
-AGSignal is **with** the cloud vendors, not against:
+UNS is **with** the cloud vendors, not against:
 
-| Cloud-vendor stack provides | AGSignal complements with |
+| Cloud-vendor stack provides | UNS complements with |
 |---|---|
 | Agent identity (Entra / IAM / Cloud IAM) | Identity-resolved approvers via IdentityProvider hook |
 | Policy enforcement (AGT / AgentCore / Vertex governance) | Runtime HITL primitive that policy engines can invoke |
 | Audit infrastructure (Defender / CloudTrail / Cloud Logging) | Three-stream HITL-specific audit emitted to host stack via AuditHook |
-| Sandboxing / runtime (rings / IAM service control / VPC SC) | Out of AGSignal scope by design |
+| Sandboxing / runtime (rings / IAM service control / VPC SC) | Out of UNS scope by design |
 | Annex IV / compliance docs | Article 14 + GDPR 22 templates that augment vendor templates |
 
-The pitch: ***"AGSignal adds what your governance stack doesn't have, without forcing you to leave it."***
+The pitch: ***"UNS adds what your governance stack doesn't have, without forcing you to leave it."***
 
 ---
 
 ## Slide 12 — Differentiation
 
-| | Cloud-vendor stacks | Framework HITL | Workflow tools | **AGSignal** |
+| | Cloud-vendor stacks | Framework HITL | Workflow tools | **UNS** |
 |---|---|---|---|---|
 | Cloud-agnostic | No | N/A | Yes | **Yes** |
 | Framework-agnostic | Adapter-only | No | Yes | **Yes** |
@@ -217,13 +217,13 @@ We're looking for:
 
 ## Slide 15 — Brand Disambiguation
 
-**AGSignal** (Apache 2.0 OSS, runtime agent-action approval) is distinct from:
+**UNS** (Apache 2.0 OSS, runtime agent-action approval) is distinct from:
 
 - **HumanSignal** — commercial data-labeling + LLM-evaluation HITL (formerly Label Studio). Different problem space.
-- **Microsoft Agent 365** — commercial agent platform with policy/identity/observability. Complementary; AGSignal plugs in.
+- **Microsoft Agent 365** — commercial agent platform with policy/identity/observability. Complementary; UNS plugs in.
 - **AWS Bedrock AgentCore** — agent runtime with Cedar policy. Complementary.
 - **Google Vertex AI Agent Governance** — platform governance + tool registry. Complementary.
-- **LangGraph/AutoGen/CrewAI HITL** — framework-native developer ergonomics. Different layer; AGSignal is the runtime control plane those frameworks call into.
+- **LangGraph/AutoGen/CrewAI HITL** — framework-native developer ergonomics. Different layer; UNS is the runtime control plane those frameworks call into.
 
 ---
 
@@ -231,7 +231,7 @@ We're looking for:
 
 > **Cloud vendors built the agent governance stack.**
 > **They forgot the runtime human-in-the-loop primitive.**
-> **AGSignal is what every team has been rebuilding — productized.**
+> **UNS is what every team has been rebuilding — productized.**
 
 Vendor-portable. Framework-agnostic. Audit-grade.
 

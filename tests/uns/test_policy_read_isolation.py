@@ -16,7 +16,6 @@ from sqlalchemy import create_engine, delete, event, insert, select, update
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import sessionmaker
 
-from agsignal.responses import SendNotificationRequest
 from db.models import (
     Base,
     NotificationPolicyRevision,
@@ -28,6 +27,7 @@ from notification.models import Channel
 from notification.policies import NotificationPolicy
 from notification.policy_loader import compute_policy_content_hash
 from uns.policy_runtime import PolicyRuntime
+from uns.responses import SendNotificationRequest
 
 
 def policy(version="1", channel=Channel.SLACK):
@@ -144,12 +144,12 @@ def test_snapshot_content_hash_and_revision_stay_consistent_during_activation(da
 def test_readiness_does_not_update_policy_authority(tmp_path):
     from fastapi.testclient import TestClient
 
-    from agsignal.app import create_app
+    from uns.app import create_app
     from uns.runtime import Runtime
 
     runtime = Runtime(f"sqlite:///{tmp_path / 'readiness.db'}", create_tables=True)
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "policy-read-test"
+    app.state.uns_api_key = "policy-read-test"
     statements = []
 
     def record(conn, cursor, statement, parameters, context, executemany):

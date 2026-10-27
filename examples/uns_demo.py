@@ -5,11 +5,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
-from agsignal.responses import SendNotificationRequest
-from notification.adapters.base import BaseAdapter, DeliveryResult, HealthCheckResult, AdapterStatus
+from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel
 from notification.service import SimpleAdapterRegistry
 from uns import Client, Runtime
+from uns.responses import SendNotificationRequest
 
 
 class Recorder(BaseAdapter):

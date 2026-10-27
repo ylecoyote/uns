@@ -1,10 +1,10 @@
 # Observability
 
-This document describes the observability model for UNS (`uns.Runtime` and AGSignal Core), including health states, readiness and Prometheus metrics endpoints, durable DLQ visibility, structured audit events, and monitoring semantics.
+This document describes the observability model for UNS (`uns.Runtime` and UNS Core), including health states, readiness and Prometheus metrics endpoints, durable DLQ visibility, structured audit events, and monitoring semantics.
 
 ## Overview
 
-UNS and AGSignal Core provide observability through:
+UNS and UNS Core provide observability through:
 - **Process liveness and authenticated readiness probes**: Public `GET /health` (`/healthz`) and authenticated `GET /ready` (`/readyz`) checking SQLite/SQLAlchemy connectivity, configured channels, ACTIVE policy count, and durable DLQ depth
 - **Prometheus and Console metrics**: Authenticated `GET /metrics` and read-model endpoints under `/ui/*`
 - **Adapter health status**: Per-channel health reporting (`HEALTHY`, `DEGRADED`, `UNHEALTHY`) and `GET /api/v1/channels/health`
@@ -34,7 +34,7 @@ class AdapterStatus(str, Enum):
     UNHEALTHY = "UNHEALTHY"
 ```
 
-### What "DEGRADED" Means for AGSignal Core
+### What "DEGRADED" Means for UNS Core
 
 A `DEGRADED` adapter indicates:
 
@@ -47,13 +47,13 @@ A `DEGRADED` adapter indicates:
 
 | Scenario | Behavior | Operator Action |
 |----------|----------|-----------------|
-| Primary channel DEGRADED | AGSignal Core attempts delivery, may fallback faster | Monitor for transition to UNHEALTHY |
+| Primary channel DEGRADED | UNS Core attempts delivery, may fallback faster | Monitor for transition to UNHEALTHY |
 | All channels DEGRADED | Delivery continues with elevated failure risk | Investigate root cause, prepare for outage |
 | Single adapter DEGRADED | Other channels unaffected | Review adapter-specific diagnostics |
 
 **DEGRADED vs UNHEALTHY:**
-- `DEGRADED`: "Try delivery but expect some failures" - AGSignal Core will attempt the channel
-- `UNHEALTHY`: "Do not attempt delivery" - AGSignal Core will skip to fallback immediately
+- `DEGRADED`: "Try delivery but expect some failures" - UNS Core will attempt the channel
+- `UNHEALTHY`: "Do not attempt delivery" - UNS Core will skip to fallback immediately
 
 ### HealthCheckResult
 
@@ -97,7 +97,7 @@ results = await registry.health_check_all()
 The public HTTP liveness endpoint is located at `GET /health` (also aliased to `GET /healthz`):
 
 ```python
-# src/agsignal/app.py
+# src/uns/app.py
 @app.get("/health", tags=["system"])
 @app.get("/healthz", tags=["system"])
 async def health() -> dict[str, str]:
@@ -275,7 +275,7 @@ def dlq_handler(notification: Notification, channel_errors: dict[Channel, str]) 
 
 ### Metric Categories
 
-UNS and AGSignal Core expose the following metric categories through `/metrics`, `/readyz`, `/ui/*`, structured logs, and callback hooks:
+UNS and UNS Core expose the following metric categories through `/metrics`, `/readyz`, `/ui/*`, structured logs, and callback hooks:
 
 #### 1. Delivery Latency
 

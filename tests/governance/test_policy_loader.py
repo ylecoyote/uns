@@ -4,10 +4,10 @@ from textwrap import dedent
 
 import pytest
 
-from agsignal.governance.decision_record import Decision
-from agsignal.governance.errors import PolicyLoadError
-from agsignal.governance.operators import Operator
-from agsignal.governance.policy_loader import (
+from uns.governance.decision_record import Decision
+from uns.governance.errors import PolicyLoadError
+from uns.governance.operators import Operator
+from uns.governance.policy_loader import (
     compute_policy_config_hash,
     load_policy_from_yaml,
 )

@@ -3,8 +3,8 @@ import os
 from fastapi import Depends
 from starlette.staticfiles import StaticFiles
 from starlette.responses import FileResponse
-from agsignal.app import create_app
-from agsignal.api.auth import require_write_principal
+from uns.app import create_app
+from uns.api.auth import require_write_principal
 from runtime_profile import make_runtime
 app=create_app(runtime=make_runtime())
 @app.get('/__smoke__/identity',dependencies=[Depends(require_write_principal)])

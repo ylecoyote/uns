@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from agsignal.responses import (
+from uns.responses import (
     SendNotificationRequest,
     SendNotificationResponse,
     SimulateNotificationResponse,
 )
-from agsignal.signaling import simulate_signal
 from uns.runtime import Runtime
+from uns.signaling import simulate_signal
 
 
 class Client:

@@ -1,1 +1,1 @@
-"""AGSignal source package."""
+"""UNS source package."""

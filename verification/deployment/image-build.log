@@ -182,27 +182,27 @@
 #12 1.181 copying src/uns/dlq.py -> build/lib/uns
 #12 1.181 copying src/uns/maintenance.py -> build/lib/uns
 #12 1.181 copying src/uns/config.py -> build/lib/uns
-#12 1.182 creating build/lib/agsignal_mcp
-#12 1.182 copying src/agsignal_mcp/runtime.py -> build/lib/agsignal_mcp
-#12 1.182 copying src/agsignal_mcp/__init__.py -> build/lib/agsignal_mcp
-#12 1.182 copying src/agsignal_mcp/tools.py -> build/lib/agsignal_mcp
-#12 1.183 copying src/agsignal_mcp/factory.py -> build/lib/agsignal_mcp
-#12 1.183 creating build/lib/agsignal
-#12 1.183 copying src/agsignal/policies.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/models.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/adapters.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/rate_limiting.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/interfaces.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/_in_memory.py -> build/lib/agsignal
-#12 1.184 copying src/agsignal/__init__.py -> build/lib/agsignal
-#12 1.185 copying src/agsignal/errors.py -> build/lib/agsignal
-#12 1.185 copying src/agsignal/app.py -> build/lib/agsignal
-#12 1.185 copying src/agsignal/sdk.py -> build/lib/agsignal
-#12 1.185 copying src/agsignal/queries.py -> build/lib/agsignal
-#12 1.185 copying src/agsignal/signaling.py -> build/lib/agsignal
-#12 1.186 copying src/agsignal/deduplication.py -> build/lib/agsignal
-#12 1.186 copying src/agsignal/integrations.py -> build/lib/agsignal
-#12 1.186 copying src/agsignal/responses.py -> build/lib/agsignal
+#12 1.182 creating build/lib/uns_mcp
+#12 1.182 copying src/uns_mcp/runtime.py -> build/lib/uns_mcp
+#12 1.182 copying src/uns_mcp/__init__.py -> build/lib/uns_mcp
+#12 1.182 copying src/uns_mcp/tools.py -> build/lib/uns_mcp
+#12 1.183 copying src/uns_mcp/factory.py -> build/lib/uns_mcp
+#12 1.183 creating build/lib/uns
+#12 1.183 copying src/uns/policies.py -> build/lib/uns
+#12 1.184 copying src/uns/models.py -> build/lib/uns
+#12 1.184 copying src/uns/adapters.py -> build/lib/uns
+#12 1.184 copying src/uns/rate_limiting.py -> build/lib/uns
+#12 1.184 copying src/uns/interfaces.py -> build/lib/uns
+#12 1.184 copying src/uns/_in_memory.py -> build/lib/uns
+#12 1.184 copying src/uns/__init__.py -> build/lib/uns
+#12 1.185 copying src/uns/errors.py -> build/lib/uns
+#12 1.185 copying src/uns/app.py -> build/lib/uns
+#12 1.185 copying src/uns/sdk.py -> build/lib/uns
+#12 1.185 copying src/uns/queries.py -> build/lib/uns
+#12 1.185 copying src/uns/signaling.py -> build/lib/uns
+#12 1.186 copying src/uns/deduplication.py -> build/lib/uns
+#12 1.186 copying src/uns/integrations.py -> build/lib/uns
+#12 1.186 copying src/uns/responses.py -> build/lib/uns
 #12 1.187 creating build/lib/notification/integrations
 #12 1.187 copying src/notification/integrations/__init__.py -> build/lib/notification/integrations
 #12 1.187 copying src/notification/integrations/app_boundary.py -> build/lib/notification/integrations
@@ -220,23 +220,23 @@
 #12 1.191 copying src/db/models/audit.py -> build/lib/db/models
 #12 1.191 copying src/db/models/_base.py -> build/lib/db/models
 #12 1.191 copying src/db/models/policy.py -> build/lib/db/models
-#12 1.191 creating build/lib/agsignal_mcp/transports
-#12 1.192 copying src/agsignal_mcp/transports/stdio.py -> build/lib/agsignal_mcp/transports
-#12 1.192 copying src/agsignal_mcp/transports/__init__.py -> build/lib/agsignal_mcp/transports
-#12 1.193 creating build/lib/agsignal/governance
-#12 1.193 copying src/agsignal/governance/policy_dsl.py -> build/lib/agsignal/governance
-#12 1.193 copying src/agsignal/governance/__init__.py -> build/lib/agsignal/governance
-#12 1.194 copying src/agsignal/governance/errors.py -> build/lib/agsignal/governance
-#12 1.194 copying src/agsignal/governance/operators.py -> build/lib/agsignal/governance
-#12 1.194 copying src/agsignal/governance/decision_record.py -> build/lib/agsignal/governance
-#12 1.194 copying src/agsignal/governance/policy_loader.py -> build/lib/agsignal/governance
-#12 1.194 creating build/lib/agsignal/api
-#12 1.195 copying src/agsignal/api/auth.py -> build/lib/agsignal/api
-#12 1.195 copying src/agsignal/api/routes_notification.py -> build/lib/agsignal/api
-#12 1.195 copying src/agsignal/api/routes_ui.py -> build/lib/agsignal/api
-#12 1.195 copying src/agsignal/api/observability.py -> build/lib/agsignal/api
-#12 1.195 copying src/agsignal/api/read_models.py -> build/lib/agsignal/api
-#12 1.196 copying src/agsignal/api/__init__.py -> build/lib/agsignal/api
+#12 1.191 creating build/lib/uns_mcp/transports
+#12 1.192 copying src/uns_mcp/transports/stdio.py -> build/lib/uns_mcp/transports
+#12 1.192 copying src/uns_mcp/transports/__init__.py -> build/lib/uns_mcp/transports
+#12 1.193 creating build/lib/uns/governance
+#12 1.193 copying src/uns/governance/policy_dsl.py -> build/lib/uns/governance
+#12 1.193 copying src/uns/governance/__init__.py -> build/lib/uns/governance
+#12 1.194 copying src/uns/governance/errors.py -> build/lib/uns/governance
+#12 1.194 copying src/uns/governance/operators.py -> build/lib/uns/governance
+#12 1.194 copying src/uns/governance/decision_record.py -> build/lib/uns/governance
+#12 1.194 copying src/uns/governance/policy_loader.py -> build/lib/uns/governance
+#12 1.194 creating build/lib/uns/api
+#12 1.195 copying src/uns/api/auth.py -> build/lib/uns/api
+#12 1.195 copying src/uns/api/routes_notification.py -> build/lib/uns/api
+#12 1.195 copying src/uns/api/routes_ui.py -> build/lib/uns/api
+#12 1.195 copying src/uns/api/observability.py -> build/lib/uns/api
+#12 1.195 copying src/uns/api/read_models.py -> build/lib/uns/api
+#12 1.196 copying src/uns/api/__init__.py -> build/lib/uns/api
 #12 1.196 running egg_info
 #12 1.197 writing src/uns.egg-info/PKG-INFO
 #12 1.198 writing dependency_links to src/uns.egg-info/dependency_links.txt
@@ -251,9 +251,9 @@
 #12 1.205 copying src/ui_client/py.typed -> build/lib/ui_client
 #12 1.205 copying src/db/py.typed -> build/lib/db
 #12 1.205 copying src/uns/py.typed -> build/lib/uns
-#12 1.205 copying src/agsignal_mcp/py.typed -> build/lib/agsignal_mcp
-#12 1.206 copying src/agsignal/py.typed -> build/lib/agsignal
-#12 1.206 copying src/agsignal/api/py.typed -> build/lib/agsignal/api
+#12 1.205 copying src/uns_mcp/py.typed -> build/lib/uns_mcp
+#12 1.206 copying src/uns/py.typed -> build/lib/uns
+#12 1.206 copying src/uns/api/py.typed -> build/lib/uns/api
 #12 1.208 installing to build/bdist.linux-aarch64/wheel
 #12 1.208 running install
 #12 1.211 running install_lib
@@ -326,88 +326,88 @@
 #12 1.225 copying build/lib/uns/dlq.py -> build/bdist.linux-aarch64/wheel/./uns
 #12 1.225 copying build/lib/uns/maintenance.py -> build/bdist.linux-aarch64/wheel/./uns
 #12 1.225 copying build/lib/uns/config.py -> build/bdist.linux-aarch64/wheel/./uns
-#12 1.225 creating build/bdist.linux-aarch64/wheel/agsignal_mcp
-#12 1.226 copying build/lib/agsignal_mcp/runtime.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
-#12 1.226 copying build/lib/agsignal_mcp/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
-#12 1.226 copying build/lib/agsignal_mcp/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
-#12 1.226 copying build/lib/agsignal_mcp/tools.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
-#12 1.226 creating build/bdist.linux-aarch64/wheel/agsignal_mcp/transports
-#12 1.227 copying build/lib/agsignal_mcp/transports/stdio.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp/transports
-#12 1.227 copying build/lib/agsignal_mcp/transports/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp/transports
-#12 1.227 copying build/lib/agsignal_mcp/factory.py -> build/bdist.linux-aarch64/wheel/./agsignal_mcp
-#12 1.227 creating build/bdist.linux-aarch64/wheel/agsignal
-#12 1.228 copying build/lib/agsignal/policies.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.228 copying build/lib/agsignal/models.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.228 copying build/lib/agsignal/adapters.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.228 creating build/bdist.linux-aarch64/wheel/agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/policy_dsl.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/errors.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/operators.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/decision_record.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/governance/policy_loader.py -> build/bdist.linux-aarch64/wheel/./agsignal/governance
-#12 1.229 copying build/lib/agsignal/rate_limiting.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/interfaces.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/_in_memory.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/errors.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/app.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.230 copying build/lib/agsignal/sdk.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.231 creating build/bdist.linux-aarch64/wheel/agsignal/api
-#12 1.231 copying build/lib/agsignal/api/auth.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.231 copying build/lib/agsignal/api/routes_notification.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.231 copying build/lib/agsignal/api/routes_ui.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.232 copying build/lib/agsignal/api/observability.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.232 copying build/lib/agsignal/api/read_models.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.232 copying build/lib/agsignal/api/__init__.py -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.232 copying build/lib/agsignal/api/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal/api
-#12 1.233 copying build/lib/agsignal/queries.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.233 copying build/lib/agsignal/py.typed -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.233 copying build/lib/agsignal/signaling.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.233 copying build/lib/agsignal/deduplication.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.234 copying build/lib/agsignal/integrations.py -> build/bdist.linux-aarch64/wheel/./agsignal
-#12 1.234 copying build/lib/agsignal/responses.py -> build/bdist.linux-aarch64/wheel/./agsignal
+#12 1.225 creating build/bdist.linux-aarch64/wheel/uns_mcp
+#12 1.226 copying build/lib/uns_mcp/runtime.py -> build/bdist.linux-aarch64/wheel/./uns_mcp
+#12 1.226 copying build/lib/uns_mcp/__init__.py -> build/bdist.linux-aarch64/wheel/./uns_mcp
+#12 1.226 copying build/lib/uns_mcp/py.typed -> build/bdist.linux-aarch64/wheel/./uns_mcp
+#12 1.226 copying build/lib/uns_mcp/tools.py -> build/bdist.linux-aarch64/wheel/./uns_mcp
+#12 1.226 creating build/bdist.linux-aarch64/wheel/uns_mcp/transports
+#12 1.227 copying build/lib/uns_mcp/transports/stdio.py -> build/bdist.linux-aarch64/wheel/./uns_mcp/transports
+#12 1.227 copying build/lib/uns_mcp/transports/__init__.py -> build/bdist.linux-aarch64/wheel/./uns_mcp/transports
+#12 1.227 copying build/lib/uns_mcp/factory.py -> build/bdist.linux-aarch64/wheel/./uns_mcp
+#12 1.227 creating build/bdist.linux-aarch64/wheel/uns
+#12 1.228 copying build/lib/uns/policies.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.228 copying build/lib/uns/models.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.228 copying build/lib/uns/adapters.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.228 creating build/bdist.linux-aarch64/wheel/uns/governance
+#12 1.229 copying build/lib/uns/governance/policy_dsl.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/governance/__init__.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/governance/errors.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/governance/operators.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/governance/decision_record.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/governance/policy_loader.py -> build/bdist.linux-aarch64/wheel/./uns/governance
+#12 1.229 copying build/lib/uns/rate_limiting.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/interfaces.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/_in_memory.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/__init__.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/errors.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/app.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.230 copying build/lib/uns/sdk.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.231 creating build/bdist.linux-aarch64/wheel/uns/api
+#12 1.231 copying build/lib/uns/api/auth.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.231 copying build/lib/uns/api/routes_notification.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.231 copying build/lib/uns/api/routes_ui.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.232 copying build/lib/uns/api/observability.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.232 copying build/lib/uns/api/read_models.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.232 copying build/lib/uns/api/__init__.py -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.232 copying build/lib/uns/api/py.typed -> build/bdist.linux-aarch64/wheel/./uns/api
+#12 1.233 copying build/lib/uns/queries.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.233 copying build/lib/uns/py.typed -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.233 copying build/lib/uns/signaling.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.233 copying build/lib/uns/deduplication.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.234 copying build/lib/uns/integrations.py -> build/bdist.linux-aarch64/wheel/./uns
+#12 1.234 copying build/lib/uns/responses.py -> build/bdist.linux-aarch64/wheel/./uns
 #12 1.234 running install_egg_info
 #12 1.235 Copying src/uns.egg-info to build/bdist.linux-aarch64/wheel/./uns-0.1.0-py3.12.egg-info
 #12 1.236 running install_scripts
 #12 1.237 creating build/bdist.linux-aarch64/wheel/uns-0.1.0.dist-info/WHEEL
 #12 1.238 creating '/build/dist/.tmp9uCOrE/.tmp-9m9z6i40/uns-0.1.0-py3-none-any.whl' and adding 'build/bdist.linux-aarch64/wheel' to it
-#12 1.238 adding 'agsignal/__init__.py'
-#12 1.238 adding 'agsignal/_in_memory.py'
-#12 1.238 adding 'agsignal/adapters.py'
-#12 1.239 adding 'agsignal/app.py'
-#12 1.239 adding 'agsignal/deduplication.py'
-#12 1.239 adding 'agsignal/errors.py'
-#12 1.239 adding 'agsignal/integrations.py'
-#12 1.239 adding 'agsignal/interfaces.py'
-#12 1.239 adding 'agsignal/models.py'
-#12 1.239 adding 'agsignal/policies.py'
-#12 1.239 adding 'agsignal/py.typed'
-#12 1.240 adding 'agsignal/queries.py'
-#12 1.240 adding 'agsignal/rate_limiting.py'
-#12 1.241 adding 'agsignal/responses.py'
-#12 1.241 adding 'agsignal/sdk.py'
-#12 1.242 adding 'agsignal/signaling.py'
-#12 1.242 adding 'agsignal/api/__init__.py'
-#12 1.242 adding 'agsignal/api/auth.py'
-#12 1.243 adding 'agsignal/api/observability.py'
-#12 1.243 adding 'agsignal/api/py.typed'
-#12 1.244 adding 'agsignal/api/read_models.py'
-#12 1.244 adding 'agsignal/api/routes_notification.py'
-#12 1.245 adding 'agsignal/api/routes_ui.py'
-#12 1.245 adding 'agsignal/governance/__init__.py'
-#12 1.245 adding 'agsignal/governance/decision_record.py'
-#12 1.245 adding 'agsignal/governance/errors.py'
-#12 1.246 adding 'agsignal/governance/operators.py'
-#12 1.246 adding 'agsignal/governance/policy_dsl.py'
-#12 1.247 adding 'agsignal/governance/policy_loader.py'
-#12 1.247 adding 'agsignal_mcp/__init__.py'
-#12 1.247 adding 'agsignal_mcp/factory.py'
-#12 1.247 adding 'agsignal_mcp/py.typed'
-#12 1.248 adding 'agsignal_mcp/runtime.py'
-#12 1.248 adding 'agsignal_mcp/tools.py'
-#12 1.248 adding 'agsignal_mcp/transports/__init__.py'
-#12 1.249 adding 'agsignal_mcp/transports/stdio.py'
+#12 1.238 adding 'uns/__init__.py'
+#12 1.238 adding 'uns/_in_memory.py'
+#12 1.238 adding 'uns/adapters.py'
+#12 1.239 adding 'uns/app.py'
+#12 1.239 adding 'uns/deduplication.py'
+#12 1.239 adding 'uns/errors.py'
+#12 1.239 adding 'uns/integrations.py'
+#12 1.239 adding 'uns/interfaces.py'
+#12 1.239 adding 'uns/models.py'
+#12 1.239 adding 'uns/policies.py'
+#12 1.239 adding 'uns/py.typed'
+#12 1.240 adding 'uns/queries.py'
+#12 1.240 adding 'uns/rate_limiting.py'
+#12 1.241 adding 'uns/responses.py'
+#12 1.241 adding 'uns/sdk.py'
+#12 1.242 adding 'uns/signaling.py'
+#12 1.242 adding 'uns/api/__init__.py'
+#12 1.242 adding 'uns/api/auth.py'
+#12 1.243 adding 'uns/api/observability.py'
+#12 1.243 adding 'uns/api/py.typed'
+#12 1.244 adding 'uns/api/read_models.py'
+#12 1.244 adding 'uns/api/routes_notification.py'
+#12 1.245 adding 'uns/api/routes_ui.py'
+#12 1.245 adding 'uns/governance/__init__.py'
+#12 1.245 adding 'uns/governance/decision_record.py'
+#12 1.245 adding 'uns/governance/errors.py'
+#12 1.246 adding 'uns/governance/operators.py'
+#12 1.246 adding 'uns/governance/policy_dsl.py'
+#12 1.247 adding 'uns/governance/policy_loader.py'
+#12 1.247 adding 'uns_mcp/__init__.py'
+#12 1.247 adding 'uns_mcp/factory.py'
+#12 1.247 adding 'uns_mcp/py.typed'
+#12 1.248 adding 'uns_mcp/runtime.py'
+#12 1.248 adding 'uns_mcp/tools.py'
+#12 1.248 adding 'uns_mcp/transports/__init__.py'
+#12 1.249 adding 'uns_mcp/transports/stdio.py'
 #12 1.249 adding 'db/__init__.py'
 #12 1.249 adding 'db/audit_store.py'
 #12 1.250 adding 'db/policy_learning_store.py'
@@ -483,7 +483,7 @@
 #13 [runtime 2/6] RUN apt-get update     && apt-get install -y --no-install-recommends libpq5     && rm -rf /var/lib/apt/lists/*
 #13 CACHED
 
-#14 [runtime 3/6] RUN groupadd --system --gid 1001 agsignal     && useradd --system --uid 1001 --gid agsignal         --create-home --home-dir /home/agsignal --shell /sbin/nologin agsignal
+#14 [runtime 3/6] RUN groupadd --system --gid 1001 uns     && useradd --system --uid 1001 --gid uns         --create-home --home-dir /home/uns --shell /sbin/nologin uns
 #14 CACHED
 
 #15 [runtime 4/6] COPY --from=builder /build/dist/ /tmp/dist/
@@ -668,7 +668,7 @@
 #16 9.363 [notice] To update, run: pip install --upgrade pip
 #16 DONE 9.6s
 
-#17 [runtime 6/6] WORKDIR /home/agsignal
+#17 [runtime 6/6] WORKDIR /home/uns
 #17 DONE 0.0s
 
 #18 exporting to image

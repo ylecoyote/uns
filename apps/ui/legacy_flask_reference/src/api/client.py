@@ -1,7 +1,7 @@
-"""Typed API client for AGSignal Console endpoints.
+"""Typed API client for UNS Console endpoints.
 
 This client provides typed access to the /ui/* endpoints defined in
-src/agsignal/api/routes_ui.py. It supports:
+src/uns/api/routes_ui.py. It supports:
 
 - Request ID propagation via X-Request-ID header
 - Consistent error handling per ErrorResponse contract
@@ -67,10 +67,10 @@ class APIError(Exception):
 
 
 class UNSUIClient:
-    """Typed client for AGSignal Console API endpoints.
+    """Typed client for UNS Console API endpoints.
 
     Attributes:
-        base_url: Base URL of the AGSignal API server
+        base_url: Base URL of the UNS API server
         timeout: Request timeout in seconds
     """
 
@@ -82,7 +82,7 @@ class UNSUIClient:
         """Initialize the UI client.
 
         Args:
-            base_url: Base URL of the AGSignal API server
+            base_url: Base URL of the UNS API server
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")

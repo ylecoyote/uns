@@ -1,4 +1,4 @@
-"""Producer idempotency for AGSignal notification creation.
+"""Producer idempotency for UNS notification creation.
 
 Idempotency protects producer retry safety. It is intentionally separate from
 deduplication, which protects human attention after a notification exists.

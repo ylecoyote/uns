@@ -1,1 +1,0 @@
-"""AGSignal MCP transport entrypoints."""

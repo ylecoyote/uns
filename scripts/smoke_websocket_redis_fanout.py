@@ -1,7 +1,7 @@
-"""Smoke test AGSignal WebSocket Redis fanout with two app instances.
+"""Smoke test UNS WebSocket Redis fanout with two app instances.
 
 This script requires a reachable Redis server. It starts two in-process
-AGSignal FastAPI apps with Redis fanout enabled:
+UNS FastAPI apps with Redis fanout enabled:
 
 - the consumer app owns a connected WebSocket client for one agent
 - the producer app accepts an HTTP notification for that agent
@@ -42,7 +42,7 @@ def build_notification_payload(agent_id: UUID) -> dict[str, object]:
         "notification_type": "agent.redis_fanout_smoke",
         "intent": "SAFETY",
         "title": "Redis fanout smoke",
-        "message": "Verify AGSignal WebSocket fanout across app instances.",
+        "message": "Verify UNS WebSocket fanout across app instances.",
         "source": "smoke:websocket-redis-fanout",
         "autonomy_context": {
             "autonomy_mode": "LIVE",
@@ -105,8 +105,8 @@ def run_smoke(
         "UNS_WEBSOCKET_REDIS_CHANNEL": channel_prefix,
     }
     with _patched_env(env):
-        from agsignal.app import create_app
         from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+        from uns.app import create_app
 
         configure_ack_engine(storage=InMemoryAckStorage())
         consumer_app = create_app()
@@ -115,7 +115,7 @@ def run_smoke(
         consumer_origin = consumer_app.state.websocket_fanout.instance_id
         producer_origin = producer_app.state.websocket_fanout.instance_id
         if consumer_origin == producer_origin:
-            raise RuntimeError("Smoke requires distinct AGSignal fanout origin IDs")
+            raise RuntimeError("Smoke requires distinct UNS fanout origin IDs")
 
         agent_id = uuid4()
         payload = build_notification_payload(agent_id)
@@ -162,11 +162,11 @@ def main() -> None:
     parser.add_argument(
         "--redis-url",
         default=os.environ.get("UNS_REDIS_URL", "redis://localhost:6379/0"),
-        help="Redis URL used by both AGSignal app instances.",
+        help="Redis URL used by both UNS app instances.",
     )
     parser.add_argument(
         "--channel-prefix",
-        default=f"agsignal:smoke:websocket:{uuid4()}",
+        default=f"uns:smoke:websocket:{uuid4()}",
         help="Redis channel prefix. Defaults to a unique smoke prefix.",
     )
     parser.add_argument(
@@ -182,7 +182,7 @@ def main() -> None:
         channel_prefix=args.channel_prefix,
         timeout_seconds=args.timeout_seconds,
     )
-    print("AGSignal WebSocket Redis fanout smoke passed")
+    print("UNS WebSocket Redis fanout smoke passed")
     for key, value in result.items():
         print(f"{key}: {value}")
 

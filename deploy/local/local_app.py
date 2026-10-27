@@ -11,8 +11,8 @@ from recording_runtime import make_runtime
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from agsignal.api.auth import require_write_principal
-from agsignal.app import create_app
+from uns.api.auth import require_write_principal
+from uns.app import create_app
 
 app = create_app(runtime=make_runtime())
 release = json.loads(Path("/release.json").read_text())

@@ -8,7 +8,7 @@ canonical UI directory structure.
 Purpose:
     Prevent Flask/Python HTML-serving patterns from returning to the UI layer.
     The canonical UI is a React SPA served by Vite, with a separate JSON API
-    backend in src/agsignal/api/routes_ui.py.
+    backend in src/uns/api/routes_ui.py.
 
 Rules:
     1. No .py files anywhere under apps/ui/** EXCEPT apps/ui/legacy_flask_reference/**
@@ -103,7 +103,7 @@ def check_python_files(ui_root: Path) -> list[BoundaryViolation]:
                 message=(
                     f"Python file found in canonical UI: {py_file.relative_to(ui_root.parent.parent)}\n"
                     "  The canonical apps/ui directory should contain only React/TypeScript/Vite code.\n"
-                    "  Python backend code should live in src/agsignal/api/ or src/notification/."
+                    "  Python backend code should live in src/uns/api/ or src/notification/."
                 ),
             )
         )
@@ -238,11 +238,11 @@ UI Boundary Migration Guidance
 If you have Python files in apps/ui/ that need to be migrated:
 
 1. Backend API Routes:
-   Move to: src/agsignal/api/routes_ui.py
+   Move to: src/uns/api/routes_ui.py
    The UI endpoints (/ui/*) are served from the main MCP server.
 
 2. Pydantic Models/Types:
-   Move to: src/notification/models.py or src/agsignal/api/read_models.py
+   Move to: src/notification/models.py or src/uns/api/read_models.py
    API response types should be defined in the backend, not the UI.
 
 3. Test Files:

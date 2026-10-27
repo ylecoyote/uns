@@ -58,11 +58,10 @@ def test_supported_and_experimental_boundaries_are_explicit():
 
 
 def test_documented_import_names_remain_usable():
-    for name in ("uns", "agsignal", "notification", "agsignal_mcp", "db", "ui_client"):
+    for name in ("uns", "uns", "notification", "uns_mcp", "db", "ui_client"):
         importlib.import_module(name)
-    from agsignal import SignalClient
     from notification.sdk import NotificationSDK
-    from uns import Client, Runtime
+    from uns import Client, Runtime, SignalClient
 
     assert SignalClient is NotificationSDK
     assert Client and Runtime

@@ -1,4 +1,4 @@
-"""AGSignal-native policy learning primitives.
+"""UNS-native policy learning primitives.
 
 This module ports the reusable policy-delta lifecycle concepts from MIP without
 bringing over trading-specific policy names or payload schemas.
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 #: Default cap on the per-delta transition history. Defense-in-depth against
 #: future evolution of the state machine that could allow ping-pong cycles.
-#: Configurable via ``AGSIGNAL_TRANSITION_HISTORY_LIMIT``; set to ``0`` to
+#: Configurable via ``UNS_TRANSITION_HISTORY_LIMIT``; set to ``0`` to
 #: disable capping (operator opt-out).
 DEFAULT_TRANSITION_HISTORY_LIMIT = 100
 
@@ -28,7 +28,7 @@ def _utc_now() -> datetime:
 
 def _transition_history_limit() -> int:
     """Resolve the configured cap from the environment, with a safe default."""
-    raw = os.environ.get("AGSIGNAL_TRANSITION_HISTORY_LIMIT")
+    raw = os.environ.get("UNS_TRANSITION_HISTORY_LIMIT")
     if raw is None or raw.strip() == "":
         return DEFAULT_TRANSITION_HISTORY_LIMIT
     try:
@@ -299,7 +299,7 @@ class PolicyDelta(BaseModel):
         default_factory=uuid4,
         description="Stable identifier for this delta",
     )
-    policy_type: str = Field(description="AGSignal policy type this delta targets")
+    policy_type: str = Field(description="UNS policy type this delta targets")
     field_path: str = Field(description="Dotted path to the policy field")
     current_value: Any = Field(description="Current value in the active policy")
     proposed_value: Any = Field(description="Proposed replacement value")

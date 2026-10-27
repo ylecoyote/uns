@@ -1,6 +1,6 @@
-"""Smoke test AGSignal WebSocket reconnect replay.
+"""Smoke test UNS WebSocket reconnect replay.
 
-The smoke starts one in-process AGSignal FastAPI app, records a notification
+The smoke starts one in-process UNS FastAPI app, records a notification
 while no WebSocket client is connected, then connects and subscribes from an
 older replay cursor. The WebSocket response must include the missed payload.
 
@@ -30,7 +30,7 @@ def build_notification_payload(agent_id: UUID) -> dict[str, object]:
         "notification_type": "agent.websocket_replay_smoke",
         "intent": "SAFETY",
         "title": "WebSocket replay smoke",
-        "message": "Verify AGSignal reconnect replay returns missed signals.",
+        "message": "Verify UNS reconnect replay returns missed signals.",
         "source": "smoke:websocket-replay",
         "autonomy_context": {
             "autonomy_mode": "LIVE",
@@ -41,8 +41,8 @@ def build_notification_payload(agent_id: UUID) -> dict[str, object]:
 
 def run_smoke() -> dict[str, Any]:
     """Run the reconnect replay smoke and return a compact result."""
-    from agsignal.app import create_app
     from notification.acknowledgment import InMemoryAckStorage, configure_ack_engine
+    from uns.app import create_app
 
     configure_ack_engine(storage=InMemoryAckStorage())
     app = create_app()
@@ -85,7 +85,7 @@ def run_smoke() -> dict[str, Any]:
 
 def main() -> None:
     result = run_smoke()
-    print("AGSignal WebSocket replay smoke passed")
+    print("UNS WebSocket replay smoke passed")
     for key, value in result.items():
         print(f"{key}: {value}")
 

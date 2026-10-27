@@ -1107,14 +1107,14 @@ uv run python examples/mip_producer_demo.py --base-url http://127.0.0.1:18080 --
     title: 'WebSocket Subprotocol Auth, MCP Server (uns-mcp) & Opt-In Channel Smoke Verifier',
     tag: 'WEBSOCKET, MCP & SMOKE',
     keywords:
-      'Sec-WebSocket-Protocol agsignal.v1 bearer base64url_token /ws/agents/ uns-mcp local_mcp.py --enable-writes UNS_MCP_DELIVERY_CONFIRMATION_TOKEN 16 tools scripts/opt_in_channel_smoke.py --dry-run --execute',
+      'Sec-WebSocket-Protocol uns.v1 bearer base64url_token /ws/agents/ uns-mcp local_mcp.py --enable-writes UNS_MCP_DELIVERY_CONFIRMATION_TOKEN 16 tools scripts/opt_in_channel_smoke.py --dry-run --execute',
     render: () => (
       <>
         <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
           <li>
             <strong>WebSocket Subprotocol Authentication (<code>/ws/agents/&#123;agent_id&#125;</code>):</strong>{' '}
             Query-string tokens are forbidden. Browser clients authenticate via{' '}
-            <code>Sec-WebSocket-Protocol: agsignal.v1, bearer.&lt;base64url_nopad_token&gt;</code>{' '}
+            <code>Sec-WebSocket-Protocol: uns.v1, bearer.&lt;base64url_nopad_token&gt;</code>{' '}
             (with <code>Origin</code> matching <code>UNS_ALLOWED_ORIGINS</code>); native clients
             pass <code>Authorization: Bearer &lt;token&gt;</code>. Connected responders can send{' '}
             <code>&#123;&quot;type&quot;: &quot;ack&quot;, &quot;notification_id&quot;: &quot;...&quot;&#125;</code>{' '}
@@ -1387,12 +1387,12 @@ curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" -H "Content-Type: appli
           keep the long-lived <code>uns</code> service running so background retries continue if a
           short-lived stdio MCP session disconnects. For WebSocket <code>1008</code> errors, verify{' '}
           <code>UNS_ALLOWED_ORIGINS</code> and pass{' '}
-          <code>Sec-WebSocket-Protocol: agsignal.v1, bearer.&lt;base64url_token&gt;</code>.
+          <code>Sec-WebSocket-Protocol: uns.v1, bearer.&lt;base64url_token&gt;</code>.
         </p>
         <pre className="docs-code-block">
           {`# Verify write-enabled MCP configuration before launching stdio host
 python3 -c '
-from agsignal_mcp.transports.stdio import runtime_config
+from uns_mcp.transports.stdio import runtime_config
 cfg = runtime_config(enable_writes=True)
 print("MCP Write Config Valid:", cfg.mode, "principal=", cfg.operator_principal)
 '`}

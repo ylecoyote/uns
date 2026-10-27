@@ -2,7 +2,7 @@
 
 # Executive Summary
 
-**AGSignal — Neutral Approval Control Plane for AI Agents**
+**UNS — Neutral Approval Control Plane for AI Agents**
 
 ---
 
@@ -48,9 +48,9 @@ Three regulatory regimes, all active in 2026, **mandate runtime human-in-the-loo
 
 The cloud-vendor governance stacks ship the documentation pipelines (e.g., Microsoft AGT's Annex IV evidence pipeline). They don't ship the runtime mechanism. That's the gap.
 
-## The Solution: AGSignal
+## The Solution: UNS
 
-AGSignal is the **neutral approval control plane** for AI agents. It plugs into the cloud-vendor governance stacks and framework-native runtimes; it doesn't compete with them.
+UNS is the **neutral approval control plane** for AI agents. It plugs into the cloud-vendor governance stacks and framework-native runtimes; it doesn't compete with them.
 
 **Core primitive (Apache 2.0 OSS):**
 
@@ -79,7 +79,7 @@ Demand is concentrated in three places, each with budget today:
 
 ## Strategic Differentiation
 
-| | Microsoft AGT / Agent 365 | AWS Bedrock AgentCore | Google Vertex AI Governance | LangGraph / AutoGen / CrewAI HITL | **AGSignal** |
+| | Microsoft AGT / Agent 365 | AWS Bedrock AgentCore | Google Vertex AI Governance | LangGraph / AutoGen / CrewAI HITL | **UNS** |
 |---|---|---|---|---|---|
 | Cloud-agnostic | No (Azure-coupled) | No (AWS-coupled) | No (GCP-coupled) | N/A | **Yes** |
 | Framework-agnostic | Adapters | AWS-runtime | Vertex-runtime | Framework-locked | **Yes** |
@@ -87,15 +87,15 @@ Demand is concentrated in three places, each with budget today:
 | Three-stream forensic audit (Decision + Approval + Delivery) | Single audit stream | Single audit stream | Single audit stream | Framework-dependent | **Yes** |
 | OSS core + commercial plugins | All MIT (no commercial layer) | Managed service only | Managed service only | OSS + paid tiers | **Apache 2.0 core; plugins per capability** |
 
-The wedge is precise: **neutral approval primitive, runtime-grade, audit-complete, vendor-portable**. AGSignal sells *the primitive every team is reinventing*, productized.
+The wedge is precise: **neutral approval primitive, runtime-grade, audit-complete, vendor-portable**. UNS sells *the primitive every team is reinventing*, productized.
 
 ## Status
 
 - v0.2 OSS core in extraction from MIP — notification & signaling layer (Slack/Email/WebSocket/PagerDuty channel adapters), declarative YAML policies, ACK lifecycle, deduplication, rate limiting, DLQ, delivery audit
 - 1823 tests passing; ruff clean; smoke-deployed
-- 9 architecture decision records committed at `_AGSignal/docs/decisions/`
+- 9 architecture decision records committed at `_UNS/docs/decisions/`
 - Roadmap v0.3 (Phase 5 cleanup) → v0.4 (Decision Engine) → v0.5 (Approval Workflow) → v0.6 (Why Layer / DecisionRecord polish) → v1.0 (OSS GA) → v2.0+ (commercial plugin ecosystem)
-- Trading-domain reference integration via MIP-AG-Trading (illustrative; not load-bearing for AGSignal positioning)
+- Trading-domain reference integration via MIP-AG-Trading (illustrative; not load-bearing for UNS positioning)
 
 ## The Ask
 
@@ -106,8 +106,8 @@ The wedge is precise: **neutral approval primitive, runtime-grade, audit-complet
 
 ## Brand Disambiguation
 
-AGSignal (Apache 2.0 OSS, runtime agent-action approval) is distinct from **HumanSignal** (commercial data-labeling and LLM-evaluation HITL, formerly Label Studio). Different problem spaces; different audiences; no relationship.
+UNS (Apache 2.0 OSS, runtime agent-action approval) is distinct from **HumanSignal** (commercial data-labeling and LLM-evaluation HITL, formerly Label Studio). Different problem spaces; different audiences; no relationship.
 
 ---
 
-*Source artifacts: PRD at `_AGSignal/agent_governance_control_plane_prd.md`; ADRs at `_AGSignal/docs/decisions/`; Vision B+ scope sketch and Stage 2 research at `_AGSignal/docs/internal/superpowers/specs/`.*
+*Source artifacts: PRD at `_UNS/agent_governance_control_plane_prd.md`; ADRs at `_UNS/docs/decisions/`; Vision B+ scope sketch and Stage 2 research at `_UNS/docs/internal/superpowers/specs/`.*

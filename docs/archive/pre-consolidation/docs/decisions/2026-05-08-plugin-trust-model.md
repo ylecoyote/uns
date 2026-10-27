@@ -23,7 +23,7 @@ Linear: TBD
 
 ## Context
 
-PRD §M9 defines AGSignal's plugin ecosystem (3 Protocols + 1 hook per §M8) and
+PRD §M9 defines UNS's plugin ecosystem (3 Protocols + 1 hook per §M8) and
 locks four design principles (read-mostly, idempotent, side-effect-free except
 logging, propagate `correlation_id`/`decision_id`) as a contractual constraint
 enforced at code review. PRD §M9.5 records that the formal Plugin Trust Model —
@@ -36,7 +36,7 @@ risk; until resolved, OSS core ships explicit-registration-only loading.
 Stage 2 production-pattern research (`stage2-pre-vs-post-execution.md`) flags
 the **governance-as-data-plane-dependency** anti-pattern: when control logic
 shares operational fate with the workload it supervises, both enforcement
-quality and resilience can fail at once. AGSignal's pre-execution-only stance
+quality and resilience can fail at once. UNS's pre-execution-only stance
 (PRD §1.2.4) already mitigates the wire-speed variant, but the same anti-pattern
 recurs at the plugin seam: a misbehaving plugin must not turn a governance
 decision into a workload outage. ADR-008 (fail-mode semantics) covers engine
@@ -54,7 +54,7 @@ deterministic trust contract rather than retrofitting one.
 ### 1. Plugin signing
 
 **Required for commercial plugins; recommended for OSS-distributed plugins; not
-required for operator-built local plugins.** AGSignal core verifies signatures
+required for operator-built local plugins.** UNS core verifies signatures
 when a manifest declares `signed: true`; unsigned plugins are loadable in v1
 provided they appear in the explicit registration list (§8) and the operator
 opts in. Mixing signed and unsigned plugins is permitted but every plugin's
@@ -64,7 +64,7 @@ trust level (§5) is recorded in the load manifest exposed to administrators.
 distributed via PyPI (the canonical commercial channel). PEP 740 binds a
 package distribution to its provenance via Sigstore-issued attestations and is
 generally available on PyPI as of late 2024; GitHub Actions Trusted Publishing
-emits attestations by default with no key management. AGSignal core verifies
+emits attestations by default with no key management. UNS core verifies
 the attestation's Sigstore bundle, the distribution's SHA-256 digest, and that
 the publisher identity matches the manifest's declared `publisher_identity`
 (§4). For non-PyPI distribution channels (private artifact registries,
@@ -73,18 +73,18 @@ shape is accepted; GPG and bare wheel signatures are explicitly rejected as
 weaker (PEP 740 itself documents that wheel-embedded signatures are deprecated
 upstream as of 2018).
 
-**Verification timing: install-time (operator tooling) AND load-time (AGSignal
-core, defense in depth).** AGSignal does not implement an installer; operators
+**Verification timing: install-time (operator tooling) AND load-time (UNS
+core, defense in depth).** UNS does not implement an installer; operators
 use `pip` or equivalent and may run `python -m pypi_attestations verify pypi`
-as part of their deployment pipeline. AGSignal core re-verifies on every plugin
+as part of their deployment pipeline. UNS core re-verifies on every plugin
 load against the manifest's recorded digest and attestation bundle reference.
 Re-verification at load is bounded (target < 100 ms per plugin) and cached for
 the lifetime of the process keyed by `(plugin_name, version, digest)`.
 
 **Signing authority: plugin-author keys with attestation, with First-Party
-designation reserved for AGSignal-team-published plugins.** AGSignal team does
+designation reserved for UNS-team-published plugins.** UNS team does
 not act as a third-party CA; the Sigstore transparency log is the trust root.
-The "AGSignal-Verified" trust level (§5) is administrative — the AGSignal team
+The "UNS-Verified" trust level (§5) is administrative — the UNS team
 publishes a curated allowlist of `publisher_identity` strings (e.g., the
 GitHub OIDC identity of a vetted commercial vendor) — not cryptographic.
 Allowlist updates ship via OSS releases; operators can override locally.
@@ -96,7 +96,7 @@ specific build pipeline at a specific time. **It is not a complete runtime
 trust model.** Trail of Bits explicitly notes that PEP 740 governs the
 *index*'s handling of attestations and does not mandate or define how
 installers verify them at runtime; the consuming toolchain is responsible
-for runtime enforcement. AGSignal's runtime trust enforcement is the
+for runtime enforcement. UNS's runtime trust enforcement is the
 combination of (a) load-time signature verification (this section), (b)
 manifest-declared capability scoping with runtime enforcement (§2), (c)
 trust-tier-graded default capabilities (§5 + ADR-005a), (d) failure
@@ -105,13 +105,13 @@ Conflating "the package is Sigstore-attested" with "the plugin is safe to
 load with full host privileges" is the documented failure mode in
 ecosystems with weaker runtime enforcement (e.g., npm supply-chain
 incidents where compromised developer credentials produced legitimately-
-signed but malicious packages). AGSignal treats provenance and runtime
+signed but malicious packages). UNS treats provenance and runtime
 enforcement as complementary layers, not interchangeable substitutes.
 
 ### 2. Capability scoping (declared, runtime-enforced)
 
-**Plugins declare extension points in the manifest; AGSignal core enforces the
-scope at runtime.** Manifest declares `extension_points: [AuditHook]`; AGSignal
+**Plugins declare extension points in the manifest; UNS core enforces the
+scope at runtime.** Manifest declares `extension_points: [AuditHook]`; UNS
 core registers the plugin only against the declared interfaces and refuses
 to call any other Protocol or hook on that plugin instance — even if the
 plugin's Python class technically implements additional methods. Violation at
@@ -131,19 +131,19 @@ and the v2+ sandboxing direction (§3).
 **PATCH-L (2026-05-08): explicit fail-closed escalation path for undeclared
 capabilities.** When a plugin needs a capability it did not declare in its
 manifest at v0.0 — e.g., a `Verified`-tier plugin originally declaring only
-`AuditHook` later wants to implement `WorkflowOrchestrator` — AGSignal core
+`AuditHook` later wants to implement `WorkflowOrchestrator` — UNS core
 **fails closed**. The escalation path is:
 
 1. **Plugin author updates the manifest** (`extension_points.implements`),
    bumps the plugin's SemVer, re-signs the distribution (Sigstore +
    attestation), and republishes through the same channel.
-2. **Operator updates the registered version** in `agsignal.yaml` to the new
-   plugin version. AGSignal core re-validates manifest + signature on next
+2. **Operator updates the registered version** in `uns.yaml` to the new
+   plugin version. UNS core re-validates manifest + signature on next
    load.
-3. **AGSignal core records** the capability change in the PluginAudit stream
+3. **UNS core records** the capability change in the PluginAudit stream
    (`plugin_capability_changed` event) so administrators see the diff.
 
-**Silent escalation is forbidden.** AGSignal core MUST NOT auto-grant a
+**Silent escalation is forbidden.** UNS core MUST NOT auto-grant a
 plugin a capability beyond its declared scope, even if (a) the plugin's
 underlying class exposes the method, (b) the operator has the plugin
 loaded at the appropriate trust tier, or (c) other plugins of the same
@@ -151,7 +151,7 @@ trust tier have the capability elevated. The principle: every capability
 is a documented operator decision, not a side effect of class
 introspection or trust-tier inheritance.
 
-**Dev-only override.** A development-mode flag (`AGSIGNAL_DEV_PLUGIN_ESCALATION=1`,
+**Dev-only override.** A development-mode flag (`UNS_DEV_PLUGIN_ESCALATION=1`,
 documented as **never to be set in production**) allows an operator to
 elevate a plugin's runtime capabilities without manifest update + re-sign.
 The flag emits a startup-time critical-severity warning, writes a
@@ -179,7 +179,7 @@ should treat sandboxing as a **roadmap requirement, not optional hardening**.
 The Stage 2 plugin-trust research is unambiguous on this point: capability
 + distribution + provenance controls are not sufficient once code is in-
 process and extensible — a compromised plugin with same-process privileges
-can still exfiltrate secrets or tamper with decisions. AGSignal v1 operators
+can still exfiltrate secrets or tamper with decisions. UNS v1 operators
 running in regulated environments should plan for v2 sandboxing migration
 as a deployment requirement, not a future luxury.
 
@@ -219,7 +219,7 @@ following occurs:
 - A regulated customer (FINRA / DORA / EU AI Act high-risk system / equivalent)
   contractually requires plugin-level fault isolation as part of their
   compliance attestation.
-- AGSignal opens a third-party plugin marketplace (loading plugins from
+- UNS opens a third-party plugin marketplace (loading plugins from
   publishers outside the operator's trust boundary becomes the default
   workflow rather than an exception).
 - A documented security incident traces to an in-process plugin compromising
@@ -234,32 +234,32 @@ from v0.0 rather than treating it as an unanticipated requirement.
 
 ### 4. Plugin manifest
 
-**Format: TOML, in a top-level `agsignal_plugin.toml` file at the package
+**Format: TOML, in a top-level `uns_plugin.toml` file at the package
 root.** TOML is the Python-package-metadata standard (`pyproject.toml`
 precedent), parseable without a runtime YAML dependency, and avoids the
 ambiguity that mixed YAML/JSON manifests introduce. Manifest is authoritative
-for AGSignal load decisions; setuptools/poetry metadata is informational only.
+for UNS load decisions; setuptools/poetry metadata is informational only.
 
 **Minimum manifest fields:**
 
 ```toml
 [plugin]
-name = "agsignal-jws-identity"        # globally unique; reverse-DNS allowed
+name = "uns-jws-identity"        # globally unique; reverse-DNS allowed
 version = "1.2.0"                     # SemVer; matches distribution version
 description = "JWS-signed approval identity provider"
 vendor = "Example Compliance Vendor"  # human-readable, optional
 
 [plugin.compatibility]
-agsignal_core = ">=1.0.0,<2.0.0"      # PEP 440 specifier; see §7
+uns_core = ">=1.0.0,<2.0.0"      # PEP 440 specifier; see §7
 schema_version = "1"                  # manifest schema, separate from plugin SemVer
 
 [plugin.extension_points]
-# declared extension points — AGSignal enforces this scope at runtime (§2)
+# declared extension points — UNS enforces this scope at runtime (§2)
 implements = ["IdentityProvider"]
 
 [plugin.signing]
-signed = true                         # if true, AGSignal verifies on load (§1)
-publisher_identity = "https://github.com/example-vendor/agsignal-jws-identity/.github/workflows/release.yml@refs/tags/v1.2.0"
+signed = true                         # if true, UNS verifies on load (§1)
+publisher_identity = "https://github.com/example-vendor/uns-jws-identity/.github/workflows/release.yml@refs/tags/v1.2.0"
 attestation_url = "https://pypi.org/.../provenance"
 
 [plugin.host_capabilities]
@@ -275,10 +275,10 @@ v2+ can introduce enforcement without a manifest schema bump.
 ### 5. Trust levels (four tiers)
 
 ```
-First-Party    : AGSignal-team-published; Sigstore identity matches the
-                 AGSignal organization. Highest implicit trust.
+First-Party    : UNS-team-published; Sigstore identity matches the
+                 UNS organization. Highest implicit trust.
 Verified       : Third-party; Sigstore-signed AND publisher_identity matches
-                 the AGSignal-curated allowlist (§1). Cryptographic chain to
+                 the UNS-curated allowlist (§1). Cryptographic chain to
                  a known publisher.
 Community      : Third-party; Sigstore-signed but publisher_identity NOT in
                  the allowlist. Cryptographic chain to an unknown publisher.
@@ -288,7 +288,7 @@ Local          : Operator-installed; signed: false in manifest. Trust derives
 
 Trust level is **computed** at load time from the manifest, signature
 verification result, and the curated allowlist; it is not a manifest field.
-AGSignal core records the computed trust level in the load manifest (§8.3) and
+UNS core records the computed trust level in the load manifest (§8.3) and
 in any audit entry the plugin participates in. The level is binary in failure
 behavior — a plugin either loads or it does not — but **administrative
 visibility is graded** (PRD §M9.5 AC: administrators can enumerate which
@@ -303,7 +303,7 @@ distinction to be observable.
 ### 6. Failure isolation
 
 **On unhandled plugin exception, idempotency violation detected at runtime, or
-M9.A principle violation: AGSignal disables the failing plugin for the rest of
+M9.A principle violation: UNS disables the failing plugin for the rest of
 the process lifetime, continues with other plugins, and emits a fail-mode
 audit entry.** This converts a plugin failure into a degraded-but-running
 control plane rather than a halt; degradation is observable.
@@ -339,15 +339,15 @@ silently with the failing plugin" alternative is rejected as masking failures
 
 ### 7. Version compatibility
 
-**Plugins declare `agsignal_core` compatibility as a PEP 440 specifier;
-AGSignal core hard-refuses to load plugins outside the declared range.**
-A plugin's `[plugin.compatibility].agsignal_core = ">=1.0.0,<2.0.0"` reflects
+**Plugins declare `uns_core` compatibility as a PEP 440 specifier;
+UNS core hard-refuses to load plugins outside the declared range.**
+A plugin's `[plugin.compatibility].uns_core = ">=1.0.0,<2.0.0"` reflects
 the plugin author's tested range; if the running core is outside this range,
-AGSignal logs the mismatch, emits an OPERATIONAL notification, and skips the
+UNS logs the mismatch, emits an OPERATIONAL notification, and skips the
 plugin. No "warn and load" mode in v1 — silent ABI mismatches are the most
 common third-party-plugin failure mode in long-running ecosystems.
 
-**Compatibility windows:** AGSignal core commits to maintaining ABI stability
+**Compatibility windows:** UNS core commits to maintaining ABI stability
 across minor versions within a major release (SemVer guarantee). A plugin
 declaring `>=1.0.0,<2.0.0` runs on every 1.x core. Major-version transitions
 require an explicit plugin-side update; compatibility-shim plugins (a 2.x
@@ -355,7 +355,7 @@ plugin declaring `>=1.5.0,<3.0.0` because it uses no 2.x-only features) are
 permitted but the burden is on the plugin author.
 
 **`schema_version` (manifest schema) is separate from plugin SemVer and from
-core SemVer.** Manifest schema bumps are AGSignal-core release events; any
+core SemVer.** Manifest schema bumps are UNS-core release events; any
 `schema_version` mismatch is a hard refusal. v1 manifest schema is `"1"`.
 
 ### 8. Discovery and loading workflow
@@ -364,14 +364,14 @@ core SemVer.** Manifest schema bumps are AGSignal-core release events; any
 
 ```
 Step 1 : Install
-         pip install agsignal-jws-identity==1.2.0
+         pip install uns-jws-identity==1.2.0
          (or equivalent: poetry, uv, private artifact registry, vendored
-         wheel in _AGSignal/plugins/, operator-built local wheel)
+         wheel in _UNS/plugins/, operator-built local wheel)
 
 Step 2 : Register
-         Operator adds the plugin to AGSignal config (YAML):
+         Operator adds the plugin to UNS config (YAML):
          plugins:
-           - name: agsignal-jws-identity
+           - name: uns-jws-identity
              version: "1.2.0"
              trust_level: required_minimum: Verified
          No auto-discovery via Python entry points or plugin directory scan
@@ -379,8 +379,8 @@ Step 2 : Register
          path until ADR-005 trust model maturity supports auto-discovery.
 
 Step 3 : Validate at startup
-         AGSignal core, on startup:
-         (a) loads the plugin's manifest (agsignal_plugin.toml)
+         UNS core, on startup:
+         (a) loads the plugin's manifest (uns_plugin.toml)
          (b) verifies signature per §1 if signed: true
          (c) computes trust level per §5 and rejects if below the operator's
              required_minimum
@@ -388,15 +388,15 @@ Step 3 : Validate at startup
          (e) confirms declared extension points are implementable by the
              loaded class (capability scope check, §2)
          Failure at any sub-step: plugin not loaded, OPERATIONAL notification
-         emitted, AGSignal core continues without the plugin (per §6 isolation).
+         emitted, UNS core continues without the plugin (per §6 isolation).
 
 Step 4 : Lifecycle init (per ADR-004 plugin lifecycle hooks)
-         AGSignal calls plugin.init() with a host-capabilities-restricted
+         UNS calls plugin.init() with a host-capabilities-restricted
          context. Plugin registers itself against its declared extension
          points only. (Exact init/load/teardown signatures: ADR-004.)
 
 Step 5 : Runtime invocation
-         AGSignal core invokes the plugin only via its declared extension
+         UNS core invokes the plugin only via its declared extension
          points (§2 enforcement). Every invocation propagates correlation_id
          and decision_id (M9.4). Failures route through §6.
 ```
@@ -406,7 +406,7 @@ deferred to v2+** and is one of the marketplace triggers that revisits §3
 sandboxing. Until then, the operator's config file is the authoritative
 plugin set.
 
-**Load manifest exposure (PRD §M9.5 AC).** AGSignal core exposes a read-only
+**Load manifest exposure (PRD §M9.5 AC).** UNS core exposes a read-only
 endpoint `GET /plugins` returning, for each loaded plugin: `name`, `version`,
 `extension_points`, `trust_level`, `signed`, `publisher_identity` (when
 applicable), `state` (`LOADED` | `DISABLED`), and `last_state_change`.
@@ -438,7 +438,7 @@ is included in periodic snapshots written to the PluginAudit stream.
 - **GPG / bare wheel signatures as the signing scheme.** Wheel-embedded
   signatures are deprecated upstream as of 2018; GPG plus PyPI provides no
   index-side verifiability. PEP 740 is the stronger 2026-current option.
-- **AGSignal team as third-party CA.** Centralizes trust on a single
+- **UNS team as third-party CA.** Centralizes trust on a single
   organization, creates a revocation/key-rotation burden the OSS project is
   not staffed for, and reproduces the failure mode that Sigstore's keyless
   identity model was designed to eliminate.
@@ -460,17 +460,17 @@ plane.
 (or equivalent Sigstore-emitting CI) to qualify for the Verified trust level;
 manual unsigned uploads ship as Community. Operators MUST maintain explicit
 plugin registration in config; auto-discovery is not available in v1.
-AGSignal core gains a PluginAudit stream and a `GET /plugins` surface; both
+UNS core gains a PluginAudit stream and a `GET /plugins` surface; both
 are additive to v1 scope but require schema and HTTP-API space.
 
 **Operator-side workflow:**
 
 1. Operator selects plugin and trust-level minimum.
 2. Operator installs via `pip` (or equivalent) — SBOM and provenance
-   verification at install time recommended but not enforced by AGSignal.
+   verification at install time recommended but not enforced by UNS.
 3. Operator adds plugin to `plugins:` config block with required minimum
    trust level.
-4. AGSignal core validates at startup; failures surface as OPERATIONAL
+4. UNS core validates at startup; failures surface as OPERATIONAL
    notifications without halting the platform.
 5. Operator monitors PluginAudit stream and `GET /plugins` for state changes.
 
@@ -487,10 +487,10 @@ are additive to v1 scope but require schema and HTTP-API space.
 
 ## References
 
-- [PEP 740 - Index support for digital attestations](https://peps.python.org/pep-0740/) - canonical Sigstore-on-PyPI specification adopted by AGSignal as the commercial-plugin signing baseline
+- [PEP 740 - Index support for digital attestations](https://peps.python.org/pep-0740/) - canonical Sigstore-on-PyPI specification adopted by UNS as the commercial-plugin signing baseline
 - [PyPI's Sigstore-powered attestations are now generally available - Sigstore Blog](https://blog.sigstore.dev/pypi-attestations-ga/) - GA announcement establishing PEP 740 readiness for production use
 - [Attestations: A new generation of signatures on PyPI - Trail of Bits](https://blog.trailofbits.com/2024/11/14/attestations-a-new-generation-of-signatures-on-pypi/) - implementation rationale and threat model that informs §1 verification choices
-- [pypi-attestations library](https://github.com/pypi/pypi-attestations) - reference implementation for signature verification; AGSignal core's load-time check uses the public Python API
+- [pypi-attestations library](https://github.com/pypi/pypi-attestations) - reference implementation for signature verification; UNS core's load-time check uses the public Python API
 - [OPA bundle signing](https://www.openpolicyagent.org/docs/latest/management-bundles/) - control-plane signing precedent; informs the "verify on load, cache by digest" pattern in §1
 - ADR-001 (Approval Workflow Semantics) — referenced for callback-signing
   precedent and the plugin-contract stability framing

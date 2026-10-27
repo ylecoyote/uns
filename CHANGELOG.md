@@ -18,9 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Revision-Locked Policy Authority (`uns.policy_runtime.PolicyRuntime`):**
   - Immutable `ACTIVE` policy snapshots (`notification_policy_revisions`, `notification_policy_snapshots`) locked at intake and read in a single lock-free `SELECT` during warm simulation/inspection (`F-05`).
   - Strict enforcement blocking producer overrides from weakening `ACTIVE` policies and blocking reserved adapter-steering metadata keys (`slack_channel`, `email_to`, `pagerduty_severity`, `websocket_user_id`).
-- **Unified HTTP, Console Read-Model, & WebSocket Service (`uns` / `agsignal.app:create_app`):**
+- **Unified HTTP, Console Read-Model, & WebSocket Service (`uns` / `uns.app:create_app`):**
   - Consolidated FastAPI service mounting `/api/v1/notifications/*`, `/api/v1/runtime/*`, `/api/v1/policies/reload`, `/ui/*`, `/ws/agents/{agent_id}`, public `/healthz`, and authenticated `/readyz` and `/metrics`.
-  - Pre-accept WebSocket authentication supporting native `Authorization: Bearer` headers and browser `agsignal.v1` + `bearer.<base64url>` subprotocols with closed-list `Origin` validation.
+  - Pre-accept WebSocket authentication supporting native `Authorization: Bearer` headers and browser `uns.v1` + `bearer.<base64url>` subprotocols with closed-list `Origin` validation.
 - **Trusted-Local MCP Server (`uns-mcp`):**
   - Read-only default mode (`stdio-local`) and explicit `--enable-writes` mode (`stdio-persistent`) requiring `UNS_DATABASE_URL`, `UNS_API_PRINCIPAL`, and `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` with an owned lifespan recovery worker and runtime-bound read helpers (`F-07`).
 - **Explicit Database Maintenance & Archival CLI (`uns-maintain` & `uns-migrate`):**

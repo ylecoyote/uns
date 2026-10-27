@@ -42,7 +42,7 @@ The current backend uses an operator API key, not separate read-only roles. A re
 
 ## Architecture
 
-The frontend contains React/TypeScript only. The JSON API lives in `src/agsignal/api/` at the repository root. Historical Python UI code is preserved in `legacy_flask_reference/`, is not served by the console, and is not part of its current test suite.
+The frontend contains React/TypeScript only. The JSON API lives in `src/uns/api/` at the repository root. Historical Python UI code is preserved in `legacy_flask_reference/`, is not served by the console, and is not part of its current test suite.
 
 ## Project Structure
 

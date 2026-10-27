@@ -9,13 +9,13 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from agsignal.app import create_app
-from agsignal.responses import SendNotificationRequest
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import Channel
 from notification.policies import PolicyRegistry, configure_policy_registry
 from notification.rate_limiting import configure_rate_limiter
 from notification.service import SimpleAdapterRegistry
+from uns.app import create_app
+from uns.responses import SendNotificationRequest
 from uns.runtime import Runtime
 
 
@@ -37,7 +37,7 @@ class RecordingAdapter(BaseAdapter):
 def scoped_app(tmp_path, monkeypatch):
     configure_policy_registry(registry=PolicyRegistry())
     configure_rate_limiter({})
-    for prefix in ("UNS_", "AGSIGNAL_"):
+    for prefix in ("UNS_", "UNS_"):
         for suffix in (
             "API_KEY", "API_PRINCIPAL", "PRODUCER_API_KEY", "PRODUCER_API_PRINCIPAL",
             "RESPONDER_API_KEY", "RESPONDER_API_PRINCIPAL", "OBSERVER_API_KEY",
@@ -50,8 +50,8 @@ def scoped_app(tmp_path, monkeypatch):
     adapters.register(RecordingAdapter())
     runtime = Runtime(f"sqlite:///{tmp_path}/scoped-websocket.db", adapters=adapters, create_tables=True)
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "operator-test-key"
-    app.state.agsignal_api_principal = "operator-principal"
+    app.state.uns_api_key = "operator-test-key"
+    app.state.uns_api_principal = "operator-principal"
     for role in ("producer", "responder", "observer"):
         setattr(app.state, f"uns_{role}_api_key", f"{role}-test-key")
         setattr(app.state, f"uns_{role}_api_principal", f"{role}-principal")
@@ -103,13 +103,13 @@ def test_websocket_response_requires_responder_scope(
     if auth_mode == "browser_subprotocol":
         encoded = base64.urlsafe_b64encode(key.encode()).decode().rstrip("=")
         headers = {"Origin": "http://localhost:5173"}
-        subprotocols = ["agsignal.v1", f"bearer.{encoded}"]
+        subprotocols = ["uns.v1", f"bearer.{encoded}"]
 
     with client.websocket_connect(
         f"/ws/agents/{agent_id}", headers=headers, subprotocols=subprotocols,
     ) as websocket:
         if auth_mode == "browser_subprotocol":
-            assert websocket.accepted_subprotocol == "agsignal.v1"
+            assert websocket.accepted_subprotocol == "uns.v1"
         assert websocket.receive_json()["type"] == "connected"
         websocket.send_json({
             "type": "ack", "notification_id": identifier, "status": response_status,

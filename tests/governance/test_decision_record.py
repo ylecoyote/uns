@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from agsignal.governance.decision_record import (
+from uns.governance.decision_record import (
     Decision,
     DecisionRecord,
     Reason,

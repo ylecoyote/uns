@@ -1,9 +1,9 @@
-# AGSignal MIP UNS Sample Policy Pack
+# UNS MIP UNS Sample Policy Pack
 
-This directory contains AGSignal sample policies derived from the Market Insights
+This directory contains UNS sample policies derived from the Market Insights
 Platform UNS implementation.
 
-These policies are examples, not AGSignal Core defaults. They show how a host
+These policies are examples, not UNS Core defaults. They show how a host
 application can model safety, governance, and operational signaling with
 mode-aware routing, acknowledgments, escalation, and deduplication.
 
@@ -17,7 +17,7 @@ mode-aware routing, acknowledgments, escalation, and deduplication.
 
 ## Usage
 
-Load the sample pack with the standard AGSignal YAML loader. The loader still
+Load the sample pack with the standard UNS YAML loader. The loader still
 lives under the historical `notification.*` runtime package for compatibility:
 
 ```python
@@ -37,10 +37,10 @@ to their domain.
 
 `examples/policies/mip-uns` is the canonical sample pack. The repository also
 keeps `config/notification_policies` loadable for demos and compatibility, but
-that directory is not an AGSignal Core default policy set.
+that directory is not an UNS Core default policy set.
 
 ## Boundary
 
 The sample content keeps MIP's concrete notification names because that makes the
-examples realistic. AGSignal Core does not require these notification types, does
+examples realistic. UNS Core does not require these notification types, does
 not import MIP or ATP code, and does not own trading-specific evidence models.

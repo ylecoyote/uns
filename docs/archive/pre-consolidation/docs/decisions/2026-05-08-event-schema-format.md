@@ -6,11 +6,11 @@ Date: 2026-05-08
 
 Updated: 2026-05-08 — Decision 4 inverted from "CloudEvents projection off
 by default" to "CloudEvents-native by default" per Stage 2 competitive
-analysis. AGSignal's strategic positioning as the "neutral approval control
+analysis. UNS's strategic positioning as the "neutral approval control
 plane that complements cloud-vendor stacks" requires envelope-format
 alignment with Microsoft Agent Governance Toolkit (which emits CloudEvents
 native) and the broader CNCF ecosystem (Knative, Eventarc, Event Grid, Dapr).
-The AGSignal-native shape is preserved as opt-out via content negotiation.
+The UNS-native shape is preserved as opt-out via content negotiation.
 Mapping table is unchanged. v0.2 → v1 was already a major version bump; the
 amendment changes which v1 default makes the break worthwhile, not whether
 the break occurs. See revised §4 + Consequences.
@@ -34,10 +34,10 @@ retrofit if adopted post-v1**, deferring the projection mechanics to this ADR.
 **Stage 2 competitive analysis revision.** Subsequent to the initial commit
 of this ADR, Stage 2 research documented Microsoft Agent Governance Toolkit's
 native CloudEvents emission and the broader CNCF ecosystem's consolidation on
-CloudEvents as the de-facto interop format. AGSignal's repositioning to
+CloudEvents as the de-facto interop format. UNS's repositioning to
 "neutral HITL approval control plane that complements cloud-vendor stacks"
-(per `_AGSignal/docs/uns/positioning-vs-cloud-stacks.md`) makes envelope-
-format alignment load-bearing: a customer running AGSignal alongside AGT,
+(per `_UNS/docs/uns/positioning-vs-cloud-stacks.md`) makes envelope-
+format alignment load-bearing: a customer running UNS alongside AGT,
 Bedrock AgentCore, or Vertex AI Governance should not need a format-
 conversion shim at every integration point. The amendment updates §4 to flip
 the default; everything else (envelope structure, type taxonomy, versioning,
@@ -48,23 +48,23 @@ CloudEvents reached **CNCF Graduated status in January 2024** and is the
 de-facto interop format for cross-platform event consumers (Knative, Azure
 Event Grid, Google Eventarc, Dapr). The `cloudevents-pydantic` library
 (`febus982/cloudevents-pydantic`, v0.2.0 Oct 2025, MIT) provides a Pydantic v2
-implementation matching AGSignal's locked stack (PRD §9.5, HARD-04). v0.2
+implementation matching UNS's locked stack (PRD §9.5, HARD-04). v0.2
 already ships notifications with envelope-shaped fields (`notification_id`,
 `intent`, `delivery_mode`, free-form `metadata: dict`); this ADR formalizes
-that shape across all AGSignal events (notifications, decision records,
+that shape across all UNS events (notifications, decision records,
 audit entries on the wire) and locks the projection rules.
 
 ADR-007 fixes the `DecisionRecord` payload schema (M2.3); this ADR does not
-re-spec it. ADR-004 fixes `agsignal.contracts` as the public boundary;
+re-spec it. ADR-004 fixes `uns.contracts` as the public boundary;
 event envelope types live there. ADR-001 fixes callback semantics; the
-callback POST body is an AGSignal event by this schema.
+callback POST body is an UNS event by this schema.
 
 ## Decision
 
 ### 1. Envelope structure: top-level metadata + nested `data:` payload
 
-Every AGSignal event on the wire is a Pydantic model with a flat
-**envelope** of AGSignal-specific metadata fields and a nested **`data`**
+Every UNS event on the wire is a Pydantic model with a flat
+**envelope** of UNS-specific metadata fields and a nested **`data`**
 field carrying the business payload. Top-level envelope fields (v1):
 
 ```
@@ -80,8 +80,8 @@ metadata          : dict         # free-form caller extensions (decision 7)
 ```
 
 `data` is the typed business payload (e.g., a `DecisionRecord` for
-`agsignal.decision.evaluated`, a `Notification` for
-`agsignal.notification.sent`). Envelope and data are separate Pydantic
+`uns.decision.evaluated`, a `Notification` for
+`uns.notification.sent`). Envelope and data are separate Pydantic
 models composed at the wire boundary; this enables independent versioning
 (decision 3) and the CloudEvents retrofit (decision 4).
 
@@ -92,23 +92,23 @@ flattened to the envelope.
 
 ### 2. Event type taxonomy: reverse-DNS, dotted-snake, lifecycle-stage suffix
 
-Type names follow `agsignal.<domain>.<action>` with reverse-DNS prefix and
+Type names follow `uns.<domain>.<action>` with reverse-DNS prefix and
 dotted snake_case segments:
 
 | Type                              | Producer            | `data` payload          |
 |-----------------------------------|---------------------|-------------------------|
-| `agsignal.decision.evaluated`     | Decision Engine     | `DecisionRecord`        |
-| `agsignal.decision.failed`        | Decision Engine     | `DecisionRecord` (fail-mode) |
-| `agsignal.approval.requested`     | Approval Workflow   | `ApprovalRequest`       |
-| `agsignal.approval.acked`         | Approval Workflow   | `ApprovalAck`           |
-| `agsignal.approval.timed_out`     | Approval Workflow   | `ApprovalTimeout`       |
-| `agsignal.notification.sent`      | Notification Layer  | `Notification`          |
-| `agsignal.notification.delivered` | Notification Layer  | `DeliveryReceipt`       |
-| `agsignal.notification.failed`    | Notification Layer  | `DeliveryFailure`       |
-| `agsignal.audit.recorded`         | Audit Hooks         | `AuditEntry`            |
+| `uns.decision.evaluated`     | Decision Engine     | `DecisionRecord`        |
+| `uns.decision.failed`        | Decision Engine     | `DecisionRecord` (fail-mode) |
+| `uns.approval.requested`     | Approval Workflow   | `ApprovalRequest`       |
+| `uns.approval.acked`         | Approval Workflow   | `ApprovalAck`           |
+| `uns.approval.timed_out`     | Approval Workflow   | `ApprovalTimeout`       |
+| `uns.notification.sent`      | Notification Layer  | `Notification`          |
+| `uns.notification.delivered` | Notification Layer  | `DeliveryReceipt`       |
+| `uns.notification.failed`    | Notification Layer  | `DeliveryFailure`       |
+| `uns.audit.recorded`         | Audit Hooks         | `AuditEntry`            |
 
 Reverse-DNS prefix matches CloudEvents `type` recommendation; dotted
-snake_case matches existing AGSignal Python idiom and v0.2 `notification_type`
+snake_case matches existing UNS Python idiom and v0.2 `notification_type`
 casing. New types are added by amendment; the taxonomy is closed at v1 to
 keep consumer dispatch tables tractable.
 
@@ -127,20 +127,20 @@ Compatibility rules: minor envelope bumps add optional fields only;
 consumers ignore unknown top-level fields. Major bumps are breaking and
 require coordinated rollout. Data-payload versions evolve independently of
 the envelope (M2.3 already commits to additive-only minor bumps for
-`DecisionRecord`); `agsignal.contracts` re-exports both version constants so
+`DecisionRecord`); `uns.contracts` re-exports both version constants so
 plugins and consumers can pin against whichever surface they bind to.
 
 The split mirrors ADR-004's per-Protocol semver decision: envelope and
 payload evolve at different cadences and shouldn't be locked to the same
 version line.
 
-### 4. CloudEvents-native by default in v1; AGSignal-native shape via opt-out
+### 4. CloudEvents-native by default in v1; UNS-native shape via opt-out
 
-**Updated 2026-05-08 per Stage 2 competitive analysis.** AGSignal v1 emits the
+**Updated 2026-05-08 per Stage 2 competitive analysis.** UNS v1 emits the
 **CloudEvents v1.0 envelope as the default wire format**, using the
 structured-mode CloudEvents JSON binding (`application/cloudevents+json`).
-The AGSignal-native envelope (described in §1) is preserved as the in-process
-source of truth in `agsignal.contracts` Pydantic models and is available as
+The UNS-native envelope (described in §1) is preserved as the in-process
+source of truth in `uns.contracts` Pydantic models and is available as
 an **opt-out wire format** for callers without CloudEvents tooling.
 
 **Default behavior:**
@@ -149,18 +149,18 @@ an **opt-out wire format** for callers without CloudEvents tooling.
   `Content-Type: application/cloudevents+json` by default.
 - The structured-mode CloudEvents binding is the only projection v1
   supports (binary mode deferred).
-- AGSignal-native Pydantic models in `agsignal.contracts` are the in-process
+- UNS-native Pydantic models in `uns.contracts` are the in-process
   source of truth; the wire-emit layer projects to CloudEvents on egress.
 
-**Opt-out for AGSignal-native shape** (callers without CloudEvents libraries
+**Opt-out for UNS-native shape** (callers without CloudEvents libraries
 or with strong ergonomic preferences):
 
 - **HTTP content negotiation**: HTTP event surfaces honor
-  `Accept: application/agsignal+json`; AGSignal returns the AGSignal-native
+  `Accept: application/uns+json`; UNS returns the UNS-native
   envelope (§1 shape). Callers may also send `Accept: application/json` for
   unspecified-format requests; the v1 default in that case is CloudEvents (a
   v0.x → v1 break documented in operator migration guidance).
-- **Per-callback configuration flag**: `agsignal.yaml` callback registration
+- **Per-callback configuration flag**: `uns.yaml` callback registration
   declares `format: cloudevents | native` (default: `cloudevents`); the flag
   pre-negotiates content type without per-request `Accept` headers.
 
@@ -174,25 +174,25 @@ documented:
 2. The CNCF ecosystem (Knative, Eventarc, Event Grid, Dapr, AWS EventBridge
    CloudEvents mode) consolidated on CloudEvents as the de-facto interop
    format for cross-platform agent and workflow events.
-3. AGSignal's repositioning as "neutral HITL approval control plane that
+3. UNS's repositioning as "neutral HITL approval control plane that
    complements cloud-vendor stacks" makes envelope-format alignment with AGT
    and the broader CNCF ecosystem load-bearing — a customer running
-   AGSignal alongside AGT, Bedrock AgentCore, or Vertex AI Governance must
+   UNS alongside AGT, Bedrock AgentCore, or Vertex AI Governance must
    not need a format-conversion shim at every integration point.
 
 The pre-amendment "CloudEvents off by default" stance was correct under the
-"AGSignal as standalone Agent Governance Signaling category" framing (PRD
+"UNS as standalone Agent Governance Signaling category" framing (PRD
 §2.8 commitment, locked pre-AGT-discovery). Under the revised "complement
 cloud-vendor stacks" positioning, that default is wrong — it imposes a
-shim cost on every integration AGSignal aims to win. Flipping the default
-to CloudEvents costs operators on the AGSignal-native path one Accept
+shim cost on every integration UNS aims to win. Flipping the default
+to CloudEvents costs operators on the UNS-native path one Accept
 header (or one `format: native` config flag) and saves every cloud-vendor-
 integration consumer the projection hop.
 
 **Cost of the flip.** v1 → v1.0 was already a major version bump from v0.2
 (per ADR-001 PATCH-1's DecisionRecord schema lock and the broader Vision B+
 rewrite); existing v0.2 consumers face migration regardless of which v1
-default is chosen. The AGSignal-native shape remains accessible to any
+default is chosen. The UNS-native shape remains accessible to any
 caller who explicitly requests it; consumers porting from v0.2 add one
 configuration flag rather than a format-conversion shim.
 
@@ -203,39 +203,39 @@ amended default + opt-out gives the same flexibility on demand without the
 per-event cost.
 
 `cloudevents-pydantic` becomes a **required runtime dependency** of
-`agsignal.events` in v1 (was: optional dependency). The library is small,
+`uns.events` in v1 (was: optional dependency). The library is small,
 Pydantic v2-native, MIT-licensed, ~5x faster than the official SDK for
 serialization (per maintainer benchmarks), and matches the locked stack per
 PRD §9.5.
 
 **Mapping table (locked):**
 
-| AGSignal envelope field   | CloudEvents context attribute |
+| UNS envelope field   | CloudEvents context attribute |
 |---------------------------|-------------------------------|
 | `event_id`                | `id`                          |
 | `event_type`              | `type`                        |
 | `created_at`              | `time`                        |
 | `source`                  | `source`                      |
-| `schema_version`          | (omitted — CloudEvents `specversion = "1.0"` is fixed; AGSignal envelope version moves to extension `agsignalschemaversion`) |
+| `schema_version`          | (omitted — CloudEvents `specversion = "1.0"` is fixed; UNS envelope version moves to extension `unsschemaversion`) |
 | `data` (payload object)   | `data` (object) + `datacontenttype = "application/json"` |
 | `correlation_id`          | extension `correlationid`     |
 | `decision_id`             | extension `decisionid`        |
-| `metadata` (free-form)    | extensions, prefixed `agsignalmeta_<key>` (lowercased, alphanumeric per CloudEvents extension naming) |
+| `metadata` (free-form)    | extensions, prefixed `unsmeta_<key>` (lowercased, alphanumeric per CloudEvents extension naming) |
 
 CloudEvents `specversion` is hardcoded to `"1.0"` in projected output.
 Attribute name casing in CloudEvents extensions is constrained
-(lowercase, alphanumeric); AGSignal projection maps fields accordingly.
+(lowercase, alphanumeric); UNS projection maps fields accordingly.
 
-### 5. Library choice: AGSignal-native Pydantic models; cloudevents-pydantic for projection
+### 5. Library choice: UNS-native Pydantic models; cloudevents-pydantic for projection
 
-`agsignal.contracts` (per ADR-004 §7) is the public boundary and ships
-**AGSignal-native Pydantic v2 models** (`Event`, `EventEnvelope`, typed
+`uns.contracts` (per ADR-004 §7) is the public boundary and ships
+**UNS-native Pydantic v2 models** (`Event`, `EventEnvelope`, typed
 payload models per decision 2). The native models are the source of truth.
 
-For the CloudEvents projection (decision 4), AGSignal uses
+For the CloudEvents projection (decision 4), UNS uses
 `cloudevents-pydantic` (febus982; v0.2.0; MIT; Pydantic v2 native; matches
 the locked stack per PRD §9.5). It is added as an **optional dependency**:
-projection is implemented in `agsignal.events.cloudevents` and only imports
+projection is implemented in `uns.events.cloudevents` and only imports
 `cloudevents-pydantic` when the projection is requested. Operators not
 using the projection do not pay the dependency cost.
 
@@ -252,7 +252,7 @@ floor unmet by JSON; PRD §9.1 latency targets — engine p99 ≤ 5 ms,
 notification p99 ≤ 100 ms — are met with JSON; the multi-format complexity
 cost dominates the benefit).
 
-The door is left open: `agsignal.events` exposes serialization through a
+The door is left open: `uns.events` exposes serialization through a
 narrow interface (`to_wire(event) -> bytes`, `from_wire(content_type, body)
 -> Event`) so a v1.x ADR can add formats without changing call sites. v1
 implements the JSON branch only.
@@ -279,7 +279,7 @@ used by the engine?" ambiguity (resolved by being explicit). The
 ### 8. Idempotency keys: `event_id` is the universal dedup key
 
 `event_id` is a producer-generated UUIDv7 (time-ordered, collision-resistant)
-and is **the** dedup key across all AGSignal event surfaces. M5.2's
+and is **the** dedup key across all UNS event surfaces. M5.2's
 "receiver-side idempotency by `decision_id`" (PRD-locked) is preserved as
 a domain-specific dedup tuple for *callback* receivers, but the wire-level
 dedup is `event_id`:
@@ -302,9 +302,9 @@ makes correlation queries naturally range-scannable.
 ```json
 {
   "event_id": "01939c2a-7e10-7d3c-9a4f-3b8a4f5e6d7c",
-  "event_type": "agsignal.decision.evaluated",
+  "event_type": "uns.decision.evaluated",
   "schema_version": "1.0",
-  "source": "/agsignal/engine/decisions",
+  "source": "/uns/engine/decisions",
   "created_at": "2026-05-08T14:30:00.123Z",
   "correlation_id": "trace-abc-123",
   "decision_id": "dec-d4e5f6",
@@ -335,15 +335,15 @@ makes correlation queries naturally range-scannable.
 {
   "specversion": "1.0",
   "id": "01939c2a-7e10-7d3c-9a4f-3b8a4f5e6d7c",
-  "type": "agsignal.decision.evaluated",
-  "source": "/agsignal/engine/decisions",
+  "type": "uns.decision.evaluated",
+  "source": "/uns/engine/decisions",
   "time": "2026-05-08T14:30:00.123Z",
   "datacontenttype": "application/json",
-  "agsignalschemaversion": "1.0",
+  "unsschemaversion": "1.0",
   "correlationid": "trace-abc-123",
   "decisionid": "dec-d4e5f6",
-  "agsignalmeta_agent_runtime": "langgraph-0.2",
-  "agsignalmeta_deployment_env": "prod-us-east-1",
+  "unsmeta_agent_runtime": "langgraph-0.2",
+  "unsmeta_deployment_env": "prod-us-east-1",
   "data": {
     "decision_id": "dec-d4e5f6",
     "policy_config_hash": "sha256:7a8b9c...",
@@ -365,13 +365,13 @@ makes correlation queries naturally range-scannable.
 
 **Updated 2026-05-08.** The original concern stands: a *strict* mandate
 (no opt-out path) would force the cloudevents-pydantic dependency onto every
-consumer including the smallest AGSignal-native callers, and would foreclose
+consumer including the smallest UNS-native callers, and would foreclose
 ergonomic choice for callers without CloudEvents tooling. The 2026-05-08
 amendment to Decision 4 flips the **default** to CloudEvents-native but
-preserves the AGSignal-native shape as opt-out. This is a meaningful
+preserves the UNS-native shape as opt-out. This is a meaningful
 distinction: the amendment makes CloudEvents the *path of least resistance*
 for cloud-vendor-integration consumers (the strategic majority post-Stage-2-
-positioning) while still serving callers who explicitly want the AGSignal-
+positioning) while still serving callers who explicitly want the UNS-
 native shape.
 
 ### No CloudEvents projection ever
@@ -415,7 +415,7 @@ it back would re-create the conflict.
 
 ### Native event without idempotency key (let consumers decide)
 
-Rejected. AGSignal core writes audit entries; without a wire-level dedup
+Rejected. UNS core writes audit entries; without a wire-level dedup
 key the at-least-once retry semantics in ADR-001 callback delivery would
 produce duplicate audit rows on every retry. `event_id` as the universal
 key removes the foot-gun for every consumer.
@@ -425,42 +425,42 @@ key removes the foot-gun for every consumer.
 **Consumer integration cost.** Native-envelope consumers are unchanged
 from v0.2's existing notification consumer shape — top-level metadata,
 nested `data` payload — so no migration. CloudEvents consumers opt in via
-content negotiation and get spec-compliant projection without AGSignal-side
-fork. The `agsignal.contracts` package re-exports envelope and payload
+content negotiation and get spec-compliant projection without UNS-side
+fork. The `uns.contracts` package re-exports envelope and payload
 models with type discrimination (`event_type` literal) so static checkers
 can flag mishandled types.
 
 **Commercial-plugin event-emit responsibilities.** Plugins that emit
-events through AGSignal (notably commercial AuditHook implementations like
+events through UNS (notably commercial AuditHook implementations like
 Merkle-Audit, and DurableWorkflow's resume callbacks) MUST construct events
-through `agsignal.contracts.Event` rather than ad-hoc dicts; this
+through `uns.contracts.Event` rather than ad-hoc dicts; this
 guarantees envelope conformance and prevents accidental schema drift.
 Plugins set `source` to a plugin-identified URI (e.g.,
-`/agsignal/plugins/merkle-audit`) and propagate `correlation_id` /
+`/uns/plugins/merkle-audit`) and propagate `correlation_id` /
 `decision_id` per ADR-004 §7's plugin-design principles. The
 CloudEvents projection is centrally implemented; plugins do not need to
 ship their own projection logic.
 
-**v1 → v1.x format-default reversal cost (if AGSignal-native default is
+**v1 → v1.x format-default reversal cost (if UNS-native default is
 later required).** Low. The amended default (CloudEvents) and the opt-out
-path (AGSignal-native via content negotiation or per-callback config) are
+path (UNS-native via content negotiation or per-callback config) are
 isomorphic at the field level — the locked mapping table (§4) is
 bidirectional. A future ADR could flip the default back without a schema
 rewrite. The dominant unknown is whether CloudEvents v2 (if/when
 standardized by CNCF) introduces breaking envelope changes; the projection
-layer absorbs that risk on AGSignal's side, and the AGSignal-native envelope
-in `agsignal.contracts` is unaffected. If `cloudevents-pydantic` falls
-behind the spec, AGSignal can pin to a known-good version or temporarily
+layer absorbs that risk on UNS's side, and the UNS-native envelope
+in `uns.contracts` is unaffected. If `cloudevents-pydantic` falls
+behind the spec, UNS can pin to a known-good version or temporarily
 roll the projection by hand using the official `cloudevents` SDK as a
 fallback.
 
 **Strategic-positioning fit.** The CloudEvents-native default is the
-load-bearing technical commitment behind AGSignal's "neutral approval
+load-bearing technical commitment behind UNS's "neutral approval
 control plane that complements cloud-vendor stacks" positioning. Cloud-
 vendor-integration consumers (Microsoft Stack Bridge, AWS Stack Bridge, GCP
 Stack Bridge — the P0/P1 commercial plugins per the Vision B+ revision)
 get format alignment for free. Framework-native consumers (LangGraph
-interrupts, AutoGen human-input modes) get the AGSignal-native shape via
+interrupts, AutoGen human-input modes) get the UNS-native shape via
 the opt-out path with one configuration flag.
 
 **Operational implications.** OPERATIONAL notifications use the same
@@ -477,14 +477,14 @@ ensures only opt-in callers pay it.
 - PRD §2.8 (Event schema commitment), §2.7 (three audit streams), M1
   (Notification layer), M2.3 (DecisionRecord schema), M5.2 (receiver-side
   idempotency), M6 (Audit ledger), §11 (ADR-002 description) —
-  `_AGSignal/agent_governance_control_plane_prd.md`
+  `_UNS/agent_governance_control_plane_prd.md`
 - HARD-06 in Stage 1 design-sync conflict report —
   `docs/internal/superpowers/specs/2026-05-08-stage1-design-sync-report.md`
 - Vision B+ scope sketch §2.8 (Architectural Commitment 8) —
   `docs/internal/superpowers/specs/2026-05-08-vision-b-plus-design.md`
 - ADR-007 (DecisionRecord internal shape) —
   `2026-05-08-decision-engine-shape.md`
-- ADR-004 (`agsignal.contracts` public boundary) —
+- ADR-004 (`uns.contracts` public boundary) —
   `2026-05-08-extension-api-surface.md`
 - ADR-001 (Approval Workflow Semantics; callback POST body shape) —
   `2026-05-08-approval-workflow-semantics.md`

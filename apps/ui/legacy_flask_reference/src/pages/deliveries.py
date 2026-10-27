@@ -20,7 +20,6 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from agsignal.api.read_models import DeliveryFilter, get_read_model_adapter
 from notification.models import (
     AutonomyMode,
     Channel,
@@ -28,6 +27,7 @@ from notification.models import (
     DeliveryStatus,
     NotificationIntent,
 )
+from uns.api.read_models import DeliveryFilter, get_read_model_adapter
 
 router = APIRouter(prefix="/pages/deliveries", tags=["ui-pages"])
 

@@ -1,4 +1,4 @@
-"""Tests for the reusable AGSignal app adapter proving smoke."""
+"""Tests for the reusable UNS app adapter proving smoke."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from uuid import uuid4
 from scripts.smoke_app_adapter_proving import build_proving_request, run_smoke
 
 
-def test_build_proving_request_uses_public_agsignal_shape() -> None:
+def test_build_proving_request_uses_public_uns_shape() -> None:
     agent_id = uuid4()
     request = build_proving_request(agent_id)
 

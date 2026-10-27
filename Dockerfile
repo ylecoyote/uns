@@ -5,10 +5,10 @@
 #
 # Run UNS (HTTP API; serve the built console on the same origin):
 #   docker run --rm -p 127.0.0.1:8000:8000 \
-#     -e AGSIGNAL_API_KEY=<secret> \
-#     -e AGSIGNAL_API_PRINCIPAL=ops-rotation \
+#     -e UNS_API_KEY=<secret> \
+#     -e UNS_API_PRINCIPAL=ops-rotation \
 #     -e DATABASE_URL=postgresql+psycopg2://... \
-#     -e AGSIGNAL_REDIS_URL=redis://... \
+#     -e UNS_REDIS_URL=redis://... \
 #     uns:dev
 #
 # Production:
@@ -45,11 +45,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user (uid 1001 to avoid clashing with common host uids).
-RUN groupadd --system --gid 1001 agsignal \
-    && useradd --system --uid 1001 --gid agsignal \
-        --create-home --home-dir /home/agsignal --shell /sbin/nologin agsignal
+RUN groupadd --system --gid 1001 uns \
+    && useradd --system --uid 1001 --gid uns \
+        --create-home --home-dir /home/uns --shell /sbin/nologin uns
 
-# Install AGSignal from the built wheel with the [full] meta-extra so all
+# Install UNS from the built wheel with the [full] meta-extra so all
 # runtime surfaces (HTTP server, Redis, SQL, MCP, channel adapters) are
 # available, plus the Postgres driver. Derivative images that only need a
 # subset (e.g. SDK-only producers) can install with no extras instead.
@@ -59,14 +59,14 @@ RUN set -- /tmp/dist/uns-*.whl \
         "psycopg2-binary>=2.9.0" \
     && rm -rf /tmp/dist
 
-USER agsignal
-WORKDIR /home/agsignal
+USER uns
+WORKDIR /home/uns
 
 # Container-friendly defaults:
 #   - bind to 0.0.0.0 (the operator's reverse proxy is the boundary; native
 #     installs default to 127.0.0.1 per docs/DEPLOYMENT.md).
 #   - unbuffered stdout/stderr so logs are streamed, not batched.
-ENV AGSIGNAL_HOST=0.0.0.0 \
+ENV UNS_HOST=0.0.0.0 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
@@ -78,6 +78,6 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)" \
         || exit 1
 
-# Unified AGSignal HTTP service. Both Core (write) and Console (read)
+# Unified UNS HTTP service. Both Core (write) and Console (read)
 # surfaces live in one process post-Phase-3.
 CMD ["uvicorn", "uns.app:app", "--host", "0.0.0.0", "--port", "8000"]

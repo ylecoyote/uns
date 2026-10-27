@@ -1,4 +1,4 @@
-"""Standalone channel-health tracking for AGSignal runtime observability."""
+"""Standalone channel-health tracking for UNS runtime observability."""
 
 from __future__ import annotations
 

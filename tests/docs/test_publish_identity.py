@@ -8,14 +8,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_pyproject_uses_agsignal_publish_identity() -> None:
+def test_pyproject_uses_uns_publish_identity() -> None:
     content = (ROOT / "pyproject.toml").read_text()
 
     assert 'name = "uns"' in content
     assert "UNS - Unified Notification Service" in content
     assert "Unified Notification Service" in content
     assert 'license = {text = "Apache-2.0"}' in content
-    assert '{name = "AGSignal Maintainers"}' in content
+    assert '{name = "UNS Maintainers"}' in content
     # A self-referencing meta-extra exists so operators can opt into the
     # full server stack with one install line.
     assert '"uns[server,redis,sql,mcp,adapters]"' in content
@@ -69,10 +69,10 @@ def test_mkdocs_nav_files_resolve() -> None:
         assert (docs_dir / rel_path).exists(), f"Missing mkdocs nav target: {rel_path}"
 
 
-def test_agsignal_integrations_exposes_generic_boundary_only() -> None:
+def test_uns_integrations_exposes_generic_boundary_only() -> None:
     from examples.integrations.mip.adapter import MIPSignalAdapter
 
-    import agsignal.integrations as integrations
+    import uns.integrations as integrations
 
     assert hasattr(integrations, "AppSignalAdapter")
     assert not hasattr(integrations, "MIPSignalAdapter")
@@ -105,7 +105,7 @@ def test_docs_index_routes_publish_readers_by_task() -> None:
         assert task in content
 
 
-def test_publish_ui_surface_uses_agsignal_console_name() -> None:
+def test_publish_ui_surface_uses_uns_console_name() -> None:
     paths = (
         ROOT / "apps" / "ui" / "README.md",
         ROOT / "apps" / "ui" / "index.html",

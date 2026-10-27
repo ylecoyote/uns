@@ -12,7 +12,7 @@ The rehearsal binds only `127.0.0.1:18080`, serves the existing production SPA a
 
 ## Findings repaired
 
-- The Dockerfile installed `agsignal[full]` after the distribution had been renamed. It now installs the exact wheel produced by its builder, preventing accidental resolution of a different registry package.
+- The Dockerfile installed `uns[full]` after the distribution had been renamed. It now installs the exact wheel produced by its builder, preventing accidental resolution of a different registry package.
 - Compose readiness lacked authentication and did not assert the returned status. Its authenticated probe now passes against the running service.
 - The clean server image had neither supported WebSocket protocol implementation. The server extra now uses `uvicorn[standard]`; real network upgrades, fanout and durable ACK pass.
 - Browser inspection exposed placeholder PREVIEW/zero-agent ACK audit context and naive SQLite timestamps. The read adapters now recover available notification context, apply the corresponding ACK filters, and return explicit UTC timestamps. The invariant summary timestamp also carries UTC. Historical orphan ACKs retain compatibility placeholders and an explicit `context_unavailable` payload flag.

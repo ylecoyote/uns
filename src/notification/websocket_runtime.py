@@ -1,4 +1,4 @@
-"""Standalone FastAPI WebSocket runtime for AGSignal clients."""
+"""Standalone FastAPI WebSocket runtime for UNS clients."""
 
 from __future__ import annotations
 
@@ -16,14 +16,14 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from agsignal.api.auth import (
+from notification.channel_health import ChannelHealthTracker
+from notification.models import AckStatus, Channel
+from uns.api.auth import (
     WritePrincipal,
     require_principal_scope,
     require_websocket_principal,
     resolve_requested_actor,
 )
-from notification.channel_health import ChannelHealthTracker
-from notification.models import AckStatus, Channel
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ class WebSocketFanoutEnvelope(BaseModel):
     notification: dict[str, object] = Field(default_factory=dict)
     origin_id: str | None = Field(
         default=None,
-        description="AGSignal process identifier that created the fanout event",
+        description="UNS process identifier that created the fanout event",
     )
 
 
@@ -218,7 +218,7 @@ class RedisPubSub(Protocol):
 
 
 class RedisWebSocketClient(RedisPublisher, Protocol):
-    """Redis surface required for AGSignal WebSocket fanout."""
+    """Redis surface required for UNS WebSocket fanout."""
 
     def pubsub(self) -> RedisPubSub: ...
 
@@ -417,7 +417,7 @@ def get_missed_notifications(
 
 
 async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
-    """Handle a standalone AGSignal agent WebSocket session."""
+    """Handle a standalone UNS agent WebSocket session."""
     principal, subprotocol = require_websocket_principal(websocket)
     manager: WebSocketConnectionManager = websocket.app.state.websocket_manager
     connection_id = str(uuid4())

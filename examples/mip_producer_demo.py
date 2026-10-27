@@ -31,7 +31,6 @@ for _import_path in (REPO_ROOT / "src", REPO_ROOT):
     if _path_str not in sys.path:
         sys.path.insert(0, _path_str)
 
-from agsignal.responses import SendNotificationRequest  # noqa: E402
 from db.policy_store import SQLAlchemyPolicyStore  # noqa: E402
 from notification.adapters.base import (  # noqa: E402
     AdapterStatus,
@@ -44,6 +43,7 @@ from notification.policies import PolicyRegistry  # noqa: E402
 from notification.policy_loader import load_policies_from_directory  # noqa: E402
 from notification.service import SimpleAdapterRegistry  # noqa: E402
 from uns import Client, Runtime  # noqa: E402
+from uns.responses import SendNotificationRequest  # noqa: E402
 
 DEFAULT_MIP_POLICY_DIR = REPO_ROOT / "examples" / "policies" / "mip-uns"
 
@@ -323,8 +323,8 @@ def _resolve_api_key(explicit_key: str | None) -> str:
         explicit_key
         or os.environ.get("UNS_PRODUCER_API_KEY")
         or os.environ.get("UNS_API_KEY")
-        or os.environ.get("AGSIGNAL_PRODUCER_API_KEY")
-        or os.environ.get("AGSIGNAL_API_KEY")
+        or os.environ.get("UNS_PRODUCER_API_KEY")
+        or os.environ.get("UNS_API_KEY")
     )
     if not key:
         raise ValueError(
@@ -353,13 +353,13 @@ async def run_http_demo(
         responder_api_key
         or os.environ.get("UNS_RESPONDER_API_KEY")
         or os.environ.get("UNS_API_KEY")
-        or os.environ.get("AGSIGNAL_RESPONDER_API_KEY")
-        or os.environ.get("AGSIGNAL_API_KEY")
+        or os.environ.get("UNS_RESPONDER_API_KEY")
+        or os.environ.get("UNS_API_KEY")
         or producer_key
     )
     admin_key = (
         os.environ.get("UNS_API_KEY")
-        or os.environ.get("AGSIGNAL_API_KEY")
+        or os.environ.get("UNS_API_KEY")
         or producer_key
     )
 

@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 keywords = ["notifications", "alerts", "messaging", "mcp", "governance", "audit", "agents"]
 authors = [
-    {name = "AGSignal Maintainers"}
+    {name = "UNS Maintainers"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# HTTP runtime: needed to run AGSignal Core / AGSignal Console FastAPI apps.
+# HTTP runtime: needed to run UNS Core / UNS Console FastAPI apps.
 # Includes the Prometheus exposition layer and the slowapi-backed rate limiter.
 server = [
     "fastapi>=0.100.0",
@@ -87,11 +87,10 @@ all = [
 ]
 
 [project.scripts]
-uns = "agsignal.app:main"
+uns = "uns.app:main"
 uns-migrate = "uns.migrate:main"
 uns-maintain = "uns.maintenance:main"
-uns-mcp = "agsignal_mcp.transports.stdio:main"
-agsignal = "agsignal.app:main"
+uns-mcp = "uns_mcp.transports.stdio:main"
 
 [project.urls]
 Homepage = "https://github.com/ylecoyote/uns"
@@ -102,7 +101,7 @@ Documentation = "https://ylecoyote.github.io/uns/"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["uns*", "agsignal*", "agsignal_mcp*", "notification*", "db*", "ui_client*"]
+include = ["uns*", "uns_mcp*", "notification*", "db*", "ui_client*"]
 
 [tool.setuptools.package-data]
 # Ship PEP 561 type-information markers in every package so downstream
@@ -150,7 +149,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agsignal", "notification", "db", "apps"]
+known-first-party = ["uns", "uns_mcp", "notification", "db", "apps"]
 
 [tool.mypy]
 python_version = "3.11"

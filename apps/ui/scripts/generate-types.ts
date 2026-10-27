@@ -1,5 +1,5 @@
 /**
- * Generates apps/ui/src/types/generated.ts from the AGSignal Console OpenAPI
+ * Generates apps/ui/src/types/generated.ts from the UNS Console OpenAPI
  * spec. Spec is exported offline by importing the FastAPI app directly,
  * avoiding any dependency on a running Console process.
  *
@@ -18,9 +18,9 @@ const REPO_ROOT = join(ROOT, "..", "..");
 const OUT_FILE = join(ROOT, "src", "types", "generated.ts");
 
 async function main(): Promise<void> {
-  console.log("Exporting OpenAPI spec from agsignal.app via uv run python...");
+  console.log("Exporting OpenAPI spec from uns.app via uv run python...");
   const specJson = execSync(
-    `uv run python -c "import os, json; os.environ['AGSIGNAL_ENABLE_DOCS']='true'; from agsignal.app import create_app; print(json.dumps(create_app(skip_persistence_config=True).openapi()))"`,
+    `uv run python -c "import os, json; os.environ['UNS_ENABLE_DOCS']='true'; from uns.app import create_app; print(json.dumps(create_app(skip_persistence_config=True).openapi()))"`,
     { cwd: REPO_ROOT, stdio: ["ignore", "pipe", "inherit"], maxBuffer: 32 * 1024 * 1024 },
   ).toString();
 

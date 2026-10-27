@@ -107,7 +107,7 @@ async def transport_checks():
     token = base64.urlsafe_b64encode(SETTINGS["UNS_API_KEY"].encode()).decode().rstrip("=")
     async with websockets.connect(
         "ws://127.0.0.1:18080/ws/agents/" + AGENT,
-        subprotocols=["agsignal.v1", "bearer." + token],
+        subprotocols=["uns.v1", "bearer." + token],
         origin=BASE,
     ) as websocket:
         check(
@@ -295,7 +295,7 @@ SQLAlchemyPolicyStore(r.sessions).save_snapshot(policies);r.engine.dispose()
         timeout["notification_id"] in docker("exec", "uns-local", "cat", "/data/responses.jsonl"),
     )
     docker("stop", "-t", "15", "uns-local")
-    seed = "from recording_runtime import make_runtime;from agsignal.responses import SendNotificationRequest;import json,sys;r=make_runtime();a=r.accept(SendNotificationRequest(**json.load(sys.stdin)),principal='local-operator');print(a.notification_id);r.engine.dispose()"
+    seed = "from recording_runtime import make_runtime;from uns.responses import SendNotificationRequest;import json,sys;r=make_runtime();a=r.accept(SendNotificationRequest(**json.load(sys.stdin)),principal='local-operator');print(a.notification_id);r.engine.dispose()"
     pending = docker(
         "run",
         "--rm",

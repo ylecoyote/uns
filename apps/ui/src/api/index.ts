@@ -1,5 +1,5 @@
 /**
- * Central API exports for AGSignal Console.
+ * Central API exports for UNS Console.
  *
  * This module provides a unified interface to all API functionality.
  * The client.ts module is the SINGLE SOURCE OF TRUTH for API communication.

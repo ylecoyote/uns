@@ -21,7 +21,7 @@ _default: Runtime | None = None
 
 
 def value(name: str, default: str = "") -> str:
-    return os.environ.get("UNS_" + name, os.environ.get("AGSIGNAL_" + name, default))
+    return os.environ.get("UNS_" + name, default)
 
 
 def configured_adapters() -> SimpleAdapterRegistry:

@@ -3,10 +3,10 @@ from uuid import uuid4
 
 import pytest
 
-from agsignal.responses import SendNotificationRequest
 from notification.adapters.base import AdapterStatus, BaseAdapter, DeliveryResult, HealthCheckResult
 from notification.models import AckStatus, Channel, DeliveryStatus
 from notification.service import SimpleAdapterRegistry
+from uns.responses import SendNotificationRequest
 from uns.runtime import Conflict, Runtime
 
 
@@ -134,16 +134,16 @@ def test_guaranteed_websocket_only_is_rejected(setup):
 async def test_http_sdk_mcp_share_identity_and_actual_delivery(setup):
     from fastapi.testclient import TestClient
 
-    from agsignal.app import create_app
-    from agsignal_mcp.runtime import MCPRuntimeConfig, RuntimeState
-    from agsignal_mcp.tools import SendSignalInput, send_signal
+    from uns.app import create_app
     from uns.client import Client
+    from uns_mcp.runtime import MCPRuntimeConfig, RuntimeState
+    from uns_mcp.tools import SendSignalInput, send_signal
 
     runtime, adapter, _, _ = setup
     payload = request()
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "local-test"
-    app.state.agsignal_api_principal = "p"
+    app.state.uns_api_key = "local-test"
+    app.state.uns_api_principal = "p"
     client = TestClient(app, headers={"Authorization": "Bearer local-test"})
     received = client.post("/api/v1/notifications", json=payload.model_dump(mode="json"))
     assert received.status_code == 202, received.text
@@ -256,13 +256,13 @@ def test_policy_reload_failure_keeps_registry_and_database(setup, tmp_path, monk
     from fastapi.testclient import TestClient
     from sqlalchemy import select
 
-    from agsignal.app import create_app
     from db.models import PersistedNotificationPolicy
+    from uns.app import create_app
 
     runtime, _, _, _ = setup
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "key"
-    app.state.agsignal_api_principal = "p"
+    app.state.uns_api_key = "key"
+    app.state.uns_api_principal = "p"
     client = TestClient(app, headers={"Authorization": "Bearer key"})
     path = tmp_path / "policies"
     path.mkdir()
@@ -378,12 +378,12 @@ async def test_preview_best_effort_and_override_provenance(setup):
 async def test_console_projects_policy_delivery_and_response(setup):
     from fastapi.testclient import TestClient
 
-    from agsignal.app import create_app
+    from uns.app import create_app
 
     runtime, _, _, _ = setup
     app = create_app(runtime=runtime, skip_persistence_config=True)
-    app.state.agsignal_api_key = "test-console-key"
-    app.state.agsignal_api_principal = "p"
+    app.state.uns_api_key = "test-console-key"
+    app.state.uns_api_principal = "p"
     client = TestClient(app, headers={"Authorization": "Bearer test-console-key"})
     response = await runtime.send(request(), principal="p")
     runtime.acknowledge(response.notification_id, actor="p")

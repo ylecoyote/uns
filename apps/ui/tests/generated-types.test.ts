@@ -1,7 +1,7 @@
 /**
  * Sanity test for the generated OpenAPI types. Doesn't validate every type
  * exhaustively — just confirms the file is present, parseable as TypeScript,
- * and contains expected endpoints and schemas from the AGSignal Console API.
+ * and contains expected endpoints and schemas from the UNS Console API.
  */
 
 import { describe, it, expectTypeOf } from "vitest";

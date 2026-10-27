@@ -1,7 +1,7 @@
 """Tests for typed governance engine exceptions."""
 
 
-from agsignal.governance.errors import (
+from uns.governance.errors import (
     ContextSchemaViolation,
     EngineFailure,
     GovernanceError,

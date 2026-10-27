@@ -44,4 +44,4 @@
    - [Producer Integration Guide](user-guides/PRODUCER-INTEGRATION-GUIDE.md) — End-to-end recipes for Python (`uns.Client`), HTTP REST, and WebSockets
    - [Agent & MCP Integration Guide](user-guides/AGENT-MCP-GUIDE.md) — Safe MCP host setup, tool catalog, and simulation-first agent workflows
 
-Historical specifications are indexed in [migration and provenance](MIGRATION.md). They do not override current contracts. The package names `notification` and `agsignal` are retained implementation/compatibility details, not separate products.
+Historical specifications are indexed in [migration and provenance](MIGRATION.md). They do not override current contracts. The package names `notification` and `uns` are retained implementation/compatibility details, not separate products.

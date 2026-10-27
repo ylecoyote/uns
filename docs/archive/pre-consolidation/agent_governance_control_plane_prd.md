@@ -1,6 +1,6 @@
 > Historical product vision. Superseded by docs/PRODUCT.md.
 
-# PRD: AGSignal — Agent Governance Signaling Control Plane
+# PRD: UNS — Agent Governance Signaling Control Plane
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Last updated | 2026-05-08 |
 | Status | Canonical |
 | Supersedes | v1.x ("Unified Notification & Signaling System") under Vision A scope |
-| Authoritative location | `_AGSignal/agent_governance_control_plane_prd.md` |
+| Authoritative location | `_UNS/agent_governance_control_plane_prd.md` |
 
 > **Major version note (2.0):** This PRD has been re-scoped from Vision A (comprehensive governance product with sidecar interception, ODRL DSL, JWS-mandated approvals, SPIFFE/SPIRE workload identity, Merkle ledger, FPGA latency tier, hallucination detection) to **Vision B+: a domain-agnostic governance control plane with a plugin ecosystem**. Crypto/identity/durability/compliance features now live in **commercial plugins** layered on top of OSS core extension points. Network interception is **architecturally decoupled** to a separate ExecutionGate project. See §11 (Open ADR-Pending Items) and the design-sync conflict report at `docs/internal/superpowers/specs/2026-05-08-stage1-design-sync-report.md` for the rationale behind each change.
 
@@ -18,7 +18,7 @@
 
 ### 1.1 One-line Summary
 
-AGSignal is the **runtime HITL (Human-in-the-Loop) Approval Control Plane for AI agents** — the neutral, vendor-portable primitive (`REQUIRE_APPROVAL → notification → human ACK → resume callback`) that cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) and framework-native HITL features don't ship as a first-class product. AGSignal **complements** those stacks via cloud-stack bridge plugins; it does not compete with them. Apache 2.0 OSS core; commercial plugins (Stack Bridges, identity/crypto, durable workflow, compliance templates) layered on stable extension points.
+UNS is the **runtime HITL (Human-in-the-Loop) Approval Control Plane for AI agents** — the neutral, vendor-portable primitive (`REQUIRE_APPROVAL → notification → human ACK → resume callback`) that cloud-vendor agent-governance stacks (Microsoft Agent 365 + AGT, AWS Bedrock AgentCore, Google Vertex AI Governance) and framework-native HITL features don't ship as a first-class product. UNS **complements** those stacks via cloud-stack bridge plugins; it does not compete with them. Apache 2.0 OSS core; commercial plugins (Stack Bridges, identity/crypto, durable workflow, compliance templates) layered on stable extension points.
 
 ### 1.2 Background
 
@@ -30,7 +30,7 @@ This paradox is not specific to financial services. Healthcare, critical infrast
 
 #### 1.2.2 Why a separate control plane
 
-Solving this paradox in every agent runtime is wasteful and error-prone. The governance concerns — policy evaluation, approval workflow, signed audit, identity, notification routing — are common across domains. They are also high-stakes: a bug in approval logic can cascade into regulatory liability. AGSignal extracts these concerns into a dedicated control plane that agent runtimes (and domain-specific governors) integrate against.
+Solving this paradox in every agent runtime is wasteful and error-prone. The governance concerns — policy evaluation, approval workflow, signed audit, identity, notification routing — are common across domains. They are also high-stakes: a bug in approval logic can cascade into regulatory liability. UNS extracts these concerns into a dedicated control plane that agent runtimes (and domain-specific governors) integrate against.
 
 #### 1.2.3 Why a plugin ecosystem (not "core + enterprise edition")
 
@@ -38,13 +38,13 @@ Vision A bundled identity, crypto, compliance templates, and durable execution i
 
 #### 1.2.4 Pre-execution-first positioning
 
-Stage 2 research identified three semantically distinct gate types in production governance systems: **pre-execution gates** (authorization controls — block before side effects), **in-execution gates** (enforcement controls — sidecar/inline runtime constraints), and **post-execution gates** (assurance controls — retrospective review and reconciliation). AGSignal v1 is **pre-execution-first**: it serves as the authorization control plane that produces decision artifacts and approval workflows *before* an action's side effects occur.
+Stage 2 research identified three semantically distinct gate types in production governance systems: **pre-execution gates** (authorization controls — block before side effects), **in-execution gates** (enforcement controls — sidecar/inline runtime constraints), and **post-execution gates** (assurance controls — retrospective review and reconciliation). UNS v1 is **pre-execution-first**: it serves as the authorization control plane that produces decision artifacts and approval workflows *before* an action's side effects occur.
 
-AGSignal explicitly does **not** claim:
+UNS explicitly does **not** claim:
 - **In-execution enforcement** ownership (that's the **ExecutionGate** sibling project's responsibility — sidecar/network interception runs in the data plane).
-- **Post-execution review** ownership (retrospective review, reconciliation, and compensation are downstream concerns; AGSignal's audit streams provide *authorization evidence*, not execution evidence).
+- **Post-execution review** ownership (retrospective review, reconciliation, and compensation are downstream concerns; UNS's audit streams provide *authorization evidence*, not execution evidence).
 
-Real-world architectures typically combine all three tiers: high-risk actions get pre-execution approval; medium-risk get in-execution constraints; low-risk get post-execution review. AGSignal does not implement the action classifier that routes between tiers — the classifier is a caller-side concern. AGSignal serves the pre-execution tier with strong primitives (decision evaluation, approval workflow, immutable audit, MCP tools) and integrates with sibling projects for the other tiers.
+Real-world architectures typically combine all three tiers: high-risk actions get pre-execution approval; medium-risk get in-execution constraints; low-risk get post-execution review. UNS does not implement the action classifier that routes between tiers — the classifier is a caller-side concern. UNS serves the pre-execution tier with strong primitives (decision evaluation, approval workflow, immutable audit, MCP tools) and integrates with sibling projects for the other tiers.
 
 ### 1.3 Target Audience
 
@@ -56,21 +56,21 @@ Per Stage 2 competitive analysis, demand for runtime HITL approval is concentrat
 - **Heads of Algorithmic Trading** and equivalent roles where money movements, irreversible API calls, and externally visible actions require human approval
 - **Regulatory bodies (external)** as audit-evidence consumers — SEC, FINRA, ESAs, and equivalent
 
-This segment buys: AGSignal core + Compliance Templates plugin + JWS-Identity / Merkle-Audit for non-repudiation. Highest dollar value per customer; lowest objection to commercial plugin pricing.
+This segment buys: UNS core + Compliance Templates plugin + JWS-Identity / Merkle-Audit for non-repudiation. Highest dollar value per customer; lowest objection to commercial plugin pricing.
 
 **Segment 2 — Agent platform teams operationalizing tool approval and runtime governance**
 
 - Engineering leaders deploying **Microsoft Agent 365 + Agent Governance Toolkit**, **AWS Bedrock AgentCore**, or **Google Vertex AI Agent Governance** who need the missing HITL approval layer that composes with their existing platform investment
 - DevOps / SRE teams responsible for the operational reliability of agent fleets and the on-call signal path
 
-This segment buys: AGSignal core + Stack Bridge plugin (Microsoft / AWS / GCP). Validates the complementary positioning; lowest friction to adoption.
+This segment buys: UNS core + Stack Bridge plugin (Microsoft / AWS / GCP). Validates the complementary positioning; lowest friction to adoption.
 
 **Segment 3 — Custom-agent builder teams**
 
 - Engineering teams building custom AI-agent applications on **LangGraph**, **AutoGen**, **CrewAI**, or framework-only stacks — currently stitching approval flows together from Slack approval buttons + custom callback handlers + email links + webhook receivers + Temporal workflows + manual UIs
 - Independent product teams without enterprise cloud-vendor commitments
 
-This segment adopts: AGSignal core OSS only (initially); upgrades to commercial DurableWorkflow plugin when production durability matters. Largest top-of-funnel; lowest dollar value per customer.
+This segment adopts: UNS core OSS only (initially); upgrades to commercial DurableWorkflow plugin when production durability matters. Largest top-of-funnel; lowest dollar value per customer.
 
 ---
 
@@ -78,11 +78,11 @@ This segment adopts: AGSignal core OSS only (initially); upgrades to commercial 
 
 These eight commitments shape every decision in this PRD. They cannot be violated by feature requests without revisiting the document at the version-major level.
 
-### 2.1 AGSignal core never participates in execution
+### 2.1 UNS core never participates in execution
 
-AGSignal is a **control plane**. It does not intercept network traffic, route trades, suspend in-flight execution loops, or block API calls between an agent and an external service. It evaluates policy, signals notifications, captures ACKs, audits decisions, and emits resume callbacks. Network-level enforcement, if required, is the responsibility of a separate **ExecutionGate** project (Apache 2.0; out of scope for this PRD) that consumes AGSignal as a notification destination.
+UNS is a **control plane**. It does not intercept network traffic, route trades, suspend in-flight execution loops, or block API calls between an agent and an external service. It evaluates policy, signals notifications, captures ACKs, audits decisions, and emits resume callbacks. Network-level enforcement, if required, is the responsibility of a separate **ExecutionGate** project (Apache 2.0; out of scope for this PRD) that consumes UNS as a notification destination.
 
-This is the hard constraint preserved from the v0.2 functional spec. Any feature proposal that would require AGSignal to participate in execution timing is rejected at the scope filter, not at the design stage.
+This is the hard constraint preserved from the v0.2 functional spec. Any feature proposal that would require UNS to participate in execution timing is rejected at the scope filter, not at the design stage.
 
 ### 2.2 Domain-specific governance lives in plugins, not core
 
@@ -90,16 +90,16 @@ Trading-specific concepts (`notional_usd`, plan lifecycles, order_count threshol
 
 The domain plugin contract evolves in two stages:
 
-- **v1 — adapter shape**: domain code owns context-capsule construction, registers its `ContextSchema` with the engine, calls `agsignal.governance.evaluate(policy, context)`, and translates `ALLOW | REQUIRE_APPROVAL | DENY` back into domain semantics.
-- **v2+ — Protocol shape**: AGSignal defines an `AgentGovernor` Protocol that domain plugins implement. The Protocol is extracted from the v1 adapter shape only after a second domain plugin confirms which abstractions are stable.
+- **v1 — adapter shape**: domain code owns context-capsule construction, registers its `ContextSchema` with the engine, calls `uns.governance.evaluate(policy, context)`, and translates `ALLOW | REQUIRE_APPROVAL | DENY` back into domain semantics.
+- **v2+ — Protocol shape**: UNS defines an `AgentGovernor` Protocol that domain plugins implement. The Protocol is extracted from the v1 adapter shape only after a second domain plugin confirms which abstractions are stable.
 
 ### 2.3 Crypto, identity, durability, compliance live in commercial plugins on top of core extension points
 
-There is no "AGSignal Enterprise Edition." The OSS core defines extension points (Protocols and hooks; see §2.6). Commercial plugins implement them. Customers pick the plugins they need à la carte: JWS-Identity if they need signed approvals, SPIFFE-Auth if they need workload identity, Merkle-Audit if they need cryptographic non-repudiation, and so on. Each plugin is independently licensed and independently versioned.
+There is no "UNS Enterprise Edition." The OSS core defines extension points (Protocols and hooks; see §2.6). Commercial plugins implement them. Customers pick the plugins they need à la carte: JWS-Identity if they need signed approvals, SPIFFE-Auth if they need workload identity, Merkle-Audit if they need cryptographic non-repudiation, and so on. Each plugin is independently licensed and independently versioned.
 
 ### 2.4 Approval Workflow is async by default, callback/webhook-driven
 
-The default Approval Workflow is asynchronous and **callback/webhook-driven**. The caller provides a `callback_url` (or webhook target) when calling `evaluate()`; AGSignal stores it with the pending decision; on ACK, AGSignal POSTs the finalized decision (with `decision_id` for idempotent resume) to the callback URL. **Polling is supported as a fallback transport** (`GET /decisions/<id>/status`) for callers without webhook infrastructure but is not the recommended default — production literature consistently identifies polling as the weakest option.
+The default Approval Workflow is asynchronous and **callback/webhook-driven**. The caller provides a `callback_url` (or webhook target) when calling `evaluate()`; UNS stores it with the pending decision; on ACK, UNS POSTs the finalized decision (with `decision_id` for idempotent resume) to the callback URL. **Polling is supported as a fallback transport** (`GET /decisions/<id>/status`) for callers without webhook infrastructure but is not the recommended default — production literature consistently identifies polling as the weakest option.
 
 The engine never blocks waiting internally. The agent runtime is responsible for managing its own suspension/resumption — typically via a durable orchestrator (Temporal, LangGraph, Restate). Synchronous "block until approved" semantics are *not* a core concern; if they are needed, they are introduced by a plugin that wraps the async API. The exact retry/timeout/escalation contract for callback semantics is **ADR-pending** (see §11, ADR-001).
 
@@ -128,11 +128,11 @@ These are NOT one ledger. **Approval completion is not proof of policy correctne
 
 ### 2.8 Event schema is custom Pydantic; CloudEvents adoption is deferred to ADR
 
-Vision A mandated a CloudEvents envelope for every event. Vision B+ uses a custom Pydantic schema (already shipped in v0.2 for notifications) **with envelope/data separation**: top-level fields are AGSignal-specific (e.g., `notification_id`, `intent`, `delivery_mode`), business payload lives in `metadata: dict`. This enables a low-cost CloudEvents retrofit if adopted post-v1 without forcing it now. CloudEvents adoption is **ADR-pending** (see §11, ADR-002).
+Vision A mandated a CloudEvents envelope for every event. Vision B+ uses a custom Pydantic schema (already shipped in v0.2 for notifications) **with envelope/data separation**: top-level fields are UNS-specific (e.g., `notification_id`, `intent`, `delivery_mode`), business payload lives in `metadata: dict`. This enables a low-cost CloudEvents retrofit if adopted post-v1 without forcing it now. CloudEvents adoption is **ADR-pending** (see §11, ADR-002).
 
 ### 2.9 Architectural Rationale: lightweight built-in Approval Workflow
 
-AGSignal core's inclusion of Approval Workflow inside the OSS core is a deliberate design choice. Stage 2 production-pattern research identified five viable HITL approval patterns: (A) PDP + Temporal signals, (B) Step Functions callback token, (C) Restate awakeables, (D) Airflow 3.1 HITLOperator, (E) Casbin enforcer + custom orchestrator. AGSignal's positioning across these:
+UNS core's inclusion of Approval Workflow inside the OSS core is a deliberate design choice. Stage 2 production-pattern research identified five viable HITL approval patterns: (A) PDP + Temporal signals, (B) Step Functions callback token, (C) Restate awakeables, (D) Airflow 3.1 HITLOperator, (E) Casbin enforcer + custom orchestrator. UNS's positioning across these:
 
 - **OSS core (v1)**: ships an in-process **lightweight built-in orchestrator** behind the `WorkflowOrchestrator` Protocol — Pattern A-shaped (PDP + lightweight workflow) but in-memory rather than Temporal-durable. Sufficient for non-regulated deployments. ACK lifecycle, timeouts, escalation; non-durable across platform restart.
 - **Commercial DurableWorkflow plugin**: maps to Pattern A (Temporal adapter) or Pattern C (Restate adapter), implementing the same `WorkflowOrchestrator` Protocol with durable backends. Customers needing exactly-once resume, multi-day pending approvals, or worker-restart survival install this plugin.
@@ -143,7 +143,7 @@ This gives "OSS core useful standalone for non-regulated deployments" without fo
 
 ## 3. Scope Boundary
 
-The diagram below names what is **inside the AGSignal repo (v1.0 OSS core)**, what is **architecturally decoupled** (separate project), what is **deferred to commercial plugins**, and what is **out entirely**.
+The diagram below names what is **inside the UNS repo (v1.0 OSS core)**, what is **architecturally decoupled** (separate project), what is **deferred to commercial plugins**, and what is **out entirely**.
 
 ```mermaid
 flowchart TB
@@ -152,7 +152,7 @@ flowchart TB
     classDef decoupled fill:#cce5ff,stroke:#004085,color:#004085
     classDef out fill:#f8d7da,stroke:#721c24,color:#721c24
 
-    subgraph CORE["AGSignal v1.0 OSS Core (Apache 2.0)"]
+    subgraph CORE["UNS v1.0 OSS Core (Apache 2.0)"]
         N["Notification & Signaling<br/>(intent routing, ACK lifecycle,<br/>channels, dedup, rate limiting)"]:::core
         D["Decision Engine<br/>evaluate policy, context →<br/>ALLOW REQUIRE_APPROVAL DENY"]:::core
         P["Policy DSL<br/>when/then with operator<br/>allowlist EQ NEQ GT IN EXISTS"]:::core
@@ -173,10 +173,10 @@ flowchart TB
     end
 
     subgraph DECOUPLED["Architecturally Decoupled (separate Apache 2.0 project)"]
-        EG["ExecutionGate<br/>network interception / sidecar /<br/>data-plane enforcement<br/>consumes AGSignal as a<br/>notification destination"]:::decoupled
+        EG["ExecutionGate<br/>network interception / sidecar /<br/>data-plane enforcement<br/>consumes UNS as a<br/>notification destination"]:::decoupled
     end
 
-    subgraph OUT["Out (not in any AGSignal-related project)"]
+    subgraph OUT["Out (not in any UNS-related project)"]
         H["Hallucination detection /<br/>RAG check<br/>(belongs in agent runtime)"]:::out
         DE["Durable execution / agent<br/>state checkpointing<br/>(use Temporal, LangGraph,<br/>Restate)"]:::out
     end
@@ -198,8 +198,8 @@ flowchart TB
 
 ### 4.1 Primary user personas
 
-- **Agent Runtime Developer** — integrates AGSignal into an agent platform; uses MCP tools and the Decision Engine.
-- **Domain Plugin Author** — builds a domain-specific governor (e.g., MIP-AG-Trading) on top of AGSignal core via the adapter shape.
+- **Agent Runtime Developer** — integrates UNS into an agent platform; uses MCP tools and the Decision Engine.
+- **Domain Plugin Author** — builds a domain-specific governor (e.g., MIP-AG-Trading) on top of UNS core via the adapter shape.
 - **Compliance Officer** — defines governance policy YAML, reviews ACKs and audit ledger entries, signs off on approval requests.
 - **On-Call Operator** — receives notifications, ACKs or dismisses them, manages break-glass when commercial Break-Glass plugin is installed.
 - **Commercial Plugin Vendor** — implements an extension-point Protocol (e.g., `AuditHook`) for a paid plugin.
@@ -221,8 +221,8 @@ So that a human reviewer is notified and the agent can resume once the decision 
 ```
 As a Domain Plugin Author
 I want to construct my own context capsule (e.g., trading-specific fields like notional_usd, order_count)
-And call agsignal.governance.evaluate(policy, context)
-So that domain logic stays in my plugin and AGSignal remains domain-agnostic.
+And call uns.governance.evaluate(policy, context)
+So that domain logic stays in my plugin and UNS remains domain-agnostic.
 ```
 
 ```
@@ -247,7 +247,7 @@ So that I can intervene before an irreversible action ships.
 ```
 As a Commercial Plugin Vendor
 I want stable extension point contracts (Protocols where multi-system precedent exists, callable hooks elsewhere) I can implement against
-So that my plugin (SPIFFE-Auth, DurableWorkflow, JWS-Identity, etc.) works against any AGSignal version that satisfies the contract.
+So that my plugin (SPIFFE-Auth, DurableWorkflow, JWS-Identity, etc.) works against any UNS version that satisfies the contract.
 ```
 
 ### 4.3 User Journey: Approval Workflow
@@ -255,7 +255,7 @@ So that my plugin (SPIFFE-Auth, DurableWorkflow, JWS-Identity, etc.) works again
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Runtime
-    participant AGS as AGSignal Core
+    participant AGS as UNS Core
     participant DE as Decision Engine
     participant Notify as Notification Layer
     participant Op as On-Call Operator
@@ -279,12 +279,12 @@ sequenceDiagram
 ### 4.4 Use cases
 
 1. **Pre-validation of a tool call**: agent calls `check_policy(action)` with a tentative action; receives `ALLOW | REQUIRE_APPROVAL | DENY` and a reason; chooses whether to proceed, ask for approval, or abandon.
-2. **High-stakes action approval**: agent calls `request_approval(context, action_details)`; AGSignal evaluates policy, emits notification, captures ACK, calls back into the agent runtime once decision is finalized.
+2. **High-stakes action approval**: agent calls `request_approval(context, action_details)`; UNS evaluates policy, emits notification, captures ACK, calls back into the agent runtime once decision is finalized.
 3. **Reasoning trace audit**: agent calls `log_decision_reasoning(trace_id, content)` to attach chain-of-thought or rationale to a decision in the audit ledger.
 4. **Policy authoring**: compliance officer writes governance policy YAML with `when`/`then` rules, deploys via the policy lifecycle (DRAFT → PREVIEW → ACTIVE → RETIRED).
-5. **Domain plugin integration**: MIP-AG-Trading constructs a trading-specific context, calls `agsignal.governance.evaluate(policy, context)`, translates the response back into ATP plan transitions. (Illustrative example; see §8.)
+5. **Domain plugin integration**: MIP-AG-Trading constructs a trading-specific context, calls `uns.governance.evaluate(policy, context)`, translates the response back into ATP plan transitions. (Illustrative example; see §8.)
 6. **Commercial plugin integration**: an enterprise installs JWS-Identity to require signed approvals; the IdentityProvider extension point is now satisfied by JWS rather than the OSS default.
-7. **Decoupled execution enforcement**: an HFT operator deploys ExecutionGate alongside AGSignal; ExecutionGate intercepts orders and consults AGSignal for governance decisions; AGSignal itself never sits in the data path.
+7. **Decoupled execution enforcement**: an HFT operator deploys ExecutionGate alongside UNS; ExecutionGate intercepts orders and consults UNS for governance decisions; UNS itself never sits in the data path.
 
 ---
 
@@ -339,7 +339,7 @@ The Decision Engine is **two-layer** (Architectural Commitment §2.5):
   subject_id           : str          # who initiated the request (resolved via IdentityProvider hook)
 
   # Optional (None when not applicable; SHOULD be populated when context permits)
-  correlation_id       : str | None   # cross-AGSignal-stream forensic linkage (Decision + Approval + Delivery)
+  correlation_id       : str | None   # cross-UNS-stream forensic linkage (Decision + Approval + Delivery)
   trace_id             : str | None   # distributed-trace integration (W3C Trace Context / OpenTelemetry); distinct from correlation_id
   span_id              : str | None   # sub-trace causal node
   parent_span_id       : str | None   # trace tree reconstruction
@@ -355,7 +355,7 @@ The Decision Engine is **two-layer** (Architectural Commitment §2.5):
   Additional fields MAY be added in minor versions; existing fields MUST NOT be removed or have semantics changed without a major version bump.
 
   - AC: `DecisionRecord` MUST be the canonical return type from both `decide()` and `evaluate()`. Callers downstream of either entrypoint MUST be able to consume the same shape.
-  - AC: **`correlation_id` and `trace_id` are semantically distinct.** `correlation_id` is for cross-AGSignal-stream linkage (Decision + Approval + Delivery audit streams). `trace_id` is for distributed-trace integration with the caller's tracing infrastructure (W3C Trace Context / OpenTelemetry). They MUST NOT be conflated; populating one does not satisfy the other.
+  - AC: **`correlation_id` and `trace_id` are semantically distinct.** `correlation_id` is for cross-UNS-stream linkage (Decision + Approval + Delivery audit streams). `trace_id` is for distributed-trace integration with the caller's tracing infrastructure (W3C Trace Context / OpenTelemetry). They MUST NOT be conflated; populating one does not satisfy the other.
   - AC: **`subject_id` is required even in OSS single-tenant deployments.** The Default IdentityProvider (M8.4) resolves it from HMAC session tokens; alternatives via JWS-Identity / SPIFFE-Auth commercial plugins.
   - AC: **`parent_decision_id` is the replay/re-evaluation linkage**, not `correlation_id`. A re-evaluation after policy changes, context changes, or operator correction MUST set `parent_decision_id` to the prior `decision_id`.
   - AC: **`request_origin` is structured, not a single string** — IP, hostname, region, and jurisdiction are separate fields. Single-string origins (e.g., URLs, hostnames alone) are insufficient for forensic jurisdiction analysis.
@@ -371,7 +371,7 @@ The Decision Engine is **two-layer** (Architectural Commitment §2.5):
   - AC: Policy YAML MUST be parsed deterministically. Two identical policies MUST produce identical `policy_config_hash`.
 - [ ] **M3.2** Operator allowlist: `EQ`, `NEQ`, `GT`, `GTE`, `LT`, `LTE`, `IN`, `NOT_IN`, `EXISTS`, `NOT_EXISTS`, `MATCHES` (regex; bounded).
   - AC: Operators outside the allowlist MUST be rejected at policy load. Regex MUST be subject to a length and complexity cap to prevent ReDoS.
-- [ ] **M3.3** Domain-agnostic field names. The DSL takes paths into the supplied `context` map; AGSignal does not reserve trading-specific or any other domain-specific names.
+- [ ] **M3.3** Domain-agnostic field names. The DSL takes paths into the supplied `context` map; UNS does not reserve trading-specific or any other domain-specific names.
   - AC: Two policies authored against different domains (e.g., a trading policy and a healthcare-PHI-access policy) MUST be parseable by the same loader without code change.
 - [ ] **M3.4** **`ContextSchema` registration** for type-safe domain integration. Domain code registers a declarative schema (allowed fields, types, validation rules) at engine construction time. The engine validates every `context` capsule and every policy field reference against the registered schema at policy-load time.
   - AC: Policies referencing fields not in the registered `ContextSchema` MUST be rejected at load time, not at evaluation time.
@@ -386,12 +386,12 @@ The Decision Engine is **two-layer** (Architectural Commitment §2.5):
 #### M5. Approval Workflow
 
 - [ ] **M5.1** `REQUIRE_APPROVAL → notification (require_ack=true) → ACK → APPROVED → callback`.
-  - AC: When the Decision Engine returns `REQUIRE_APPROVAL`, AGSignal MUST emit a notification carrying the `decision_id` and MUST register the caller-supplied `callback_url` (if any) with the pending decision.
-- [ ] **M5.2** **Callback/webhook by default** (Architectural Commitment §2.4). On ACK, AGSignal POSTs the finalized DecisionRecord to the registered `callback_url` with `decision_id` for idempotent resume.
+  - AC: When the Decision Engine returns `REQUIRE_APPROVAL`, UNS MUST emit a notification carrying the `decision_id` and MUST register the caller-supplied `callback_url` (if any) with the pending decision.
+- [ ] **M5.2** **Callback/webhook by default** (Architectural Commitment §2.4). On ACK, UNS POSTs the finalized DecisionRecord to the registered `callback_url` with `decision_id` for idempotent resume.
   - AC: Callback POST MUST be retried with exponential backoff on failure (default: 3 retries over ~10 minutes; configurable).
   - AC: Callback failure after retries MUST surface as a Delivery Audit entry AND a degraded-decision marker; it MUST NOT silently lose the approved decision.
   - AC: Callback signing (HMAC) using the Default IdentityProvider's session key MUST be supported, so callers can verify callback authenticity.
-  - AC: **Receiver-side idempotency requirement**: callers MUST handle duplicate callback POSTs idempotently using `decision_id` as the dedup key. AGSignal's at-least-once retry semantics combined with caller's idempotent receive yields effectively-once resume. (Per Stage 2 production-pattern research: even orchestrators with exactly-once wake-up semantics like Restate awakeables require idempotent receivers; AGSignal does not promise stronger semantics than its caller can absorb.)
+  - AC: **Receiver-side idempotency requirement**: callers MUST handle duplicate callback POSTs idempotently using `decision_id` as the dedup key. UNS's at-least-once retry semantics combined with caller's idempotent receive yields effectively-once resume. (Per Stage 2 production-pattern research: even orchestrators with exactly-once wake-up semantics like Restate awakeables require idempotent receivers; UNS does not promise stronger semantics than its caller can absorb.)
 - [ ] **M5.3** **Polling fallback transport** for callers without webhook infrastructure: `GET /decisions/<decision_id>/status` returns the current decision state and (when finalized) the full DecisionRecord.
   - AC: Polling MUST be eventually consistent with callback delivery. Documented as fallback-only; the recommended integration pattern is callback.
 - [ ] **M5.4** Engine never blocks waiting internally. The agent runtime is responsible for its own suspension/resumption (typically via a durable orchestrator).
@@ -519,8 +519,8 @@ These four principles are **enforced at code-review time**, not runtime, in v1. 
 
 - W1. **Network interception / sidecar / data-plane enforcement** — explicitly decoupled to the ExecutionGate project.
 - W2. **Hallucination detection / RAG check** — out of scope; belongs in the agent runtime, not the governance layer.
-- W3. **Durable execution / agent state checkpointing** — out of scope; use Temporal, LangGraph, or Restate. AGSignal integrates via the `WorkflowOrchestrator` Protocol but does not implement the orchestrator.
-- W4. **ODRL DSL** — replaced by the AGSignal `when`/`then` DSL with operator allowlist (M3). ODRL interop is a v2+ consideration only if explicit enterprise demand emerges.
+- W3. **Durable execution / agent state checkpointing** — out of scope; use Temporal, LangGraph, or Restate. UNS integrates via the `WorkflowOrchestrator` Protocol but does not implement the orchestrator.
+- W4. **ODRL DSL** — replaced by the UNS `when`/`then` DSL with operator allowlist (M3). ODRL interop is a v2+ consideration only if explicit enterprise demand emerges.
 - W5. **FPGA / sub-100µs latency tier** — explicitly out for v1.0; only revisited if HFT customers concretely demand it.
 - W6. **Multi-tenant control plane** — v1.0 is single-tenant; multi-tenancy is v2+.
 
@@ -546,33 +546,33 @@ The OSS core ships a **default implementation for each extension point** (M8). T
 
 ## 7. Out of Scope (Architecturally Decoupled / Out Entirely)
 
-### 7.1 Architecturally decoupled (separate Apache 2.0 project, consumes AGSignal)
+### 7.1 Architecturally decoupled (separate Apache 2.0 project, consumes UNS)
 
-- **ExecutionGate** — network interception, sidecar, data-plane enforcement. ExecutionGate is a standalone project that consumes AGSignal as a notification destination. It is not part of the AGSignal repo or the AGSignal release lifecycle. Customers needing pre-execution network-level blocking install ExecutionGate alongside AGSignal.
+- **ExecutionGate** — network interception, sidecar, data-plane enforcement. ExecutionGate is a standalone project that consumes UNS as a notification destination. It is not part of the UNS repo or the UNS release lifecycle. Customers needing pre-execution network-level blocking install ExecutionGate alongside UNS.
 
-### 7.2 Out entirely (not in any AGSignal-related project)
+### 7.2 Out entirely (not in any UNS-related project)
 
-- **Hallucination detection / RAG check** — belongs in the agent runtime. AGSignal *audits* hallucination scores producers supply (e.g., as fields in `context`), but it does not *perform* the check.
-- **Durable execution / agent state checkpointing** — use existing orchestrators (Temporal, LangGraph, Restate). AGSignal integrates with them via the `WorkflowOrchestrator` Protocol but does not reinvent their primitives.
+- **Hallucination detection / RAG check** — belongs in the agent runtime. UNS *audits* hallucination scores producers supply (e.g., as fields in `context`), but it does not *perform* the check.
+- **Durable execution / agent state checkpointing** — use existing orchestrators (Temporal, LangGraph, Restate). UNS integrates with them via the `WorkflowOrchestrator` Protocol but does not reinvent their primitives.
 
 ---
 
 ## 8. Domain Plugin Pattern (Illustrative, Not Load-Bearing)
 
-Domain-specific governance lives in domain plugins, not in AGSignal core (Architectural Commitment §2.2).
+Domain-specific governance lives in domain plugins, not in UNS core (Architectural Commitment §2.2).
 
 ### 8.1 Adapter shape (v1)
 
 A domain plugin owns:
 
-1. **Context capsule construction**: the plugin extracts whatever domain-specific fields matter (e.g., `notional_usd`, `patient_id`, `operation_class`) and assembles them into a generic `context` map suitable for AGSignal.
-2. **Calling AGSignal**: `agsignal.governance.evaluate(policy, context)`.
+1. **Context capsule construction**: the plugin extracts whatever domain-specific fields matter (e.g., `notional_usd`, `patient_id`, `operation_class`) and assembles them into a generic `context` map suitable for UNS.
+2. **Calling UNS**: `uns.governance.evaluate(policy, context)`.
 3. **Translating the result**: the plugin maps `ALLOW | REQUIRE_APPROVAL | DENY` back into domain-native semantics (plan transitions, workflow states, etc.).
-4. **Domain-specific policy YAML**: lives in the domain plugin's repo, not in AGSignal's.
+4. **Domain-specific policy YAML**: lives in the domain plugin's repo, not in UNS's.
 
 ### 8.2 Protocol shape (v2+)
 
-When at least two domain plugins exist, AGSignal will extract an `AgentGovernor` Protocol that captures the stable abstractions observed across both. Plugins then implement the Protocol rather than wrapping the adapter shape directly. This is a v2+ concern; we do not build the Protocol speculatively.
+When at least two domain plugins exist, UNS will extract an `AgentGovernor` Protocol that captures the stable abstractions observed across both. Plugins then implement the Protocol rather than wrapping the adapter shape directly. This is a v2+ concern; we do not build the Protocol speculatively.
 
 ### 8.3 Example: MIP-AG-Trading (one concrete instance)
 
@@ -582,7 +582,7 @@ MIP-AG-Trading is one domain plugin that uses the adapter shape. It owns:
 - Translation of `ALLOW | REQUIRE_APPROVAL | DENY` back into ATP plan transitions.
 - All trading-specific policy YAML (FINRA-relevant rules, position-limit constraints).
 
-**AGSignal does not depend on MIP.** MIP is referenced here to make the adapter shape concrete. Healthcare, defense, or any other domain plugin would follow the same pattern with its own context capsule and policy YAML.
+**UNS does not depend on MIP.** MIP is referenced here to make the adapter shape concrete. Healthcare, defense, or any other domain plugin would follow the same pattern with its own context capsule and policy YAML.
 
 ---
 
@@ -611,7 +611,7 @@ MIP-AG-Trading is one domain plugin that uses the adapter shape. It owns:
 ### 9.4 Scalability
 
 - v1.0 OSS core targets a single-tenant, vertically scalable deployment with horizontal scaling of stateless components (decision engine workers, notification delivery workers).
-- Multi-tenancy is v2+. Customers needing multi-tenant control planes today are expected to run one AGSignal instance per tenant.
+- Multi-tenancy is v2+. Customers needing multi-tenant control planes today are expected to run one UNS instance per tenant.
 
 ### 9.5 Compatibility
 
@@ -625,7 +625,7 @@ MIP-AG-Trading is one domain plugin that uses the adapter shape. It owns:
 
 ### 10.1 Quantitative metrics
 
-1. **Domain-agnostic verification**: at least two distinct domain plugins (e.g., MIP-AG-Trading plus one non-trading domain) are integrated against AGSignal core via the adapter shape, with no domain-specific names in core code or policy DSL. Measured by code review and a `grep` audit on the `agsignal.governance` and `agsignal.policy` modules.
+1. **Domain-agnostic verification**: at least two distinct domain plugins (e.g., MIP-AG-Trading plus one non-trading domain) are integrated against UNS core via the adapter shape, with no domain-specific names in core code or policy DSL. Measured by code review and a `grep` audit on the `uns.governance` and `uns.policy` modules.
 2. **Decision Engine performance**: p99 evaluation latency ≤ 5 ms on a policy of 100 rules, measured in CI on a reference VM.
 3. **GUARANTEED delivery invariant**: zero silent drops of `SAFETY` or `GOVERNANCE` notifications across staging and production for the v1.0 release. Audit ledger reconciliation confirms every produced notification has a delivery outcome (delivered, escalated, or visible degradation).
 4. **Audit completeness**: 100% of Decision Engine invocations produce a Decision Audit Ledger entry. Verified by matching `decision_id` counts between the Decision Engine emitter and the audit table.
@@ -634,7 +634,7 @@ MIP-AG-Trading is one domain plugin that uses the adapter shape. It owns:
 ### 10.2 Qualitative metrics
 
 1. **Compliance officer can author and deploy a policy without engineering involvement.** Measured by a usability evaluation: a non-engineer authors a `when`/`then` policy YAML, deploys to PREVIEW, observes "would-be" decisions in the audit ledger, and promotes to ACTIVE.
-2. **Domain plugin authors do not need to fork AGSignal core.** Measured by a code review of the second domain plugin: the plugin uses only the public adapter API (`agsignal.governance.evaluate`, `agsignal.notify`, `agsignal.audit`) without reaching into private modules.
+2. **Domain plugin authors do not need to fork UNS core.** Measured by a code review of the second domain plugin: the plugin uses only the public adapter API (`uns.governance.evaluate`, `uns.notify`, `uns.audit`) without reaching into private modules.
 3. **OSS / commercial split is unambiguous.** Measured by reviewing this PRD: every feature is classified as core (M1–M9), commercial plugin (§6), decoupled (§7.1), or out (§7.2). No item is left ambiguous.
 
 ---
@@ -661,7 +661,7 @@ These are decisions that the canonical PRD intentionally does not lock; each wil
 
 ### 12.1 Dependencies
 
-- **Existing v0.2 implementation** (`_AGSignal/docs/internal/prd.md`, the Ralphy-style narrow PRD) is the starting point. It already provides the Notification & Signaling layer (M1). It will be downgraded from "PRD" to "derived build-spec under this canonical PRD," updated with code-gen contracts for the new governance primitives (M2–M7).
+- **Existing v0.2 implementation** (`_UNS/docs/internal/prd.md`, the Ralphy-style narrow PRD) is the starting point. It already provides the Notification & Signaling layer (M1). It will be downgraded from "PRD" to "derived build-spec under this canonical PRD," updated with code-gen contracts for the new governance primitives (M2–M7).
 - **Pydantic v2** for all data contracts (notifications, decisions, policies, audit entries).
 - **FastAPI (async)** for the HTTP surface (matches v0.2 production architecture per HARD-04 resolution).
 - **Redis** for deduplication (`SETNX` + TTL) and rate limiting (token bucket); already in use in v0.2.
@@ -670,14 +670,14 @@ These are decisions that the canonical PRD intentionally does not lock; each wil
 
 ### 12.2 Constraints
 
-- AGSignal core MUST NOT directly depend on any commercial plugin. Plugins depend on core; not the reverse.
-- AGSignal core MUST NOT contain any vertical-domain identifiers (no `notional_usd`, no `patient_id`, no `transaction_amount` in the engine code path or the policy DSL operator set).
-- AGSignal core MUST NOT execute network-level enforcement. (Architectural Commitment §2.1.)
+- UNS core MUST NOT directly depend on any commercial plugin. Plugins depend on core; not the reverse.
+- UNS core MUST NOT contain any vertical-domain identifiers (no `notional_usd`, no `patient_id`, no `transaction_amount` in the engine code path or the policy DSL operator set).
+- UNS core MUST NOT execute network-level enforcement. (Architectural Commitment §2.1.)
 
 ### 12.3 Assumptions
 
-- Agent runtimes that integrate AGSignal handle their own suspension/resumption (typically via a durable orchestrator). AGSignal does not provide an agent state machine.
-- Domain plugins are responsible for their own context capsule construction. AGSignal does not enrich or transform domain-supplied context.
+- Agent runtimes that integrate UNS handle their own suspension/resumption (typically via a durable orchestrator). UNS does not provide an agent state machine.
+- Domain plugins are responsible for their own context capsule construction. UNS does not enrich or transform domain-supplied context.
 - Compliance officers can author YAML and read it. Visual policy authoring is a Could Have (C2), not Must Have.
 - A second domain plugin will materialize within the v1.0 release window or shortly thereafter, enabling the v2+ Protocol extraction (Architectural Commitment §2.2).
 
@@ -687,29 +687,29 @@ These are decisions that the canonical PRD intentionally does not lock; each wil
 |---|---|---|---|
 | Adapter shape ossifies before a second domain exists, making the eventual Protocol extraction painful. | High | Medium | Keep the v1 adapter shape narrow; resist adding convenience methods that are not domain-agnostic. Commit to the Protocol extraction in v2+ planning, not later. |
 | ADR-001 (sync vs async) decision breaks early callers. | Medium | Medium | Document the async-by-default contract clearly in v1.0; introduce sync only via an opt-in wrapper plugin, not by changing the core API. |
-| Commercial plugins fragment the user experience. | Medium | Medium | Define the four core extension points (M8) carefully; ship reference defaults that are usable for most non-regulated callers. Provide a single "AGSignal + plugins" composition guide. |
+| Commercial plugins fragment the user experience. | Medium | Medium | Define the four core extension points (M8) carefully; ship reference defaults that are usable for most non-regulated callers. Provide a single "UNS + plugins" composition guide. |
 | Hash-chain ledger semantics (M6.3) interact poorly with high-throughput decisions. | Medium | Low–Medium | Allow batched chaining (chain checkpoints rather than per-entry chaining) as an option; the base semantics are append-only with detectable tampering, not strict per-entry chaining. ADR-003 may revise. |
 | Policy DSL scope creep (operator allowlist grows). | Medium | High | Keep the allowlist closed and require an ADR or major-version bump to add operators. Convenience belongs in the capability/constraint convention layer (M4), not in new operators. |
 | Plugin trust model under-specified at v1.0. | High | High | ADR-005 is on the v1.0 critical path. Until resolved, OSS core ships with explicit-registration-only plugin loading (no auto-discovery of third-party plugins). |
-| Network interception users expect the OSS core to provide it. | Medium | Medium | Document ExecutionGate as a sibling project and link prominently. Provide a clear integration recipe (ExecutionGate → AGSignal as notification destination). |
+| Network interception users expect the OSS core to provide it. | Medium | Medium | Document ExecutionGate as a sibling project and link prominently. Provide a clear integration recipe (ExecutionGate → UNS as notification destination). |
 
 ---
 
 ## 13. Glossary (Cross-Document)
 
-This glossary is the source of truth for terminology used across the AGSignal doc set. It resolves SOFT-02 ("Policy" lives in three different places) and SOFT-03 ("State machine" overload) from the Stage 1 design-sync report.
+This glossary is the source of truth for terminology used across the UNS doc set. It resolves SOFT-02 ("Policy" lives in three different places) and SOFT-03 ("State machine" overload) from the Stage 1 design-sync report.
 
 ### 13.1 Policy concepts (resolves SOFT-02)
 
 - **GovernancePolicy** — domain-action-level decision policies. The `when`/`then` rules that the **Decision Engine** evaluates to produce `ALLOW | REQUIRE_APPROVAL | DENY`. **This is the policy primitive owned by this PRD** (M2, M3).
-- **NotificationPolicy** — routing/channel YAML. Controls delivery_mode, channels, ACK requirements, dedup, and rate limiting per notification_type. Owned by the Notification & Signaling Layer (M1). Lives in `_AGSignal/policies/`.
+- **NotificationPolicy** — routing/channel YAML. Controls delivery_mode, channels, ACK requirements, dedup, and rate limiting per notification_type. Owned by the Notification & Signaling Layer (M1). Lives in `_UNS/policies/`.
 - **AgentGovernorPolicy** — domain-specific governance configuration owned by a domain plugin (e.g., MIP-AG-Trading). Lives in the domain plugin's repo. Translates into `GovernancePolicy` rules and `context` field shape via the adapter shape (§8).
 
 These are three legitimately distinct concepts that historically shared the word "policy." The Vision B+ canonical convention is: **GovernancePolicy** = decision rules (this PRD); **NotificationPolicy** = routing YAML (M1); **AgentGovernorPolicy** = domain plugin's bundle (§8).
 
 ### 13.2 State machines (resolves SOFT-03)
 
-The AGSignal doc set previously used "state machine" to refer to three distinct lifecycles. The canonical names are:
+The UNS doc set previously used "state machine" to refer to three distinct lifecycles. The canonical names are:
 
 - **Decision lifecycle** — `PENDING_POLICY → PENDING_APPROVAL → APPROVED | REJECTED | TIMED_OUT`. Owned by the Decision Engine + Approval Workflow (M2, M5).
 - **Notification lifecycle** — `PENDING → DELIVERED → ACKED | DISMISSED | TIMED_OUT`. Owned by the Notification & Signaling Layer (M1.3).
@@ -719,7 +719,7 @@ These are three distinct state machines on three distinct objects (decisions, no
 
 ### 13.3 Audit streams (Architectural Commitment §2.7)
 
-AGSignal emits **three semantically distinct audit streams**, correlated by `correlation_id` + `decision_id`:
+UNS emits **three semantically distinct audit streams**, correlated by `correlation_id` + `decision_id`:
 
 - **Decision Audit** — every Decision Engine evaluation (M6.1). Records *what the policy decided* (the `DecisionRecord` plus context digest).
 - **Approval Audit** — every human ACK / DISMISS / TIMED_OUT in the Approval Workflow (M6.2). Records *what the human decided*.
@@ -728,53 +728,53 @@ AGSignal emits **three semantically distinct audit streams**, correlated by `cor
 These streams are correlated but **semantically distinct**:
 
 - **Approval completion is not proof of policy correctness.** The ACK only proves a human agreed; the Decision Audit captures what the policy actually evaluated.
-- **None of the three streams prove the action actually executed downstream.** AGSignal's audit substrate records *authorization* (Decision), *human decision* (Approval), and *notification delivery* (Delivery). It does NOT record whether the caller's action — the trade, the API call, the database write — actually happened. **Execution evidence is the caller's responsibility** and is the subject of a separate post-execution audit pipeline outside AGSignal's scope.
+- **None of the three streams prove the action actually executed downstream.** UNS's audit substrate records *authorization* (Decision), *human decision* (Approval), and *notification delivery* (Delivery). It does NOT record whether the caller's action — the trade, the API call, the database write — actually happened. **Execution evidence is the caller's responsibility** and is the subject of a separate post-execution audit pipeline outside UNS's scope.
 
-An auditor inspecting only the Approval Audit cannot reconstruct policy correctness; they need the Decision Audit. An auditor inspecting all three AGSignal streams cannot prove that the authorized action actually shipped; they need the caller's downstream execution log. The three AGSignal streams together provide *authorization-side* forensic completeness, not end-to-end forensic completeness.
+An auditor inspecting only the Approval Audit cannot reconstruct policy correctness; they need the Decision Audit. An auditor inspecting all three UNS streams cannot prove that the authorized action actually shipped; they need the caller's downstream execution log. The three UNS streams together provide *authorization-side* forensic completeness, not end-to-end forensic completeness.
 
 ### 13.4 Architectural roles
 
-- **AGSignal core** — the OSS Apache 2.0 control plane defined by this PRD. Domain-agnostic. Single repo (`_AGSignal/`).
-- **Domain plugin** — caller-side code that constructs domain-specific context capsules and translates AGSignal decisions into domain-native semantics. Examples: MIP-AG-Trading. Lives in the domain's own repo.
+- **UNS core** — the OSS Apache 2.0 control plane defined by this PRD. Domain-agnostic. Single repo (`_UNS/`).
+- **Domain plugin** — caller-side code that constructs domain-specific context capsules and translates UNS decisions into domain-native semantics. Examples: MIP-AG-Trading. Lives in the domain's own repo.
 - **Commercial plugin** — proprietary code that implements one of the OSS core extension points (M8). Examples: JWS-Identity, SPIFFE-Auth, Merkle-Audit, Break-Glass, DurableWorkflow, Compliance Templates, Enterprise Dashboards (§6).
-- **ExecutionGate** — a separate Apache 2.0 sibling project (out of this PRD's scope) that performs network-level execution gating and consumes AGSignal as a notification destination. Owned by a separate roadmap.
+- **ExecutionGate** — a separate Apache 2.0 sibling project (out of this PRD's scope) that performs network-level execution gating and consumes UNS as a notification destination. Owned by a separate roadmap.
 - **Agent runtime** — the platform that hosts the autonomous agent (LangGraph, AutoGen, MIP, custom). Responsible for its own suspension/resumption.
 
 ### 13.5 Other terms
 
-- **AGS / Agent Governance Signaling** — the long-term product category claim. AGSignal v1.0 is the reference implementation of AGS for the OSS core + commercial plugin ecosystem.
+- **AGS / Agent Governance Signaling** — the long-term product category claim. UNS v1.0 is the reference implementation of AGS for the OSS core + commercial plugin ecosystem.
 - **Context (or context capsule)** — the generic map of fields a caller supplies to the Decision Engine. Domain-specific names appear only inside the context payload, never in core code or policy DSL operators.
 - **policy_config_hash** — deterministic hash of the active GovernancePolicy YAML at decision time. Recorded on every Decision Audit Ledger entry to allow auditors to retrieve the exact policy version that produced any decision.
 - **Compliance-Autonomy Paradox** — the structural tension between agent autonomy and regulatory determinism. Framing inherited from Vision A; preserved as positioning narrative.
-- **Human-in-the-Loop (HITL)** — the interaction pattern where a human reviewer renders a decision before an agent proceeds. Realized in AGSignal via the Approval Workflow (M5); decoupled from any specific UI or transport.
-- **DORA / FINRA / SOX / HIPAA** — regulatory regimes relevant to compliance-template commercial plugins (§6). AGSignal core is regime-agnostic; commercial templates encode regime-specific rules.
+- **Human-in-the-Loop (HITL)** — the interaction pattern where a human reviewer renders a decision before an agent proceeds. Realized in UNS via the Approval Workflow (M5); decoupled from any specific UI or transport.
+- **DORA / FINRA / SOX / HIPAA** — regulatory regimes relevant to compliance-template commercial plugins (§6). UNS core is regime-agnostic; commercial templates encode regime-specific rules.
 
 ---
 
 ## 14. Appendix
 
-### 14.1 Relationship to other AGSignal docs
+### 14.1 Relationship to other UNS docs
 
 | Document | Relationship to this PRD |
 |---|---|
-| `_AGSignal/docs/internal/prd.md` (Ralphy-style narrow PRD) | **Derived build-spec** under this canonical PRD. Updated to add code-gen contracts for the new governance primitives (M2–M7). No longer carries strategic positioning. |
-| `_AGSignal/docs/internal/superpowers/specs/2026-05-08-vision-b-plus-design.md` | **Scope sketch** that anchors this PRD. Source of the Architectural Commitments and the in/out/deferred classification. |
-| `_AGSignal/docs/internal/superpowers/specs/2026-05-08-stage1-design-sync-report.md` | **Conflict report** that motivates the rewrite. Identifies the 14 conflicts (7 HARD, 5 SOFT, 2 DOCUMENTED-DIVERGENCE) in the prior PRD, all of which are resolved by Vision B+ scope or assigned to ADRs in §11. |
-| `_AGSignal/docs/uns/*` | **Historical strategic context.** Carries the prior conflicts. To be marked as superseded by this PRD or selectively pruned to retain only material that survives the Vision B+ scope filter. |
+| `_UNS/docs/internal/prd.md` (Ralphy-style narrow PRD) | **Derived build-spec** under this canonical PRD. Updated to add code-gen contracts for the new governance primitives (M2–M7). No longer carries strategic positioning. |
+| `_UNS/docs/internal/superpowers/specs/2026-05-08-vision-b-plus-design.md` | **Scope sketch** that anchors this PRD. Source of the Architectural Commitments and the in/out/deferred classification. |
+| `_UNS/docs/internal/superpowers/specs/2026-05-08-stage1-design-sync-report.md` | **Conflict report** that motivates the rewrite. Identifies the 14 conflicts (7 HARD, 5 SOFT, 2 DOCUMENTED-DIVERGENCE) in the prior PRD, all of which are resolved by Vision B+ scope or assigned to ADRs in §11. |
+| `_UNS/docs/uns/*` | **Historical strategic context.** Carries the prior conflicts. To be marked as superseded by this PRD or selectively pruned to retain only material that survives the Vision B+ scope filter. |
 | Future ADRs (ADR-001 through ADR-007) | Each resolves an explicit ADR-pending item in §11. To be created in `docs/adr/` per the documentation-criteria storage convention. |
 
 ### 14.2 Regulatory framing (preserved positioning, not core requirements)
 
-The Vision A PRD framed AGSignal extensively around DORA Article 20 timelines, FINRA Rule 3110 supervision requirements, FINRA CAT timestamping, and Rule 15c3-5 pre-trade controls. These framings are preserved here as **positioning** for the Compliance Templates commercial plugin (§6) and as background for compliance-officer-targeted user stories. They are **not requirements on the OSS core**: the core is regime-agnostic, and regime-specific rules are encoded in commercial template plugins.
+The Vision A PRD framed UNS extensively around DORA Article 20 timelines, FINRA Rule 3110 supervision requirements, FINRA CAT timestamping, and Rule 15c3-5 pre-trade controls. These framings are preserved here as **positioning** for the Compliance Templates commercial plugin (§6) and as background for compliance-officer-targeted user stories. They are **not requirements on the OSS core**: the core is regime-agnostic, and regime-specific rules are encoded in commercial template plugins.
 
 #### 14.2.1 Article 12 vs Annex IV split (EU AI Act)
 
-Stage 2 research mapped each production HITL pattern to EU AI Act requirements. AGSignal's split:
+Stage 2 research mapped each production HITL pattern to EU AI Act requirements. UNS's split:
 
-- **Article 12 (record-keeping)** is **generated automatically** by AGSignal: every Decision Engine evaluation, every Approval Workflow ACK, and every notification delivery produces a timestamped, correlated audit entry across the three streams (M6). Operators get Article 12 evidence as a side effect of using AGSignal.
-- **Annex IV (technical documentation)** is the **operator's responsibility** — it requires system-level documentation (architecture diagrams, risk-management process, oversight procedures, training data lineage, monitoring plan). AGSignal does not auto-generate Annex IV deliverables. The optional commercial **Compliance Templates plugin** (§6) provides starter templates and audit-export formats that materially reduce the operator's authoring burden but do not eliminate it.
+- **Article 12 (record-keeping)** is **generated automatically** by UNS: every Decision Engine evaluation, every Approval Workflow ACK, and every notification delivery produces a timestamped, correlated audit entry across the three streams (M6). Operators get Article 12 evidence as a side effect of using UNS.
+- **Annex IV (technical documentation)** is the **operator's responsibility** — it requires system-level documentation (architecture diagrams, risk-management process, oversight procedures, training data lineage, monitoring plan). UNS does not auto-generate Annex IV deliverables. The optional commercial **Compliance Templates plugin** (§6) provides starter templates and audit-export formats that materially reduce the operator's authoring burden but do not eliminate it.
 
-Operators planning EU AI Act high-risk system deployments should plan for Annex IV authoring as a separate workstream from AGSignal integration. Article 12 evidence "comes for free" with AGSignal usage; Annex IV does not.
+Operators planning EU AI Act high-risk system deployments should plan for Annex IV authoring as a separate workstream from UNS integration. Article 12 evidence "comes for free" with UNS usage; Annex IV does not.
 
 ### 14.3 Terminology reference
 
@@ -784,14 +784,14 @@ Operators planning EU AI Act high-risk system deployments should plan for Annex 
 - **FINRA** — Financial Industry Regulatory Authority (US; relevant to compliance templates).
 - **HITL** — Human-in-the-Loop (see §13.5).
 - **JWS** — JSON Web Signature (used by the JWS-Identity commercial plugin).
-- **MCP** — Model Context Protocol (the agent-tool interface AGSignal exposes governance tools through; M7).
+- **MCP** — Model Context Protocol (the agent-tool interface UNS exposes governance tools through; M7).
 - **mTLS** — Mutual TLS (used by SPIFFE-Auth commercial plugin).
-- **ODRL** — Open Digital Rights Language (W3C policy expression language; not used by AGSignal core, which uses its own `when`/`then` DSL).
+- **ODRL** — Open Digital Rights Language (W3C policy expression language; not used by UNS core, which uses its own `when`/`then` DSL).
 - **SPIFFE / SPIRE / SVID** — Secure Production Identity Framework / Server / Verifiable Identity Document (used by SPIFFE-Auth commercial plugin).
 
 ### 14.4 Document change history
 
 | Version | Date | Notes |
 |---|---|---|
-| 2.0 | 2026-05-08 | Re-scoped from Vision A to Vision B+. Removed sidecar / ODRL / FPGA / hallucination detection / CloudEvents-as-mandate. Reclassified JWS / SPIFFE / Merkle / Break-Glass / DurableWorkflow / Compliance Templates / Enterprise Dashboards as commercial plugins. Added Decision Engine, Policy DSL, Approval Workflow, Decision Audit Ledger, MCP governance tools, and four extension-point Protocols. Added cross-doc glossary. Listed seven ADR-pending items. Renamed system from "Unified Notification & Signaling System" to "AGSignal — Agent Governance Signaling Control Plane". |
+| 2.0 | 2026-05-08 | Re-scoped from Vision A to Vision B+. Removed sidecar / ODRL / FPGA / hallucination detection / CloudEvents-as-mandate. Reclassified JWS / SPIFFE / Merkle / Break-Glass / DurableWorkflow / Compliance Templates / Enterprise Dashboards as commercial plugins. Added Decision Engine, Policy DSL, Approval Workflow, Decision Audit Ledger, MCP governance tools, and four extension-point Protocols. Added cross-doc glossary. Listed seven ADR-pending items. Renamed system from "Unified Notification & Signaling System" to "UNS — Agent Governance Signaling Control Plane". |
 | 1.x | (prior) | Vision A scope; superseded. |

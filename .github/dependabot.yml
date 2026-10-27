@@ -7,7 +7,7 @@ updates:
     open-pull-requests-limit: 5
     versioning-strategy: widen
     ignore:
-      # agsignal_mcp targets the FastMCP 1.x runtime API (mcp[cli]>=1.0.0,<2)
+      # uns_mcp targets the FastMCP 1.x runtime API (mcp[cli]>=1.0.0,<2)
       - dependency-name: "mcp"
         versions: [">= 2.0.0"]
 

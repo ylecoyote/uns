@@ -27,7 +27,7 @@ These clarify previously underspecified interactions. Delivery evidence means pr
 
 ## Evidence and independent review
 
-The reviewer's exact 11 tests are preserved in `verification/iteration2/reviewer_reproductions.py`; all 11 baseline assertions failed locally. This is evidence of observed behavior, not acceptance of every assertion's contract. New executable regressions are in `tests/uns/test_iteration2_runtime.py`, `tests/uns/test_policy_read_isolation.py`, `tests/notification/test_delivery_attempt_evidence.py` and `tests/agsignal_mcp/test_runtime_bound_reads.py`.
+The reviewer's exact 11 tests are preserved in `verification/iteration2/reviewer_reproductions.py`; all 11 baseline assertions failed locally. This is evidence of observed behavior, not acceptance of every assertion's contract. New executable regressions are in `tests/uns/test_iteration2_runtime.py`, `tests/uns/test_policy_read_isolation.py`, `tests/notification/test_delivery_attempt_evidence.py` and `tests/uns_mcp/test_runtime_bound_reads.py`.
 
 The original reproduction is intentionally not the final pass gate: it expects no late SMTP completion, stale aggregate outcome mutation, unconditional execution of a now-conflicting replay, and removal of by-design retention payloads. The final tests exercise the documented contracts directly. Re-running the untouched reviewer file produces **5 passed, 6 failed** with these explicit dispositions:
 

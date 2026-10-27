@@ -21,12 +21,20 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from agsignal.api.read_models import (
+from notification.audit import InMemoryAuditStore
+from notification.models import (
+    AutonomyMode,
+    Channel,
+    DeliveryMode,
+    DeliveryStatus,
+    NotificationIntent,
+)
+from uns.api.read_models import (
     InMemoryReadModelAdapter,
     configure_read_model_adapter,
 )
-from agsignal.app import create_app
-from agsignal.responses import (
+from uns.app import create_app
+from uns.responses import (
     AuditEvent,
     AuditEventType,
     AutonomyContextResponse,
@@ -45,16 +53,8 @@ from agsignal.responses import (
     ResolutionSource,
     ResolutionStep,
 )
-from agsignal.responses import (
+from uns.responses import (
     UIErrorResponse as ErrorResponse,
-)
-from notification.audit import InMemoryAuditStore
-from notification.models import (
-    AutonomyMode,
-    Channel,
-    DeliveryMode,
-    DeliveryStatus,
-    NotificationIntent,
 )
 
 # =============================================================================
@@ -70,7 +70,7 @@ def client() -> TestClient:
     configure_read_model_adapter(fresh_adapter)
 
     app = create_app(skip_persistence_config=True)  # Explicit legacy read-model fixture
-    app.state.agsignal_api_key = "test-key"
+    app.state.uns_api_key = "test-key"
     return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
@@ -118,7 +118,7 @@ def populated_client() -> TestClient:
 
     configure_read_model_adapter(fresh_adapter)
     app = create_app(skip_persistence_config=True)  # Explicit legacy read-model fixture
-    app.state.agsignal_api_key = "test-key"
+    app.state.uns_api_key = "test-key"
     return TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 

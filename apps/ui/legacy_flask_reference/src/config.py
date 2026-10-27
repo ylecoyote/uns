@@ -1,10 +1,10 @@
-"""Configuration for AGSignal Console.
+"""Configuration for UNS Console.
 
 This module provides configuration management for the UI application,
 including API base URL and other environment-based settings.
 
 Environment Variables:
-    UNS_API_BASE_URL: Base URL for the AGSignal backend API (default: http://localhost:8000)
+    UNS_API_BASE_URL: Base URL for the UNS backend API (default: http://localhost:8000)
     UNS_UI_DEBUG: Enable debug mode (default: false)
     UNS_UI_REQUEST_TIMEOUT: Request timeout in seconds (default: 30)
 """
@@ -19,13 +19,13 @@ from typing import Any
 
 @dataclass(frozen=True)
 class UIConfig:
-    """Configuration for the AGSignal Console.
+    """Configuration for the UNS Console.
 
     This configuration is immutable (frozen) to prevent accidental modification
     after initialization.
 
     Attributes:
-        api_base_url: Base URL for the AGSignal backend API.
+        api_base_url: Base URL for the UNS backend API.
         debug: Whether debug mode is enabled.
         request_timeout: Request timeout in seconds.
         api_version: API version prefix (default: v1).

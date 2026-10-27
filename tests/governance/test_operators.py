@@ -2,8 +2,8 @@
 
 import pytest
 
-from agsignal.governance.errors import PolicyEvaluationError, PolicyLoadError
-from agsignal.governance.operators import Operator, evaluate_operator, parse_operator
+from uns.governance.errors import PolicyEvaluationError, PolicyLoadError
+from uns.governance.operators import Operator, evaluate_operator, parse_operator
 
 
 class TestOperatorEnum:

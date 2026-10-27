@@ -1,5 +1,5 @@
 /**
- * Page component exports for AGSignal Console.
+ * Page component exports for UNS Console.
  *
  * Export all page-level components from this index.
  */

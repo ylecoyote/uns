@@ -1,1 +1,1 @@
-"""Tests for AGSignal Console application."""
+"""Tests for UNS Console application."""

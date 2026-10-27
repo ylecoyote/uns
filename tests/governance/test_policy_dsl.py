@@ -3,9 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from agsignal.governance.decision_record import Decision
-from agsignal.governance.operators import Operator
-from agsignal.governance.policy_dsl import (
+from uns.governance.decision_record import Decision
+from uns.governance.operators import Operator
+from uns.governance.policy_dsl import (
     Condition,
     Policy,
     Rule,

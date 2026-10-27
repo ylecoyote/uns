@@ -17,12 +17,12 @@ tests/uns/test_policy_changes.py ......                                  [ 58%]
 tests/uns/test_policy_read_isolation.py ............                     [ 63%]
 tests/uns/test_runtime.py ................                               [ 71%]
 tests/uns/test_transport_security.py ...........................         [ 84%]
-tests/agsignal_mcp/test_factory.py ..                                    [ 84%]
-tests/agsignal_mcp/test_lifecycle.py .....                               [ 87%]
-tests/agsignal_mcp/test_runtime_bound_reads.py ..........                [ 92%]
-tests/agsignal_mcp/test_signal_tools.py ....                             [ 93%]
-tests/agsignal_mcp/test_status_tools.py .........                        [ 98%]
-tests/agsignal_mcp/test_stdio_entrypoint.py ....                         [100%]
+tests/uns_mcp/test_factory.py ..                                    [ 84%]
+tests/uns_mcp/test_lifecycle.py .....                               [ 87%]
+tests/uns_mcp/test_runtime_bound_reads.py ..........                [ 92%]
+tests/uns_mcp/test_signal_tools.py ....                             [ 93%]
+tests/uns_mcp/test_status_tools.py .........                        [ 98%]
+tests/uns_mcp/test_stdio_entrypoint.py ....                         [100%]
 
 =============================== warnings summary ===============================
 ../../..<workspace>/uns-remediation/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from agsignal.api.auth import (
+from uns.api.auth import (
     WritePrincipal,
     require_admin_principal,
     require_authenticated_observer,
