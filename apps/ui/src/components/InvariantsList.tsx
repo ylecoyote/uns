@@ -1,8 +1,7 @@
 /**
- * InvariantsList component
+ * InvariantsList component — Modernist 3-Column Specification Rows (1c)
  *
- * Displays a list of invariants with details.
- * Supports pagination and displays evidence links.
+ * Displays a list of invariants with details, enforcement description, and source evidence.
  */
 
 import type { InvariantEntry, PaginationInfo } from '../types/invariants';
@@ -13,16 +12,12 @@ interface SeverityBadgeProps {
 
 function SeverityBadge({ severity }: SeverityBadgeProps) {
   const styles: Record<string, string> = {
-    HIGH: 'bg-red-100 text-red-800 border-red-200',
-    MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    LOW: 'bg-blue-100 text-blue-800 border-blue-200',
+    HIGH: 'tag-delivery-fail',
+    MEDIUM: 'tag-delivery-info',
+    LOW: 'badge-default',
   };
 
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[severity]}`}>
-      {severity}
-    </span>
-  );
+  return <span className={`badge ${styles[severity] ?? 'badge-default'}`}>{severity}</span>;
 }
 
 interface EnforcementBadgeProps {
@@ -30,18 +25,7 @@ interface EnforcementBadgeProps {
 }
 
 function EnforcementBadge({ type }: EnforcementBadgeProps) {
-  const styles: Record<string, string> = {
-    guard: 'bg-green-100 text-green-800',
-    isolation: 'bg-purple-100 text-purple-800',
-    test: 'bg-gray-100 text-gray-800',
-    exception: 'bg-orange-100 text-orange-800',
-  };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[type]}`}>
-      {type}
-    </span>
-  );
+  return <span className="badge tag-response-ok">{type}</span>;
 }
 
 interface StatusBadgeProps {
@@ -49,16 +33,8 @@ interface StatusBadgeProps {
 }
 
 function StatusBadge({ status }: StatusBadgeProps) {
-  const styles: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-500',
-  };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  );
+  const cls = status === 'active' ? 'tag-delivery-ok' : 'badge-default';
+  return <span className={`badge ${cls}`}>{status}</span>;
 }
 
 interface InvariantCardProps {
@@ -67,63 +43,117 @@ interface InvariantCardProps {
 
 function InvariantCard({ invariant }: InvariantCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{invariant.id}</code>
+    <article className="invariant-row-card">
+      {/* Left Column: ID & Classification Tags */}
+      <div className="invariant-col-id">
+        <code
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            fontSize: '14px',
+          }}
+        >
+          {invariant.id}
+        </code>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
           <StatusBadge status={invariant.status} />
-        </div>
-        <div className="flex items-center gap-2">
           <SeverityBadge severity={invariant.severity} />
           <EnforcementBadge type={invariant.enforcement.type} />
         </div>
       </div>
 
-      {/* Statement */}
-      <p className="text-gray-900 mb-4">{invariant.statement}</p>
-
-      {/* Enforcement Description */}
-      <div className="text-sm text-gray-600 mb-4">
-        <span className="font-medium">Enforcement:</span> {invariant.enforcement.description}
-      </div>
-
-      {/* Mitigation (for exceptions) */}
-      {invariant.mitigation && invariant.mitigation.length > 0 && (
-        <div className="bg-orange-50 rounded-lg p-3 mb-4">
-          <div className="text-sm font-medium text-orange-800 mb-1">Mitigation:</div>
-          <ul className="list-disc list-inside text-sm text-orange-700">
-            {invariant.mitigation.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
+      {/* Middle Column: Statement, Enforcement & Evidence */}
+      <div className="invariant-col-body">
+        <div
+          style={{
+            fontFamily: 'var(--font-heading)',
+            fontWeight: 800,
+            fontSize: '18px',
+            letterSpacing: '-0.015em',
+            marginBottom: '6px',
+          }}
+        >
+          {invariant.statement}
         </div>
-      )}
 
-      {/* Evidence Links */}
-      {invariant.evidence.length > 0 && (
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-2">Evidence:</div>
-          <ul className="space-y-1">
+        <div style={{ fontSize: '13px', color: 'var(--color-neutral-700)', marginBottom: '12px' }}>
+          <strong>Enforcement:</strong> {invariant.enforcement.description}
+        </div>
+
+        {invariant.mitigation && invariant.mitigation.length > 0 && (
+          <div
+            style={{
+              padding: '10px 12px',
+              background: 'var(--color-surface)',
+              borderLeft: '3px solid var(--color-accent)',
+              marginBottom: '12px',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+              Mitigation:
+            </div>
+            <ul style={{ margin: '4px 0 0', paddingLeft: '18px', fontSize: '12px' }}>
+              {invariant.mitigation.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {invariant.evidence.length > 0 && (
+          <div
+            style={{
+              borderTop: '1px solid var(--color-divider)',
+              paddingTop: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              fontSize: '12px',
+            }}
+          >
+            <span className="invariants-eyebrow">Evidence:</span>
             {invariant.evidence.map((evidence, index) => (
-              <li key={index} className="text-sm">
-                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{evidence.path}</code>
+              <div key={index}>
+                <code
+                  style={{
+                    background: 'var(--color-surface)',
+                    padding: '2px 6px',
+                    border: '1px solid var(--color-divider)',
+                    fontSize: '11px',
+                  }}
+                >
+                  {evidence.path}
+                </code>
                 {evidence.line_ref && (
-                  <span className="text-gray-500 ml-1">({evidence.line_ref})</span>
+                  <span className="monospace" style={{ color: 'var(--color-neutral-600)', marginLeft: '6px' }}>
+                    ({evidence.line_ref})
+                  </span>
                 )}
-                <span className="text-gray-600 ml-2">{evidence.note}</span>
-              </li>
+                <span style={{ color: 'var(--color-neutral-700)', marginLeft: '8px' }}>
+                  — {evidence.note}
+                </span>
+              </div>
             ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100">
-        <span>Owner: {invariant.owner}</span>
-        <span>Last reviewed: {new Date(invariant.last_reviewed).toLocaleDateString()}</span>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Right Column: Ownership & Review Metadata */}
+      <div className="invariant-col-meta">
+        <div>
+          <div className="invariants-eyebrow">Owner</div>
+          <div className="monospace" style={{ color: 'var(--color-text)', marginTop: '2px' }}>
+            Owner: {invariant.owner}
+          </div>
+        </div>
+        <div style={{ marginTop: '12px' }}>
+          <div className="invariants-eyebrow">Last Reviewed</div>
+          <div className="monospace" style={{ color: 'var(--color-text)', marginTop: '2px' }}>
+            Last reviewed: {new Date(invariant.last_reviewed).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -134,46 +164,44 @@ interface InvariantsListProps {
   onLoadMore: () => void;
 }
 
-export function InvariantsList({ invariants, pagination, loading, onLoadMore }: InvariantsListProps) {
+export function InvariantsList({
+  invariants,
+  pagination,
+  loading,
+  onLoadMore,
+}: InvariantsListProps) {
   if (!loading && invariants.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-8 text-center">
-        <div className="text-gray-500">No invariants found matching the current filters.</div>
+      <div className="empty-state">
+        <div>No invariants found matching the current filters.</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Invariant Cards */}
-      {invariants.map(invariant => (
+    <div>
+      {invariants.map((invariant) => (
         <InvariantCard key={invariant.id} invariant={invariant} />
       ))}
 
-      {/* Loading indicator */}
       {loading && (
-        <div className="flex justify-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="loading-state">
+          <div>Loading invariants...</div>
         </div>
       )}
 
-      {/* Load More */}
-      {!loading && pagination?.has_more && (
-        <div className="flex justify-center py-4">
-          <button
-            onClick={onLoadMore}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Load More
-          </button>
-        </div>
-      )}
-
-      {/* Pagination Info */}
       {pagination && (
-        <div className="text-center text-sm text-gray-500 py-2">
-          Showing {invariants.length}
-          {pagination.total_count !== undefined && ` of ${pagination.total_count}`} invariants
+        <div className="pagination">
+          <div className="pagination-info">
+            Showing {invariants.length}
+            {pagination.total_count !== undefined && ` of ${pagination.total_count}`} invariants
+          </div>
+
+          {!loading && pagination.has_more && (
+            <button onClick={onLoadMore} className="btn btn-secondary">
+              Load More
+            </button>
+          )}
         </div>
       )}
     </div>

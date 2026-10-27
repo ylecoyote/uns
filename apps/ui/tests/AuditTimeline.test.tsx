@@ -179,6 +179,32 @@ describe('AuditTimeline', () => {
 
       expect(screen.getByText(/Showing 3/)).toBeInTheDocument();
     });
+
+    it('defaults to By notification lifecycle table (1e) and toggles to All events (1d)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAuditEventsResponse),
+      });
+
+      render(<AuditTimeline />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('audit-lifecycle-table')).toBeInTheDocument();
+      });
+
+      // 3 mock events belong to 2 unique notifications (123e... and 223e...)
+      expect(
+        screen.getByTestId('audit-lifecycle-row-123e4567-e89b-12d3-a456-426614174001')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('audit-lifecycle-row-223e4567-e89b-12d3-a456-426614174001')
+      ).toBeInTheDocument();
+
+      // Switch segmented control to All events (1d)
+      fireEvent.click(screen.getByTestId('audit-view-all-events'));
+      expect(screen.queryByTestId('audit-lifecycle-table')).not.toBeInTheDocument();
+      expect(screen.getByTestId('audit-event-list')).not.toHaveClass('audit-stream-hidden');
+    });
   });
 
   describe('API Integration', () => {

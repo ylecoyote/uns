@@ -1,13 +1,10 @@
 /**
- * InvariantsPage component
+ * InvariantsPage component — System Invariants (/invariants)
  *
- * Main page for viewing system invariants.
- * Features:
- * - Summary panel showing statistics from /ui/invariants/summary
- * - Filter controls for severity, enforcement_type, status, and search
- * - Paginated list of invariants
- * - Degraded state display when API returns degraded=true or
- *   invariants_source_unavailable error occurs
+ * Restyled with the Modernist Swiss-grid layout (1c):
+ * - Architectural 2-column page header
+ * - Full-bleed modular summary grid (Oversized Total Invariants + Severity / Enforcement / Status cells)
+ * - Modular filter bar + 3-column invariant specification rows
  */
 
 import { useState } from 'react';
@@ -22,77 +19,88 @@ export function InvariantsPage() {
 
   const { invariants, pagination, loading, error, degraded, loadMore } = useInvariants(filters);
 
-  // Degraded state comes from:
-  // 1. API response with degraded=true
-  // 2. invariants_source_unavailable error code
-  // 3. Other non-not_found errors (fallback for backwards compatibility)
   const isDegraded = degraded || (error !== null && error.code !== 'not_found');
-
-  // For invariants_source_unavailable, we show degraded state but not error banner
   const showError = error !== null && error.code !== 'invariants_source_unavailable';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">System Invariants</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View and monitor system invariants for compliance and audit purposes
-          </p>
+    <div className="invariants-page min-h-screen bg-gray-50">
+      {/* Architectural Page Header */}
+      <header className="page-header">
+        <div>
+          <h1>System Invariants</h1>
         </div>
+        <p className="page-description">
+          View and monitor system invariants for compliance and audit purposes
+        </p>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Degraded State Banner - top level for visibility */}
+      <div>
+        {/* Degraded State Banner */}
         {isDegraded && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-            <span className="text-yellow-600 text-xl" aria-hidden="true">&#9888;</span>
+          <div
+            style={{
+              padding: '14px 24px',
+              background: 'var(--color-surface)',
+              borderBottom: '2px solid var(--color-divider)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <span
+              style={{
+                width: '10px',
+                height: '10px',
+                background: 'var(--color-accent)',
+                display: 'inline-block',
+                flex: 'none',
+              }}
+              aria-hidden="true"
+            />
             <div>
-              <div className="text-yellow-800 font-medium">Degraded State</div>
-              <div className="text-yellow-700 text-sm">
+              <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 800 }}>
+                Degraded State
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-neutral-700)' }}>
                 The invariant registry may be incomplete or outdated. Some data may be unavailable.
               </div>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Summary Panel (Sidebar) */}
-          <div className="lg:col-span-1">
-            <InvariantsSummary degraded={isDegraded} />
-          </div>
+        {/* Modular Summary Grid (1c) */}
+        <InvariantsSummary degraded={isDegraded} />
 
-          {/* Main List Area */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Filters */}
-            <InvariantsFilter filters={filters} onFiltersChange={setFilters} />
+        {/* Modular Filter Bar */}
+        <InvariantsFilter filters={filters} onFiltersChange={setFilters} />
 
-            {/* Error Display - only for errors that aren't handled by degraded state */}
-            {showError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-red-600" aria-hidden="true">&#9888;</span>
-                  <span className="text-red-800 font-medium">Error loading invariants</span>
-                </div>
-                <p className="text-red-600 text-sm mt-1">{error.message}</p>
-                {error.request_id && (
-                  <p className="text-red-500 text-xs mt-1">Request ID: {error.request_id}</p>
-                )}
-              </div>
+        {/* Error Display */}
+        {showError && (
+          <div className="error-state">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span aria-hidden="true">&#9888;</span>
+              <strong>Error loading invariants</strong>
+            </div>
+            <p className="error-message" style={{ marginTop: '4px' }}>
+              {error.message}
+            </p>
+            {error.request_id && (
+              <p className="monospace" style={{ fontSize: '12px', margin: 0 }}>
+                Request ID: {error.request_id}
+              </p>
             )}
-
-            {/* Invariants List - still shows partial data in degraded state */}
-            <InvariantsList
-              invariants={invariants}
-              pagination={pagination}
-              loading={loading}
-              onLoadMore={loadMore}
-            />
           </div>
-        </div>
-      </main>
+        )}
+
+        {/* Invariants Specification Rows */}
+        <InvariantsList
+          invariants={invariants}
+          pagination={pagination}
+          loading={loading}
+          onLoadMore={loadMore}
+        />
+      </div>
     </div>
   );
 }
