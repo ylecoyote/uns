@@ -2,7 +2,7 @@
 
 ## Design Philosophy
 
-AGSignal Console (UNS Console) began in v1 as a **read-first "flight instruments" dashboard**, not an unconstrained control cockpit, establishing observability and audit trust before introducing operational mutations. It has since evolved into a capability-gated **Responder & Operator Console** that pairs read-first flight-instrument telemetry with strictly scoped, backend-enforced responder, producer, and operator actions across five primary surfaces.
+AGSignal Console (UNS Console) began in v1 as a **read-first "flight instruments" dashboard**, not an unconstrained control cockpit, establishing observability and audit trust before introducing operational mutations. It has since evolved into a capability-gated **Responder & Operator Console** that pairs read-first flight-instrument telemetry with strictly scoped, backend-enforced responder, producer, and operator actions across six primary surfaces.
 
 ## v1 Constraints (Historical Baseline & Permanent Boundaries)
 
@@ -58,6 +58,11 @@ AGSignal Console (UNS Console) began in v1 as a **read-first "flight instruments
 
 - **System Invariants (`/invariants`):** Read-only verification surface backed by `GET /ui/invariants` and `GET /ui/invariants/summary`, exposing invariant severity, enforcement mechanisms, and repository evidence links.
 - **Dual-Mode Audit Timeline (`/audit`):** Queries `GET /ui/audit` and defaults to **By notification (`1e`)** lifecycle grouping (`NOTIFICATION | STARTED | DELIVERED | RESPONSE | TIME TO RESPOND`), which correlates all audit events for each `notification_id` into an expandable lifecycle row computing elapsed response time (`ack.received` / `ack.dismissed` / `ack.timed_out` minus `notification.created`), with a segmented toggle to the chronological **All events (`1d`)** stream.
+
+### 6. In-Portal Documentation & Runbooks (`/docs`)
+
+- **Two-Column Split Index & Documentation Reader:** Provides a sticky `260px` left section index paired with a full-width Modernist documentation reader supporting `?section=` URL deep-linking (`overview`, `workflows`, `state-machines`, `integration`, `runbooks`, `all`) and instant cross-section keyword filtering (`docs-search-input`).
+- **Complete Operational & Integration Reference:** Embeds the live Modernist badge visual grammar table (filled delivery badges vs. outlined response badges), capability pill matrix (`OPERATOR`, `RESPONDER`, `PRODUCER`, `READ-ONLY`), multi-tab `BroadcastChannel('uns_console_session')` handshake reference, surface-by-surface workflow guides with direct navigation links, delivery/acknowledgment state machines, `mip-uns` and `uns-mcp` integration examples, and symptom-driven Troubleshooting Guides (`TSG-01` through `TSG-06`).
 
 ## Modernist Design System Specification
 

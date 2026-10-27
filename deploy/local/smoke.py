@@ -209,7 +209,7 @@ def main():
     for path in ("/ready", "/local-status", "/metrics", "/ui/audit"):
         check("Unauthenticated " + path + " rejected", httpx.get(BASE + path).status_code == 401)
     check("Public liveness works", httpx.get(BASE + "/health").status_code == 200)
-    for path in ("/", "/deliveries", "/policy", "/audit", "/invariants", "/operations"):
+    for path in ("/", "/deliveries", "/policy", "/audit", "/invariants", "/operations", "/docs"):
         response = call("GET", path)
         check(
             "Recording banner on " + path,

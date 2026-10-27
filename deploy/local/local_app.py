@@ -39,6 +39,7 @@ def local_status() -> dict[str, Any]:
 @app.get("/operations", response_class=HTMLResponse)
 @app.get("/invariants", response_class=HTMLResponse)
 @app.get("/audit", response_class=HTMLResponse)
+@app.get("/docs", response_class=HTMLResponse)
 def console(identifier: str | None = None) -> str:
     return index
 

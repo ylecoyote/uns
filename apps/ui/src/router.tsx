@@ -12,6 +12,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import {
   AuditTimeline,
+  DocsPage,
   InvariantsPage,
   OperationsPage,
   PlaceholderPage,
@@ -40,6 +41,8 @@ function getRouteElement(config: RouteConfig): React.ReactElement {
       return <PolicyInspectorPage />;
     case ROUTES.OPERATIONS:
       return <OperationsPage />;
+    case ROUTES.DOCS:
+      return <DocsPage />;
     default:
       return <PlaceholderPage title={config.title} description={config.description} />;
   }
