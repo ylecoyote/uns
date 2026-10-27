@@ -55,6 +55,10 @@ describe('Route Constants', () => {
     expect(ROUTES.INVARIANTS).toBe('/invariants');
   });
 
+  it('defines DOCS route', () => {
+    expect(ROUTES.DOCS).toBe('/docs');
+  });
+
   it('has unique route paths', () => {
     const paths = Object.values(ROUTES);
     const uniquePaths = new Set(paths);
@@ -71,6 +75,7 @@ describe('Route Configs', () => {
     expect(configPaths).toContain(ROUTES.POLICY);
     expect(configPaths).toContain(ROUTES.OPERATIONS);
     expect(configPaths).toContain(ROUTES.INVARIANTS);
+    expect(configPaths).toContain(ROUTES.DOCS);
   });
 
   it('marks AUDIT as implemented', () => {
@@ -96,6 +101,13 @@ describe('Route Configs', () => {
   it('marks OPERATIONS as implemented', () => {
     const config = getRouteConfig(ROUTES.OPERATIONS);
     expect(config?.implemented).toBe(true);
+  });
+
+  it('marks DOCS as implemented', () => {
+    const config = getRouteConfig(ROUTES.DOCS);
+    expect(config?.implemented).toBe(true);
+    expect(config?.title).toBe('Docs');
+    expect(config?.navOrder).toBe(6);
   });
 
   it('each config has required fields', () => {
@@ -141,6 +153,7 @@ describe('getNavRoutes', () => {
     expect(navRoutes.some((r) => r.path === ROUTES.DELIVERIES)).toBe(true);
     expect(navRoutes.some((r) => r.path === ROUTES.POLICY)).toBe(true);
     expect(navRoutes.some((r) => r.path === ROUTES.INVARIANTS)).toBe(true);
+    expect(navRoutes.some((r) => r.path === ROUTES.DOCS)).toBe(true);
   });
 
   it('does not mutate original ROUTE_CONFIGS', () => {
@@ -211,6 +224,17 @@ describe('AppRoutes', () => {
 
     expect(screen.getByText('Policy Inspector')).toBeInTheDocument();
     // PolicyInspectorPage should show form/content, not placeholder
+    expect(screen.queryByText('Page not yet implemented.')).not.toBeInTheDocument();
+  });
+
+  it('renders DocsPage for /docs route', () => {
+    render(
+      <MemoryRouter initialEntries={['/docs']}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Documentation & Runbooks')).toBeInTheDocument();
     expect(screen.queryByText('Page not yet implemented.')).not.toBeInTheDocument();
   });
 

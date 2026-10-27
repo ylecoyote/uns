@@ -26,6 +26,9 @@ export const ROUTES = {
 
   /** Invariants viewer - system invariants */
   INVARIANTS: '/invariants',
+
+  /** Documentation & runbooks workspace */
+  DOCS: '/docs',
 } as const;
 
 /**
@@ -92,6 +95,13 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
     description: 'Audit event stream viewer',
     implemented: true,
     navOrder: 5,
+  },
+  {
+    path: ROUTES.DOCS,
+    title: 'Docs',
+    description: 'Operator manual, producer integration guides, and incident runbooks',
+    implemented: true,
+    navOrder: 6,
   },
 ];
 

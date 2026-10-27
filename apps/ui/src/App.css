@@ -1444,6 +1444,187 @@ pre,
   border-bottom: 2px solid var(--color-divider);
 }
 
+/* ==========================================================================
+   Surface: Documentation & Runbooks Workspace (/docs — Split Index + Reader)
+   ========================================================================== */
+
+.docs-search-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-bottom: 2px solid var(--color-divider);
+  background: var(--color-surface);
+}
+
+.docs-search-cell {
+  padding: 14px 24px;
+  border-right: 1px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.docs-search-actions {
+  padding: 14px 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.docs-split-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: calc(100vh - 180px);
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.docs-nav-rail {
+  border-right: 2px solid var(--color-divider);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.docs-nav-sticky {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-nav-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--color-divider);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-700);
+}
+
+.docs-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.docs-nav-item {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.docs-nav-btn {
+  width: 100%;
+  text-align: left;
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  border-left: 4px solid transparent;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.docs-nav-btn:hover {
+  background: var(--color-bg);
+}
+
+.docs-nav-btn.active {
+  background: var(--color-bg);
+  border-left-color: var(--color-accent);
+  font-weight: 800;
+}
+
+.docs-nav-btn-sub {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--color-neutral-700);
+}
+
+.docs-reader {
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-section-block {
+  border-bottom: 2px solid var(--color-divider);
+}
+
+.docs-section-block:last-child {
+  border-bottom: none;
+}
+
+.docs-section-header {
+  padding: 24px 32px 16px;
+  background: var(--color-surface);
+  border-bottom: 2px solid var(--color-divider);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.docs-section-header h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.docs-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.docs-card {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.docs-card:last-child {
+  border-bottom: none;
+}
+
+.docs-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.docs-card-header h3 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.docs-code-block {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-left: 3px solid var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  color: var(--color-text);
+  border-radius: 0;
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 960px) {
   .page-header {
@@ -1453,14 +1634,16 @@ pre,
 
   .filter-row,
   .filter-grid-4,
-  .invariants-filter-bar {
+  .invariants-filter-bar,
+  .docs-search-bar {
     grid-template-columns: 1fr 1fr;
   }
 
   .policy-split-layout,
   .invariants-summary-grid,
   .invariant-row-card,
-  .modernist-audit-card {
+  .modernist-audit-card,
+  .docs-split-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1468,7 +1651,9 @@ pre,
   .invariants-total-cell,
   .invariant-col-id,
   .invariant-col-body,
-  .modernist-audit-cell {
+  .modernist-audit-cell,
+  .docs-nav-rail,
+  .docs-search-cell {
     border-right: none;
     border-bottom: 1px solid var(--color-divider);
   }
