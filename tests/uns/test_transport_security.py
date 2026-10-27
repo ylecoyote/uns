@@ -575,3 +575,107 @@ def test_ui_active_policies_catalog_and_default_policy_reload(configured, tmp_pa
     assert payload["items"][0]["require_ack"] is True
     assert payload["items"][0]["ack_timeout_seconds"] == 600
     assert payload["items"][0]["dedup_window_seconds"] == 180
+
+
+def test_ui_policy_revisions_returns_lineage_across_statuses_and_filters(configured):
+    from db.policy_store import SQLAlchemyPolicyStore
+    from notification.policies import NotificationPolicy
+
+    app, runtime, _ = configured
+    app.state.uns_observer_api_key = "observer-key"
+    app.state.uns_observer_api_principal = "console-observer"
+
+    store = SQLAlchemyPolicyStore(runtime.sessions)
+    # Persist v1.0.0 ACTIVE, then supersede with v2.0.0 ACTIVE (retiring v1.0.0)
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "trading.order_placed",
+                "version": "1.0.0",
+                "status": "ACTIVE",
+                "intent": "GOVERNANCE",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK"]},
+                "require_ack": {"LIVE": True},
+                "dedup_window_seconds": 300,
+            }
+        )
+    )
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "trading.order_placed",
+                "version": "2.0.0",
+                "status": "ACTIVE",
+                "intent": "GOVERNANCE",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK", "EMAIL"]},
+                "require_ack": {"LIVE": True},
+                "dedup_window_seconds": 120,
+            }
+        )
+    )
+    # Persist PREVIEW and DRAFT policies
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "trading.order_placed",
+                "version": "2.1.0",
+                "status": "PREVIEW",
+                "intent": "GOVERNANCE",
+                "delivery_mode": "BEST_EFFORT",
+                "channels": {"LIVE": ["WEBSOCKET"]},
+                "require_ack": {"LIVE": False},
+                "dedup_window_seconds": 60,
+            }
+        )
+    )
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "ops.canary_check",
+                "version": "0.1.0",
+                "status": "DRAFT",
+                "intent": "OPERATIONAL",
+                "delivery_mode": "BEST_EFFORT",
+                "channels": {"LIVE": ["WEBSOCKET"]},
+                "require_ack": {"LIVE": False},
+                "dedup_window_seconds": 90,
+            }
+        )
+    )
+
+    unauth_client = TestClient(app)
+    assert unauth_client.get("/ui/policies/revisions").status_code == 401
+
+    observer_client = TestClient(app, headers={"Authorization": "Bearer observer-key"})
+    resp = observer_client.get("/ui/policies/revisions")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_count"] == 4
+    # Deterministic ordering: notification_type ASC, version DESC
+    assert [
+        (item["notification_type"], item["version"], item["status"])
+        for item in body["items"]
+    ] == [
+        ("ops.canary_check", "0.1.0", "DRAFT"),
+        ("trading.order_placed", "2.1.0", "PREVIEW"),
+        ("trading.order_placed", "2.0.0", "ACTIVE"),
+        ("trading.order_placed", "1.0.0", "RETIRED"),
+    ]
+    for item in body["items"]:
+        assert item["config_hash"]
+        assert item["created_at"]
+        assert item["updated_at"]
+
+    # Filter by notification_type and status
+    retired_only = observer_client.get(
+        "/ui/policies/revisions",
+        params={"notification_type": "trading.order_placed", "status": "RETIRED"},
+    )
+    assert retired_only.status_code == 200
+    retired_payload = retired_only.json()
+    assert retired_payload["total_count"] == 1
+    assert retired_payload["items"][0]["version"] == "1.0.0"
+    assert retired_payload["items"][0]["status"] == "RETIRED"
+    assert retired_payload["items"][0]["channels"] == ["SLACK"]

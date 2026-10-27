@@ -367,6 +367,42 @@ export const EffectivePolicyResponseSchema = z.object({
   resolution_context: ResolutionContextSchema,
 });
 
+/**
+ * Policy lifecycle status enum - strict validation
+ */
+export const PolicyLifecycleStatusSchema = z.enum(['ACTIVE', 'DRAFT', 'PREVIEW', 'RETIRED']);
+
+/**
+ * Policy revision summary schema
+ */
+export const PolicyRevisionSummarySchema = z.object({
+  policy_id: z.string().nullable().optional(),
+  notification_type: z.string(),
+  version: z.string(),
+  status: PolicyLifecycleStatusSchema,
+  config_hash: z.string().nullable().optional(),
+  previous_version_id: z.string().nullable().optional(),
+  intent: NotificationIntentSchema.nullable(),
+  channels: z.array(ChannelSchema),
+  delivery_mode: DeliveryModeSchema.nullable(),
+  require_ack: z.boolean().nullable(),
+  ack_timeout_minutes: z.number().nullable().optional(),
+  ack_timeout_seconds: z.number().nullable().optional(),
+  dedup_window_seconds: z.number(),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional(),
+  activated_at: z.string().nullable().optional(),
+  retired_at: z.string().nullable().optional(),
+});
+
+/**
+ * Policy revision list response schema
+ */
+export const PolicyRevisionListResponseSchema = z.object({
+  items: z.array(PolicyRevisionSummarySchema),
+  total_count: z.number(),
+});
+
 // ============================================================================
 // Type Inference
 // ============================================================================
@@ -383,3 +419,5 @@ export type InvariantEntry = z.infer<typeof InvariantEntrySchema>;
 export type InvariantListResponse = z.infer<typeof InvariantListResponseSchema>;
 export type InvariantSummaryResponse = z.infer<typeof InvariantSummaryResponseSchema>;
 export type EffectivePolicyResponse = z.infer<typeof EffectivePolicyResponseSchema>;
+export type PolicyRevisionSummary = z.infer<typeof PolicyRevisionSummarySchema>;
+export type PolicyRevisionListResponse = z.infer<typeof PolicyRevisionListResponseSchema>;

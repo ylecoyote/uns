@@ -605,6 +605,37 @@ class ActivePolicyListResponse(BaseModel):
     total_count: int = Field(description="Total number of active policies")
 
 
+class PolicyRevisionSummary(BaseModel):
+    """Summary of a persisted notification routing policy revision for governance and lineage."""
+
+    policy_id: UUID | None = Field(default=None, description="Persisted policy revision identifier")
+    notification_type: str = Field(description="Policy notification_type identifier")
+    version: str = Field(description="Policy version")
+    status: str = Field(description="Lifecycle status (ACTIVE, DRAFT, PREVIEW, RETIRED)")
+    config_hash: str | None = Field(default=None, description="Semantic policy content hash")
+    previous_version_id: UUID | None = Field(
+        default=None, description="Previous policy version ID in lifecycle lineage"
+    )
+    intent: NotificationIntent | None = Field(default=None, description="Default notification intent")
+    channels: list[Channel] = Field(default_factory=list, description="Default LIVE channels")
+    delivery_mode: DeliveryMode | None = Field(default=None, description="Default LIVE delivery mode")
+    require_ack: bool | None = Field(default=None, description="Default LIVE ack requirement")
+    ack_timeout_minutes: int | None = Field(default=None, description="Default LIVE ack timeout in minutes")
+    ack_timeout_seconds: int | None = Field(default=None, description="Default LIVE ack timeout in seconds")
+    dedup_window_seconds: int = Field(description="Deduplication window in seconds")
+    created_at: datetime | None = Field(default=None, description="When the policy revision was created")
+    updated_at: datetime | None = Field(default=None, description="When the policy revision was last updated")
+    activated_at: datetime | None = Field(default=None, description="When the policy revision became ACTIVE")
+    retired_at: datetime | None = Field(default=None, description="When the policy revision was retired")
+
+
+class PolicyRevisionListResponse(BaseModel):
+    """Catalog of notification routing policy revisions across lifecycle statuses."""
+
+    items: list[PolicyRevisionSummary] = Field(default_factory=list)
+    total_count: int = Field(description="Total number of policy revisions")
+
+
 class EvidenceLink(BaseModel):
     """Link to evidence for an invariant."""
 
@@ -731,5 +762,7 @@ __all__ = [
     "InvariantEntry",
     "InvariantListResponse",
     "InvariantSummaryResponse",
+    "PolicyRevisionListResponse",
+    "PolicyRevisionSummary",
     "UIErrorResponse",
 ]

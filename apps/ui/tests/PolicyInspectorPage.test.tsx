@@ -627,4 +627,126 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
       '3 loaded, 3 persisted, 3 active'
     );
   });
+
+  it('renders Policy Revision History & Lineage with Modernist status badges, status filtering, and row selection into Inspector/Simulator', async () => {
+    startConsoleSession('producer-key', {
+      subject: 'producer-user',
+      scopes: ['observer', 'producer'],
+      auth_mode: 'required',
+    });
+
+    vi.mocked(api.fetchPolicyRevisions).mockResolvedValue({
+      total_count: 4,
+      items: [
+        {
+          notification_type: 'ops.canary_check',
+          version: '0.1.0',
+          status: 'DRAFT',
+          config_hash: 'aaaa1111222233334444',
+          intent: 'OPERATIONAL',
+          channels: ['WEBSOCKET'],
+          delivery_mode: 'BEST_EFFORT',
+          require_ack: false,
+          dedup_window_seconds: 90,
+          created_at: '2026-01-23T01:00:00Z',
+          updated_at: '2026-01-23T01:00:00Z',
+        },
+        {
+          notification_type: 'trading.order_placed',
+          version: '2.1.0',
+          status: 'PREVIEW',
+          config_hash: 'bbbb1111222233334444',
+          intent: 'GOVERNANCE',
+          channels: ['WEBSOCKET'],
+          delivery_mode: 'BEST_EFFORT',
+          require_ack: false,
+          dedup_window_seconds: 60,
+          created_at: '2026-01-23T03:00:00Z',
+          updated_at: '2026-01-23T03:00:00Z',
+        },
+        {
+          notification_type: 'trading.order_placed',
+          version: '2.0.0',
+          status: 'ACTIVE',
+          config_hash: 'cccc1111222233334444',
+          intent: 'GOVERNANCE',
+          channels: ['SLACK', 'EMAIL'],
+          delivery_mode: 'GUARANTEED',
+          require_ack: true,
+          dedup_window_seconds: 120,
+          created_at: '2026-01-23T02:00:00Z',
+          updated_at: '2026-01-23T02:00:00Z',
+        },
+        {
+          notification_type: 'trading.order_placed',
+          version: '1.0.0',
+          status: 'RETIRED',
+          config_hash: 'dddd1111222233334444',
+          intent: 'GOVERNANCE',
+          channels: ['SLACK'],
+          delivery_mode: 'GUARANTEED',
+          require_ack: true,
+          dedup_window_seconds: 300,
+          created_at: '2026-01-23T00:00:00Z',
+          updated_at: '2026-01-23T02:00:00Z',
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/policy']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('policy-revisions-section')).toBeInTheDocument();
+    });
+
+    // Verify Modernist badge visual grammar per status
+    expect(
+      screen.getByTestId('policy-revision-status-trading.order_placed-2.0.0')
+    ).toHaveClass('tag-delivery-ok');
+    expect(
+      screen.getByTestId('policy-revision-status-trading.order_placed-2.1.0')
+    ).toHaveClass('tag-delivery-pending');
+    expect(
+      screen.getByTestId('policy-revision-status-ops.canary_check-0.1.0')
+    ).toHaveClass('tag-delivery-pending');
+    expect(
+      screen.getByTestId('policy-revision-status-trading.order_placed-1.0.0')
+    ).toHaveClass('badge-default');
+
+    // Filter by RETIRED using Modernist .seg segmented toggle
+    fireEvent.click(screen.getByTestId('policy-status-filter-RETIRED'));
+    expect(
+      screen.getByTestId('policy-revision-row-trading.order_placed-1.0.0')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('policy-revision-row-trading.order_placed-2.0.0')
+    ).not.toBeInTheDocument();
+
+    // Reset filter to ALL and click PREVIEW revision to load into Inspector & Simulator
+    fireEvent.click(screen.getByTestId('policy-status-filter-ALL'));
+    fireEvent.click(
+      screen.getByTestId('policy-revision-row-trading.order_placed-2.1.0')
+    );
+
+    await waitFor(() => {
+      expect(api.fetchEffectivePolicy).toHaveBeenCalledWith(
+        {
+          notification_type: 'trading.order_placed',
+          intent: 'GOVERNANCE',
+          autonomy_mode: 'PREVIEW',
+          irreversible: false,
+        },
+        expect.anything()
+      );
+    });
+
+    expect(screen.getByTestId('sim-notification-type-input')).toHaveValue(
+      'trading.order_placed'
+    );
+    expect(screen.getByTestId('sim-autonomy-mode-select')).toHaveValue('PREVIEW');
+  });
 });

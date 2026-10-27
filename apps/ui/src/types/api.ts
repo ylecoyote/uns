@@ -367,6 +367,38 @@ export interface ActivePolicyListResponse {
   total_count: number;
 }
 
+export type PolicyLifecycleStatus = 'ACTIVE' | 'DRAFT' | 'PREVIEW' | 'RETIRED';
+
+export interface PolicyRevisionSummary {
+  policy_id?: string | null;
+  notification_type: string;
+  version: string;
+  status: PolicyLifecycleStatus | string;
+  config_hash?: string | null;
+  previous_version_id?: string | null;
+  intent: NotificationIntent | null;
+  channels: Channel[];
+  delivery_mode: DeliveryMode | null;
+  require_ack: boolean | null;
+  ack_timeout_minutes?: number | null;
+  ack_timeout_seconds?: number | null;
+  dedup_window_seconds: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  activated_at?: string | null;
+  retired_at?: string | null;
+}
+
+export interface PolicyRevisionListResponse {
+  items: PolicyRevisionSummary[];
+  total_count: number;
+}
+
+export interface PolicyRevisionsFilter {
+  notification_type?: string;
+  status?: PolicyLifecycleStatus | string;
+}
+
 export interface SendNotificationRequestPayload {
   notification_type: string;
   intent: NotificationIntent;
