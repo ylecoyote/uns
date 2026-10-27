@@ -2,17 +2,17 @@
  * DocsPage — In-Portal Documentation & Runbooks Workspace (/docs)
  *
  * Implements a Modernist two-column split layout (260px sticky left section index
- * + main documentation reader) with URL deep-linking (?section=) and instant
+ * + main documentation reader) with URL deep-linking (?section= and ?q=) and instant
  * cross-section keyword filtering across all 5 documentation domains:
- * 1. Overview & Visual Grammar (capability pills, BroadcastChannel session sync, badge grammar)
+ * 1. Overview & Visual Grammar (capability pills, BroadcastChannel session sync, profile banner, badge grammar)
  * 2. Console Surfaces & Workflows (/deliveries, /policy, /operations, /invariants, /audit)
- * 3. Architecture & State Machines (delivery lifecycle, ACK lifecycle, idempotency vs. dedup)
+ * 3. Architecture & State Machines (delivery lifecycle, ACK lifecycle, idempotency vs. dedup, INV/F-01..F-08 taxonomy)
  * 4. Producer, MIP & Agent MCP (uns.Runtime, mip-uns, WebSocket subprotocols, uns-mcp, smoke)
- * 5. Incident Runbooks (TSG-01 through TSG-06)
+ * 5. Incident Runbooks (Environment bootstrap + TSG-01 through TSG-06 with console action links)
  */
 
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '../types/routes';
 
@@ -38,6 +38,10 @@ interface DocsCardEntry {
   readonly title: string;
   readonly tag: string;
   readonly keywords: string;
+  readonly actionLink?: {
+    readonly to: string;
+    readonly label: string;
+  };
   readonly render: () => ReactNode;
 }
 
@@ -48,7 +52,7 @@ const SECTION_META: readonly DocsSectionMeta[] = [
     navSubtitle: 'Auth scopes, multi-tab sync & badge grammar',
     heading: '1. Overview & Visual Grammar',
     summary:
-      'Server-verified session capability introspection, tab-memory credential security, and the Modernist filled vs. outlined badge visual grammar.',
+      'Server-verified session capability introspection, tab-memory credential security, profile banner telemetry, and the Modernist filled vs. outlined badge visual grammar.',
   },
   {
     id: 'workflows',
@@ -64,7 +68,7 @@ const SECTION_META: readonly DocsSectionMeta[] = [
     navSubtitle: 'Delivery, ACK deadlines, idempotency & dedup',
     heading: '3. Architecture & State Machines',
     summary:
-      'Authoritative state machines for transactional outbox delivery, human acknowledgment obligations, and idempotency vs. semantic deduplication.',
+      'Authoritative state machines for transactional outbox delivery, human acknowledgment obligations, idempotency vs. semantic deduplication, and F-01–F-08 runtime guarantees.',
   },
   {
     id: 'integration',
@@ -80,7 +84,7 @@ const SECTION_META: readonly DocsSectionMeta[] = [
     navSubtitle: 'DLQ replay, leases, timeouts, policies & WAL backups',
     heading: '5. Incident Runbooks (TSG-01–06)',
     summary:
-      'Symptom-driven Troubleshooting Guides (TSG-01 through TSG-06) with diagnostic commands, SQLite queries, and safe operator remediation workflows.',
+      'Symptom-driven Troubleshooting Guides (TSG-01 through TSG-06) with environment bootstrap, diagnostic commands, SQLite queries, and safe operator remediation workflows.',
   },
 ] as const;
 
@@ -110,7 +114,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Session Capability Introspection (GET /ui/session) & Non-Lossy Capability Pills',
     tag: 'AUTH & RBAC',
     keywords:
-      'GET /ui/session ConsoleSessionResponse OPERATOR RESPONDER PRODUCER READ-ONLY observer responder producer admin scopes capability pills persistence_mode INV-UI-001',
+      'GET /ui/session ConsoleSessionResponse OPERATOR RESPONDER PRODUCER READ-ONLY observer responder producer admin scopes capability pills persistence_mode INV-UI-001 entry_id notification_id RuntimeDLQ',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -142,8 +146,12 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   Full administrative authority: atomic policy reload (
                   <code>POST /api/v1/policies/reload</code>), dead-letter <strong>Replay</strong> (
                   <code>POST /api/v1/runtime/notifications/&#123;id&#125;/replay</code>) and{' '}
-                  <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;id&#125;</code>), plus
-                  all Responder, Producer, and Observer capabilities.
+                  <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code> —
+                  where in canonical <code>uns.Runtime</code> / <code>RuntimeDLQ</code> mode,{' '}
+                  <code>entry_id === notification_id</code>, whereas in legacy non-runtime{' '}
+                  <code>DLQService</code> fixtures, <code>entry_id</code> is the DLQ entry UUID
+                  returned by <code>GET /api/v1/dlq</code>), plus all Responder, Producer, and
+                  Observer capabilities.
                 </td>
               </tr>
               <tr>
@@ -186,12 +194,50 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   Strictly non-mutating flight-instrument telemetry across <code>GET /ui/*</code>,{' '}
                   <code>GET /readyz</code>, <code>GET /api/v1/channels/health</code>,{' '}
                   <code>GET /api/v1/dlq</code>, and <code>GET /api/v1/runtime/dead-letters</code>{' '}
-                  (enforcing <code>INV-UI-001</code>).
+                  (enforcing{' '}
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>INV-UI-001</code>
+                  </Link>
+                  ).
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </>
+    ),
+  },
+  {
+    id: 'overview-profile-banner',
+    sectionId: 'overview',
+    title: 'Profile & Mode Banner (LOCAL RECORDING MODE vs. Live External Delivery)',
+    tag: 'PROFILE TELEMETRY',
+    keywords:
+      'LOCAL RECORDING MODE PROFILE: LOCAL-RECORDING persistence_mode GET /ui/session GET /readyz local_app.py recording_only',
+    render: () => (
+      <>
+        <p style={{ margin: 0 }}>
+          When running under the persistent localhost recording deployment (
+          <code>deploy/local/local_app.py</code>), the console renders a top-of-page{' '}
+          <strong>LOCAL RECORDING MODE</strong> banner (
+          <code>PROFILE: LOCAL-RECORDING</code>) above the navigation bar:
+        </p>
+        <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
+          <li>
+            <strong>External Traffic Suppression:</strong> In <code>LOCAL-RECORDING</code> mode,
+            Slack, email, and PagerDuty channels write durable local receipts (with{' '}
+            <code>metadata.recording_only = true</code>) instead of contacting external third-party
+            providers.
+          </li>
+          <li>
+            <strong>Complementary to <code>persistence_mode</code>:</strong> While{' '}
+            <code>GET /ui/session</code> and <code>GET /readyz</code> report storage durability (
+            <code>persistence_mode: &quot;persistent&quot;</code> vs.{' '}
+            <code>&quot;in_memory&quot;</code>), the profile banner distinguishes whether{' '}
+            <code>DELIVERED</code> badges represent local recording-sink acceptance or live external
+            provider transmission.
+          </li>
+        </ul>
       </>
     ),
   },
@@ -281,14 +327,15 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Modernist Badge Visual Grammar: Filled Delivery vs. Outlined Human Response',
     tag: 'VISUAL GRAMMAR',
     keywords:
-      'Modernist badge visual grammar filled delivery state outlined human response obligation DELIVERED FAILED DEAD-LETTER PENDING DEDUPLICATED ACKED DISMISSED ACK TIMEOUT ACK PENDING Archivo #f3f2f2 #eae9e9 #201e1d #ec3013',
+      'Modernist badge visual grammar filled delivery state outlined human response obligation DELIVERED FAILED DEAD-LETTER PENDING DEDUPLICATED ACKED DISMISSED ACK TIMEOUT ACK PENDING RESOLVED FAILURE_RESOLVED Archivo #f3f2f2 #eae9e9 #201e1d #ec3013',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
           To prevent operators from conflating <strong>machine channel transport</strong> with{' '}
           <strong>human obligation acknowledgment</strong>, the Modernist design system enforces a
           strict visual dichotomy: <strong>Filled badges</strong> represent transport delivery
-          states, while <strong>Outlined badges</strong> represent human response states.
+          states, while <strong>Outlined badges</strong> represent human response and operator
+          resolution states.
         </p>
         <div className="table-container" style={{ border: '1px solid var(--color-divider)' }}>
           <table className="data-table" data-testid="docs-badge-grammar-table">
@@ -344,8 +391,9 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   <code>.tag-delivery-pending</code> (Dashed neutral stroke)
                 </td>
                 <td>
-                  Queued in transactional outbox awaiting initial dispatch, backoff retry, or
-                  in-flight leader settlement.
+                  Machine delivery state (<code>status = &quot;PENDING&quot;</code>): queued in
+                  transactional outbox awaiting initial dispatch, backoff retry, or in-flight leader
+                  settlement.
                 </td>
               </tr>
               <tr>
@@ -419,8 +467,24 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   <code>.tag-response-none</code> (<code>1.5px dashed</code> transparent outline)
                 </td>
                 <td>
-                  Delivered with <code>require_ack = true</code>; awaiting responder action before{' '}
-                  <code>deadline</code>.
+                  Human response state (<code>ack_status = &quot;PENDING&quot;</code>): delivered
+                  with <code>require_ack = true</code> and awaiting responder action before{' '}
+                  <code>deadline</code> (distinct from machine delivery <code>PENDING</code>).
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>DLQ Recovery (Outlined)</strong>
+                </td>
+                <td>
+                  <span className="badge tag-response-ok">RESOLVED</span>
+                </td>
+                <td>
+                  <code>.tag-response-ok</code> (<code>FAILURE_RESOLVED</code> audit event)
+                </td>
+                <td>
+                  Dead-letter flag cleared (<code>dead_letter = false</code>) via{' '}
+                  <code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code> without re-sending.
                 </td>
               </tr>
             </tbody>
@@ -439,7 +503,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Deliveries & Obligation Triage (/deliveries & /deliveries/:id)',
     tag: 'SURFACE 1',
     keywords:
-      'Deliveries /deliveries /deliveries/:notificationId obligation_owner_id ack_inherited effective_ack_status events_truncated 100 events Acknowledge Dismiss POST /api/v1/notifications/{id}/ack dismiss 409 Conflict responder notes',
+      'Deliveries /deliveries /deliveries/:notificationId obligation_owner_id ack_inherited effective_ack_status events_truncated 100 events Acknowledge Dismiss POST /api/v1/notifications/{id}/ack dismiss 409 Conflict responder notes withholds View Canonical Owner',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -452,9 +516,12 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             <strong>Canonical Owner vs. Deduplicated Follower Lineage:</strong> Surfaces{' '}
             <code>obligation_owner_id</code>, <code>ack_inherited</code>,{' '}
             <code>effective_ack_status</code>, <code>obligation_resolution_status</code>, and{' '}
-            <code>obligation_resolution_error</code>. When a notification is deduplicated (
-            <code>obligation_owner_id !== notification_id</code>), the detail view links directly to
-            the canonical owner and routes ACK/Dismiss actions to that owner.
+            <code>obligation_resolution_error</code>. When viewing a deduplicated follower (
+            <code>obligation_owner_id !== notification_id</code>), the follower detail view{' '}
+            <strong>withholds direct ACK/Dismiss buttons</strong> to prevent audit-attribution
+            split-brain and renders a direct <strong>View Canonical Owner</strong> link (
+            <code>/deliveries/&#123;obligation_owner_id&#125;</code>) where the responder reviews
+            and acknowledges/dismisses the canonical owner obligation.
           </li>
           <li>
             <strong>Bounded Runtime Event Stream:</strong> Renders chronological{' '}
@@ -490,7 +557,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Policy Workspace: Catalog, Resolution Trace, Revisions, Simulator & Reload (/policy)',
     tag: 'SURFACE 2',
     keywords:
-      'Policy Workspace /policy GET /ui/policies/active GET /ui/policies/effective GET /ui/policies/revisions explicit_override mode_override policy_base sdk_default ACTIVE PREVIEW DRAFT RETIRED simulate [TEST] live dispatch POST /api/v1/policies/reload',
+      'Policy Workspace /policy GET /ui/policies/active GET /ui/policies/effective GET /ui/policies/revisions explicit_override mode_override policy_base sdk_default ACTIVE PREVIEW DRAFT RETIRED simulate [TEST] live dispatch POST /api/v1/policies/reload uns-console-policy-test uns_console_policy_test',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -522,8 +589,9 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             <strong>Dry-Run Simulator &amp; Synthetically Tagged <code>[TEST]</code> Dispatch:</strong>{' '}
             Principals with <code>PRODUCER</code> or <code>OPERATOR</code> capability can run
             side-effect-free simulations (<code>POST /api/v1/notifications/simulate</code>) or
-            dispatch a live verification signal prefixed with <code>[TEST]</code> (
-            <code>source: &quot;uns-console-policy-test&quot;</code>) via{' '}
+            dispatch a live verification signal prefixed with <code>[TEST]</code> tagged with both{' '}
+            <code>source: &quot;uns-console-policy-test&quot;</code> (request field) and{' '}
+            <code>metadata.source: &quot;uns_console_policy_test&quot;</code> (metadata tag) via{' '}
             <code>POST /api/v1/notifications</code>.
           </li>
           <li>
@@ -546,7 +614,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Operations & Dead-Letter Recovery (/operations)',
     tag: 'SURFACE 3',
     keywords:
-      'Operations /operations GET /readyz 503 GET /api/v1/channels/health GET /api/v1/dlq GET /api/v1/runtime/dead-letters Replay Resolve replay_blocked_by replay_block_reason DELETE /api/v1/dlq/{entry_id}',
+      'Operations /operations GET /readyz 503 GET /api/v1/channels/health GET /api/v1/dlq GET /api/v1/runtime/dead-letters Replay Resolve replay_blocked_by replay_block_reason DELETE /api/v1/dlq/{entry_id} RuntimeDLQ DLQService',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -573,11 +641,18 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             <code>replay_blocked_by</code> / <code>replay_block_reason</code>.
           </li>
           <li>
-            <strong>Inline Replay vs. Resolve:</strong> Principals with <code>OPERATOR</code>{' '}
-            capability can trigger <strong>Replay</strong> (when <code>replay_blocked_by</code> is{' '}
-            <code>null</code>) to start delivery Cycle <code>N+1</code>, or{' '}
-            <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code>) to clear{' '}
-            <code>dead_letter = false</code> with an audited <code>FAILURE_RESOLVED</code> event.
+            <strong>Inline Replay vs. Resolve &amp; <code>&#123;entry_id&#125;</code> Contract:</strong>{' '}
+            Principals with <code>OPERATOR</code> capability can trigger <strong>Replay</strong> (
+            <code>POST /api/v1/runtime/notifications/&#123;id&#125;/replay</code>, enabled when{' '}
+            <code>replay_blocked_by</code> is <code>null</code>) to start delivery Cycle{' '}
+            <code>N+1</code>, or <strong>Resolve</strong> (
+            <code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code>) to clear{' '}
+            <code>dead_letter = false</code> with an audited <code>FAILURE_RESOLVED</code> event. In
+            canonical <code>uns.Runtime</code> mode (<code>RuntimeDLQ</code>),{' '}
+            <code>entry_id === notification_id</code> (invoking{' '}
+            <code>Runtime.resolve_failure(entry_id)</code>), whereas in legacy non-runtime{' '}
+            <code>DLQService</code> fixtures, <code>entry_id</code> is the distinct DLQ entry UUID
+            returned by <code>GET /api/v1/dlq</code>.
           </li>
         </ul>
         <div>
@@ -621,7 +696,10 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             <strong>System Invariants (<code>/invariants</code>):</strong> Queries{' '}
             <code>GET /ui/invariants</code> and <code>GET /ui/invariants/summary</code> to verify
             runtime, schema, static-analysis, and test invariants (including{' '}
-            <code>INV-UI-001</code>) with links to repository evidence.
+            <Link to={ROUTES.INVARIANTS}>
+              <code>INV-UI-001</code>
+            </Link>
+            ) with links to repository evidence.
           </li>
         </ul>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -650,8 +728,23 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
       <>
         <p style={{ margin: 0 }}>
           Every accepted notification in <code>uns_notifications</code> transitions through a
-          lease-fenced transactional outbox state machine managed by <code>uns.Runtime</code>:
+          lease-fenced transactional outbox state machine managed by <code>uns.Runtime</code>. Click
+          any delivery state badge below to filter <code>/deliveries</code> by that status:
         </p>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link to="/deliveries?status=PENDING" className="badge tag-delivery-pending">
+            Filter: PENDING &rarr;
+          </Link>
+          <Link to="/deliveries?status=DELIVERED" className="badge tag-delivery-ok">
+            Filter: DELIVERED &rarr;
+          </Link>
+          <Link to="/deliveries?status=DEDUPLICATED" className="badge tag-delivery-info">
+            Filter: DEDUPLICATED &rarr;
+          </Link>
+          <Link to="/deliveries?status=FAILED" className="badge tag-delivery-fail">
+            Filter: FAILED &rarr;
+          </Link>
+        </div>
         <pre className="docs-code-block">
           {`[Intake: Runtime.accept()]
    ├── No active dedup leader ──────────────► PENDING (Leader: dedup_owner_id = NULL)
@@ -666,7 +759,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
    └── Exhausted (GUARANTEED mode) ─────────► FAILED + dead_letter = true (DLQ)
          ├── First pending follower promoted ► DEDUP_OWNER_PROMOTED + OBLIGATION_HANDED_OFF
          ├── Operator POST .../replay ──────► PENDING (Cycle N+1, only when replay_blocked_by is null)
-         └── Operator DELETE /api/v1/dlq/{id}► FAILED (dead_letter = false, FAILURE_RESOLVED)`}
+         └── Operator DELETE /api/v1/dlq/{entry_id} ► FAILED (dead_letter = false, FAILURE_RESOLVED)`}
         </pre>
       </>
     ),
@@ -674,19 +767,29 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
   {
     id: 'state-machines-ack',
     sectionId: 'state-machines',
-    title: 'Obligation Acknowledgment State Machine (uns_notifications.ack_status)',
+    title: 'Obligation Acknowledgment State Machine & Timeout Unit Contract (ack_timeout_minutes vs. ack_timeout_seconds)',
     tag: 'OBLIGATION LIFECYCLE',
     keywords:
-      'Obligation Acknowledgment State Machine PENDING ACKED DISMISSED TIMED_OUT terminal immutability 409 Conflict follower inheritance ack_inherited effective_ack_status uns-timeout-worker escalation_required',
+      'Obligation Acknowledgment State Machine PENDING ACKED DISMISSED TIMED_OUT ack_timeout_minutes ack_timeout_seconds terminal immutability 409 Conflict follower inheritance ack_inherited effective_ack_status uns-timeout-worker escalation_required',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
           When a notification with <code>require_ack = true</code> reaches{' '}
           <code>status = &quot;DELIVERED&quot;</code>, <code>Runtime.dispatch()</code> initializes{' '}
           <code>ack_status = &quot;PENDING&quot;</code> and computes{' '}
-          <code>deadline = delivered_at + 60 * ack_timeout_minutes</code> (default <code>15m</code>{' '}
-          for <code>SAFETY</code>, <code>30m</code> for <code>GOVERNANCE</code>):
+          <code>deadline = delivered_at + 60 * ack_timeout_minutes</code>:
         </p>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link to={ROUTES.AUDIT} className="badge tag-response-ok">
+            Audit: ACKED &rarr;
+          </Link>
+          <Link to={ROUTES.AUDIT} className="badge tag-response-warn">
+            Audit: DISMISSED &rarr;
+          </Link>
+          <Link to={ROUTES.AUDIT} className="badge tag-response-fail">
+            Audit: ACK TIMEOUT &rarr;
+          </Link>
+        </div>
         <pre className="docs-code-block">
           {`[Before DELIVERED or require_ack = false] ──► ack_status = NULL
 [Leader reaches DELIVERED (require_ack = true)]
@@ -697,6 +800,15 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                                                                     escalation_required=true)`}
         </pre>
         <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
+          <li>
+            <strong>Timeout Unit Contract (<code>ack_timeout_minutes</code> vs. <code>ack_timeout_seconds</code>):</strong>{' '}
+            YAML policy definitions and <code>GET /ui/policies/effective</code> configure{' '}
+            <code>ack_timeout_minutes</code> in <strong>minutes</strong> (default <code>15</code>{' '}
+            minutes for <code>SAFETY</code>, <code>30</code> minutes for <code>GOVERNANCE</code>),
+            whereas <code>GET /ui/policies/active</code> and{' '}
+            <code>GET /ui/policies/revisions</code> return both <code>ack_timeout_minutes</code> and
+            pre-multiplied <code>ack_timeout_seconds</code> (<code>60 * ack_timeout_minutes</code>).
+          </li>
           <li>
             <strong>Terminal Immutability &amp; <code>409 Conflict</code>:</strong> Once{' '}
             <code>ack_status</code> enters <code>ACKED</code>, <code>DISMISSED</code>, or{' '}
@@ -716,68 +828,186 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
   {
     id: 'state-machines-idempotency-vs-dedup',
     sectionId: 'state-machines',
-    title: 'Idempotency (idempotency_key) vs. Semantic Deduplication (dedup_key)',
+    title: 'Idempotency (idempotency_key) vs. Semantic Deduplication (dedup_key & effective_hash)',
     tag: 'DEDUP CONTRACT',
     keywords:
-      'idempotency_key dedup_key dedup_window_seconds idempotent_replay 409 Conflict DEDUPLICATED uns_dedup effective_hash',
+      'idempotency_key dedup_key dedup_window_seconds idempotent_replay 409 Conflict DEDUPLICATED uns_dedup effective_hash TSG-04 cohort',
     render: () => (
-      <div className="table-container" style={{ border: '1px solid var(--color-divider)' }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Dimension</th>
-              <th>
-                Exact Request Idempotency (<code>idempotency_key</code>)
-              </th>
-              <th>
-                Semantic Alert Coalescing (<code>dedup_key</code>)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <strong>Composite Key Scope</strong>
-              </td>
-              <td>
-                <code>SHA-256([principal, source, idempotency_key])</code>
-              </td>
-              <td>
-                <code>SHA-256([principal, source, dedup_key, effective_hash])</code>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Active Horizon</strong>
-              </td>
-              <td>
-                Until operational row is expired by <code>uns-maintain</code> (
-                <code>idempotency_seconds</code>)
-              </td>
-              <td>
-                Policy&apos;s <code>dedup_window_seconds</code> (default <code>300s</code>); pending
-                leader ownership survives TTL expiry (<code>F-01</code>)
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Behavior on Match</strong>
-              </td>
-              <td>
-                Identical payload returns original <code>notification_id</code> with{' '}
-                <code>idempotent_replay: true</code>. Mutated payload with same key raises{' '}
-                <code>409 Conflict</code>.
-              </td>
-              <td>
-                Creates a new <code>notification_id</code> linked via{' '}
-                <code>dedup_owner_id</code> to the window leader; settles as{' '}
-                <code>DEDUPLICATED</code> when leader delivers, or promotes first follower if leader
-                exhausts retries.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <>
+        <div className="table-container" style={{ border: '1px solid var(--color-divider)' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Dimension</th>
+                <th>
+                  Exact Request Idempotency (<code>idempotency_key</code>)
+                </th>
+                <th>
+                  Semantic Alert Coalescing (<code>dedup_key</code>)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Composite Key Scope</strong>
+                </td>
+                <td>
+                  <code>SHA-256([principal, source, idempotency_key])</code>
+                </td>
+                <td>
+                  <code>SHA-256([principal, source, dedup_key, effective_hash])</code>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Active Horizon</strong>
+                </td>
+                <td>
+                  Until operational row is expired by <code>uns-maintain</code> (
+                  <code>idempotency_seconds</code>)
+                </td>
+                <td>
+                  Policy&apos;s <code>dedup_window_seconds</code> (default <code>300s</code>);
+                  pending leader ownership survives TTL expiry (
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>F-01</code>
+                  </Link>
+                  )
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Behavior on Match</strong>
+                </td>
+                <td>
+                  Identical payload returns original <code>notification_id</code> with{' '}
+                  <code>idempotent_replay: true</code>. Mutated payload with same key raises{' '}
+                  <code>409 Conflict</code>.
+                </td>
+                <td>
+                  Creates a new <code>notification_id</code> linked via{' '}
+                  <code>dedup_owner_id</code> to the window leader; settles as{' '}
+                  <code>DEDUPLICATED</code> when leader delivers, or promotes first follower if
+                  leader exhausts retries.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style={{ margin: 0 }}>
+          <strong>What is <code>effective_hash</code>?</strong> <code>effective_hash</code> is the
+          canonical SHA-256 digest of the resolved effective routing parameters (
+          <code>channels</code>, <code>delivery_mode</code>, <code>require_ack</code>,{' '}
+          <code>ack_timeout_minutes</code>). <strong>Second-order policy reload interaction:</strong>{' '}
+          reloading a policy (<code>TSG-04</code>) that alters effective routing changes{' '}
+          <code>effective_hash</code> and intentionally starts a fresh deduplication cohort rather
+          than coalescing new signals under stale routing rules.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'state-machines-invariants-taxonomy',
+    sectionId: 'state-machines',
+    title: 'System Invariants (INV-UI-001) & Runtime Remediation Guarantees (F-01–F-08)',
+    tag: 'INVARIANTS & F-01..F-08',
+    keywords:
+      'INV-UI-001 F-01 F-02 F-03 F-04a F-04b F-05 F-06 F-07 F-08a F-08b System Invariants /invariants remediation',
+    render: () => (
+      <>
+        <p style={{ margin: 0 }}>
+          Architectural invariants (such as{' '}
+          <Link to={ROUTES.INVARIANTS}>
+            <code>INV-UI-001</code>
+          </Link>
+          ) are verifiable in the{' '}
+          <Link to={ROUTES.INVARIANTS}>
+            <strong>System Invariants (<code>/invariants</code>)</strong>
+          </Link>{' '}
+          workspace, while <code>F-01</code> through <code>F-08b</code> denote the core runtime
+          correctness guarantees enforced by <code>uns.Runtime</code>:
+        </p>
+        <div className="table-container" style={{ border: '1px solid var(--color-divider)' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Identifier</th>
+                <th>Guarantee / Invariant Summary</th>
+                <th>Related Runbook / Surface</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>INV-UI-001</code>
+                  </Link>
+                </td>
+                <td>
+                  All <code>/ui/*</code> read-model endpoints are strictly non-mutating; mutations
+                  execute exclusively via scope-checked <code>/api/v1/*</code> endpoints.
+                </td>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>/invariants</Link>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>F-01</code> &amp; <code>F-02</code>
+                  </Link>
+                </td>
+                <td>
+                  Pending leader ownership survives deduplication TTL expiry (<code>F-01</code>),
+                  and <code>replay()</code> enforces durable successor lineage verification via{' '}
+                  <code>dedup_successor_id</code> (<code>F-02</code>).
+                </td>
+                <td>TSG-01 · DLQ &amp; Replay</td>
+              </tr>
+              <tr>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>F-03</code>, <code>F-04a</code>, <code>F-04b</code>
+                  </Link>
+                </td>
+                <td>
+                  Append-only per-channel observations (<code>CHANNEL_ATTEMPT_RESULT</code>) survive
+                  worker lease loss (<code>F-03</code>), and SMTP socket deadlines avoid internal
+                  retry of ambiguous post-admission timeouts (<code>F-04a/b</code>).
+                </td>
+                <td>TSG-02 · Leases &amp; SMTP</td>
+              </tr>
+              <tr>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>F-05</code> &amp; <code>F-06</code>
+                  </Link>
+                </td>
+                <td>
+                  Revision-locked policy snapshots with lock-free warm simulation reads (
+                  <code>F-05</code>) and due-time ordered callback delivery via{' '}
+                  <code>ix_uns_callbacks</code> (<code>F-06</code>).
+                </td>
+                <td>TSG-03 &amp; TSG-04</td>
+              </tr>
+              <tr>
+                <td>
+                  <Link to={ROUTES.INVARIANTS}>
+                    <code>F-07</code>, <code>F-08a</code>, <code>F-08b</code>
+                  </Link>
+                </td>
+                <td>
+                  Runtime-bound MCP read helpers (<code>F-07</code>), explicit non-archive vs.
+                  verified-archive retention modes (<code>F-08a</code>), and UTC-normalized audit
+                  cutoff comparisons (<code>F-08b</code>).
+                </td>
+                <td>TSG-05 &amp; TSG-06</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </>
     ),
   },
 
@@ -923,12 +1153,41 @@ uv run python scripts/opt_in_channel_smoke.py --execute --channel slack`}
   // SECTION 5: INCIDENT RUNBOOKS (TSG-01–06)
   // =========================================================================
   {
+    id: 'runbook-env-bootstrap',
+    sectionId: 'runbooks',
+    title: 'Runbook Environment Setup & Shell Bootstrap Preamble',
+    tag: 'PREREQUISITES · ENV SETUP',
+    keywords:
+      'Runbook Environment Setup UNS_BASE_URL UNS_API_KEY UNS_DATABASE_URL UNS_DB_FILE NOTIF_ID ENTRY_ID prerequisites',
+    render: () => (
+      <>
+        <p style={{ margin: 0 }}>
+          Before running any diagnostic or remediation commands in <code>TSG-01</code> through{' '}
+          <code>TSG-06</code>, export these operator environment variables in your shell so{' '}
+          <code>$UNS_BASE_URL</code>, <code>$UNS_API_KEY</code>, <code>$UNS_DB_FILE</code>, and{' '}
+          <code>$NOTIF_ID</code> are explicitly bound:
+        </p>
+        <pre className="docs-code-block">
+          {`export UNS_BASE_URL="http://127.0.0.1:18080"
+export UNS_API_KEY="<YOUR_UNS_API_KEY>"
+export UNS_DATABASE_URL="sqlite:////data/uns.db"
+export UNS_DB_FILE="\${UNS_DATABASE_URL#sqlite:///}"
+export NOTIF_ID="<notification-uuid>"`}
+        </pre>
+      </>
+    ),
+  },
+  {
     id: 'runbook-tsg-01',
     sectionId: 'runbooks',
     title: 'TSG-01: Dead-Letter Queue (DLQ) Triage & Safe Replay',
     tag: 'TSG-01 · DLQ & REPLAY',
     keywords:
-      'TSG-01 Dead-Letter Queue DLQ Triage Safe Replay dlq_depth replay_blocked_by replay_block_reason DEDUP_OWNER_PROMOTED OBLIGATION_HANDED_OFF DELETE /api/v1/dlq F-01 F-02',
+      'TSG-01 Dead-Letter Queue DLQ Triage Safe Replay dlq_depth replay_blocked_by replay_block_reason DEDUP_OWNER_PROMOTED OBLIGATION_HANDED_OFF DELETE /api/v1/dlq ENTRY_ID RuntimeDLQ F-01 F-02',
+    actionLink: {
+      to: ROUTES.OPERATIONS,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -944,7 +1203,11 @@ uv run python scripts/opt_in_channel_smoke.py --execute --channel slack`}
           <code>dedup_successor_id</code> + <code>OBLIGATION_HANDED_OFF</code>. Replay is blocked (
           <code>409 Conflict</code>) whenever <code>replay_blocked_by</code> is non-null (
           <code>PENDING</code>, <code>DELIVERED</code>, <code>DEDUPLICATED</code>, or{' '}
-          <code>UNRESOLVED_LINEAGE</code>).
+          <code>UNRESOLVED_LINEAGE</code>). Note that <code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code>{' '}
+          takes <code>&#123;entry_id&#125;</code>: in canonical <code>uns.Runtime</code> (
+          <code>RuntimeDLQ</code>), <code>entry_id === notification_id</code>, whereas in legacy
+          non-runtime <code>DLQService</code> fixtures, <code>entry_id</code> is the DLQ entry UUID
+          from <code>GET /api/v1/dlq</code>.
         </p>
         <pre className="docs-code-block">
           {`# 1. Inspect dead letters and check replay_blocked_by / replay_block_reason
@@ -956,8 +1219,9 @@ curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" \\
   "$UNS_BASE_URL/api/v1/runtime/notifications/$NOTIF_ID/replay" | jq .
 
 # 2B. If obligation was satisfied by a successor (replay_blocked_by != null) -> Resolve DLQ entry
+ENTRY_ID="$NOTIF_ID" # In RuntimeDLQ, entry_id === notification_id
 curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \\
-  "$UNS_BASE_URL/api/v1/dlq/$NOTIF_ID" | jq .`}
+  "$UNS_BASE_URL/api/v1/dlq/$ENTRY_ID" | jq .`}
         </pre>
       </>
     ),
@@ -968,7 +1232,11 @@ curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \\
     title: 'TSG-02: Delivery Leases, Worker Crash Recovery & UNKNOWN SMTP Provider Effects',
     tag: 'TSG-02 · LEASES & SMTP',
     keywords:
-      'TSG-02 Delivery Leases Worker Crash Recovery UNKNOWN SMTP Provider Effects LEASE_LOST CHANNEL_ATTEMPT_STARTED CHANNEL_ATTEMPT_RESULT provider_effect_may_have_occurred provider_outcome F-03 F-04a F-04b',
+      'TSG-02 Delivery Leases Worker Crash Recovery UNKNOWN SMTP Provider Effects LEASE_LOST CHANNEL_ATTEMPT_STARTED CHANNEL_ATTEMPT_RESULT provider_effect_may_have_occurred provider_outcome ENTRY_ID F-03 F-04a F-04b',
+    actionLink: {
+      to: ROUTES.DELIVERIES,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -979,20 +1247,35 @@ curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \\
           timeout.
         </p>
         <p style={{ margin: 0 }}>
-          <strong>Mechanics (<code>F-03</code> / <code>F-04a</code> / <code>F-04b</code>):</strong>{' '}
-          Workers claim a 60-second fenced <code>lease_token</code>. Per-channel observations are
-          persisted append-only via <code>CHANNEL_ATTEMPT_RESULT</code> even if the lease expires
-          before aggregate settlement. <code>EmailAdapter</code> budgets socket timeouts against the
-          remaining lease and never locally retries ambiguous post-admission SMTP timeouts.
+          <strong>3-Way Decision Branch on <code>CHANNEL_ATTEMPT_RESULT</code> (<code>F-03</code> / <code>F-04a</code> / <code>F-04b</code>):</strong>
         </p>
+        <ol style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '4px' }}>
+          <li>
+            <strong><code>&quot;success&quot;: true</code>:</strong> The external provider accepted
+            the message before the worker lost its lease. Do <strong>not</strong> replay; resolve the
+            DLQ flag via <code>DELETE /api/v1/dlq/$ENTRY_ID</code>.
+          </li>
+          <li>
+            <strong><code>metadata.provider_outcome == &quot;UNKNOWN&quot;</code> (post-admission SMTP timeout where <code>success</code> is <code>false</code>):</strong>{' '}
+            <strong>Verify out-of-band first</strong> (inspect SMTP relay logs or recipient mailbox)
+            before choosing <strong>Resolve</strong> (if the email arrived) vs.{' '}
+            <strong>Replay</strong> (if the message was dropped; replaying without verification
+            risks duplicate email delivery).
+          </li>
+          <li>
+            <strong><code>&quot;success&quot;: false</code> and <code>provider_outcome != &quot;UNKNOWN&quot;</code>:</strong>{' '}
+            Fix the downstream provider/network issue and trigger <strong>Replay</strong>.
+          </li>
+        </ol>
         <pre className="docs-code-block">
           {`# Inspect per-channel attempt observations and lease fencing events before replaying
 curl -sS -H "Authorization: Bearer $UNS_API_KEY" \\
   "$UNS_BASE_URL/api/v1/runtime/notifications/$NOTIF_ID" \\
   | jq '.events[] | select(.kind == "CHANNEL_ATTEMPT_STARTED" or .kind == "CHANNEL_ATTEMPT_RESULT" or .kind == "LEASE_LOST")'
 
-# If CHANNEL_ATTEMPT_RESULT shows "success": true, do NOT replay — resolve the DLQ flag instead:
-curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" "$UNS_BASE_URL/api/v1/dlq/$NOTIF_ID"`}
+# Branch 1 (success == true) or Branch 2 (verified delivered out-of-band) -> Resolve DLQ entry:
+ENTRY_ID="$NOTIF_ID" # In RuntimeDLQ, entry_id === notification_id
+curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" "$UNS_BASE_URL/api/v1/dlq/$ENTRY_ID"`}
         </pre>
       </>
     ),
@@ -1004,6 +1287,10 @@ curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" "$UNS_BASE_URL/api/v1
     tag: 'TSG-03 · ACK & CALLBACKS',
     keywords:
       'TSG-03 Acknowledgment Timeouts Escalations Callback Retry Exhaustion TIMED_OUT uns-timeout-worker 409 Conflict 403 principal_override_forbidden callback_pending callback_attempts ix_uns_callbacks F-06',
+    actionLink: {
+      to: ROUTES.AUDIT,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -1025,12 +1312,9 @@ curl -sS -H "Authorization: Bearer $UNS_API_KEY" \\
   "$UNS_BASE_URL/api/v1/runtime/notifications/$NOTIF_ID" \\
   | jq '{id, status, ack_status, actor, delivered_at, deadline, responded_at, response_metadata}'
 
-# 2. Re-enable exhausted terminal callbacks (callback_attempts >= 3) after restoring receiver
-sqlite3 "$UNS_DB_FILE" "
-  UPDATE uns_events
-  SET callback_attempts = 0, callback_until = at, callback_token = NULL
-  WHERE callback_pending = 1 AND callback_attempts >= 3;
-"`}
+# 2. Re-enable exhausted terminal callbacks scoped to a single notification (with 5s busy timeout & env guards)
+sqlite3 -cmd ".timeout 5000" "\${UNS_DB_FILE:?Set UNS_DB_FILE}" \\
+  "UPDATE uns_events SET callback_pending = 1, callback_attempts = 0, callback_until = at, callback_token = NULL WHERE notification_id = '\${NOTIF_ID:?Set NOTIF_ID}' AND (callback_pending = 1 OR callback_error IS NOT NULL) AND callback_attempts >= 3;"`}
         </pre>
       </>
     ),
@@ -1042,6 +1326,10 @@ sqlite3 "$UNS_DB_FILE" "
     tag: 'TSG-04 · POLICY AUTHORITY',
     keywords:
       'TSG-04 Policy Lifecycle Revision Governance Content Hashing Override Rejections POST /api/v1/policies/reload 409 422 RETIRED PolicyOverrideError slack_channel email_to pagerduty_severity websocket_user_id F-05',
+    actionLink: {
+      to: ROUTES.POLICY,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -1053,10 +1341,10 @@ sqlite3 "$UNS_DB_FILE" "
           <strong>Mechanics (<code>F-05</code>):</strong> Active policies are stored in
           revision-locked snapshots (<code>notification_policy_snapshots</code>). Re-activating a
           previously <code>RETIRED</code> content hash returns <code>409 Conflict</code> until the
-          YAML <code>version</code> is incremented. Producer requests cannot weaken{' '}
-          <code>ACTIVE</code> policy fields or pass reserved adapter-steering keys (
-          <code>slack_channel</code>, <code>email_to</code>, <code>pagerduty_severity</code>,{' '}
-          <code>websocket_user_id</code>).
+          YAML <code>version</code> is incremented. Pass <code>-d &apos;&#123;&#125;&apos;</code> to
+          reload from the server&apos;s configured <code>UNS_POLICY_DIR</code> (an optional{' '}
+          <code>&#123;&quot;policy_dir&quot;: &quot;...&quot;&#125;</code> body is only for
+          subdirectories within the server&apos;s allowed policy root).
         </p>
         <pre className="docs-code-block">
           {`# 1. Inspect effective policy resolution & field trace
@@ -1066,9 +1354,9 @@ curl -sS -G -H "Authorization: Bearer $UNS_API_KEY" "$UNS_BASE_URL/ui/policies/e
   --data-urlencode "autonomy_mode=LIVE" \\
   --data-urlencode "irreversible=true" | jq .
 
-# 2. Reload YAML policy directory after bumping version on updated/re-enabled policies
+# 2. Reload YAML policies from the server's configured UNS_POLICY_DIR
 curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" -H "Content-Type: application/json" \\
-  "$UNS_BASE_URL/api/v1/policies/reload" -d '{"policy_dir": "examples/policies/mip-uns"}' | jq .`}
+  "$UNS_BASE_URL/api/v1/policies/reload" -d '{}' | jq .`}
         </pre>
       </>
     ),
@@ -1080,6 +1368,10 @@ curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" -H "Content-Type: appli
     tag: 'TSG-05 · MCP & WEBSOCKET',
     keywords:
       'TSG-05 MCP Transport Safety Agent Recovery Workflows uns-mcp --enable-writes UNS_DATABASE_URL UNS_API_PRINCIPAL UNS_MCP_DELIVERY_CONFIRMATION_TOKEN WS_1008_POLICY_VIOLATION 1008 UNS_ALLOWED_ORIGINS F-07',
+    actionLink: {
+      to: ROUTES.OPERATIONS,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -1115,6 +1407,10 @@ print("MCP Write Config Valid:", cfg.mode, "principal=", cfg.operator_principal)
     tag: 'TSG-06 · MAINTENANCE & BACKUP',
     keywords:
       'TSG-06 SQLite WAL Retention Maintenance uns-maintain Verified Online Backups uns-maintain-and-backup.sh --archive FileExistsError oversized_notification_ids RETENTION_APPLIED PRAGMA quick_check F-08a F-08b',
+    actionLink: {
+      to: ROUTES.OPERATIONS,
+      label: 'Open in Console →',
+    },
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -1146,7 +1442,7 @@ ARCHIVE_FILE="/var/backups/uns/archive-$(date -u +%Y%m%dT%H%M%SZ)-$(uuidgen | tr
   --apply --operator "oncall-operator" --archive "$ARCHIVE_FILE"
 
 BACKUP_FILE="/var/backups/uns/uns-$(date -u +%Y%m%dT%H%M%SZ).db"
-sqlite3 "$UNS_DB_FILE" ".backup '$BACKUP_FILE'"
+sqlite3 -cmd ".timeout 5000" "\${UNS_DB_FILE:?Set UNS_DB_FILE}" ".backup $BACKUP_FILE"
 sqlite3 "$BACKUP_FILE" "PRAGMA quick_check;"`}
         </pre>
       </>
@@ -1156,7 +1452,12 @@ sqlite3 "$BACKUP_FILE" "PRAGMA quick_check;"`}
 
 export function DocsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState('');
+  const urlQuery = searchParams.get('q') ?? '';
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+
+  useEffect(() => {
+    setSearchQuery(urlQuery);
+  }, [urlQuery]);
 
   const selectedSection = parseSectionParam(searchParams.get('section'));
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -1165,20 +1466,31 @@ export function DocsPage() {
   const handleSelectSection = (sectionId: DocsSectionId) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('section', sectionId);
+    nextParams.delete('q');
+    setSearchQuery('');
     setSearchParams(nextParams, { replace: false });
   };
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    if (value.trim().length > 0 && searchParams.get('section') !== 'all') {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('section', 'all');
-      setSearchParams(nextParams, { replace: true });
+    const nextParams = new URLSearchParams(searchParams);
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      nextParams.set('q', value);
+      if (nextParams.get('section') !== 'all') {
+        nextParams.set('section', 'all');
+      }
+    } else {
+      nextParams.delete('q');
     }
+    setSearchParams(nextParams, { replace: true });
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('q');
+    setSearchParams(nextParams, { replace: true });
   };
 
   const visibleSections = useMemo(() => {
@@ -1261,8 +1573,8 @@ export function DocsPage() {
       </div>
 
       {/* Two-Column Split Layout: 260px Sticky Left Index + Main Documentation Reader */}
-      <div className="docs-split-layout">
-        <aside className="docs-nav-rail" aria-label="Documentation sections">
+      <div className="docs-split-layout docs-layout">
+        <aside className="docs-nav-rail docs-sidebar" aria-label="Documentation sections">
           <div className="docs-nav-sticky">
             <div className="docs-nav-header">Workspace Index</div>
             <ul className="docs-nav-list">
@@ -1275,12 +1587,7 @@ export function DocsPage() {
                       data-testid={`docs-nav-${sec.id}`}
                       className={`docs-nav-btn ${isActive ? 'active' : ''}`}
                       aria-current={isActive ? 'true' : undefined}
-                      onClick={() => {
-                        if (isSearching) {
-                          setSearchQuery('');
-                        }
-                        handleSelectSection(sec.id);
-                      }}
+                      onClick={() => handleSelectSection(sec.id)}
                     >
                       <span>{sec.navLabel}</span>
                       <span className="docs-nav-btn-sub">{sec.navSubtitle}</span>
@@ -1296,12 +1603,7 @@ export function DocsPage() {
                     isSearching || selectedSection === 'all' ? 'active' : ''
                   }`}
                   aria-current={isSearching || selectedSection === 'all' ? 'true' : undefined}
-                  onClick={() => {
-                    if (isSearching) {
-                      setSearchQuery('');
-                    }
-                    handleSelectSection('all');
-                  }}
+                  onClick={() => handleSelectSection('all')}
                 >
                   <span>All Sections (Full Reference)</span>
                   <span className="docs-nav-btn-sub">View all 5 sections on one page</span>
@@ -1347,12 +1649,25 @@ export function DocsPage() {
                   {cards.map((card) => (
                     <article
                       key={card.id}
-                      className="docs-card"
+                      className={`docs-card ${
+                        card.sectionId === 'runbooks' ? 'docs-runbook-card' : ''
+                      }`}
                       data-testid={`docs-card-${card.id}`}
                     >
                       <div className="docs-card-header">
                         <h3>{card.title}</h3>
-                        <span className="badge badge-default">{card.tag}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {card.actionLink && (
+                            <Link
+                              to={card.actionLink.to}
+                              className="btn btn-secondary"
+                              data-testid={`docs-action-${card.id}`}
+                            >
+                              {card.actionLink.label}
+                            </Link>
+                          )}
+                          <span className="badge badge-default">{card.tag}</span>
+                        </div>
                       </div>
                       {card.render()}
                     </article>

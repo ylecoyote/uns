@@ -64,16 +64,11 @@ sqlite3 "$UNS_DB_FILE" "
 - When calling `POST /api/v1/notifications/{id}/ack` or `/dismiss`, either omit `acked_by` / `dismissed_by` from the JSON body or set it to the exact value of `UNS_API_PRINCIPAL`. Supplying any other string returns `403 Forbidden`.
 
 ### Scenario C: Re-enabling exhausted callbacks (`callback_attempts >= 3`)
-If an external callback endpoint was down and `uns_events` rows reached `callback_attempts = 3` (with `callback_pending = 1`), reset their attempt counter in SQLite after restoring the callback receiver:
+If an external callback endpoint was down and `uns_events` rows reached `callback_attempts = 3` (with `callback_pending = 1`), reset the attempt counter scoped to the target notification in SQLite (with a 5-second busy timeout and environment guards) after restoring the callback receiver:
 
 ```sh
-sqlite3 "$UNS_DB_FILE" "
-  UPDATE uns_events
-  SET callback_attempts = 0,
-      callback_until = at,
-      callback_token = NULL
-  WHERE callback_pending = 1 AND callback_attempts >= 3;
-"
+sqlite3 -cmd ".timeout 5000" "${UNS_DB_FILE:?Set UNS_DB_FILE}" \
+  "UPDATE uns_events SET callback_pending = 1, callback_attempts = 0, callback_until = at, callback_token = NULL WHERE notification_id = '${NOTIF_ID:?Set NOTIF_ID}' AND (callback_pending = 1 OR callback_error IS NOT NULL) AND callback_attempts >= 3;"
 ```
 
 ---

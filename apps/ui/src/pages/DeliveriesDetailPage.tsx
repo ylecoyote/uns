@@ -488,9 +488,27 @@ export function DeliveriesDetailPage() {
             background: 'var(--color-surface)',
           }}
         >
-          <h2 id="runtime-state-heading" style={{ marginTop: 0, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Delivery and human response
-          </h2>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+              marginBottom: '12px',
+            }}
+          >
+            <h2 id="runtime-state-heading" style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Delivery and human response
+            </h2>
+            <Link
+              to="/docs?section=runbooks&q=TSG-02"
+              className="btn btn-secondary"
+              data-testid="delivery-detail-runbook-link"
+            >
+              Runbook: TSG-01 / TSG-02 →
+            </Link>
+          </div>
           <dl className="detail-list">
             <div className="detail-item">
               <dt>Delivery</dt>

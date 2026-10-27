@@ -19,7 +19,8 @@ This manual explains how human operators, responders, producers, and support eng
   | `READ-ONLY` | `observer` only | Non-mutating telemetry inspection across `/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, and `/docs`. |
 - **Modernist Badge Visual Grammar (Filled Delivery vs. Outlined Response):**
   - **Filled Badges (Machine Delivery State):** Solid fills indicate channel transport outcomes (`DELIVERED` / `SUCCESS` in solid `#201e1d` charcoal ink; `FAILED` / `DEAD-LETTER` in solid `#ec3013` signal vermilion; `DEDUPLICATED` in stone `#eae9e9`; `PENDING` in dashed neutral stroke).
-  - **Outlined Badges (Human Obligation State):** `1.5px` stroked transparent badges indicate human response status (`ACKED`, `DISMISSED`, `ACK TIMEOUT` / `TIMED_OUT`, `ACK PENDING`), preventing visual conflation between transport delivery and human acknowledgment.
+  - **Outlined Badges (Human Obligation & Resolution State):** `1.5px` stroked transparent badges indicate human response status (`ACKED`, `DISMISSED`, `ACK TIMEOUT` / `TIMED_OUT`, `ACK PENDING`) and dead-letter resolution (`RESOLVED` / `FAILURE_RESOLVED`), preventing visual conflation between transport delivery and human acknowledgment.
+- **Profile & Mode Banner (`LOCAL RECORDING MODE`):** When running in the persistent localhost recording deployment (`deploy/local/local_app.py`), a top-of-page banner (`PROFILE: LOCAL-RECORDING`) indicates that Slack, email, and PagerDuty channels record receipts locally rather than sending external messages, complementing `persistence_mode` from `GET /ui/session` and `GET /readyz`.
 
 ---
 
@@ -45,16 +46,16 @@ Once signed in, the top navigation bar links to six primary workspaces:
 - **Deliveries Explorer (`/deliveries`):** Browse and filter notification obligations (`GET /ui/deliveries`) by delivery `status`, `intent`, `delivery_mode`, `autonomy_mode`, `channel`, `notification_type`, and `agent_id`.
 - **Delivery Detail & Obligation Triage (`/deliveries/:notificationId`):**
   1. **Header & Autonomy Context:** Notification UUID, `notification_type`, `intent`, `source`, `correlation_id`, `agent_id`, `autonomy_mode`, `plan_id`, and `decision_snapshot_id`.
-  2. **Canonical Owner vs. Deduplicated Follower Lineage:** Displays `obligation_owner_id`, `ack_inherited`, `effective_ack_status`, `obligation_resolution_status`, and `obligation_resolution_error`. When viewing a deduplicated follower, the console links directly to the canonical owner notification and routes response actions to that owner.
+  2. **Canonical Owner vs. Deduplicated Follower Lineage:** Displays `obligation_owner_id`, `ack_inherited`, `effective_ack_status`, `obligation_resolution_status`, and `obligation_resolution_error`. When viewing a deduplicated follower (`obligation_owner_id !== notification_id`), the follower detail view **withholds direct ACK/Dismiss buttons** to prevent audit-attribution split-brain and provides a direct **View Canonical Owner** link (`/deliveries/{obligation_owner_id}`) where the responder reviews and acknowledges/dismisses the canonical owner obligation.
   3. **Inline Responder Actions (`RESPONDER` / `OPERATOR`):** Execute inline **Acknowledge** (`POST /api/v1/notifications/{id}/ack`) or **Dismiss** (`POST /api/v1/notifications/{id}/dismiss`) with optional responder notes (`metadata.note`). If a concurrent transition returns `409 Conflict`, the view automatically refreshes the timeline and surfaces a concurrency notice.
-  4. **Inline Dead-Letter Recovery (`OPERATOR`):** For dead-lettered `GUARANTEED` notifications (`dead_letter = true`), trigger **Replay** (`POST /api/v1/runtime/notifications/{id}/replay`) or **Resolve** (`DELETE /api/v1/dlq/{id}`).
+  4. **Inline Dead-Letter Recovery (`OPERATOR`):** For dead-lettered `GUARANTEED` notifications (`dead_letter = true`), trigger **Replay** (`POST /api/v1/runtime/notifications/{id}/replay`) or **Resolve** (`DELETE /api/v1/dlq/{entry_id}`, where `entry_id === notification_id` in canonical `uns.Runtime` / `RuntimeDLQ` mode).
   5. **Bounded Runtime Event Ledger:** Displays the chronological `uns_events` stream (`events`, `events_total_count`, `events_truncated`) capped at the most recent 100 events.
 
 ### 3.2 Policy Workspace (`/policy`)
 - **Active Policies Catalog (`GET /ui/policies/active`):** Click any registered policy row to populate the inspector and synchronize the `?notification_type=` deep-link.
 - **Effective Policy Resolution Trace (`GET /ui/policies/effective`):** Two-column split layout displaying resolved effective values (`delivery_mode`, `channels`, `require_ack`, `ack_timeout_minutes`, `dedup_window_seconds`) alongside the step-by-step field precedence trace (`explicit_override` -> `mode_override` -> `policy_base` -> `sdk_default`).
 - **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Inspect the durable revision ledger across `ACTIVE`, `PREVIEW`, `DRAFT`, and `RETIRED` revisions with status filter pills, selection-scoped filtering, `policy_revision_id` / `supersedes_revision_id` lineage chains, `content_hash`, and actor attribution (`created_by`, `published_by`).
-- **Dry-Run Simulator & `[TEST]` Live Dispatch (`PRODUCER` / `OPERATOR`):** Preview routing without side effects (`POST /api/v1/notifications/simulate`) or dispatch a synthetically tagged `[TEST]` verification signal (`POST /api/v1/notifications` with `source: "uns-console-policy-test"`).
+- **Dry-Run Simulator & `[TEST]` Live Dispatch (`PRODUCER` / `OPERATOR`):** Preview routing without side effects (`POST /api/v1/notifications/simulate`) or dispatch a synthetically tagged `[TEST]` verification signal (`POST /api/v1/notifications` with `source: "uns-console-policy-test"` and `metadata.source: "uns_console_policy_test"`).
 - **Atomic Policy Reload (`OPERATOR`):** Trigger `POST /api/v1/policies/reload` to validate YAML definitions on disk and atomically advance the active policy snapshot revision.
 
 ### 3.3 Operations & Dead-Letter Recovery (`/operations`)
@@ -79,7 +80,7 @@ Once signed in, the top navigation bar links to six primary workspaces:
 - **Purpose:** Built-in operator manual, state-machine reference, producer/MCP integration cookbook, and TSG-01–06 incident runbooks (`/docs`).
 - **How to Use:**
   - Use the sticky `260px` left index rail or `?section=` URL deep-links (`overview`, `workflows`, `state-machines`, `integration`, `runbooks`, `all`) to jump directly to a domain.
-  - Type into the top keyword search bar (`docs-search-input`) to filter across all 5 sections and all 6 Troubleshooting Guides in real time.
+  - Type into the top keyword search bar (`docs-search-input`) or deep-link via `?q=<keyword>` (e.g., `/docs?section=runbooks&q=TSG-01`) to filter across all 5 sections and all 6 Troubleshooting Guides in real time.
 
 ---
 
