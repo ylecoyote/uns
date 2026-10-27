@@ -313,12 +313,22 @@ async def reload_policies(
     """Reload notification policies from YAML files."""
     import os
 
-    raw_policy_dir = Path(reload_request.policy_dir)
-    if ".." in raw_policy_dir.parts:
-        raise HTTPException(status_code=422, detail="Path traversal is not permitted in policy_dir")
     configured_root = getattr(http_request.app.state, "policy_dir", None) or os.environ.get(
         "UNS_POLICY_DIR", os.environ.get("AGSIGNAL_POLICY_DIR")
     )
+    if reload_request.policy_dir:
+        raw_policy_dir = Path(reload_request.policy_dir)
+    elif configured_root:
+        raw_policy_dir = Path(str(configured_root))
+    else:
+        default_dir = Path("config/notification_policies")
+        raw_policy_dir = (
+            default_dir
+            if default_dir.exists() or not Path("config/policies").exists()
+            else Path("config/policies")
+        )
+    if ".." in raw_policy_dir.parts:
+        raise HTTPException(status_code=422, detail="Path traversal is not permitted in policy_dir")
     if configured_root:
         allowed_root = Path(str(configured_root)).resolve()
         resolved_dir = raw_policy_dir.resolve()
