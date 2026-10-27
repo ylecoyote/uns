@@ -245,6 +245,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ui/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get console session capabilities
+         * @description Return the authenticated principal subject and capability scopes.
+         */
+        get: operations["get_console_session_ui_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ui/deliveries": {
         parameters: {
             query?: never;
@@ -297,6 +317,26 @@ export interface paths {
          * @description Get effective policy resolution for a notification type. Read-only endpoint.
          */
         get: operations["get_effective_policy_ui_policies_effective_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ui/policies/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active notification policies
+         * @description Return the catalog of currently active notification routing policies.
+         */
+        get: operations["list_active_policies_ui_policies_active_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -531,6 +571,69 @@ export interface components {
             obligation_resolution_error?: ("CYCLE" | "MISSING_TARGET" | "GROUP_MISMATCH") | null;
         };
         /**
+         * ActivePolicyListResponse
+         * @description Catalog of active notification routing policies.
+         */
+        ActivePolicyListResponse: {
+            /** Items */
+            items?: components["schemas"]["ActivePolicySummary"][];
+            /**
+             * Total Count
+             * @description Total number of active policies
+             */
+            total_count: number;
+        };
+        /**
+         * ActivePolicySummary
+         * @description Summary of an active notification routing policy for the console catalog.
+         */
+        ActivePolicySummary: {
+            /**
+             * Notification Type
+             * @description Policy notification_type identifier
+             */
+            notification_type: string;
+            /**
+             * Version
+             * @description Policy version
+             */
+            version: string;
+            /**
+             * Status
+             * @description Lifecycle status (e.g., ACTIVE)
+             */
+            status: string;
+            /** @description Default notification intent */
+            intent?: components["schemas"]["NotificationIntent"] | null;
+            /**
+             * Channels
+             * @description Default LIVE channels
+             */
+            channels?: components["schemas"]["Channel"][];
+            /** @description Default LIVE delivery mode */
+            delivery_mode?: components["schemas"]["DeliveryMode"] | null;
+            /**
+             * Require Ack
+             * @description Default LIVE ack requirement
+             */
+            require_ack?: boolean | null;
+            /**
+             * Ack Timeout Minutes
+             * @description Default LIVE ack timeout in minutes
+             */
+            ack_timeout_minutes?: number | null;
+            /**
+             * Ack Timeout Seconds
+             * @description Default LIVE ack timeout in seconds
+             */
+            ack_timeout_seconds?: number | null;
+            /**
+             * Dedup Window Seconds
+             * @description Deduplication window in seconds
+             */
+            dedup_window_seconds: number;
+        };
+        /**
          * AuditEvent
          * @description Single audit event.
          */
@@ -691,6 +794,18 @@ export interface components {
             unavailable_channels?: components["schemas"]["Channel"][];
             /** Channels */
             channels?: components["schemas"]["ChannelHealth"][];
+        };
+        /**
+         * ConsoleSessionResponse
+         * @description Authenticated console principal and capability scopes.
+         */
+        ConsoleSessionResponse: {
+            /** Subject */
+            subject: string;
+            /** Scopes */
+            scopes?: string[];
+            /** Persistence Mode */
+            persistence_mode?: string | null;
         };
         /**
          * DLQEntry
@@ -949,9 +1064,7 @@ export interface components {
          */
         DeliveryTimelineResponse: {
             /** Runtime State */
-            runtime_state?: {
-                [key: string]: unknown;
-            } | null;
+            runtime_state?: components["schemas"]["RuntimeDeliveryState"] | null;
             /**
              * Notification Id
              * Format: uuid
@@ -1316,10 +1429,9 @@ export interface components {
         PolicyReloadRequest: {
             /**
              * Policy Dir
-             * @description Directory containing YAML policy files
-             * @default config/notification_policies
+             * @description Directory containing YAML policy files (defaults to configured UNS_POLICY_DIR or config/notification_policies)
              */
-            policy_dir: string;
+            policy_dir?: string | null;
         };
         /**
          * PolicyReloadResponse
@@ -1613,6 +1725,79 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * RuntimeEvent
+         * @description Single runtime obligation lifecycle event.
+         */
+        RuntimeEvent: {
+            /** Id */
+            id: string;
+            /**
+             * Notification Id
+             * Format: uuid
+             */
+            notification_id: string;
+            /** Kind */
+            kind: string;
+            /** At */
+            at: number;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Callback Pending */
+            callback_pending?: boolean;
+            /** Callback Attempts */
+            callback_attempts?: number;
+            /** Callback Error */
+            callback_error?: string | null;
+        };
+        /**
+         * RuntimeDeliveryState
+         * @description Durable runtime delivery and obligation lineage state.
+         */
+        RuntimeDeliveryState: {
+            /** Delivery Status */
+            delivery_status: string;
+            /** Ack Status */
+            ack_status: string | null;
+            /** Deadline */
+            deadline?: number | null;
+            /** Dead Letter */
+            dead_letter: boolean;
+            /** Policy Config Hash */
+            policy_config_hash?: string | null;
+            /** Policy Evaluation Id */
+            policy_evaluation_id?: string | null;
+            /** Require Ack */
+            require_ack?: boolean;
+            /** Obligation Owner Id */
+            obligation_owner_id?: string | null;
+            /** Effective Status */
+            effective_status?: string;
+            /** Effective Ack Status */
+            effective_ack_status?: string | null;
+            /** Ack Inherited */
+            ack_inherited?: boolean;
+            /** Obligation Resolution Status */
+            obligation_resolution_status?: string;
+            /** Obligation Resolution Error */
+            obligation_resolution_error?: string | null;
+            /** Actor */
+            actor?: string | null;
+            /** Responded At */
+            responded_at?: number | null;
+            /** Response Metadata */
+            response_metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Events */
+            events?: components["schemas"]["RuntimeEvent"][];
+            /** Events Total Count */
+            events_total_count?: number;
+            /** Events Truncated */
+            events_truncated?: boolean;
         };
     };
     responses: never;
@@ -1992,6 +2177,40 @@ export interface operations {
             };
         };
     };
+    get_console_session_ui_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authenticated console principal and capability scopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid API credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Credential lacks observer authority */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_deliveries_ui_deliveries_get: {
         parameters: {
             query?: {
@@ -2130,6 +2349,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_policies_ui_policies_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivePolicyListResponse"];
                 };
             };
         };
@@ -2347,3 +2586,9 @@ export interface operations {
         };
     };
 }
+
+export type ConsoleSessionResponse = components["schemas"]["ConsoleSessionResponse"];
+export type ActivePolicySummary = components["schemas"]["ActivePolicySummary"];
+export type ActivePolicyListResponse = components["schemas"]["ActivePolicyListResponse"];
+export type RuntimeEvent = components["schemas"]["RuntimeEvent"];
+export type RuntimeDeliveryState = components["schemas"]["RuntimeDeliveryState"];
