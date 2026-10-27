@@ -1,22 +1,17 @@
 /**
- * AuditTimeline page - displays the filtered audit event stream.
+ * AuditTimeline page — displays the filtered audit event stream (/audit).
  *
- * Features:
- * - Filterable list of audit events
- * - Time range filtering
- * - Event type, notification_id, agent_id, autonomy_mode, correlation_id filters
- * - Cursor-based pagination with "Load More"
- * - Safe payload formatting with JSON viewer
- *
- * This page is READ-ONLY per ui-scope.md.
- *
- * Follows the InvariantsPage SPA patterns for consistency.
+ * Implements the Modernist restyle with:
+ * - Architectural 2-column header + Delivery (filled) vs. Response (outlined) legend
+ * - Default "By notification" lifecycle view (1e) with segmented toggle to "All events" (1d)
+ * - Full compatibility with existing AuditTimeline.test.tsx assertions
  */
 
 import { useState } from 'react';
 import type { AuditEventFilter } from '../types/api';
 import { useAuditEvents } from '../hooks/useAuditEvents';
-import { AuditFilters, AuditEventList } from '../components';
+import { AuditFilters, type AuditViewMode } from '../components/AuditFilters';
+import { AuditEventList } from '../components/AuditEventList';
 
 const DEFAULT_LIMIT = 25;
 
@@ -24,6 +19,7 @@ export function AuditTimeline() {
   const [filters, setFilters] = useState<AuditEventFilter>({
     limit: DEFAULT_LIMIT,
   });
+  const [viewMode, setViewMode] = useState<AuditViewMode>('by-notification');
 
   const { events, pagination, loading, error, refetch, loadMore } = useAuditEvents(filters);
 
@@ -32,50 +28,79 @@ export function AuditTimeline() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50" data-testid="audit-timeline-page">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">Audit Timeline</h1>
-          <p className="mt-1 text-sm text-gray-500">
+    <div className="audit-timeline-page min-h-screen bg-gray-50" data-testid="audit-timeline-page">
+      {/* Architectural 2-Column Header with Delivery vs. Response Legend */}
+      <header className="page-header">
+        <div>
+          <h1>Audit Timeline</h1>
+        </div>
+        <div className="audit-legend-group">
+          <p className="page-description">
             Browse the audit event stream for notification delivery and acknowledgment events.
           </p>
+          <div className="audit-legend-strip">
+            <span>
+              <span className="badge tag-delivery-ok" style={{ marginRight: '6px' }}>
+                Delivery
+              </span>
+              Filled label = delivery event
+            </span>
+            <span>
+              <span className="badge tag-response-ok" style={{ marginRight: '6px' }}>
+                Response
+              </span>
+              Outlined label = human response
+            </span>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Filters */}
-          <AuditFilters filters={filters} onFiltersChange={handleFilterChange} />
+      <main>
+        <div>
+          {/* Filters + Segmented View Toggle */}
+          <AuditFilters
+            filters={filters}
+            onFiltersChange={handleFilterChange}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4" data-testid="error-state">
-              <div className="flex items-center gap-2">
-                <span className="text-red-600">&#9888;</span>
-                <span className="text-red-800 font-medium">Error loading audit events</span>
+            <div
+              className="error-state bg-red-50 border border-red-200 rounded-lg p-4"
+              data-testid="error-state"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>&#9888;</span>
+                <strong>Error loading audit events</strong>
               </div>
-              <p className="text-red-600 text-sm mt-1">{error.message}</p>
+              <p className="error-message" style={{ marginTop: '4px' }}>
+                {error.message}
+              </p>
               {error.request_id && (
-                <p className="text-red-500 text-xs mt-1">Request ID: {error.request_id}</p>
+                <p className="monospace" style={{ fontSize: '12px', margin: '4px 0 8px' }}>
+                  Request ID: {error.request_id}
+                </p>
               )}
               <button
                 type="button"
                 onClick={refetch}
-                className="mt-3 px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="btn btn-secondary"
               >
                 Retry
               </button>
             </div>
           )}
 
-          {/* Audit Events List */}
+          {/* Audit Events List (1e By Notification + 1d All Events) */}
           <AuditEventList
             events={events}
             pagination={pagination}
             loading={loading}
             onLoadMore={loadMore}
+            viewMode={viewMode}
           />
         </div>
       </main>

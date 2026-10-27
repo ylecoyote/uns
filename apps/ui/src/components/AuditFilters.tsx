@@ -1,15 +1,20 @@
 /**
- * AuditFilters component provides filter controls for the audit event stream.
+ * AuditFilters component — Modernist 4-Column Modular Filter Grid (1d / 1e)
  *
- * Follows the InvariantsFilter pattern for consistency.
+ * Provides filter controls for the audit event stream plus the segmented
+ * view toggle ("By notification" lifecycle view vs. "All events" stream).
  */
 
 import { useCallback, useState } from 'react';
 import type { AuditEventFilter, AuditEventType, AutonomyMode } from '../types/api';
 
+export type AuditViewMode = 'by-notification' | 'all-events';
+
 interface AuditFiltersProps {
   filters: AuditEventFilter;
   onFiltersChange: (filters: AuditEventFilter) => void;
+  viewMode?: AuditViewMode;
+  onViewModeChange?: (mode: AuditViewMode) => void;
 }
 
 const eventTypeOptions: Array<{ value: AuditEventType | ''; label: string }> = [
@@ -35,7 +40,12 @@ const autonomyModeOptions: Array<{ value: AutonomyMode | ''; label: string }> = 
   { value: 'LIVE', label: 'Live' },
 ];
 
-export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
+export function AuditFilters({
+  filters,
+  onFiltersChange,
+  viewMode = 'by-notification',
+  onViewModeChange,
+}: AuditFiltersProps) {
   const [notificationId, setNotificationId] = useState(filters.notification_id || '');
   const [agentId, setAgentId] = useState(filters.agent_id || '');
   const [correlationId, setCorrelationId] = useState(filters.correlation_id || '');
@@ -94,22 +104,24 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
     filters.end_time;
 
   return (
-    <div className="bg-white rounded-lg shadow p-4" data-testid="audit-filters">
-      {/* First row: dropdowns */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        {/* Event Type Filter */}
-        <div>
-          <label htmlFor="event-type-filter" className="sr-only">
-            Filter by event type
+    <div
+      className="modernist-filter-panel bg-white rounded-lg shadow"
+      data-testid="audit-filters"
+    >
+      <div className="filter-grid-4">
+        {/* Cell 1: Event Type */}
+        <div className="filter-cell">
+          <label htmlFor="event-type-filter" className="field-label">
+            Event Type
           </label>
           <select
             id="event-type-filter"
             value={filters.event_type || ''}
             onChange={handleEventTypeChange}
-            className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-select"
             data-testid="event-type-select"
           >
-            {eventTypeOptions.map(option => (
+            {eventTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -117,32 +129,30 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
           </select>
         </div>
 
-        {/* Autonomy Mode Filter */}
-        <div>
-          <label htmlFor="autonomy-mode-filter" className="sr-only">
-            Filter by autonomy mode
+        {/* Cell 2: Autonomy Mode */}
+        <div className="filter-cell">
+          <label htmlFor="autonomy-mode-filter" className="field-label">
+            Autonomy Mode
           </label>
           <select
             id="autonomy-mode-filter"
             value={filters.autonomy_mode || ''}
             onChange={handleAutonomyModeChange}
-            className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-select"
             data-testid="autonomy-mode-select"
           >
-            {autonomyModeOptions.map(option => (
+            {autonomyModeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
         </div>
-      </div>
 
-      {/* Second row: text inputs */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <div className="flex-1">
-          <label htmlFor="notification-id-filter" className="sr-only">
-            Filter by notification ID
+        {/* Cell 3: Notification ID */}
+        <div className="filter-cell">
+          <label htmlFor="notification-id-filter" className="field-label">
+            Notification ID
           </label>
           <input
             id="notification-id-filter"
@@ -150,14 +160,15 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
             placeholder="Notification ID (UUID)"
             value={notificationId}
             onChange={(e) => setNotificationId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-input monospace"
             data-testid="notification-id-input"
           />
         </div>
 
-        <div className="flex-1">
-          <label htmlFor="agent-id-filter" className="sr-only">
-            Filter by agent ID
+        {/* Cell 4: Agent ID */}
+        <div className="filter-cell">
+          <label htmlFor="agent-id-filter" className="field-label">
+            Agent ID
           </label>
           <input
             id="agent-id-filter"
@@ -165,14 +176,15 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
             placeholder="Agent ID (UUID)"
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-input monospace"
             data-testid="agent-id-input"
           />
         </div>
 
-        <div className="flex-1">
-          <label htmlFor="correlation-id-filter" className="sr-only">
-            Filter by correlation ID
+        {/* Cell 5: Correlation ID */}
+        <div className="filter-cell">
+          <label htmlFor="correlation-id-filter" className="field-label">
+            Correlation ID
           </label>
           <input
             id="correlation-id-filter"
@@ -180,16 +192,14 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
             placeholder="Correlation ID"
             value={correlationId}
             onChange={(e) => setCorrelationId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-input monospace"
             data-testid="correlation-id-input"
           />
         </div>
-      </div>
 
-      {/* Third row: time range */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <div className="flex-1">
-          <label htmlFor="start-time-filter" className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Cell 6: Start Time */}
+        <div className="filter-cell">
+          <label htmlFor="start-time-filter" className="field-label">
             Start Time
           </label>
           <input
@@ -197,13 +207,14 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
             type="datetime-local"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-input monospace"
             data-testid="start-time-input"
           />
         </div>
 
-        <div className="flex-1">
-          <label htmlFor="end-time-filter" className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Cell 7: End Time */}
+        <div className="filter-cell">
+          <label htmlFor="end-time-filter" className="field-label">
             End Time
           </label>
           <input
@@ -211,33 +222,60 @@ export function AuditFilters({ filters, onFiltersChange }: AuditFiltersProps) {
             type="datetime-local"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="modernist-input monospace"
             data-testid="end-time-input"
           />
         </div>
+
+        {/* Cell 8: Segmented View Control + Actions */}
+        <div className="filter-cell" style={{ justifyContent: 'space-between' }}>
+          <span className="field-label">View Mode</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="seg" role="group" aria-label="View mode">
+              <button
+                type="button"
+                className={viewMode === 'by-notification' ? 'seg-opt active' : 'seg-opt'}
+                onClick={() => onViewModeChange?.('by-notification')}
+                data-testid="audit-view-by-notification"
+              >
+                By notification
+              </button>
+              <button
+                type="button"
+                className={viewMode === 'all-events' ? 'seg-opt active' : 'seg-opt'}
+                onClick={() => onViewModeChange?.('all-events')}
+                data-testid="audit-view-all-events"
+              >
+                All events
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-4">
-        <button
-          type="button"
-          onClick={handleApplyFilters}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          data-testid="apply-filters-btn"
-        >
-          Apply Filters
-        </button>
-
-        {hasActiveFilters && (
+      {/* Action buttons bar */}
+      <div className="filter-actions">
+        <div className="filter-actions-left">
           <button
             type="button"
-            onClick={handleClearFilters}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            data-testid="clear-filters-btn"
+            onClick={handleApplyFilters}
+            className="btn btn-primary"
+            data-testid="apply-filters-btn"
           >
-            Clear
+            Apply Filters
           </button>
-        )}
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="btn btn-secondary"
+              data-testid="clear-filters-btn"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

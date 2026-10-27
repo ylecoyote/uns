@@ -1,12 +1,17 @@
 /**
- * InvariantsFilter component
+ * InvariantsFilter component — Modernist Modular Filter Bar (1c)
  *
  * Filter controls for invariants list.
  * Supports filtering by severity, enforcement_type, status, and search text.
  */
 
 import { useCallback, useState } from 'react';
-import type { EnforcementType, InvariantFilters, InvariantSeverity, InvariantStatus } from '../types/invariants';
+import type {
+  EnforcementType,
+  InvariantFilters,
+  InvariantSeverity,
+  InvariantStatus,
+} from '../types/invariants';
 
 interface InvariantsFilterProps {
   filters: InvariantFilters;
@@ -70,12 +75,9 @@ export function InvariantsFilter({ filters, onFiltersChange }: InvariantsFilterP
     [filters, onFiltersChange]
   );
 
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchText(e.target.value);
-    },
-    []
-  );
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchText(e.target.value);
+  }, []);
 
   const handleSearchSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -109,104 +111,89 @@ export function InvariantsFilter({ filters, onFiltersChange }: InvariantsFilterP
     filters.severity || filters.enforcement_type || filters.status || filters.search;
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Search */}
-        <form onSubmit={handleSearchSubmit} className="flex-1">
-          <label htmlFor="search" className="sr-only">
-            Search invariants
-          </label>
-          <div className="relative">
-            <input
-              id="search"
-              type="text"
-              placeholder="Search invariant statements..."
-              value={searchText}
-              onChange={handleSearchChange}
-              onKeyDown={handleSearchKeyDown}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 pr-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="Search"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </button>
-          </div>
-        </form>
-
-        {/* Severity Filter */}
-        <div>
-          <label htmlFor="severity" className="sr-only">
-            Filter by severity
-          </label>
-          <select
-            id="severity"
-            value={filters.severity || ''}
-            onChange={handleSeverityChange}
-            className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {severityOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+    <div className="invariants-filter-bar">
+      {/* Search */}
+      <form onSubmit={handleSearchSubmit} className="invariants-filter-cell">
+        <label htmlFor="search" className="field-label">
+          Search Statements
+        </label>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input
+            id="search"
+            type="text"
+            className="modernist-input"
+            placeholder="Search invariant statements..."
+            value={searchText}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+          />
+          <button type="submit" className="btn btn-secondary" aria-label="Search">
+            Search
+          </button>
         </div>
+      </form>
 
-        {/* Enforcement Type Filter */}
-        <div>
-          <label htmlFor="enforcement_type" className="sr-only">
-            Filter by enforcement type
-          </label>
-          <select
-            id="enforcement_type"
-            value={filters.enforcement_type || ''}
-            onChange={handleEnforcementChange}
-            className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {enforcementOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Severity Filter */}
+      <div className="invariants-filter-cell">
+        <label htmlFor="severity" className="field-label">
+          Filter by severity
+        </label>
+        <select
+          id="severity"
+          value={filters.severity || ''}
+          onChange={handleSeverityChange}
+          className="modernist-select"
+        >
+          {severityOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {/* Status Filter */}
-        <div>
-          <label htmlFor="status" className="sr-only">
-            Filter by status
-          </label>
-          <select
-            id="status"
-            value={filters.status || ''}
-            onChange={handleStatusChange}
-            className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {statusOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Enforcement Type Filter */}
+      <div className="invariants-filter-cell">
+        <label htmlFor="enforcement_type" className="field-label">
+          Filter by enforcement type
+        </label>
+        <select
+          id="enforcement_type"
+          value={filters.enforcement_type || ''}
+          onChange={handleEnforcementChange}
+          className="modernist-select"
+        >
+          {enforcementOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {/* Clear Filters */}
+      {/* Status Filter */}
+      <div className="invariants-filter-cell">
+        <label htmlFor="status" className="field-label">
+          Filter by status
+        </label>
+        <select
+          id="status"
+          value={filters.status || ''}
+          onChange={handleStatusChange}
+          className="modernist-select"
+        >
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Clear Filters */}
+      <div className="invariants-filter-cell">
         {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
+          <button type="button" onClick={handleClearFilters} className="btn btn-secondary">
             Clear
           </button>
         )}

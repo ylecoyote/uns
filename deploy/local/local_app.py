@@ -23,7 +23,7 @@ index = (
 )
 index = index.replace(
     "<body>",
-    '<body><aside style="padding:10px 24px;background:#fff4ce;color:#513c00;font:14px system-ui" role="note"><strong>Local recording mode.</strong> Notifications are saved on this Mac. No Slack, email or PagerDuty messages are sent.</aside>',
+    '<body><aside style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 24px;background:#eae9e9;color:#201e1d;border-bottom:1px solid rgba(32,30,29,0.4);font:12px Archivo,system-ui,sans-serif" role="note"><span style="display:inline-flex;align-items:center;gap:10px"><span style="width:10px;height:10px;background:#ec3013;display:inline-block;flex:none" aria-hidden="true"></span><span><strong style="font-weight:800;letter-spacing:0.04em;text-transform:uppercase">Local recording mode.</strong> Notifications are saved on this Mac. No Slack, email or PagerDuty messages are sent.</span></span><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px">PROFILE: LOCAL-RECORDING</span></aside>',
 )
 
 
@@ -36,6 +36,7 @@ def local_status() -> dict[str, Any]:
 @app.get("/deliveries", response_class=HTMLResponse)
 @app.get("/deliveries/{identifier}", response_class=HTMLResponse)
 @app.get("/policy", response_class=HTMLResponse)
+@app.get("/operations", response_class=HTMLResponse)
 @app.get("/invariants", response_class=HTMLResponse)
 @app.get("/audit", response_class=HTMLResponse)
 def console(identifier: str | None = None) -> str:
