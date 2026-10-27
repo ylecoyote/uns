@@ -59,6 +59,7 @@ export function PolicyInspectorForm({
     if (externalSelection.autonomy_mode) {
       setAutonomyMode(externalSelection.autonomy_mode);
     }
+    setIrreversible(false);
     setValidationError(null);
   }, [externalSelection]);
 

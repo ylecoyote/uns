@@ -4,7 +4,7 @@
  * Follows the same patterns as useInvariants hook for consistency.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAuditEvents, ApiError } from '../api';
 import type {
   AuditEvent,
@@ -27,8 +27,10 @@ export function useAuditEvents(filters: AuditEventFilter): UseAuditEventsResult 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const fetchData = useCallback(async (isLoadMore = false) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -39,6 +41,9 @@ export function useAuditEvents(filters: AuditEventFilter): UseAuditEventsResult 
       };
 
       const response = await getAuditEvents(currentFilters);
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
       if (isLoadMore) {
         setEvents(prev => [...prev, ...response.items]);
@@ -49,9 +54,14 @@ export function useAuditEvents(filters: AuditEventFilter): UseAuditEventsResult 
       setPagination(response.pagination);
       setCursor(response.pagination.next_cursor);
     } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       setError(err as ApiError);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [filters, cursor]);
 

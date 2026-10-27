@@ -312,6 +312,7 @@ async def reload_policies(
 ) -> PolicyReloadResponse:
     """Reload notification policies from YAML files."""
     import os
+    import tempfile
 
     configured_root = getattr(http_request.app.state, "policy_dir", None) or os.environ.get(
         "UNS_POLICY_DIR", os.environ.get("AGSIGNAL_POLICY_DIR")
@@ -329,15 +330,32 @@ async def reload_policies(
         )
     if ".." in raw_policy_dir.parts:
         raise HTTPException(status_code=422, detail="Path traversal is not permitted in policy_dir")
+    resolved_dir = raw_policy_dir.resolve()
     if configured_root:
         allowed_root = Path(str(configured_root)).resolve()
-        resolved_dir = raw_policy_dir.resolve()
         if resolved_dir != allowed_root and allowed_root not in resolved_dir.parents:
             raise HTTPException(
                 status_code=422,
                 detail="policy_dir must reside within the configured UNS_POLICY_DIR",
             )
-    policy_dir = raw_policy_dir
+    else:
+        allowed_roots = [
+            Path.cwd().resolve(),
+            Path(__file__).resolve().parents[2],
+            Path(tempfile.gettempdir()).resolve(),
+        ]
+        for extra_tmp in ("/tmp", "/private/tmp", "/private/var/folders"):
+            extra_path = Path(extra_tmp)
+            if extra_path.exists():
+                allowed_roots.append(extra_path.resolve())
+        if not any(
+            resolved_dir == root or root in resolved_dir.parents for root in allowed_roots
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="policy_dir must reside within the configured UNS_POLICY_DIR",
+            )
+    policy_dir = resolved_dir
     with _policy_reload_lock:
         registry = PolicyRegistry(runtime_only=False)
         try:

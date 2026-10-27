@@ -40,6 +40,15 @@ const autonomyModeOptions: Array<{ value: AutonomyMode | ''; label: string }> = 
   { value: 'LIVE', label: 'Live' },
 ];
 
+function parseOptionalIsoDate(raw: string): string | undefined {
+  if (!raw) return undefined;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+  return undefined;
+}
+
 export function AuditFilters({
   filters,
   onFiltersChange,
@@ -52,38 +61,46 @@ export function AuditFilters({
   const [startTime, setStartTime] = useState(filters.start_time?.slice(0, 16) || '');
   const [endTime, setEndTime] = useState(filters.end_time?.slice(0, 16) || '');
 
+  const buildCurrentFilters = useCallback(
+    (overrides?: Partial<AuditEventFilter>): AuditEventFilter => ({
+      ...filters,
+      notification_id: notificationId || undefined,
+      agent_id: agentId || undefined,
+      correlation_id: correlationId || undefined,
+      start_time: parseOptionalIsoDate(startTime),
+      end_time: parseOptionalIsoDate(endTime),
+      ...overrides,
+    }),
+    [filters, notificationId, agentId, correlationId, startTime, endTime]
+  );
+
   const handleEventTypeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value as AuditEventType | '';
-      onFiltersChange({
-        ...filters,
-        event_type: value || undefined,
-      });
+      onFiltersChange(
+        buildCurrentFilters({
+          event_type: value || undefined,
+        })
+      );
     },
-    [filters, onFiltersChange]
+    [buildCurrentFilters, onFiltersChange]
   );
 
   const handleAutonomyModeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value as AutonomyMode | '';
-      onFiltersChange({
-        ...filters,
-        autonomy_mode: value || undefined,
-      });
+      onFiltersChange(
+        buildCurrentFilters({
+          autonomy_mode: value || undefined,
+        })
+      );
     },
-    [filters, onFiltersChange]
+    [buildCurrentFilters, onFiltersChange]
   );
 
   const handleApplyFilters = useCallback(() => {
-    onFiltersChange({
-      ...filters,
-      notification_id: notificationId || undefined,
-      agent_id: agentId || undefined,
-      correlation_id: correlationId || undefined,
-      start_time: startTime ? new Date(startTime).toISOString() : undefined,
-      end_time: endTime ? new Date(endTime).toISOString() : undefined,
-    });
-  }, [filters, onFiltersChange, notificationId, agentId, correlationId, startTime, endTime]);
+    onFiltersChange(buildCurrentFilters());
+  }, [buildCurrentFilters, onFiltersChange]);
 
   const handleClearFilters = useCallback(() => {
     setNotificationId('');

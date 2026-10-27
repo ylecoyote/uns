@@ -268,6 +268,96 @@ describe('OperationsPage', () => {
     expect(screen.getByTestId(`dlq-replay-btn-${entryEligible}`)).not.toBeDisabled();
   });
 
+  it('performs full outer join for runtime-only dead letters and surfaces runtime dead-letter fetch errors', async () => {
+    startConsoleSession('admin-key', {
+      subject: 'operator-admin',
+      scopes: ['observer', 'admin'],
+      auth_mode: 'required',
+    });
+
+    const runtimeOnlyId = '33333333-3333-4333-8333-333333333333';
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockReadyzPayload),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockChannelHealthPayload),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ depth: 0, items: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve([
+            {
+              notification_id: runtimeOnlyId,
+              status: 'FAILED',
+              attempts: 4,
+              cycle: 2,
+              cycle_attempts: 2,
+              outcome: {
+                notification_type: 'safety.kill_switch',
+                error_message: 'Webhook 504',
+              },
+              replay_blocked_by: null,
+              replay_block_reason: null,
+            },
+          ]),
+      });
+
+    renderOperationsPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`dlq-row-${runtimeOnlyId}`)).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId(`dlq-row-${runtimeOnlyId}`)).toHaveTextContent(
+      'safety.kill_switch'
+    );
+    expect(screen.getByTestId(`dlq-row-${runtimeOnlyId}`)).toHaveTextContent(
+      '4 (cycle 2)'
+    );
+
+    // Trigger manual refresh where runtime dead-letters fails -> surfaces dlq-error-banner
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockReadyzPayload),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockChannelHealthPayload),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockDlqPayload),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ detail: 'Runtime store unavailable' }),
+      });
+
+    fireEvent.click(screen.getByTestId('refresh-operations-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dlq-error-banner')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('dlq-table')).toBeInTheDocument();
+  });
+
   it('preserves open inline confirmation across background refresh and executes Replay and Resolve', async () => {
     startConsoleSession('admin-key', {
       subject: 'operator-admin',

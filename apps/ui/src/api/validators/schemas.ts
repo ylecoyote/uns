@@ -368,6 +368,30 @@ export const EffectivePolicyResponseSchema = z.object({
 });
 
 /**
+ * Active policy summary schema
+ */
+export const ActivePolicySummarySchema = z.object({
+  notification_type: z.string(),
+  version: z.string(),
+  status: z.string(),
+  intent: NotificationIntentSchema.nullable(),
+  channels: z.array(ChannelSchema),
+  delivery_mode: DeliveryModeSchema.nullable(),
+  require_ack: z.boolean().nullable(),
+  ack_timeout_minutes: z.number().nullable().optional(),
+  ack_timeout_seconds: z.number().nullable().optional(),
+  dedup_window_seconds: z.number(),
+});
+
+/**
+ * Active policy list response schema
+ */
+export const ActivePolicyListResponseSchema = z.object({
+  items: z.array(ActivePolicySummarySchema),
+  total_count: z.number(),
+});
+
+/**
  * Policy lifecycle status enum - strict validation
  */
 export const PolicyLifecycleStatusSchema = z.enum(['ACTIVE', 'DRAFT', 'PREVIEW', 'RETIRED']);
@@ -419,5 +443,7 @@ export type InvariantEntry = z.infer<typeof InvariantEntrySchema>;
 export type InvariantListResponse = z.infer<typeof InvariantListResponseSchema>;
 export type InvariantSummaryResponse = z.infer<typeof InvariantSummaryResponseSchema>;
 export type EffectivePolicyResponse = z.infer<typeof EffectivePolicyResponseSchema>;
+export type ActivePolicySummary = z.infer<typeof ActivePolicySummarySchema>;
+export type ActivePolicyListResponse = z.infer<typeof ActivePolicyListResponseSchema>;
 export type PolicyRevisionSummary = z.infer<typeof PolicyRevisionSummarySchema>;
 export type PolicyRevisionListResponse = z.infer<typeof PolicyRevisionListResponseSchema>;

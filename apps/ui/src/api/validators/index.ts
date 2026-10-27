@@ -35,6 +35,8 @@ export {
   decodeInvariantsList,
   decodeInvariantsSummary,
   decodeEffectivePolicy,
+  decodeActivePoliciesList,
+  decodePolicyRevisionsList,
   // Error handling
   ContractDriftError,
   assertDecode,

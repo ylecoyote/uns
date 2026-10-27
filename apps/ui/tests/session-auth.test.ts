@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiRootRequest, apiRootRequestWithStatus, ApiError } from '../src/api/client';
 import {
   clearConsoleSession,
+  expireConsoleSession,
   getCapabilityPills,
   getConsoleSession,
   hasScope,
@@ -219,6 +220,49 @@ describe('Authenticated API requests', () => {
       persistenceMode: 'persistent',
       expired: false,
     });
+
+    // UNS_SESSION_SYNC updates peer tab even when it already holds an older credential
+    peerChannel.postMessage({
+      type: 'UNS_SESSION_SYNC',
+      credential: 'rotated-key',
+      subject: 'operator-rotated',
+      scopes: ['admin', 'observer'],
+      persistenceMode: 'persistent',
+    });
+    expect(getConsoleSession()).toMatchObject({
+      credential: 'rotated-key',
+      subject: 'operator-rotated',
+      scopes: ['admin', 'observer'],
+      expired: false,
+    });
+
+    // UNS_SESSION_EXPIRE transitions peer tabs holding the same expired credential to expired: true
+    peerChannel.postMessage({
+      type: 'UNS_SESSION_EXPIRE',
+      credential: 'rotated-key',
+    });
+    expect(getConsoleSession()).toMatchObject({
+      credential: null,
+      expired: true,
+    });
+
+    // Local expireConsoleSession broadcasts UNS_SESSION_EXPIRE to peer tabs
+    startConsoleSession('expiring-key', {
+      subject: 'obs',
+      scopes: ['observer'],
+    });
+    receivedMessages.length = 0;
+    expireConsoleSession(getConsoleSession());
+    expect(getConsoleSession()).toMatchObject({
+      credential: null,
+      expired: true,
+    });
+    expect(receivedMessages).toEqual([
+      {
+        type: 'UNS_SESSION_EXPIRE',
+        credential: 'expiring-key',
+      },
+    ]);
 
     unsubscribe();
     resetConsoleSessionChannelForTests();

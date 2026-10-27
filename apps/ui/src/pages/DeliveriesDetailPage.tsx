@@ -3,7 +3,7 @@
  * bounded runtime events, and capability-gated responder actions for a notification.
  */
 
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   acknowledgeNotification,
@@ -104,6 +104,21 @@ function getModeClass(mode: string): string {
       return 'mode-live';
     default:
       return '';
+  }
+}
+
+function getAckStatusBadgeClass(ackStatus: string | null | undefined): string {
+  switch (ackStatus) {
+    case 'ACKED':
+      return 'tag-response-ok';
+    case 'DISMISSED':
+      return 'tag-response-warn';
+    case 'TIMED_OUT':
+    case 'ESCALATED':
+      return 'tag-response-fail';
+    case 'PENDING':
+    default:
+      return 'tag-response-none';
   }
 }
 
@@ -263,6 +278,13 @@ export function DeliveriesDetailPage() {
     kind: 'success' | 'info' | 'error';
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    setResponderNote('');
+    setConfirmingDecision(null);
+    setConfirmingRecovery(null);
+    setActionFeedback(null);
+  }, [notificationId]);
 
   if (isLoading) {
     return (
@@ -481,18 +503,7 @@ export function DeliveriesDetailPage() {
             <div className="detail-item">
               <dt>Human response</dt>
               <dd>
-                <span
-                  className={`badge ${
-                    runtimeState.ack_status === 'ACKED'
-                      ? 'tag-response-ok'
-                      : runtimeState.ack_status === 'DISMISSED'
-                        ? 'tag-response-warn'
-                        : runtimeState.ack_status === 'TIMED_OUT' ||
-                            runtimeState.ack_status === 'ESCALATED'
-                          ? 'tag-response-fail'
-                          : 'tag-response-none'
-                  }`}
-                >
+                <span className={`badge ${getAckStatusBadgeClass(runtimeState.ack_status)}`}>
                   {runtimeState.ack_status ?? 'No response deadline started'}
                 </span>
               </dd>
@@ -501,7 +512,13 @@ export function DeliveriesDetailPage() {
               <div className="detail-item">
                 <dt>Inherited response</dt>
                 <dd data-testid="inherited-ack-status">
-                  <span className="badge tag-response-ok">{runtimeState.effective_ack_status}</span>
+                  <span
+                    className={`badge ${getAckStatusBadgeClass(
+                      runtimeState.effective_ack_status
+                    )}`}
+                  >
+                    {runtimeState.effective_ack_status}
+                  </span>
                 </dd>
               </div>
             )}

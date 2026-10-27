@@ -165,7 +165,14 @@ def inspect_channel_readiness(
         if slack_webhook
         else ("bot_token" if (slack_bot_token and slack_channel) else "unconfigured")
     )
-    slack_missing = [] if slack_configured else ["UNS_SLACK_WEBHOOK_URL"]
+    if slack_configured:
+        slack_missing: list[str] = []
+    elif slack_bot_token and not slack_channel:
+        slack_missing = ["UNS_SLACK_CHANNEL"]
+    elif slack_channel and not slack_bot_token:
+        slack_missing = ["UNS_SLACK_BOT_TOKEN"]
+    else:
+        slack_missing = ["UNS_SLACK_WEBHOOK_URL"]
 
     # 2. Email / SMTP: UNS_SMTP_HOST, UNS_SMTP_FROM, UNS_SMOKE_EMAIL_TO
     smtp_host = _env_get(source_env, "UNS_SMTP_HOST", "AGSIGNAL_SMTP_HOST")
@@ -235,6 +242,8 @@ def build_channel_adapter(
         webhook_url = _env_get(source_env, "UNS_SLACK_WEBHOOK_URL", "AGSIGNAL_SLACK_WEBHOOK_URL")
         bot_token = _env_get(source_env, "UNS_SLACK_BOT_TOKEN", "AGSIGNAL_SLACK_BOT_TOKEN")
         slack_channel = _env_get(source_env, "UNS_SLACK_CHANNEL", "AGSIGNAL_SLACK_CHANNEL")
+        if webhook_url:
+            return SlackWebhookSmokeAdapter(webhook_url=webhook_url)
         if bot_token and slack_channel:
             return SlackAdapter(
                 SlackConfig(
@@ -243,10 +252,8 @@ def build_channel_adapter(
                     retry_attempts=1,
                 )
             )
-        if webhook_url:
-            return SlackWebhookSmokeAdapter(webhook_url=webhook_url)
         raise AdapterConfigurationError(
-            "Slack is not configured; set UNS_SLACK_WEBHOOK_URL",
+            "Slack is not configured; set UNS_SLACK_WEBHOOK_URL or both UNS_SLACK_BOT_TOKEN and UNS_SLACK_CHANNEL",
             channel=Channel.SLACK,
         )
 
@@ -406,11 +413,30 @@ async def run_channel_smoke(
         policies: list[NotificationPolicy] = []
 
         for target in configured_targets:
-            base_adapter = (
-                adapter_overrides[target]
-                if adapter_overrides and target in adapter_overrides
-                else build_channel_adapter(target, env=env)
-            )
+            try:
+                base_adapter = (
+                    adapter_overrides[target]
+                    if adapter_overrides and target in adapter_overrides
+                    else build_channel_adapter(target, env=env)
+                )
+            except (AdapterConfigurationError, ValueError) as exc:
+                attempts_report.append(
+                    {
+                        "channel": target.upper(),
+                        "notification_id": None,
+                        "attempt_status": "FAILED",
+                        "success": False,
+                        "latency_ms": 0.0,
+                        "provider_receipt": {
+                            "message_id": None,
+                            "delivered_at": None,
+                            "metadata": {},
+                            "error": str(exc),
+                        },
+                        "event_kinds": ["ADAPTER_CONFIGURATION_ERROR"],
+                    }
+                )
+                continue
             proxy = _TimedAdapterProxy(base_adapter)
             proxies[target] = proxy
             registry.register(proxy)
@@ -426,65 +452,65 @@ async def run_channel_smoke(
                 )
             )
 
-        runtime = Runtime(db_url, adapters=registry, max_attempts=1, create_tables=True)
-        try:
-            SQLAlchemyPolicyStore(runtime.sessions).save_snapshot(policies)
-            agent_id = uuid4()
-            run_id = uuid4().hex[:8]
+        if proxies:
+            runtime = Runtime(db_url, adapters=registry, max_attempts=1, create_tables=True)
+            try:
+                SQLAlchemyPolicyStore(runtime.sessions).save_snapshot(policies)
+                agent_id = uuid4()
+                run_id = uuid4().hex[:8]
 
-            for target in configured_targets:
-                proxy = proxies[target]
-                request = SendNotificationRequest(
-                    notification_type=f"smoke.opt_in.{target}",
-                    intent="OPERATIONAL",
-                    title=f"{SMOKE_TAG} {target.upper()} verification signal ({run_id})",
-                    message=(
-                        f"{SMOKE_TAG} Real-channel acceptance verification for "
-                        f"channel={target.upper()} run_id={run_id}."
-                    ),
-                    source="scripts.opt_in_channel_smoke",
-                    autonomy_context={
-                        "agent_id": str(agent_id),
-                        "autonomy_mode": "LIVE",
-                    },
-                    idempotency_key=f"uns-opt-in-smoke-{target}-{run_id}",
-                    correlation_id=f"uns-opt-in-smoke-{run_id}",
-                    metadata={"smoke_tag": SMOKE_TAG, "target_channel": target.upper()},
-                )
-                response = await runtime.send(request, principal=principal)
-                events = runtime.events(response.notification_id)
-                delivery_result = proxy.last_result
-
-                attempts_report.append(
-                    {
-                        "channel": proxy.channel.value,
-                        "notification_id": str(response.notification_id),
-                        "attempt_status": response.status.value,
-                        "success": bool(delivery_result and delivery_result.success),
-                        "latency_ms": proxy.last_latency_ms,
-                        "provider_receipt": {
-                            "message_id": delivery_result.message_id if delivery_result else None,
-                            "delivered_at": (
-                                delivery_result.delivered_at.isoformat()
-                                if delivery_result and delivery_result.delivered_at
-                                else None
-                            ),
-                            "metadata": _sanitize_receipt_metadata(
-                                delivery_result.metadata if delivery_result else None
-                            ),
-                            "error": delivery_result.error if delivery_result else None,
+                for target, proxy in proxies.items():
+                    request = SendNotificationRequest(
+                        notification_type=f"smoke.opt_in.{target}",
+                        intent="OPERATIONAL",
+                        title=f"{SMOKE_TAG} {target.upper()} verification signal ({run_id})",
+                        message=(
+                            f"{SMOKE_TAG} Real-channel acceptance verification for "
+                            f"channel={target.upper()} run_id={run_id}."
+                        ),
+                        source="scripts.opt_in_channel_smoke",
+                        autonomy_context={
+                            "agent_id": str(agent_id),
+                            "autonomy_mode": "LIVE",
                         },
-                        "event_kinds": [event["kind"] for event in events],
-                    }
-                )
-        finally:
-            runtime.engine.dispose()
+                        idempotency_key=f"uns-opt-in-smoke-{target}-{run_id}",
+                        correlation_id=f"uns-opt-in-smoke-{run_id}",
+                        metadata={"smoke_tag": SMOKE_TAG, "target_channel": target.upper()},
+                    )
+                    response = await runtime.send(request, principal=principal)
+                    events = runtime.events(response.notification_id)
+                    delivery_result = proxy.last_result
+
+                    attempts_report.append(
+                        {
+                            "channel": proxy.channel.value,
+                            "notification_id": str(response.notification_id),
+                            "attempt_status": response.status.value,
+                            "success": bool(delivery_result and delivery_result.success),
+                            "latency_ms": proxy.last_latency_ms,
+                            "provider_receipt": {
+                                "message_id": delivery_result.message_id if delivery_result else None,
+                                "delivered_at": (
+                                    delivery_result.delivered_at.isoformat()
+                                    if delivery_result and delivery_result.delivered_at
+                                    else None
+                                ),
+                                "metadata": _sanitize_receipt_metadata(
+                                    delivery_result.metadata if delivery_result else None
+                                ),
+                                "error": delivery_result.error if delivery_result else None,
+                            },
+                            "event_kinds": [event["kind"] for event in events],
+                        }
+                    )
+            finally:
+                runtime.engine.dispose()
 
     return {
         "smoke_tag": SMOKE_TAG,
         "mode": "executed",
         "execute_requested": True,
-        "external_traffic_sent": True,
+        "external_traffic_sent": bool(proxies),
         "selected_channels": targets,
         "configured_channels": configured_targets,
         "readiness": {ch: readiness[ch] for ch in targets},

@@ -27,18 +27,22 @@
 
 import { z, ZodError } from 'zod';
 import {
+  ActivePolicyListResponseSchema,
   AuditEventListResponseSchema,
   DeliveryTimelineListResponseSchema,
   DeliveryTimelineResponseSchema,
   InvariantListResponseSchema,
   InvariantSummaryResponseSchema,
   EffectivePolicyResponseSchema,
+  PolicyRevisionListResponseSchema,
+  type ActivePolicyListResponse,
   type AuditEventListResponse,
   type DeliveryTimelineListResponse,
   type DeliveryTimelineResponse,
   type InvariantListResponse,
   type InvariantSummaryResponse,
   type EffectivePolicyResponse,
+  type PolicyRevisionListResponse,
 } from './schemas';
 
 // ============================================================================
@@ -182,6 +186,20 @@ export const decodeInvariantsSummary = createDecoder<InvariantSummaryResponse>(
  */
 export const decodeEffectivePolicy = createDecoder<EffectivePolicyResponse>(
   EffectivePolicyResponseSchema
+);
+
+/**
+ * Decode and validate an active policies list response.
+ */
+export const decodeActivePoliciesList = createDecoder<ActivePolicyListResponse>(
+  ActivePolicyListResponseSchema
+);
+
+/**
+ * Decode and validate a policy revisions list response.
+ */
+export const decodePolicyRevisionsList = createDecoder<PolicyRevisionListResponse>(
+  PolicyRevisionListResponseSchema
 );
 
 // ============================================================================

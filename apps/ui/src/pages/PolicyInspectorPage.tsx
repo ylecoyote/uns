@@ -54,6 +54,23 @@ function getPolicyStatusBadgeClass(status: string): string {
   }
 }
 
+function resolveCatalogIntent(
+  notificationType: string,
+  activePolicies: ActivePolicySummary[],
+  policyRevisions: PolicyRevisionSummary[]
+): NotificationIntent | null {
+  const activeMatch = activePolicies.find(
+    (p) => p.notification_type === notificationType && p.intent !== null
+  );
+  if (activeMatch?.intent) {
+    return activeMatch.intent;
+  }
+  const revisionMatch = policyRevisions.find(
+    (r) => r.notification_type === notificationType && r.intent !== null
+  );
+  return revisionMatch?.intent ?? null;
+}
+
 function RouterQueryNotificationTypeSync({
   onSelectType,
 }: {
@@ -97,6 +114,10 @@ export function PolicyInspectorPage() {
   const [externalSelection, setExternalSelection] =
     useState<PolicyExternalSelection | null>(null);
   const selectionSeqRef = useRef(0);
+  const pendingQueryTypeRef = useRef<{
+    type: string;
+    resolvedIntent: NotificationIntent | null;
+  } | null>(null);
 
   // Simulator & Test Sender state
   const [simNotificationType, setSimNotificationType] = useState('');
@@ -185,6 +206,10 @@ export function PolicyInspectorPage() {
       setSimNotificationType(notificationType);
       setSimIntent(intent);
       setSimAutonomyMode(autonomyMode);
+      setSimIrreversible(false);
+      setSimulationResult(null);
+      setTestSendResult(null);
+      setSimulatorError(null);
       void inspect({
         notification_type: notificationType,
         intent,
@@ -197,12 +222,41 @@ export function PolicyInspectorPage() {
 
   const handleQueryTypeSelect = useCallback(
     (notificationType: string) => {
-      applyPolicySelection(notificationType, 'OPERATIONAL', 'LIVE');
+      const matchedIntent = resolveCatalogIntent(
+        notificationType,
+        activePolicies,
+        policyRevisions
+      );
+      pendingQueryTypeRef.current = {
+        type: notificationType,
+        resolvedIntent: matchedIntent,
+      };
+      applyPolicySelection(notificationType, matchedIntent ?? 'OPERATIONAL', 'LIVE');
     },
-    [applyPolicySelection]
+    [activePolicies, applyPolicySelection, policyRevisions]
   );
 
+  useEffect(() => {
+    const pending = pendingQueryTypeRef.current;
+    if (!pending || pending.resolvedIntent !== null) return;
+    const matchedIntent = resolveCatalogIntent(
+      pending.type,
+      activePolicies,
+      policyRevisions
+    );
+    if (matchedIntent !== null) {
+      pendingQueryTypeRef.current = {
+        type: pending.type,
+        resolvedIntent: matchedIntent,
+      };
+      if (matchedIntent !== 'OPERATIONAL') {
+        applyPolicySelection(pending.type, matchedIntent, 'LIVE');
+      }
+    }
+  }, [activePolicies, applyPolicySelection, policyRevisions]);
+
   const handleInspect = (params: PolicyInspectorParams) => {
+    pendingQueryTypeRef.current = null;
     setSimNotificationType(params.notification_type);
     setSimIntent(params.intent);
     setSimAutonomyMode(params.autonomy_mode);
@@ -211,6 +265,7 @@ export function PolicyInspectorPage() {
   };
 
   const handleClear = () => {
+    pendingQueryTypeRef.current = null;
     clear();
   };
 
@@ -223,6 +278,7 @@ export function PolicyInspectorPage() {
     setSimulating(true);
     setSimulatorError(null);
     setSimulationResult(null);
+    setTestSendResult(null);
 
     try {
       const response = await simulateNotification({
@@ -253,6 +309,7 @@ export function PolicyInspectorPage() {
     setSendingTest(true);
     setSimulatorError(null);
     setTestSendResult(null);
+    setSimulationResult(null);
 
     const rawTitle = simTitle.trim() || 'Policy verification';
     const taggedTitle = rawTitle.startsWith('[TEST]') ? rawTitle : `[TEST] ${rawTitle}`;
@@ -563,13 +620,14 @@ export function PolicyInspectorPage() {
                 {activePolicies.map((policy) => (
                   <tr
                     key={policy.notification_type}
-                    onClick={() =>
+                    onClick={() => {
+                      pendingQueryTypeRef.current = null;
                       applyPolicySelection(
                         policy.notification_type,
                         policy.intent ?? 'OPERATIONAL',
                         'LIVE'
-                      )
-                    }
+                      );
+                    }}
                     style={{ cursor: 'pointer' }}
                     data-testid={`active-policy-row-${policy.notification_type}`}
                   >
@@ -690,13 +748,14 @@ export function PolicyInspectorPage() {
                     .map((rev) => (
                       <tr
                         key={`${rev.notification_type}-${rev.version}-${rev.status}-${rev.config_hash ?? ''}`}
-                        onClick={() =>
+                        onClick={() => {
+                          pendingQueryTypeRef.current = null;
                           applyPolicySelection(
                             rev.notification_type,
                             rev.intent ?? 'OPERATIONAL',
-                            rev.status.toUpperCase() === 'PREVIEW' ? 'PREVIEW' : 'LIVE'
-                          )
-                        }
+                            'LIVE'
+                          );
+                        }}
                         style={{ cursor: 'pointer' }}
                         data-testid={`policy-revision-row-${rev.notification_type}-${rev.version}`}
                       >

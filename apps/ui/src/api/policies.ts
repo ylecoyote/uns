@@ -24,22 +24,11 @@ import type {
 } from '../types/api';
 import { apiGet, apiRootRequest, type RequestOptions } from './client';
 import {
-  ContractDriftError,
-  PolicyRevisionListResponseSchema,
+  decodeActivePoliciesList,
   decodeEffectivePolicy,
+  decodePolicyRevisionsList,
   decodeWithMode,
-  type DecodeResult,
 } from './validators';
-
-function decodePolicyRevisions(
-  data: unknown
-): DecodeResult<PolicyRevisionListResponse> {
-  const result = PolicyRevisionListResponseSchema.safeParse(data);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  return { success: false, error: new ContractDriftError(result.error, data) };
-}
 
 /**
  * Fetch effective policy for the given parameters
@@ -76,8 +65,19 @@ export async function fetchEffectivePolicy(
 export async function fetchActivePolicies(
   options?: RequestOptions
 ): Promise<ActivePolicyListResponse> {
-  return apiGet<ActivePolicyListResponse>('/policies/active', undefined, options);
+  const data = await apiGet<ActivePolicyListResponse>(
+    '/policies/active',
+    undefined,
+    options
+  );
+  return decodeWithMode(
+    decodeActivePoliciesList,
+    data,
+    'GET /ui/policies/active'
+  ) as ActivePolicyListResponse;
 }
+
+export const getActivePolicies = fetchActivePolicies;
 
 /**
  * Fetch stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).
@@ -99,11 +99,13 @@ export async function fetchPolicyRevisions(
     options
   );
   return decodeWithMode(
-    decodePolicyRevisions,
+    decodePolicyRevisionsList,
     data,
     'GET /ui/policies/revisions'
   ) as PolicyRevisionListResponse;
 }
+
+export const getPolicyRevisions = fetchPolicyRevisions;
 
 /**
  * Run a side-effect-free notification routing simulation.

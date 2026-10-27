@@ -679,3 +679,316 @@ def test_ui_policy_revisions_returns_lineage_across_statuses_and_filters(configu
     assert retired_payload["items"][0]["version"] == "1.0.0"
     assert retired_payload["items"][0]["status"] == "RETIRED"
     assert retired_payload["items"][0]["channels"] == ["SLACK"]
+
+
+def test_f01_deliveries_deduplicates_retry_rows_and_timeline_reflects_runtime_replay(configured):
+    """F-01: GET /ui/deliveries deduplicates by notification_id before filtering/counting; timeline reflects runtime_state."""
+    from datetime import UTC, datetime, timedelta
+
+    from db.models import NotificationAuditRecord
+
+    app, runtime, adapter = configured
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+
+    nid = uuid4()
+    agent_id = uuid4()
+    t0 = datetime(2026, 4, 20, 12, 0, 0, tzinfo=UTC)
+    with runtime.sessions() as session:
+        # Earlier FAILED attempt followed by later DELIVERED attempt for the same notification_id
+        session.add(
+            NotificationAuditRecord(
+                id=uuid4(),
+                notification_id=nid,
+                notification_type="security.test",
+                status="FAILED",
+                channels_attempted=["SLACK"],
+                channels_succeeded=[],
+                channels_failed=["SLACK"],
+                delivery_mode="GUARANTEED",
+                autonomy_mode="LIVE",
+                intent="SAFETY",
+                agent_id=agent_id,
+                title="Retry test",
+                source="test",
+                notification_created_at=t0,
+                delivered_at=t0,
+                created_at=t0,
+                error_message="Initial timeout",
+            )
+        )
+        session.add(
+            NotificationAuditRecord(
+                id=uuid4(),
+                notification_id=nid,
+                notification_type="security.test",
+                status="DELIVERED",
+                channels_attempted=["SLACK"],
+                channels_succeeded=["SLACK"],
+                channels_failed=[],
+                delivery_mode="GUARANTEED",
+                autonomy_mode="LIVE",
+                intent="SAFETY",
+                agent_id=agent_id,
+                title="Retry test",
+                source="test",
+                notification_created_at=t0,
+                delivered_at=t0 + timedelta(seconds=5),
+                created_at=t0 + timedelta(seconds=5),
+            )
+        )
+        session.commit()
+
+    all_resp = client.get("/ui/deliveries")
+    assert all_resp.status_code == 200
+    all_body = all_resp.json()
+    assert all_body["pagination"]["total_count"] == 1
+    assert len(all_body["items"]) == 1
+    assert all_body["items"][0]["notification_id"] == str(nid)
+    assert all_body["items"][0]["status"] == "DELIVERED"
+
+    # Filtering by status=FAILED must NOT return a notification whose current state is DELIVERED
+    failed_resp = client.get("/ui/deliveries", params={"status": "FAILED"})
+    assert failed_resp.status_code == 200
+    assert failed_resp.json()["pagination"]["total_count"] == 0
+    assert failed_resp.json()["items"] == []
+
+    # When a failed notification is replayed and runtime_state is PENDING, timeline status reflects PENDING
+    adapter.success = False
+    runtime.max_attempts = 1
+    send_resp = client.post(
+        "/api/v1/notifications",
+        json=signal(title="Replay target").model_dump(mode="json"),
+    )
+    assert send_resp.status_code in (200, 201, 202)
+    failed_nid = send_resp.json()["notification_id"]
+
+    replay_resp = client.post(f"/api/v1/runtime/notifications/{failed_nid}/replay")
+    assert replay_resp.status_code == 200
+
+    timeline_resp = client.get(f"/ui/deliveries/{failed_nid}")
+    assert timeline_resp.status_code == 200
+    timeline_body = timeline_resp.json()
+    assert timeline_body["runtime_state"]["delivery_status"] == "PENDING"
+    assert timeline_body["status"] == "PENDING"
+
+
+def test_f02_policy_revisions_single_query_no_ddl_and_chronological_ordering(configured):
+    """F-02: GET /ui/policies/revisions executes a single read-only SELECT, orders chronologically, and emits UTC timestamps."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import event
+
+    from db.policy_store import SQLAlchemyPolicyStore
+    from notification.policies import NotificationPolicy
+
+    app, runtime, _ = configured
+    store = SQLAlchemyPolicyStore(runtime.sessions)
+    t0 = datetime(2026, 4, 20, 10, 0, 0, tzinfo=UTC)
+
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "risk.limit",
+                "version": "9.0.0",
+                "status": "RETIRED",
+                "intent": "OPERATIONAL",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK"]},
+                "require_ack": {"LIVE": False},
+                "created_at": t0.isoformat(),
+                "updated_at": t0.isoformat(),
+            }
+        )
+    )
+    store.save_policy(
+        NotificationPolicy.from_dict(
+            {
+                "notification_type": "risk.limit",
+                "version": "10.0.0",
+                "status": "ACTIVE",
+                "intent": "OPERATIONAL",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK", "PAGERDUTY"]},
+                "require_ack": {"LIVE": True},
+                "created_at": (t0 + timedelta(minutes=5)).isoformat(),
+                "updated_at": (t0 + timedelta(minutes=5)).isoformat(),
+            }
+        )
+    )
+
+    statements: list[str] = []
+
+    def record_sql(_conn, _cursor, statement, *_args):
+        verb = statement.strip().split(None, 1)[0].upper() if statement.strip() else ""
+        statements.append(verb)
+
+    event.listen(runtime.engine, "before_cursor_execute", record_sql)
+    try:
+        client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+        resp = client.get("/ui/policies/revisions", params={"notification_type": "risk.limit"})
+    finally:
+        event.remove(runtime.engine, "before_cursor_execute", record_sql)
+
+    assert resp.status_code == 200
+    assert statements == ["SELECT"]
+    items = resp.json()["items"]
+    assert [item["version"] for item in items] == ["10.0.0", "9.0.0"]
+    for item in items:
+        assert item["created_at"].endswith("Z") or item["created_at"].endswith("+00:00")
+        assert item["updated_at"].endswith("Z") or item["updated_at"].endswith("+00:00")
+
+
+def test_f03_effective_policy_resolves_registered_policy_intent_when_omitted(configured):
+    """F-03: GET /ui/policies/effective resolves policy.intent when intent param is omitted for registered policy."""
+    from db.policy_store import SQLAlchemyPolicyStore
+    from notification.policies import NotificationPolicy
+
+    app, runtime, _ = configured
+    store = SQLAlchemyPolicyStore(runtime.sessions)
+    store.save_snapshot(
+        [
+            NotificationPolicy.from_dict(
+                {
+                    "notification_type": "governance.approval_required",
+                    "version": "1.0.0",
+                    "status": "ACTIVE",
+                    "intent": "GOVERNANCE",
+                    "delivery_mode": "GUARANTEED",
+                    "channels": {"LIVE": ["SLACK"]},
+                    "require_ack": {"LIVE": True},
+                    "ack_timeout_minutes": 15,
+                }
+            )
+        ]
+    )
+
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+    resp = client.get(
+        "/ui/policies/effective",
+        params={"notification_type": "governance.approval_required", "autonomy_mode": "LIVE"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["notification_type"] == "governance.approval_required"
+    assert body["resolution_context"]["intent"] == "GOVERNANCE"
+    assert body["effective"]["require_ack"] is True
+
+
+def test_f04_audit_events_preserve_ack_metadata_and_stage_order(configured):
+    """F-04: GET /ui/audit preserves responder ack_metadata in SQL mode and orders equal-timestamp stages deterministically."""
+    from datetime import UTC, datetime
+
+    from db.models import AckAuditRecord, NotificationAuditRecord
+
+    app, runtime, _ = configured
+    nid = uuid4()
+    agent_id = uuid4()
+    t_same = datetime(2026, 4, 20, 15, 30, 0, tzinfo=UTC)
+
+    with runtime.sessions() as session:
+        session.add(
+            NotificationAuditRecord(
+                id=uuid4(),
+                notification_id=nid,
+                notification_type="security.test",
+                status="DELIVERED",
+                channels_attempted=["SLACK"],
+                channels_succeeded=["SLACK"],
+                channels_failed=[],
+                delivery_mode="GUARANTEED",
+                autonomy_mode="LIVE",
+                intent="SAFETY",
+                agent_id=agent_id,
+                title="Audit test",
+                source="test",
+                notification_created_at=t_same,
+                delivered_at=t_same,
+                created_at=t_same,
+            )
+        )
+        session.add(
+            AckAuditRecord(
+                id=uuid4(),
+                notification_id=nid,
+                old_status=None,
+                new_status="PENDING",
+                acked_by=None,
+                acked_at=t_same,
+                created_at=t_same,
+                ack_metadata={},
+            )
+        )
+        session.add(
+            AckAuditRecord(
+                id=uuid4(),
+                notification_id=nid,
+                old_status="PENDING",
+                new_status="ACKED",
+                acked_by="risk-lead",
+                acked_at=t_same,
+                created_at=t_same,
+                ack_metadata={"note": "Verified on desk"},
+            )
+        )
+        session.commit()
+
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+    resp = client.get("/ui/audit", params={"notification_id": str(nid)})
+    assert resp.status_code == 200
+    events = resp.json()["items"]
+    event_types = [e["event_type"] for e in events]
+    assert event_types.index("ack.received") < event_types.index("ack.pending")
+    assert event_types.index("ack.pending") < event_types.index("delivery.succeeded")
+
+    ack_event = next(e for e in events if e["event_type"] == "ack.received")
+    assert ack_event["payload"]["note"] == "Verified on desk"
+    assert ack_event["payload"]["acked_by"] == "risk-lead"
+
+
+def test_f05_policy_hash_consistency_and_reload_path_containment(configured, tmp_path):
+    """F-05: compute_policy_content_hash matches across YAML/dict/store, and reload rejects arbitrary paths when UNS_POLICY_DIR is unset."""
+    from db.policy_store import SQLAlchemyPolicyStore
+    from notification.policy_loader import compute_policy_content_hash, load_policy_from_yaml
+
+    app, runtime, _ = configured
+    yaml_path = tmp_path / "sample_policy.yaml"
+    yaml_path.write_text(
+        """
+notification_type: execution.slippage
+version: "1.0.0"
+status: ACTIVE
+description: "Initial description"
+intent: OPERATIONAL
+delivery_mode: GUARANTEED
+channels:
+  LIVE: [SLACK]
+require_ack:
+  LIVE: true
+ack_timeout_minutes: 10
+""".strip()
+    )
+    loaded = load_policy_from_yaml(yaml_path)
+    store = SQLAlchemyPolicyStore(runtime.sessions)
+    persisted = store.save_policy(loaded)
+    assert loaded.config_hash == persisted.content_hash
+    # Changing only description or config_id does not alter canonical content hash
+    dumped = loaded.model_dump(mode="json")
+    dumped["description"] = "Updated description only"
+    assert compute_policy_content_hash(dumped) == loaded.config_hash
+
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+    bad_reload = client.post("/api/v1/policies/reload", json={"policy_dir": "/etc"})
+    assert bad_reload.status_code == 422
+
+
+def test_f07_sqlite_engine_configures_wal_and_busy_timeout(configured):
+    """F-07: File-backed SQLite engine enables WAL journal mode and 30000ms busy_timeout."""
+    from sqlalchemy import text
+
+    _, runtime, _ = configured
+    with runtime.engine.connect() as conn:
+        journal_mode = conn.execute(text("PRAGMA journal_mode")).scalar()
+        busy_timeout = conn.execute(text("PRAGMA busy_timeout")).scalar()
+    assert str(journal_mode).lower() == "wal"
+    assert int(busy_timeout) == 30000
+

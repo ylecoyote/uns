@@ -338,3 +338,40 @@ def test_build_channel_adapter_supports_webhook_and_bot_token_for_slack() -> Non
         },
     )
     assert bot_adapter.channel == Channel.SLACK
+
+
+def test_f08_slack_readiness_and_adapter_precedence_and_structured_error_handling(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """F-08: Slack webhook takes precedence over incomplete bot token, and invalid config in --execute returns structured JSON."""
+    env_webhook_and_partial_bot = {
+        "UNS_SLACK_WEBHOOK_URL": "https://hooks.slack.com/services/T000/B000/XXXX",
+        "UNS_SLACK_BOT_TOKEN": "xoxb-partial-without-channel",
+    }
+    readiness = inspect_channel_readiness(env_webhook_and_partial_bot)["slack"]
+    assert readiness["configured"] is True
+    assert readiness["mode"] == "webhook"
+    adapter = build_channel_adapter("slack", env=env_webhook_and_partial_bot)
+    assert isinstance(adapter, SlackWebhookSmokeAdapter)
+
+    env_partial_bot_only = {
+        "UNS_SLACK_BOT_TOKEN": "xoxb-partial-without-channel",
+    }
+    partial_readiness = inspect_channel_readiness(env_partial_bot_only)["slack"]
+    assert partial_readiness["configured"] is False
+    assert partial_readiness["missing_env"] == ["UNS_SLACK_CHANNEL"]
+
+    # Invalid webhook URL (non-HTTPS) during --execute returns structured FAILED JSON instead of crashing
+    bad_webhook_env = {
+        "UNS_SLACK_WEBHOOK_URL": "http://hooks.slack.com/services/T000/B000/XXXX",
+    }
+    exit_code = smoke_main(
+        ["--execute", "--channel", "slack", "--json"],
+        env=bad_webhook_env,
+    )
+    assert exit_code == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["mode"] == "executed"
+    assert payload["attempts"][0]["attempt_status"] == "FAILED"
+    assert "https://" in payload["attempts"][0]["provider_receipt"]["error"].lower()
+

@@ -18,6 +18,7 @@ exceptions.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -273,13 +274,20 @@ async def get_delivery_timeline(
         except KeyError:
             pass  # Historical audit rows predate durable runtime state.
 
+    effective_status = timeline.status
+    if runtime_state is not None:
+        raw_runtime_status = runtime_state.get("delivery_status")
+        if isinstance(raw_runtime_status, str):
+            with suppress(ValueError):
+                effective_status = DeliveryStatus(raw_runtime_status)
+
     return DeliveryTimelineResponse(
         runtime_state=runtime_state,
         notification_id=timeline.notification_id,
         notification_type=timeline.notification_type,
         intent=timeline.intent,
         delivery_mode=timeline.delivery_mode,
-        status=timeline.status,
+        status=effective_status,
         created_at=timeline.created_at,
         delivered_at=timeline.delivered_at,
         attempts=attempts,
@@ -299,8 +307,8 @@ async def get_delivery_timeline(
 
 async def get_effective_policy(
     notification_type: str,
-    intent: NotificationIntent,
-    autonomy_mode: AutonomyMode,
+    intent: NotificationIntent | None = None,
+    autonomy_mode: AutonomyMode = AutonomyMode.LIVE,
     irreversible: bool = False,
     *,
     policy_registry: PolicyRegistry | None = None,
@@ -322,7 +330,11 @@ async def get_effective_policy(
     registry = policy_registry if policy_registry is not None else get_policy_registry()
     policy = registry.get_sync(notification_type)
 
-    if (
+    if intent is None:
+        if policy is None:
+            raise ValueError("intent is required when notification_type has no registered policy")
+        intent = policy.intent or NotificationIntent.OPERATIONAL
+    elif (
         policy is not None
         and policy.is_runtime_enforced
         and policy.intent is not None
