@@ -75,6 +75,10 @@ sqlite3 "$UNS_DB_FILE" "
        --apply \
        --operator "oncall-operator" \
        --archive "$ARCHIVE_FILE"
+
+     BACKUP_FILE="/var/backups/uns/uns-$(date -u +%Y%m%dT%H%M%SZ).db"
+     sqlite3 -cmd ".timeout 5000" "${UNS_DB_FILE:?Set UNS_DB_FILE}" ".backup $BACKUP_FILE"
+     sqlite3 "$BACKUP_FILE" "PRAGMA quick_check;"
      ```
   3. If a previous run failed mid-transaction, inspect any leftover partial file at the old path, verify whether its SHA-256 appears in `SELECT payload FROM uns_events WHERE kind = 'RETENTION_APPLIED'`, and remove the unreferenced partial file.
 

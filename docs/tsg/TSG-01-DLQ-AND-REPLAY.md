@@ -66,11 +66,12 @@ curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" \
 - The background worker (`runtime.worker()`) will claim and dispatch the notification within ~1 second.
 
 ### Scenario B: `replay_blocked_by` is non-null (`DELIVERED`, `DEDUPLICATED`, `PENDING`, or `UNRESOLVED_LINEAGE`)
-If a promoted follower (`DEDUP_OWNER_PROMOTED`) or current owner is `PENDING` or already `DELIVERED`, `POST /api/v1/runtime/notifications/{id}/replay` automatically raises `409 Conflict` to prevent duplicate delivery. Once the obligation is satisfied (or resolved out-of-band), clear the dead-letter flag via `DELETE /api/v1/dlq/{entry_id}`:
+If a promoted follower (`DEDUP_OWNER_PROMOTED`) or current owner is `PENDING` or already `DELIVERED`, `POST /api/v1/runtime/notifications/{id}/replay` automatically raises `409 Conflict` to prevent duplicate delivery. Once the obligation is satisfied (or resolved out-of-band), clear the dead-letter flag via `DELETE /api/v1/dlq/{entry_id}` (where in canonical `uns.Runtime` / `RuntimeDLQ` mode, `entry_id === notification_id`, whereas in legacy non-runtime `DLQService` fixtures, `entry_id` is the DLQ entry UUID from `GET /api/v1/dlq`):
 
 ```sh
+ENTRY_ID="$NOTIF_ID" # In RuntimeDLQ, entry_id === notification_id
 curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \
-  "$UNS_BASE_URL/api/v1/dlq/$NOTIF_ID" | jq .
+  "$UNS_BASE_URL/api/v1/dlq/$ENTRY_ID" | jq .
 ```
 - **Effect:** Invokes `Runtime.resolve_failure`, setting `dead_letter = False` while keeping `status = "FAILED"` and recording a `FAILURE_RESOLVED` audit event with the operator's principal.
 

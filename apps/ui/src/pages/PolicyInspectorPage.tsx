@@ -383,53 +383,73 @@ export function PolicyInspectorPage() {
             All data is read-only.
           </p>
 
-          {/* Admin Operator Policy Reload Bar */}
-          {isAdmin && (
-            <div
-              className="policy-reload-bar"
-              data-testid="policy-reload-bar"
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
-            >
-              {!confirmingReload ? (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setConfirmingReload(true)}
-                  disabled={reloadingPolicies}
-                  data-testid="initiate-policy-reload-btn"
-                >
-                  Reload Policies from Server Directory
-                </button>
-              ) : (
-                <div
-                  data-testid="policy-reload-confirm-panel"
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
-                >
-                  <span style={{ fontSize: '12px', fontWeight: 600 }}>
-                    Validate and reload YAML policies from configured server directory?
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => void handleConfirmReload()}
-                    disabled={reloadingPolicies}
-                    data-testid="confirm-policy-reload-btn"
-                  >
-                    {reloadingPolicies ? 'Reloading…' : 'Confirm Reload'}
-                  </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {inRouter ? (
+              <Link
+                to="/docs?section=runbooks&q=TSG-04"
+                className="btn btn-secondary"
+                data-testid="policy-runbook-link"
+              >
+                Runbook: TSG-04 →
+              </Link>
+            ) : (
+              <a
+                href="/docs?section=runbooks&q=TSG-04"
+                className="btn btn-secondary"
+                data-testid="policy-runbook-link"
+              >
+                Runbook: TSG-04 →
+              </a>
+            )}
+
+            {/* Admin Operator Policy Reload Bar */}
+            {isAdmin && (
+              <div
+                className="policy-reload-bar"
+                data-testid="policy-reload-bar"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
+              >
+                {!confirmingReload ? (
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => setConfirmingReload(false)}
+                    onClick={() => setConfirmingReload(true)}
                     disabled={reloadingPolicies}
-                    data-testid="cancel-policy-reload-btn"
+                    data-testid="initiate-policy-reload-btn"
                   >
-                    Cancel
+                    Reload Policies from Server Directory
                   </button>
-                </div>
-              )}
-            </div>
-          )}
+                ) : (
+                  <div
+                    data-testid="policy-reload-confirm-panel"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+                  >
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                      Validate and reload YAML policies from configured server directory?
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => void handleConfirmReload()}
+                      disabled={reloadingPolicies}
+                      data-testid="confirm-policy-reload-btn"
+                    >
+                      {reloadingPolicies ? 'Reloading…' : 'Confirm Reload'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setConfirmingReload(false)}
+                      disabled={reloadingPolicies}
+                      data-testid="cancel-policy-reload-btn"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -87,17 +87,15 @@ sqlite3 "$UNS_DB_FILE" "
 ## 4. Safe Remediation Steps
 
 ### Step 4.1: When a notification with `LEASE_LOST` lands in the DLQ
-1. **Inspect `CHANNEL_ATTEMPT_RESULT` events and provider logs first** before calling `/replay`.
-   - If a `CHANNEL_ATTEMPT_RESULT` event shows `"success": true` (with a `message_id`), the external provider accepted the message even though the worker lost its lease before aggregate settlement.
-   - If `CHANNEL_ATTEMPT_RESULT` shows `metadata.provider_outcome == "UNKNOWN"`, an in-flight SMTP operation timed out after admission and may or may not have completed at the relay.
-2. **If the provider already delivered the message:**
-   - Do **not** replay. Clear the DLQ flag via:
+1. **Inspect `CHANNEL_ATTEMPT_RESULT` events and provider logs first** before calling `/replay` (3-way decision branch):
+   - **Branch 1 (`"success": true` with `message_id`):** The external provider accepted the message even though the worker lost its lease before aggregate settlement. Do **not** replay — resolve the DLQ entry via `DELETE /api/v1/dlq/$ENTRY_ID`:
      ```sh
+     ENTRY_ID="$NOTIF_ID" # In RuntimeDLQ, entry_id === notification_id
      curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \
-       "$UNS_BASE_URL/api/v1/dlq/$NOTIF_ID"
+       "$UNS_BASE_URL/api/v1/dlq/$ENTRY_ID"
      ```
-3. **If the provider rejected or dropped the connection without delivering:**
-   - Fix the underlying network/provider latency issue, then trigger replay via `POST /api/v1/runtime/notifications/$NOTIF_ID/replay`.
+   - **Branch 2 (`metadata.provider_outcome == "UNKNOWN"`):** An in-flight SMTP operation timed out after admission (`success` is `false`) and may or may not have completed at the relay. **Verify out-of-band first** (inspect SMTP relay logs or recipient mailbox) before choosing **Resolve** (if the email arrived) vs. **Replay** (if the message was dropped; replaying without verification risks duplicate email delivery).
+   - **Branch 3 (`"success": false` and `provider_outcome != "UNKNOWN"`):** The provider rejected or dropped the connection before acceptance. Fix the underlying network/provider latency issue, then trigger replay via `POST /api/v1/runtime/notifications/$NOTIF_ID/replay`.
 
 ### Step 4.2: Mitigating Slow SMTP / Provider Calls
 - Ensure your SMTP relay (`UNS_SMTP_HOST`) is local or low-latency so that connection + `STARTTLS` + `login` + `sendmail` completes well under `lease_seconds` (`60.0s`).

@@ -76,12 +76,12 @@ sqlite3 "$UNS_DB_FILE" "
 
 ### Scenario B: `POST /api/v1/policies/reload` returns `422 Unprocessable Entity`
 - **Cause:** YAML syntax error, invalid enum (`channels`, `delivery_mode`, `status`), or invalid policy field (`ack_timeout_minutes <= 0`, `dedup_window_seconds < 0`).
-- **Fix:** Inspect the `detail` message in the `422` response, correct the YAML file in your policy directory, and retry:
+- **Fix:** Inspect the `detail` message in the `422` response, correct the YAML file in your configured `UNS_POLICY_DIR`, and retry with `-d '{}'` (note that an optional `{"policy_dir": "..."}` body is only for subdirectories within the server's allowed policy root):
   ```sh
   curl -sS -X POST -H "Authorization: Bearer $UNS_API_KEY" \
     -H "Content-Type: application/json" \
     "$UNS_BASE_URL/api/v1/policies/reload" \
-    -d '{"policy_dir": "examples/policies/mip-uns"}' | jq .
+    -d '{}' | jq .
   ```
 
 ### Scenario C: Producer receives `422` on `POST /api/v1/notifications`

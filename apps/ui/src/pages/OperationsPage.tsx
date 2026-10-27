@@ -762,11 +762,20 @@ export function OperationsPage() {
               <h2 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Dead-Letter Queue Triage ({dlqState.rows.length})
               </h2>
-              {!isAdmin && (
-                <span className="badge badge-default" data-testid="dlq-readonly-notice">
-                  Operator (admin) scope required for Replay / Resolve actions
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {!isAdmin && (
+                  <span className="badge badge-default" data-testid="dlq-readonly-notice">
+                    Operator (admin) scope required for Replay / Resolve actions
+                  </span>
+                )}
+                <Link
+                  to="/docs?section=runbooks&q=TSG-01"
+                  className="btn btn-secondary"
+                  data-testid="dlq-runbook-link"
+                >
+                  Runbook: TSG-01 →
+                </Link>
+              </div>
             </div>
 
             {operatorFeedback && (
