@@ -247,6 +247,8 @@ async def get_delivery_timeline(
     if runtime is not None:
         try:
             row = runtime.get(notification_id)
+            all_events = runtime.events(notification_id) if hasattr(runtime, "events") else []
+            bounded_events = all_events[-100:]
             runtime_state = {
                 "delivery_status": row["status"],
                 "ack_status": row["ack_status"],
@@ -254,6 +256,19 @@ async def get_delivery_timeline(
                 "dead_letter": row["dead_letter"],
                 "policy_config_hash": row["notification"]["policy_config_hash"],
                 "policy_evaluation_id": row["notification"]["policy_evaluation_id"],
+                "require_ack": bool(row["notification"].get("require_ack", False)),
+                "obligation_owner_id": row.get("obligation_owner_id"),
+                "effective_status": row.get("effective_status", row["status"]),
+                "effective_ack_status": row.get("effective_ack_status"),
+                "ack_inherited": bool(row.get("ack_inherited", False)),
+                "obligation_resolution_status": row.get("obligation_resolution_status", "RESOLVED"),
+                "obligation_resolution_error": row.get("obligation_resolution_error"),
+                "actor": row.get("actor"),
+                "responded_at": row.get("responded_at"),
+                "response_metadata": row.get("response_metadata"),
+                "events": bounded_events,
+                "events_total_count": len(all_events),
+                "events_truncated": len(all_events) > 100,
             }
         except KeyError:
             pass  # Historical audit rows predate durable runtime state.

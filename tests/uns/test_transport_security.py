@@ -441,3 +441,137 @@ def test_readyz_reports_persistence_mode_and_operational_progress(configured):
         "oldest_callback_retry_age_seconds",
         "unresolved_failure_count",
     }
+
+
+def test_ui_session_introspects_principal_scopes_and_persistence_mode(configured):
+    app, _, _ = configured
+    app.state.uns_producer_api_key = "producer-key"
+    app.state.uns_producer_api_principal = "wyredeck-producer"
+    app.state.uns_responder_api_key = "responder-key"
+    app.state.uns_responder_api_principal = "oncall-responder"
+    app.state.uns_observer_api_key = "observer-key"
+    app.state.uns_observer_api_principal = "console-observer"
+
+    client = TestClient(app)
+
+    assert client.get("/ui/session").status_code == 401
+    assert client.get("/ui/session", headers={"Authorization": "Bearer invalid-key"}).status_code == 401
+
+    obs = client.get("/ui/session", headers={"Authorization": "Bearer observer-key"})
+    assert obs.status_code == 200
+    assert obs.json() == {
+        "subject": "console-observer",
+        "scopes": ["observer"],
+        "persistence_mode": "persistent",
+    }
+
+    prod = client.get("/ui/session", headers={"Authorization": "Bearer producer-key"})
+    assert prod.status_code == 200
+    assert prod.json() == {
+        "subject": "wyredeck-producer",
+        "scopes": ["observer", "producer"],
+        "persistence_mode": "persistent",
+    }
+
+    resp = client.get("/ui/session", headers={"Authorization": "Bearer responder-key"})
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "subject": "oncall-responder",
+        "scopes": ["observer", "responder"],
+        "persistence_mode": "persistent",
+    }
+
+    adm = client.get("/ui/session", headers={"Authorization": "Bearer test-key"})
+    assert adm.status_code == 200
+    assert adm.json() == {
+        "subject": "verified-operator",
+        "scopes": ["admin", "observer", "producer", "responder"],
+        "persistence_mode": "persistent",
+    }
+
+
+def test_ui_delivery_timeline_projects_obligation_lineage_and_bounds_events(configured):
+    app, runtime, _ = configured
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+
+    owner_resp = client.post(
+        "/api/v1/notifications",
+        json=signal(require_ack=True, dedup_key="ui-lineage-key").model_dump(mode="json"),
+    )
+    assert owner_resp.status_code == 202
+    owner_id = owner_resp.json()["notification_id"]
+
+    follower_resp = client.post(
+        "/api/v1/notifications",
+        json=signal(require_ack=True, dedup_key="ui-lineage-key").model_dump(mode="json"),
+    )
+    assert follower_resp.status_code == 202
+    follower_id = follower_resp.json()["notification_id"]
+
+    # Append > 100 synthetic runtime events to verify the 100-event bound
+    with runtime.sessions.begin() as session:
+        for idx in range(110):
+            runtime._event(session, str(owner_id), "SYNTHETIC_CHECK", {"seq": idx})
+
+    owner_timeline = client.get(f"/ui/deliveries/{owner_id}")
+    assert owner_timeline.status_code == 200
+    owner_rt = owner_timeline.json()["runtime_state"]
+    assert owner_rt["obligation_owner_id"] == owner_id
+    assert owner_rt["ack_inherited"] is False
+    assert owner_rt["obligation_resolution_status"] == "RESOLVED"
+    assert owner_rt["events_truncated"] is True
+    assert owner_rt["events_total_count"] >= 111
+    assert len(owner_rt["events"]) == 100
+    assert owner_rt["events"][-1]["payload"]["seq"] == 109
+
+    follower_timeline = client.get(f"/ui/deliveries/{follower_id}")
+    assert follower_timeline.status_code == 200
+    follower_rt = follower_timeline.json()["runtime_state"]
+    assert follower_rt["obligation_owner_id"] == owner_id
+    assert follower_rt["effective_ack_status"] == "PENDING"
+    assert follower_rt["ack_inherited"] is True
+    assert follower_rt["obligation_resolution_status"] == "RESOLVED"
+    assert follower_rt["events_truncated"] is False
+
+
+def test_ui_active_policies_catalog_and_default_policy_reload(configured, tmp_path, monkeypatch):
+    import yaml
+
+    app, _, _ = configured
+    client = TestClient(app, headers={"Authorization": "Bearer test-key"})
+
+    policy_dir = tmp_path / "policies"
+    policy_dir.mkdir()
+    (policy_dir / "ops.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "notification_type": "ops.console_test",
+                "version": "1.2.0",
+                "status": "ACTIVE",
+                "intent": "OPERATIONAL",
+                "delivery_mode": "GUARANTEED",
+                "channels": {"LIVE": ["SLACK", "WEBSOCKET"]},
+                "require_ack": {"LIVE": True},
+                "ack_timeout_minutes": 10,
+                "dedup_window_seconds": 180,
+            }
+        )
+    )
+    monkeypatch.setenv("UNS_POLICY_DIR", str(policy_dir))
+
+    # Reload with empty body {} -> defaults to UNS_POLICY_DIR
+    reload_resp = client.post("/api/v1/policies/reload", json={})
+    assert reload_resp.status_code == 200, reload_resp.text
+    assert reload_resp.json()["policy_count"] == 1
+    assert reload_resp.json()["notification_types"] == ["ops.console_test"]
+
+    active_resp = client.get("/ui/policies/active")
+    assert active_resp.status_code == 200
+    payload = active_resp.json()
+    assert payload["total_count"] == 1
+    assert payload["items"][0]["notification_type"] == "ops.console_test"
+    assert payload["items"][0]["channels"] == ["SLACK", "WEBSOCKET"]
+    assert payload["items"][0]["delivery_mode"] == "GUARANTEED"
+    assert payload["items"][0]["require_ack"] is True
+    assert payload["items"][0]["ack_timeout_seconds"] == 600
+    assert payload["items"][0]["dedup_window_seconds"] == 180

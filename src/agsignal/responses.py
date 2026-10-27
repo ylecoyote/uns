@@ -308,9 +308,9 @@ class PolicyReloadRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    policy_dir: str = Field(
-        default="config/notification_policies",
-        description="Directory containing YAML policy files",
+    policy_dir: str | None = Field(
+        default=None,
+        description="Directory containing YAML policy files (defaults to configured UNS_POLICY_DIR or config/notification_policies)",
     )
 
 
@@ -583,6 +583,28 @@ class EffectivePolicyResponse(BaseModel):
     resolution_context: ResolutionContext
 
 
+class ActivePolicySummary(BaseModel):
+    """Summary of an active notification routing policy for the console catalog."""
+
+    notification_type: str = Field(description="Policy notification_type identifier")
+    version: str = Field(description="Policy version")
+    status: str = Field(description="Lifecycle status (e.g., ACTIVE)")
+    intent: NotificationIntent | None = Field(default=None, description="Default notification intent")
+    channels: list[Channel] = Field(default_factory=list, description="Default LIVE channels")
+    delivery_mode: DeliveryMode | None = Field(default=None, description="Default LIVE delivery mode")
+    require_ack: bool | None = Field(default=None, description="Default LIVE ack requirement")
+    ack_timeout_minutes: int | None = Field(default=None, description="Default LIVE ack timeout in minutes")
+    ack_timeout_seconds: int | None = Field(default=None, description="Default LIVE ack timeout in seconds")
+    dedup_window_seconds: int = Field(description="Deduplication window in seconds")
+
+
+class ActivePolicyListResponse(BaseModel):
+    """Catalog of active notification routing policies."""
+
+    items: list[ActivePolicySummary] = Field(default_factory=list)
+    total_count: int = Field(description="Total number of active policies")
+
+
 class EvidenceLink(BaseModel):
     """Link to evidence for an invariant."""
 
@@ -653,6 +675,14 @@ class AuditEventListResponse(BaseModel):
     pagination: PaginationInfo
 
 
+class ConsoleSessionResponse(BaseModel):
+    """Authenticated console principal and capability scopes."""
+
+    subject: str
+    scopes: list[str] = Field(default_factory=list)
+    persistence_mode: str | None = None
+
+
 __all__ = [
     # Notification write DTOs
     "AutonomyContextRequest",
@@ -687,9 +717,12 @@ __all__ = [
     "ResolutionContext",
     "ResolutionStep",
     # Console / read composite Response classes
+    "ActivePolicyListResponse",
+    "ActivePolicySummary",
     "AuditEvent",
     "AuditEventListResponse",
     "AutonomyContextResponse",
+    "ConsoleSessionResponse",
     "DeliveryTimelineListResponse",
     "DeliveryTimelineResponse",
     "DeliveryTimelineSummary",

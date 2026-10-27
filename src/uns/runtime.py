@@ -238,6 +238,7 @@ class Runtime:
             owner, resolution_error = self._resolve_obligation_owner(session, result)
             inherited = owner is not None and str(owner["id"]) != str(result["id"])
             result["obligation_owner_id"] = str(owner["id"]) if owner is not None else None
+            result["effective_status"] = owner["status"] if owner is not None else result["status"]
             result["effective_ack_status"] = owner["ack_status"] if owner is not None else None
             result["ack_inherited"] = inherited
             result["obligation_resolution_status"] = "RESOLVED" if owner is not None else "UNRESOLVED"

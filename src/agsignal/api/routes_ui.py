@@ -37,7 +37,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from agsignal.api.auth import require_read_principal
+from agsignal.api.auth import (
+    WritePrincipal,
+    require_authenticated_observer,
+    require_read_principal,
+)
 from agsignal.api.observability import (
     create_error_response_with_request_id,
     get_structured_logger,
@@ -64,10 +68,13 @@ from agsignal.queries import (
     list_invariants as _query_list_invariants,
 )
 from agsignal.responses import (
+    ActivePolicyListResponse,
+    ActivePolicySummary,
     AuditEvent,
     AuditEventListResponse,
     AuditEventType,
     AutonomyContextResponse,
+    ConsoleSessionResponse,
     DeliveryAttempt,
     DeliveryTimelineListResponse,
     DeliveryTimelineResponse,
@@ -107,6 +114,32 @@ router = APIRouter(prefix="/ui", tags=["ui"], dependencies=[Depends(require_read
 # =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.get(
+    "/session",
+    response_model=ConsoleSessionResponse,
+    responses={
+        200: {"description": "Authenticated console principal and capability scopes"},
+        401: {"description": "Missing or invalid API credential"},
+        403: {"description": "Credential lacks observer authority"},
+    },
+    summary="Get console session capabilities",
+    description="Return the authenticated principal subject and capability scopes.",
+)
+async def get_console_session(
+    http_request: Request,
+    principal: WritePrincipal = Depends(require_authenticated_observer),
+) -> ConsoleSessionResponse:
+    """Return server-verified identity and capability scopes for the console."""
+    log_endpoint_call(logger, "get_console_session", subject=principal.subject)
+    runtime = getattr(http_request.app.state, "runtime", None)
+    persistence_mode = runtime.persistence_mode if runtime is not None else "in_memory"
+    return ConsoleSessionResponse(
+        subject=principal.subject,
+        scopes=sorted(principal.scopes),
+        persistence_mode=persistence_mode,
+    )
 
 
 @router.get(
@@ -254,6 +287,67 @@ async def get_effective_policy(
 
 
 @router.get(
+    "/policies/active",
+    response_model=ActivePolicyListResponse,
+    summary="List active notification policies",
+    description="Return the catalog of currently active notification routing policies.",
+)
+async def list_active_policies(
+    http_request: Request,
+) -> ActivePolicyListResponse:
+    """Return all active notification policies from the runtime or process registry."""
+    from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
+
+    log_endpoint_call(logger, "list_active_policies")
+    runtime = getattr(http_request.app.state, "runtime", None)
+    registry = (
+        runtime.policy_runtime.registry()
+        if runtime is not None
+        else get_policy_registry()
+    )
+    items: list[ActivePolicySummary] = []
+    for policy in sorted(registry.get_all().values(), key=lambda p: p.notification_type):
+        default_intent = policy.intent or NotificationIntent.OPERATIONAL
+        channels = policy.get_channels_for_mode(AutonomyMode.LIVE, default_intent) or list(
+            policy.channels
+        )
+        delivery_mode = (
+            policy.get_delivery_mode_for_mode(AutonomyMode.LIVE, default_intent)
+            if policy.intent
+            else policy.delivery_mode
+        )
+        require_ack = policy.get_require_ack_for_mode(AutonomyMode.LIVE, policy.intent)
+        ack_timeout_minutes = (
+            policy.get_ack_timeout_minutes_for_mode(AutonomyMode.LIVE, default_intent)
+            if policy.intent
+            else policy.ack_timeout_minutes
+        )
+        ack_timeout_seconds = (
+            ack_timeout_minutes * 60 if ack_timeout_minutes is not None else None
+        )
+        dedup_window_seconds = (
+            policy.dedup_window_seconds
+            if policy.dedup_window_seconds is not None
+            else DEFAULT_DEDUP_WINDOW_SECONDS
+        )
+        items.append(
+            ActivePolicySummary(
+                notification_type=policy.notification_type,
+                version=policy.version,
+                status=policy.status.value,
+                intent=policy.intent,
+                channels=channels,
+                delivery_mode=delivery_mode,
+                require_ack=require_ack,
+                ack_timeout_minutes=ack_timeout_minutes,
+                ack_timeout_seconds=ack_timeout_seconds,
+                dedup_window_seconds=dedup_window_seconds,
+            )
+        )
+    return ActivePolicyListResponse(items=items, total_count=len(items))
+
+
+@router.get(
     "/invariants",
     response_model=InvariantListResponse,
     responses={
@@ -380,6 +474,7 @@ __all__ = [
     "AuditEventListResponse",
     "AuditEventType",
     "AutonomyContextResponse",
+    "ConsoleSessionResponse",
     "DeliveryAttempt",
     "DeliveryTimelineListResponse",
     "DeliveryTimelineResponse",
