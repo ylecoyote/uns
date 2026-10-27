@@ -189,11 +189,38 @@ export const DeliveryAttemptSchema = z.object({
 /**
  * Delivery timeline response schema (full detail)
  */
+export const RuntimeEventSchema = z.object({
+  id: z.string(),
+  notification_id: z.string(),
+  kind: z.string(),
+  at: z.number(),
+  payload: z.record(z.string(), z.unknown()),
+  callback_pending: z.boolean().optional(),
+  callback_attempts: z.number().optional(),
+  callback_error: z.string().nullable().optional(),
+}).passthrough();
+
 export const DeliveryTimelineResponseSchema = z.object({
   runtime_state: z.object({
-    delivery_status: z.string(), ack_status: z.string().nullable(),
-    deadline: z.number().nullable(), dead_letter: z.boolean(),
-    policy_config_hash: z.string(), policy_evaluation_id: z.string(),
+    delivery_status: z.string(),
+    ack_status: z.string().nullable(),
+    deadline: z.number().nullable().optional(),
+    dead_letter: z.boolean(),
+    policy_config_hash: z.string().nullable().optional(),
+    policy_evaluation_id: z.string().nullable().optional(),
+    require_ack: z.boolean().optional(),
+    obligation_owner_id: z.string().nullable().optional(),
+    effective_status: z.string().optional(),
+    effective_ack_status: z.string().nullable().optional(),
+    ack_inherited: z.boolean().optional(),
+    obligation_resolution_status: z.string().optional(),
+    obligation_resolution_error: z.string().nullable().optional(),
+    actor: z.string().nullable().optional(),
+    responded_at: z.number().nullable().optional(),
+    response_metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+    events: z.array(RuntimeEventSchema).optional(),
+    events_total_count: z.number().optional(),
+    events_truncated: z.boolean().optional(),
   }).nullable().optional(),
   notification_id: z.string(),
   notification_type: z.string(),

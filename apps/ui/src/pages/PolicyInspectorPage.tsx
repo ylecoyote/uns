@@ -1,80 +1,805 @@
 /**
- * PolicyInspectorPage component
+ * PolicyInspectorPage — Policy Workspace (/policy)
  *
- * Main page for viewing effective policy resolution.
- * Features:
- * - Form for entering notification_type, intent, autonomy_mode, irreversible
- * - Display of effective policy values
- * - Resolution trace showing how each value was determined
- *
- * All functionality is READ-ONLY per UI Scope v1.
+ * Surface 4 of the UNS Console Responder & Operator Workflows specification:
+ * - Active Policies Catalog table (GET /ui/policies/active) with one-click selection
+ * - ?notification_type= deep-link auto-population and inspection
+ * - Effective Policy Inspector & Resolution Trace (GET /ui/policies/effective)
+ * - Dry-Run Simulator (POST /api/v1/notifications/simulate) & Tagged Live Test Sender
+ *   (POST /api/v1/notifications with [TEST] prefix and source: "uns_console_policy_test")
+ *   for producer / admin scopes
+ * - Atomic Two-Phase Policy Reload (POST /api/v1/policies/reload with {}) for admin scope
  */
 
-import { PolicyInspectorForm } from '../components/PolicyInspectorForm';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
+import {
+  fetchActivePolicies,
+  reloadPolicies,
+  sendTestNotification,
+  simulateNotification,
+} from '../api/policies';
+import { getConsoleSession, hasScope, subscribeConsoleSession } from '../auth/session';
+import {
+  PolicyInspectorForm,
+  type PolicyExternalSelection,
+} from '../components/PolicyInspectorForm';
 import { ResolutionTraceDisplay } from '../components/ResolutionTraceDisplay';
 import { usePolicyInspector } from '../hooks/usePolicyInspector';
-import type { PolicyInspectorParams } from '../types/api';
+import type {
+  ActivePolicySummary,
+  AutonomyMode,
+  NotificationIntent,
+  PolicyInspectorParams,
+  PolicyReloadResponsePayload,
+  SendNotificationResponsePayload,
+  SimulateNotificationResponsePayload,
+} from '../types/api';
+
+const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
+
+function RouterQueryNotificationTypeSync({
+  onSelectType,
+}: {
+  onSelectType: (notificationType: string) => void;
+}) {
+  const location = useLocation();
+  const handledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get('notification_type')?.trim() ?? null;
+    if (raw && handledRef.current !== raw) {
+      handledRef.current = raw;
+      onSelectType(raw);
+    }
+  }, [location.search, onSelectType]);
+
+  return null;
+}
 
 export function PolicyInspectorPage() {
+  const inRouter = useInRouterContext();
+  const session = useSyncExternalStore(subscribeConsoleSession, getConsoleSession);
+  const canProduce = hasScope(session, 'producer');
+  const isAdmin = hasScope(session, 'admin');
+
   const { result, loading, error, inspect, clear } = usePolicyInspector();
 
+  // Active policy catalog state
+  const [activePolicies, setActivePolicies] = useState<ActivePolicySummary[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  // External selection sync for PolicyInspectorForm
+  const [externalSelection, setExternalSelection] =
+    useState<PolicyExternalSelection | null>(null);
+  const selectionSeqRef = useRef(0);
+
+  // Simulator & Test Sender state
+  const [simNotificationType, setSimNotificationType] = useState('');
+  const [simIntent, setSimIntent] = useState<NotificationIntent>('OPERATIONAL');
+  const [simAutonomyMode, setSimAutonomyMode] = useState<AutonomyMode>('LIVE');
+  const [simIrreversible, setSimIrreversible] = useState(false);
+  const [simTitle, setSimTitle] = useState('Policy routing verification');
+  const [simMessage, setSimMessage] = useState(
+    'Verifying channel routing and acknowledgment policy from UNS Console.'
+  );
+  const [simSource, setSimSource] = useState('uns-console');
+  const [simAgentId, setSimAgentId] = useState(DEFAULT_AGENT_ID);
+
+  const [simulating, setSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] =
+    useState<SimulateNotificationResponsePayload | null>(null);
+  const [confirmingTestSend, setConfirmingTestSend] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testSendResult, setTestSendResult] =
+    useState<SendNotificationResponsePayload | null>(null);
+  const [simulatorError, setSimulatorError] = useState<string | null>(null);
+
+  // Admin Policy Reload state
+  const [confirmingReload, setConfirmingReload] = useState(false);
+  const [reloadingPolicies, setReloadingPolicies] = useState(false);
+  const [reloadResult, setReloadResult] = useState<PolicyReloadResponsePayload | null>(
+    null
+  );
+  const [reloadError, setReloadError] = useState<string | null>(null);
+
+  const loadCatalog = useCallback(async () => {
+    if (typeof fetchActivePolicies !== 'function') return;
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const response = await fetchActivePolicies();
+      if (response && Array.isArray(response.items)) {
+        setActivePolicies(response.items);
+      }
+    } catch (err) {
+      setCatalogError(
+        err instanceof Error ? err.message : 'Unable to load active policies.'
+      );
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  const applyPolicySelection = useCallback(
+    (
+      notificationType: string,
+      intent: NotificationIntent = 'OPERATIONAL',
+      autonomyMode: AutonomyMode = 'LIVE'
+    ) => {
+      selectionSeqRef.current += 1;
+      setExternalSelection({
+        notification_type: notificationType,
+        intent,
+        autonomy_mode: autonomyMode,
+        seq: selectionSeqRef.current,
+      });
+      setSimNotificationType(notificationType);
+      setSimIntent(intent);
+      setSimAutonomyMode(autonomyMode);
+      void inspect({
+        notification_type: notificationType,
+        intent,
+        autonomy_mode: autonomyMode,
+        irreversible: false,
+      });
+    },
+    [inspect]
+  );
+
+  const handleQueryTypeSelect = useCallback(
+    (notificationType: string) => {
+      applyPolicySelection(notificationType, 'OPERATIONAL', 'LIVE');
+    },
+    [applyPolicySelection]
+  );
+
   const handleInspect = (params: PolicyInspectorParams) => {
-    inspect(params);
+    setSimNotificationType(params.notification_type);
+    setSimIntent(params.intent);
+    setSimAutonomyMode(params.autonomy_mode);
+    setSimIrreversible(Boolean(params.irreversible));
+    void inspect(params);
   };
 
   const handleClear = () => {
     clear();
   };
 
+  async function handleSimulate() {
+    const trimmedType = simNotificationType.trim();
+    if (!trimmedType) {
+      setSimulatorError('Notification type is required for simulation.');
+      return;
+    }
+    setSimulating(true);
+    setSimulatorError(null);
+    setSimulationResult(null);
+
+    try {
+      const response = await simulateNotification({
+        notification_type: trimmedType,
+        intent: simIntent,
+        title: simTitle.trim() || 'Policy simulation preview',
+        message: simMessage.trim() || 'Dry-run simulation from UNS Console.',
+        source: simSource.trim() || 'uns-console',
+        autonomy_context: {
+          autonomy_mode: simAutonomyMode,
+          agent_id: simAgentId.trim() || DEFAULT_AGENT_ID,
+        },
+        irreversible: simIrreversible,
+      });
+      setSimulationResult(response);
+    } catch (err) {
+      setSimulatorError(
+        err instanceof Error ? err.message : 'Simulation request failed.'
+      );
+    } finally {
+      setSimulating(false);
+    }
+  }
+
+  async function handleConfirmTestSend() {
+    const trimmedType = simNotificationType.trim();
+    if (!trimmedType || sendingTest) return;
+    setSendingTest(true);
+    setSimulatorError(null);
+    setTestSendResult(null);
+
+    const rawTitle = simTitle.trim() || 'Policy verification';
+    const taggedTitle = rawTitle.startsWith('[TEST]') ? rawTitle : `[TEST] ${rawTitle}`;
+
+    try {
+      const response = await sendTestNotification({
+        notification_type: trimmedType,
+        intent: simIntent,
+        title: taggedTitle,
+        message: simMessage.trim() || 'Live policy test notification from UNS Console.',
+        source: simSource.trim() || 'uns-console',
+        autonomy_context: {
+          autonomy_mode: simAutonomyMode,
+          agent_id: simAgentId.trim() || DEFAULT_AGENT_ID,
+        },
+        irreversible: simIrreversible,
+        metadata: {
+          source: 'uns_console_policy_test',
+          triggered_by: session.subject ?? 'console_operator',
+        },
+      });
+      setConfirmingTestSend(false);
+      setTestSendResult(response);
+    } catch (err) {
+      setSimulatorError(
+        err instanceof Error ? err.message : 'Live test notification dispatch failed.'
+      );
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function handleConfirmReload() {
+    if (reloadingPolicies) return;
+    setReloadingPolicies(true);
+    setReloadError(null);
+    setReloadResult(null);
+
+    try {
+      const response = await reloadPolicies();
+      setConfirmingReload(false);
+      setReloadResult(response);
+      await loadCatalog();
+    } catch (err) {
+      setReloadError(
+        err instanceof Error ? err.message : 'Failed to reload policies from server.'
+      );
+    } finally {
+      setReloadingPolicies(false);
+    }
+  }
+
   return (
     <div className="policy-inspector-page" data-testid="policy-inspector-page">
+      {inRouter && <RouterQueryNotificationTypeSync onSelectType={handleQueryTypeSelect} />}
       {/* Page Header */}
-      <div className="page-header">
-        <h1>Policy Inspector</h1>
-        <p className="page-description">
-          View effective policy values and resolution trace for any notification type.
-          All data is read-only.
-        </p>
-      </div>
+      <header className="page-header">
+        <div>
+          <h1>Policy Inspector</h1>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <p className="page-description">
+            View effective policy values and resolution trace for any notification type.
+            All data is read-only.
+          </p>
 
-      {/* Inspector Form */}
-      <div className="inspector-form-section card">
-        <PolicyInspectorForm
-          onInspect={handleInspect}
-          onClear={handleClear}
-          loading={loading}
-        />
-      </div>
+          {/* Admin Operator Policy Reload Bar */}
+          {isAdmin && (
+            <div
+              className="policy-reload-bar"
+              data-testid="policy-reload-bar"
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
+            >
+              {!confirmingReload ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setConfirmingReload(true)}
+                  disabled={reloadingPolicies}
+                  data-testid="initiate-policy-reload-btn"
+                >
+                  Reload Policies from Server Directory
+                </button>
+              ) : (
+                <div
+                  data-testid="policy-reload-confirm-panel"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+                >
+                  <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                    Validate and reload YAML policies from configured server directory?
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void handleConfirmReload()}
+                    disabled={reloadingPolicies}
+                    data-testid="confirm-policy-reload-btn"
+                  >
+                    {reloadingPolicies ? 'Reloading…' : 'Confirm Reload'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setConfirmingReload(false)}
+                    disabled={reloadingPolicies}
+                    data-testid="cancel-policy-reload-btn"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="loading-state" data-testid="loading-state">
-          <p>Resolving policy...</p>
+      {reloadResult && (
+        <div
+          role="status"
+          data-testid="policy-reload-result"
+          style={{
+            padding: '12px 24px',
+            borderBottom: '2px solid var(--color-divider)',
+            backgroundColor: 'var(--color-surface)',
+          }}
+        >
+          <strong>Policies reloaded atomically:</strong> {reloadResult.loaded_count} loaded,{' '}
+          {reloadResult.persisted_count} persisted, {reloadResult.policy_count} active (
+          {reloadResult.notification_types.join(', ') || 'none'}).
         </div>
       )}
 
-      {/* Error State */}
-      {error && !loading && (
-        <div className="error-state" data-testid="error-state">
-          <div className="error-message">
-            <strong>Error resolving policy</strong>
-            <p>{error.message}</p>
-            {error.code && <p className="error-code">Code: {error.code}</p>}
-            {error.requestId && <p className="error-request-id">Request ID: {error.requestId}</p>}
+      {reloadError && (
+        <div
+          role="alert"
+          data-testid="policy-reload-error"
+          style={{
+            padding: '12px 24px',
+            borderBottom: '2px solid var(--color-accent)',
+            backgroundColor: 'var(--color-accent-100)',
+            color: 'var(--color-accent-800)',
+          }}
+        >
+          Policy reload failed: {reloadError}
+        </div>
+      )}
+
+      {/* Two-Column Split Layout (1b: Query Pane on Left, Resolution Trace / Poster on Right) */}
+      <section className="policy-split-layout">
+        <div className="policy-query-pane">
+          <PolicyInspectorForm
+            onInspect={handleInspect}
+            onClear={handleClear}
+            loading={loading}
+            externalSelection={externalSelection}
+          />
+        </div>
+
+        <div className="policy-trace-pane">
+          {/* Loading State */}
+          {loading && (
+            <div className="loading-state" data-testid="loading-state">
+              <p>Resolving policy...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className="error-state" data-testid="error-state">
+              <div className="error-message">
+                <strong>Error resolving policy</strong>
+                <p>{error.message}</p>
+                {error.code && <p className="error-code">Code: {error.code}</p>}
+                {error.requestId && <p className="error-request-id">Request ID: {error.requestId}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Results */}
+          {result && !loading && !error && <ResolutionTraceDisplay response={result} />}
+
+          {/* Empty State Poster (1b) */}
+          {!result && !loading && !error && (
+            <div className="policy-empty-poster" data-testid="empty-state">
+              <div className="policy-empty-eyebrow">Resolution Trace — Awaiting Query</div>
+              <p className="policy-empty-statement">
+                Enter a notification type and click "Inspect Policy" to view resolution details.
+              </p>
+              <div className="policy-precedence-grid">
+                <div>
+                  <strong>01. Type Match</strong>
+                  Exact notification_type or wildcard domain fallback.
+                </div>
+                <div>
+                  <strong>02. Mode Override</strong>
+                  PREVIEW / SHADOW channel clamping &amp; suppression rules.
+                </div>
+                <div>
+                  <strong>03. Guardrail Floor</strong>
+                  Irreversible &amp; SAFETY intent minimum delivery guarantees.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Active Policies Catalog Table */}
+      {activePolicies.length > 0 && (
+        <section
+          data-testid="active-policies-section"
+          style={{ borderBottom: '2px solid var(--color-divider)' }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              background: 'var(--color-surface)',
+              borderBottom: '1px solid var(--color-divider)',
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Active Policies Catalog ({activePolicies.length})
+            </h2>
+            <span style={{ fontSize: '12px', color: 'var(--color-neutral-700)' }}>
+              Click any policy row to populate the Inspector and Simulator
+            </span>
           </div>
+          {catalogError && <p className="field-error" style={{ padding: '0 24px' }}>{catalogError}</p>}
+          <div className="table-container">
+            <table className="data-table" data-testid="active-policies-table">
+              <thead>
+                <tr>
+                  <th>Notification Type</th>
+                  <th>Default Intent</th>
+                  <th>LIVE Channels</th>
+                  <th>Delivery Mode</th>
+                  <th>Require ACK</th>
+                  <th>ACK Timeout</th>
+                  <th>Dedup Window</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activePolicies.map((policy) => (
+                  <tr
+                    key={policy.notification_type}
+                    onClick={() =>
+                      applyPolicySelection(
+                        policy.notification_type,
+                        policy.intent ?? 'OPERATIONAL',
+                        'LIVE'
+                      )
+                    }
+                    style={{ cursor: 'pointer' }}
+                    data-testid={`active-policy-row-${policy.notification_type}`}
+                  >
+                    <td className="monospace">
+                      <strong>{policy.notification_type}</strong>
+                    </td>
+                    <td>{policy.intent ?? 'SDK Default'}</td>
+                    <td>{policy.channels.join(', ') || 'SDK Default'}</td>
+                    <td>{policy.delivery_mode ?? 'SDK Default'}</td>
+                    <td>
+                      {policy.require_ack === null
+                        ? 'SDK Default'
+                        : policy.require_ack
+                          ? 'Yes'
+                          : 'No'}
+                    </td>
+                    <td className="timestamp">
+                      {policy.ack_timeout_seconds !== null
+                        ? `${policy.ack_timeout_seconds}s`
+                        : '-'}
+                    </td>
+                    <td className="timestamp">{policy.dedup_window_seconds}s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {catalogLoading && activePolicies.length === 0 && (
+        <div style={{ padding: '12px 24px', fontSize: '12px' }}>
+          Loading active policy catalog…
         </div>
       )}
 
-      {/* Results */}
-      {result && !loading && !error && (
-        <ResolutionTraceDisplay response={result} />
-      )}
+      {/* Dry-Run Simulator & Tagged Live Test Sender (Producer / Admin scopes) */}
+      {canProduce && (
+        <section
+          data-testid="policy-simulator-section"
+          style={{
+            padding: '24px',
+            background: 'var(--color-bg)',
+            borderBottom: '2px solid var(--color-divider)',
+          }}
+        >
+          <h2 style={{ marginTop: 0, fontSize: '18px' }}>
+            Dry-Run Simulator &amp; Tagged Live Test Dispatch
+          </h2>
+          <p style={{ marginTop: 0, color: 'var(--color-neutral-700)', fontSize: '13px' }}>
+            Preview routing decisions with zero side effects, or dispatch a synthetically tagged{' '}
+            <code>[TEST]</code> notification attributed to{' '}
+            <code>{session.subject ?? 'authenticated producer'}</code>.
+          </p>
 
-      {/* Empty State */}
-      {!result && !loading && !error && (
-        <div className="empty-state" data-testid="empty-state">
-          <p>Enter a notification type and click "Inspect Policy" to view resolution details.</p>
-        </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '12px',
+              marginBottom: '12px',
+            }}
+          >
+            <div>
+              <label htmlFor="sim-notification-type" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Notification Type
+              </label>
+              <input
+                id="sim-notification-type"
+                type="text"
+                className="modernist-input monospace"
+                value={simNotificationType}
+                onChange={(e) => setSimNotificationType(e.target.value)}
+                placeholder="e.g., trading.order_placed"
+                data-testid="sim-notification-type-input"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="sim-intent" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Intent
+              </label>
+              <select
+                id="sim-intent"
+                className="modernist-select"
+                value={simIntent}
+                onChange={(e) => setSimIntent(e.target.value as NotificationIntent)}
+                data-testid="sim-intent-select"
+              >
+                <option value="SAFETY">SAFETY</option>
+                <option value="GOVERNANCE">GOVERNANCE</option>
+                <option value="OPERATIONAL">OPERATIONAL</option>
+                <option value="INFORMATIONAL">INFORMATIONAL</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="sim-autonomy-mode" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Autonomy Mode
+              </label>
+              <select
+                id="sim-autonomy-mode"
+                className="modernist-select"
+                value={simAutonomyMode}
+                onChange={(e) => setSimAutonomyMode(e.target.value as AutonomyMode)}
+                data-testid="sim-autonomy-mode-select"
+              >
+                <option value="PREVIEW">PREVIEW</option>
+                <option value="SHADOW">SHADOW</option>
+                <option value="LIVE">LIVE</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="sim-title" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Title
+              </label>
+              <input
+                id="sim-title"
+                type="text"
+                className="modernist-input"
+                value={simTitle}
+                onChange={(e) => setSimTitle(e.target.value)}
+                data-testid="sim-title-input"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="sim-source" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Producer Source
+              </label>
+              <input
+                id="sim-source"
+                type="text"
+                className="modernist-input monospace"
+                value={simSource}
+                onChange={(e) => setSimSource(e.target.value)}
+                data-testid="sim-source-input"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="sim-agent-id" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                Agent UUID
+              </label>
+              <input
+                id="sim-agent-id"
+                type="text"
+                className="modernist-input monospace"
+                value={simAgentId}
+                onChange={(e) => setSimAgentId(e.target.value)}
+                data-testid="sim-agent-id-input"
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '14px' }}>
+            <label htmlFor="sim-message" className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+              Message Body
+            </label>
+            <input
+              id="sim-message"
+              type="text"
+              className="modernist-input"
+              value={simMessage}
+              onChange={(e) => setSimMessage(e.target.value)}
+              data-testid="sim-message-input"
+            />
+          </div>
+
+          {simulatorError && (
+            <div
+              role="alert"
+              data-testid="simulator-error"
+              style={{
+                marginBottom: '12px',
+                padding: '10px 14px',
+                border: '1.5px solid var(--color-accent)',
+                backgroundColor: 'var(--color-accent-100)',
+                color: 'var(--color-accent-800)',
+              }}
+            >
+              {simulatorError}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void handleSimulate()}
+              disabled={simulating || sendingTest}
+              data-testid="simulate-btn"
+            >
+              {simulating ? 'Simulating…' : 'Simulate (Dry-Run)'}
+            </button>
+
+            {!confirmingTestSend ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setConfirmingTestSend(true)}
+                disabled={simulating || sendingTest || !simNotificationType.trim()}
+                data-testid="initiate-test-send-btn"
+              >
+                Send Live Test Notification
+              </button>
+            ) : (
+              <div
+                data-testid="confirm-test-send-panel"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+              >
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                  Dispatch live <code>[TEST]</code> notification to configured channels?
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void handleConfirmTestSend()}
+                  disabled={sendingTest}
+                  data-testid="confirm-test-send-btn"
+                >
+                  {sendingTest ? 'Dispatching…' : 'Confirm Live Test Send'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setConfirmingTestSend(false)}
+                  disabled={sendingTest}
+                  data-testid="cancel-test-send-btn"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          {simulationResult && (
+            <div
+              className="card"
+              data-testid="simulation-result-card"
+              style={{ marginTop: '16px', backgroundColor: 'var(--color-surface)' }}
+            >
+              <h3 style={{ marginTop: 0, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Dry-Run Simulation Outcome
+              </h3>
+              <dl
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '12px',
+                  margin: 0,
+                }}
+              >
+                <div>
+                  <dt className="field-label">Simulated Outcome</dt>
+                  <dd data-testid="sim-result-status" style={{ margin: '4px 0 0', fontWeight: 600 }}>
+                    {simulationResult.status}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="field-label">Resolved Channels</dt>
+                  <dd data-testid="sim-result-channels" style={{ margin: '4px 0 0', fontFamily: 'var(--font-mono)' }}>
+                    {simulationResult.channels_attempted.join(', ') || 'None'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="field-label">Delivery Mode</dt>
+                  <dd data-testid="sim-result-delivery-mode" style={{ margin: '4px 0 0', fontFamily: 'var(--font-mono)' }}>
+                    {simulationResult.delivery_mode}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="field-label">Require ACK</dt>
+                  <dd data-testid="sim-result-require-ack" style={{ margin: '4px 0 0', fontWeight: 600 }}>
+                    {simulationResult.require_ack ? 'Yes' : 'No'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="field-label">Policy Source</dt>
+                  <dd data-testid="sim-result-policy-source" style={{ margin: '4px 0 0', fontFamily: 'var(--font-mono)' }}>
+                    {simulationResult.policy_source}
+                  </dd>
+                </div>
+              </dl>
+              {simulationResult.warnings.length > 0 && (
+                <ul style={{ marginTop: '8px', marginBottom: 0 }}>
+                  {simulationResult.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {testSendResult && (
+            <div
+              role="status"
+              data-testid="test-send-result-card"
+              style={{
+                marginTop: '16px',
+                padding: '12px 16px',
+                border: '1.5px solid var(--color-text)',
+                backgroundColor: 'var(--color-surface)',
+              }}
+            >
+              <strong>Live [TEST] notification accepted:</strong>{' '}
+              <span className="monospace">{testSendResult.notification_id}</span> (
+              {testSendResult.status}){' '}
+              {inRouter ? (
+                <Link
+                  to={`/deliveries/${testSendResult.notification_id}`}
+                  data-testid="test-send-delivery-link"
+                >
+                  View Delivery Timeline &rarr;
+                </Link>
+              ) : (
+                <a
+                  href={`/deliveries/${testSendResult.notification_id}`}
+                  data-testid="test-send-delivery-link"
+                >
+                  View Delivery Timeline &rarr;
+                </a>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );

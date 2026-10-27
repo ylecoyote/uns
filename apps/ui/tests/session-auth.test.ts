@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { apiGet, ApiError } from '../src/api/client';
-import { clearConsoleSession, getConsoleSession, startConsoleSession } from '../src/auth/session';
+import { apiGet, apiRootRequest, apiRootRequestWithStatus, ApiError } from '../src/api/client';
+import {
+  clearConsoleSession,
+  getCapabilityPills,
+  getConsoleSession,
+  hasScope,
+  requestPeerConsoleSession,
+  resetConsoleSessionChannelForTests,
+  startConsoleSession,
+  subscribeConsoleSession,
+} from '../src/auth/session';
 
 const mockFetch = vi.fn();
 const failure = (status: number, body: unknown) => ({ ok: false, status, json: async () => body });
@@ -72,5 +81,146 @@ describe('Authenticated API requests', () => {
     await expect(apiGet('/audit')).rejects.toMatchObject({
       name: 'ApiError', statusCode: 502, message: 'The service returned an error (HTTP 502).',
     });
+  });
+
+  it('supports root-relative POST and DELETE mutations with structured 403/409 errors and allowStatus', async () => {
+    startConsoleSession('responder-key', { subject: 'uns-responder', scopes: ['observer', 'responder'] });
+    const controller = new AbortController();
+
+    // 1. 403 Forbidden from auth.py keeps session alive and surfaces insufficient_scope
+    mockFetch.mockResolvedValueOnce(
+      failure(403, {
+        detail: {
+          error: 'insufficient_scope',
+          message: "Credential principal 'uns-responder' lacks required 'admin' authority.",
+        },
+      })
+    );
+    await expect(
+      apiRootRequest('POST', '/api/v1/policies/reload', {}, { signal: controller.signal })
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      statusCode: 403,
+      code: 'insufficient_scope',
+    });
+    expect(getConsoleSession().credential).toBe('responder-key');
+
+    // 2. 409 Conflict from runtime route preserves detail message and keeps session alive
+    mockFetch.mockResolvedValueOnce(
+      failure(409, { detail: 'Obligation already satisfied by successor' })
+    );
+    await expect(
+      apiRootRequest('POST', '/api/v1/runtime/notifications/abc/replay')
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      statusCode: 409,
+      message: 'Obligation already satisfied by successor',
+    });
+    expect(getConsoleSession().credential).toBe('responder-key');
+
+    // 3. allowStatus: [503] parses degraded /readyz payload without throwing
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({ status: 'not_ready', operational_progress: { pending_count: 4 } }),
+    });
+    const readiness = await apiRootRequestWithStatus<{
+      status: string;
+      operational_progress: { pending_count: number };
+    }>('GET', '/readyz', undefined, { allowStatus: [503] });
+    expect(readiness.status).toBe(503);
+    expect(readiness.ok).toBe(false);
+    expect(readiness.data.operational_progress.pending_count).toBe(4);
+  });
+
+  it('computes non-lossy capability pills and hasScope across the scope lattice', () => {
+    startConsoleSession('obs-key', { subject: 'obs', scopes: ['observer'] });
+    expect(getCapabilityPills(getConsoleSession())).toEqual(['READ-ONLY']);
+    expect(hasScope(getConsoleSession(), 'observer')).toBe(true);
+    expect(hasScope(getConsoleSession(), 'responder')).toBe(false);
+
+    startConsoleSession('dual-key', { subject: 'dual', scopes: ['observer', 'producer', 'responder'] });
+    expect(getCapabilityPills(getConsoleSession())).toEqual(['RESPONDER', 'PRODUCER']);
+    expect(hasScope(getConsoleSession(), 'responder')).toBe(true);
+    expect(hasScope(getConsoleSession(), 'producer')).toBe(true);
+    expect(hasScope(getConsoleSession(), 'admin')).toBe(false);
+
+    startConsoleSession('admin-key', { subject: 'admin-user', scopes: ['admin', 'observer'] });
+    expect(getCapabilityPills(getConsoleSession())).toEqual(['OPERATOR']);
+    expect(hasScope(getConsoleSession(), 'responder')).toBe(true);
+    expect(hasScope(getConsoleSession(), 'producer')).toBe(true);
+    expect(hasScope(getConsoleSession(), 'admin')).toBe(true);
+  });
+
+  it('hydrates and clears sessions across same-origin tabs via in-memory BroadcastChannel', () => {
+    const channels = new Set<{ onmessage: ((event: MessageEvent) => void) | null }>();
+    class MockBroadcastChannel {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      constructor(_name: string) {
+        channels.add(this);
+      }
+      postMessage(data: unknown) {
+        for (const peer of channels) {
+          if (peer !== this && peer.onmessage) {
+            peer.onmessage({ data } as MessageEvent);
+          }
+        }
+      }
+      close() {
+        channels.delete(this);
+      }
+    }
+
+    vi.stubGlobal('BroadcastChannel', MockBroadcastChannel);
+    resetConsoleSessionChannelForTests();
+
+    const unsubscribe = subscribeConsoleSession(() => {});
+    const peerChannel = new MockBroadcastChannel('uns_console_session');
+    const receivedMessages: unknown[] = [];
+    peerChannel.onmessage = (event: MessageEvent) => {
+      receivedMessages.push(event.data);
+    };
+
+    // Active tab grants session when peer tab requests it
+    startConsoleSession('tab-shared-key', {
+      subject: 'operator-1',
+      scopes: ['admin', 'observer', 'producer', 'responder'],
+      persistenceMode: 'persistent',
+    });
+    receivedMessages.length = 0;
+    peerChannel.postMessage({ type: 'UNS_SESSION_REQUEST' });
+    expect(receivedMessages).toEqual([
+      {
+        type: 'UNS_SESSION_GRANT',
+        credential: 'tab-shared-key',
+        subject: 'operator-1',
+        scopes: ['admin', 'observer', 'producer', 'responder'],
+        persistenceMode: 'persistent',
+      },
+    ]);
+
+    // Peer tab sign-out clears this tab's in-memory session
+    peerChannel.postMessage({ type: 'UNS_SESSION_CLEAR' });
+    expect(getConsoleSession().credential).toBeNull();
+
+    // Empty tab can hydrate from a peer grant and request a peer session
+    requestPeerConsoleSession();
+    peerChannel.postMessage({
+      type: 'UNS_SESSION_GRANT',
+      credential: 'hydrated-key',
+      subject: 'responder-2',
+      scopes: ['observer', 'responder'],
+      persistenceMode: 'persistent',
+    });
+    expect(getConsoleSession()).toMatchObject({
+      credential: 'hydrated-key',
+      subject: 'responder-2',
+      scopes: ['observer', 'responder'],
+      persistenceMode: 'persistent',
+      expired: false,
+    });
+
+    unsubscribe();
+    resetConsoleSessionChannelForTests();
   });
 });

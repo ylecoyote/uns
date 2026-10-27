@@ -2,11 +2,12 @@
  * Standardized typed API client for AGSignal Console endpoints.
  *
  * This is the SINGLE SOURCE OF TRUTH for all API communication.
- * All endpoints are READ-ONLY per ui-scope.md.
  *
  * Features:
- * - Type-safe request/response handling
+ * - Type-safe request/response handling for GET, POST, and DELETE
  * - Consistent error handling with ApiError class
+ * - Strict 401 (expire session) vs. 403/409 (keep session, surface error) separation
+ * - Optional allowStatus support (e.g., 503 on /readyz)
  * - Request ID propagation via X-Request-ID header
  * - Query parameter building utilities
  * - AbortSignal support for request cancellation
@@ -49,6 +50,14 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Transient sign-in probe credential; never establishes a session by itself. */
   credential?: string;
+  /** Non-2xx HTTP status codes whose JSON body should still be parsed and returned (e.g. [503] for /readyz). */
+  allowStatus?: readonly number[];
+}
+
+export interface ApiStatusResult<T> {
+  readonly status: number;
+  readonly ok: boolean;
+  readonly data: T;
 }
 
 /**
@@ -61,19 +70,12 @@ export type QueryParamValue = string | number | boolean | undefined;
  */
 export type QueryParams = Record<string, QueryParamValue>;
 
-/** Base URL for all API endpoints */
+/** Base URL for /ui endpoints */
 const API_BASE = '/ui';
 
 /**
  * Build a query string from a parameters object.
  * Filters out undefined values and properly encodes all parameters.
- *
- * @param params - Object containing query parameters
- * @returns Query string with leading '?' or empty string if no params
- *
- * @example
- * buildQueryString({ limit: 10, cursor: undefined, status: 'active' })
- * // Returns '?limit=10&status=active'
  */
 export function buildQueryString(params: QueryParams): string {
   const searchParams = new URLSearchParams();
@@ -89,16 +91,7 @@ export function buildQueryString(params: QueryParams): string {
 }
 
 /**
- * Make a typed GET request to the API.
- *
- * @param path - API path (e.g., '/audit')
- * @param params - Query parameters (undefined values are filtered out)
- * @param options - Request options including optional requestId for correlation
- * @returns Promise resolving to the typed response
- * @throws {ApiError} When the server returns a non-OK response
- *
- * @example
- * const events = await apiGet<AuditEventListResponse>('/audit', { limit: 10 });
+ * Make a typed GET request to a /ui endpoint.
  */
 export async function apiGet<T>(
   path: string,
@@ -107,7 +100,6 @@ export async function apiGet<T>(
 ): Promise<T> {
   const url = new URL(`${API_BASE}${path}`, window.location.origin);
 
-  // Add query parameters, filtering out undefined values
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) {
@@ -123,7 +115,6 @@ export async function apiGet<T>(
   const credential = options?.credential ?? session.credential;
   if (credential) headers.Authorization = `Bearer ${credential}`;
 
-  // Propagate request ID for correlation if provided
   if (options?.requestId) {
     headers['X-Request-ID'] = options.requestId;
   }
@@ -136,7 +127,8 @@ export async function apiGet<T>(
     redirect: 'error',
   });
 
-  if (!response.ok) {
+  const isAllowedStatus = options?.allowStatus?.includes(response.status) ?? false;
+  if (!response.ok && !isAllowedStatus) {
     if (response.status === 401 && options?.credential === undefined) {
       expireConsoleSession(session);
     }
@@ -146,58 +138,166 @@ export async function apiGet<T>(
   return response.json() as Promise<T>;
 }
 
+/**
+ * Make a typed HTTP request to any root-relative endpoint (/ui/*, /api/v1/*, /readyz)
+ * while preserving the HTTP status code.
+ */
+export async function apiRootRequestWithStatus<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+  options?: RequestOptions
+): Promise<ApiStatusResult<T>> {
+  const url = new URL(path, window.location.origin);
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const session = getConsoleSession();
+  const credential = options?.credential ?? session.credential;
+  if (credential) {
+    headers.Authorization = `Bearer ${credential}`;
+  }
+  if (options?.requestId) {
+    headers['X-Request-ID'] = options.requestId;
+  }
+
+  const init: RequestInit = {
+    method,
+    headers,
+    signal: options?.signal,
+    cache: 'no-store',
+    redirect: 'error',
+  };
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url.toString(), init);
+  const isAllowedStatus = options?.allowStatus?.includes(response.status) ?? false;
+
+  if (!response.ok && !isAllowedStatus) {
+    // Strictly expire session only on 401 Unauthorized, never on 403 Forbidden or 409 Conflict.
+    if (response.status === 401 && options?.credential === undefined) {
+      expireConsoleSession(session);
+    }
+    throw await responseError(response);
+  }
+
+  const data = (await response.json()) as T;
+  return {
+    status: response.status,
+    ok: response.ok,
+    data,
+  };
+}
+
+/**
+ * Make a typed HTTP request to any root-relative endpoint (/ui/*, /api/v1/*, /readyz).
+ */
+export async function apiRootRequest<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+  options?: RequestOptions
+): Promise<T> {
+  const result = await apiRootRequestWithStatus<T>(method, path, body, options);
+  return result.data;
+}
+
 async function responseError(response: Response): Promise<ApiError> {
   // Auth middleware and gateways may return plain FastAPI errors or HTML.
-  // Preserve typed API errors, but never display raw unstructured error bodies.
-  let body: unknown;
-  try { body = await response.json(); } catch { /* Use the safe fallback below. */ }
-  if (typeof body === 'object' && body !== null && 'detail' in body) body = body.detail;
-  if (typeof body === 'object' && body !== null && 'error' in body) {
-    const detail = body.error;
-    if (typeof detail === 'object' && detail !== null &&
-        'code' in detail && typeof detail.code === 'string' &&
-        'message' in detail && typeof detail.message === 'string' &&
-        'request_id' in body && typeof body.request_id === 'string') {
-      return new ApiError(body as ErrorResponse, response.status);
+  // Preserve typed API errors, but never display raw unstructured 401/5xx error bodies.
+  let rawBody: unknown;
+  try {
+    rawBody = await response.json();
+  } catch {
+    /* Use the safe fallback below. */
+  }
+  const requestIdHeader = response.headers?.get('X-Request-ID') ?? '';
+
+  let body: unknown = rawBody;
+  if (typeof body === 'object' && body !== null && 'detail' in body) {
+    const detailValue = (body as { detail: unknown }).detail;
+    if (typeof detailValue === 'object' && detailValue !== null) {
+      body = detailValue;
+    } else if (
+      typeof detailValue === 'string' &&
+      (response.status === 404 || response.status === 409 || response.status === 422)
+    ) {
+      return new ApiError(
+        {
+          error: { code: `http_${response.status}`, message: detailValue },
+          request_id: requestIdHeader,
+        },
+        response.status
+      );
     }
   }
-  return new ApiError({
-    error: { code: `http_${response.status}`, message: `The service returned an error (HTTP ${response.status}).` },
-    request_id: response.headers?.get('X-Request-ID') ?? '',
-  }, response.status);
+
+  if (typeof body === 'object' && body !== null && 'error' in body) {
+    const errField = (body as { error: unknown }).error;
+    // Standard UIErrorResponse envelope: { error: { code, message, details? }, request_id }
+    if (
+      typeof errField === 'object' &&
+      errField !== null &&
+      'code' in errField &&
+      typeof (errField as { code: unknown }).code === 'string' &&
+      'message' in errField &&
+      typeof (errField as { message: unknown }).message === 'string' &&
+      'request_id' in body &&
+      typeof (body as { request_id: unknown }).request_id === 'string'
+    ) {
+      return new ApiError(body as ErrorResponse, response.status);
+    }
+    // Write/Auth FastAPI envelope: { error: string, message: string, ... }
+    if (
+      typeof errField === 'string' &&
+      'message' in body &&
+      typeof (body as { message: unknown }).message === 'string'
+    ) {
+      return new ApiError(
+        {
+          error: {
+            code: errField,
+            message: (body as { message: string }).message,
+            details: body as Record<string, unknown>,
+          },
+          request_id: requestIdHeader,
+        },
+        response.status
+      );
+    }
+  }
+
+  return new ApiError(
+    {
+      error: {
+        code: `http_${response.status}`,
+        message: `The service returned an error (HTTP ${response.status}).`,
+      },
+      request_id: requestIdHeader,
+    },
+    response.status
+  );
 }
 
 /**
  * Convenience wrapper for making typed API requests.
  * Uses apiGet internally but accepts a full path including the /ui prefix.
- *
- * @param fullPath - Full API path (e.g., '/ui/audit')
- * @param options - Request options
- * @returns Promise resolving to the typed response
- * @throws {ApiError} When the server returns a non-OK response
- *
- * @example
- * const summary = await apiRequest<InvariantSummaryResponse>('/ui/invariants/summary');
  */
 export async function apiRequest<T>(
   fullPath: string,
   options?: RequestOptions
 ): Promise<T> {
-  // If the path starts with /ui, strip it since apiGet adds it
   const path = fullPath.startsWith('/ui') ? fullPath.slice(3) : fullPath;
   return apiGet<T>(path, undefined, options);
 }
 
 /**
  * Convert a filter object to query parameters.
- * This utility maps filter properties to their query parameter equivalents.
- *
- * @param filter - Filter object with optional properties
- * @returns Query parameters object with undefined values preserved
- *
- * @example
- * const params = filterToParams({ severity: 'HIGH', limit: 10, unused: undefined });
- * // Returns { severity: 'HIGH', limit: 10, unused: undefined }
  */
 export function filterToParams<T extends object>(filter: T): QueryParams {
   const params: QueryParams = {};

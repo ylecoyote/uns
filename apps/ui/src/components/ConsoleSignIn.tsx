@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, apiGet } from '../api/client';
-import { startConsoleSession } from '../auth/session';
+import { requestPeerConsoleSession, startConsoleSession } from '../auth/session';
+import type { ConsoleSessionResponse } from '../types/api';
 
 function accessError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -21,7 +22,14 @@ export function ConsoleSignIn({ expired }: { expired: boolean }) {
   const request = useRef<AbortController | null>(null);
   const keyInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => () => { request.current?.abort(); }, []);
+  useEffect(() => {
+    if (!expired) {
+      requestPeerConsoleSession();
+    }
+    return () => {
+      request.current?.abort();
+    };
+  }, [expired]);
 
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,9 +43,19 @@ export function ConsoleSignIn({ expired }: { expired: boolean }) {
     setError(null);
 
     try {
-      // Validate against a protected read before mounting any console pages.
-      await apiGet('/audit', { limit: 1 }, { credential: key, signal: controller.signal });
-      if (!controller.signal.aborted) startConsoleSession(key);
+      // Validate against /ui/session and introspect server-verified principal capabilities.
+      const info = await apiGet<Partial<ConsoleSessionResponse>>(
+        '/session',
+        undefined,
+        { credential: key, signal: controller.signal }
+      );
+      if (!controller.signal.aborted) {
+        startConsoleSession(key, {
+          subject: typeof info?.subject === 'string' ? info.subject : null,
+          scopes: Array.isArray(info?.scopes) ? info.scopes : ['observer'],
+          persistenceMode: typeof info?.persistence_mode === 'string' ? info.persistence_mode : null,
+        });
+      }
     } catch (cause) {
       if (!controller.signal.aborted) setError(accessError(cause));
     } finally {

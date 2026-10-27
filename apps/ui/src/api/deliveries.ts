@@ -8,11 +8,14 @@
  */
 
 import type {
+  AckRequest,
+  AckResponse,
   DeliveryTimelineListResponse,
   DeliveryTimelineResponse,
   DeliveryFilter,
+  DismissRequest,
 } from '../types/api';
-import { apiGet, type RequestOptions } from './client';
+import { apiGet, apiRootRequest, type RequestOptions } from './client';
 import {
   decodeDeliveriesList,
   decodeDeliveryTimeline,
@@ -63,4 +66,30 @@ export async function getDeliveryTimeline(
 ): Promise<DeliveryTimelineResponse> {
   const data = await apiGet<DeliveryTimelineResponse>(`/deliveries/${notificationId}`, undefined, options);
   return decodeWithMode(decodeDeliveryTimeline, data, `GET /ui/deliveries/${notificationId}`);
+}
+
+export async function acknowledgeNotification(
+  notificationId: string,
+  body?: AckRequest,
+  options?: RequestOptions
+): Promise<AckResponse> {
+  return apiRootRequest<AckResponse>(
+    'POST',
+    `/api/v1/notifications/${notificationId}/ack`,
+    body ?? {},
+    options
+  );
+}
+
+export async function dismissNotification(
+  notificationId: string,
+  body?: DismissRequest,
+  options?: RequestOptions
+): Promise<AckResponse> {
+  return apiRootRequest<AckResponse>(
+    'POST',
+    `/api/v1/notifications/${notificationId}/dismiss`,
+    body ?? {},
+    options
+  );
 }
