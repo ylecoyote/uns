@@ -118,3 +118,7 @@ uv.lock
 
 # MkDocs static site output
 site/
+
+# Vitest HTML reports
+.vitest/
+apps/ui/.vitest/
