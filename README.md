@@ -32,9 +32,10 @@ From this repository, with Python 3.12:
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/python examples/uns_demo.py
+.venv/bin/python examples/mip_producer_demo.py
 ```
 
-The demo uses a local recording adapter, accepts and delivers one signal, restarts the runtime, acknowledges it, and checks audit history. It sends nothing externally. Starting the persistent HTTP daemon (`uns`) requires an explicit `UNS_DATABASE_URL` (or `--in-memory` for ephemeral testing). See [deployment](docs/DEPLOYMENT.md) for the durable HTTP service and [API](docs/API.md) for the canonical Python and MCP interfaces.
+The demos use a local recording adapter, accept and deliver signals, exercise dry-run simulation, deduplication coalescing, and operator acknowledgment, and verify audit history without sending external network traffic. Starting the persistent HTTP daemon (`uns`) requires an explicit `UNS_DATABASE_URL` (or `--in-memory` for ephemeral testing). See [deployment](docs/DEPLOYMENT.md) for the durable HTTP service, [operator console guide](docs/user-guides/OPERATOR-CONSOLE-GUIDE.md) for the 6-surface Responder & Operator Console (`/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, `/docs`), and [API](docs/API.md) for the canonical Python and MCP interfaces.
 
 Simulation has no side effects. Acceptance means recoverable pending work. Delivery requires a channel result. Human acknowledgment is a separate state.
 
