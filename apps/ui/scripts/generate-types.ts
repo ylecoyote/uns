@@ -20,7 +20,7 @@ const OUT_FILE = join(ROOT, "src", "types", "generated.ts");
 async function main(): Promise<void> {
   console.log("Exporting OpenAPI spec from uns.app via uv run python...");
   const specJson = execSync(
-    `uv run python -c "import os, json; os.environ['UNS_ENABLE_DOCS']='true'; from uns.app import create_app; print(json.dumps(create_app(skip_persistence_config=True).openapi()))"`,
+    `uv run python -c "import os, json; os.environ['UNS_ENABLE_DOCS']='true'; from uns import Runtime; from uns.app import create_app; print(json.dumps(create_app(runtime=Runtime('sqlite://', create_tables=True), skip_persistence_config=True).openapi()))"`,
     { cwd: REPO_ROOT, stdio: ["ignore", "pipe", "inherit"], maxBuffer: 32 * 1024 * 1024 },
   ).toString();
 
@@ -67,6 +67,14 @@ async function main(): Promise<void> {
           title: "Deadline",
         },
         dead_letter: { type: "boolean", title: "Dead Letter" },
+        replay_blocked_by: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+          title: "Replay Blocked By",
+        },
+        replay_block_reason: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+          title: "Replay Block Reason",
+        },
         policy_config_hash: {
           anyOf: [{ type: "string" }, { type: "null" }],
           title: "Policy Config Hash",

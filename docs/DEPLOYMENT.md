@@ -22,7 +22,7 @@ Use actual deployment secret provisioning rather than committing environment fil
 
 ### Persistence at HTTP startup
 
-The `uns` CLI and the default HTTP application factory refuse to start with a missing, empty, or in-memory database URL unless ephemeral operation is explicitly enabled. The check also applies when Uvicorn imports `uns.app:app` or `uns.app:app`, including the shipped Docker command and ASGI factory startup. Configure a persistent `UNS_DATABASE_URL` (or its supported alias), migrate it, and mount the database directory on persistent storage when using a container.
+The `uns` CLI and the default HTTP application factory refuse to start with a missing, empty, or in-memory database URL unless ephemeral operation is explicitly enabled. The check also applies when Uvicorn imports `uns.app:app`, including the shipped Docker command and ASGI factory startup. Configure a persistent `UNS_DATABASE_URL` (or its supported alias), migrate it, and mount the database directory on persistent storage when using a container.
 
 For an intentional local demo, use `uns --in-memory` or set `UNS_ALLOW_IN_MEMORY=true` before starting the HTTP service. Missing or empty database configuration then selects `sqlite://`. These options permit volatile storage; they do not replace an already configured persistent URL. `/readyz` reports the actual `persistence_mode` as `persistent` or `in_memory`. The HTTP opt-in does not relax the separate persistent-storage requirement for MCP writes.
 
@@ -34,37 +34,37 @@ Embedded code can still deliberately construct a memory `Runtime` or call the co
 
 ## Complete Environment Variable Reference
 
-UNS reads `UNS_*` environment variables first and falls back to `UNS_*` aliases for backward compatibility (`src/uns/config.py` and `src/uns/api/auth.py`).
+UNS reads `UNS_*` environment variables (`src/uns/config.py` and `src/uns/api/auth.py`) and accepts standard `DATABASE_URL` as a fallback for `UNS_DATABASE_URL`.
 
 ### Core Runtime & HTTP Server
 
-| Variable | Legacy Alias | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `UNS_DATABASE_URL` | `UNS_DATABASE_URL`, `DATABASE_URL` | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., `sqlite:////var/lib/uns/uns.db`). Use file-backed SQLite for the exercised deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
-| `UNS_ALLOW_IN_MEMORY` | `UNS_ALLOW_IN_MEMORY` | `false` | No | Explicit HTTP demo opt-in (`true`/`1`/`yes`/`on`), also enabled by `uns --in-memory`. Permits missing or volatile database configuration; does not weaken the MCP write guard. |
-| `UNS_API_KEY` | `UNS_API_KEY` | *(None)* | For operator access | Full operator credential (`admin`, `producer`, `responder`, `observer`), required for administrative endpoints and `/metrics`. Scoped credentials can access their permitted endpoints without this key. If no credentials are configured, protected endpoints return `503 write_auth_not_configured`. |
-| `UNS_API_PRINCIPAL` | `UNS_API_PRINCIPAL` | `uns-api-key` | **Yes** (MCP Writes) | Audited actor/principal identity bound to `UNS_API_KEY` and `uns-mcp --enable-writes`. |
-| `UNS_PRODUCER_API_KEY` | `UNS_PRODUCER_API_KEY` | *(None)* | No | Grants `producer` and `observer`: submit/simulate notifications and read status/audit. Cannot acknowledge, dismiss, or administer policies and dead letters. |
-| `UNS_PRODUCER_API_PRINCIPAL` | `UNS_PRODUCER_API_PRINCIPAL` | `uns-producer` | No | Audited principal bound to the producer credential. |
-| `UNS_RESPONDER_API_KEY` | `UNS_RESPONDER_API_KEY` | *(None)* | No | Grants `responder` and `observer`: ACK/DISMISS through HTTP or WebSocket commands and read status/audit. Cannot submit notifications or administer policies and dead letters. |
-| `UNS_RESPONDER_API_PRINCIPAL` | `UNS_RESPONDER_API_PRINCIPAL` | `uns-responder` | No | Audited principal bound to the responder credential. |
-| `UNS_OBSERVER_API_KEY` | `UNS_OBSERVER_API_KEY` | *(None)* | No | Grants `observer`: Console, status/audit, readiness, and WebSocket stream/replay reads. Does not permit mutations or `/metrics`. |
-| `UNS_OBSERVER_API_PRINCIPAL` | `UNS_OBSERVER_API_PRINCIPAL` | `uns-observer` | No | Principal bound to the observer credential. |
-| `UNS_HOST` | `UNS_HOST` | `127.0.0.1` | No | Bind address for the `uns` HTTP/WebSocket server (`--host` CLI override). |
-| `UNS_PORT` | `UNS_PORT` | `8000` | No | TCP port for the `uns` HTTP/WebSocket server (`--port` CLI override). |
-| `UNS_POLICY_DIR` | `UNS_POLICY_DIR` | *(None)* | No | Directory of YAML policy definitions loaded and persisted into the durable `notification_policies` store at startup. |
-| `UNS_CREATE_TABLES` | `UNS_CREATE_TABLES` | `false` (`true` for explicit in-memory operation) | No | When `true`, runs additive table bootstrap on startup (`uns-migrate` is recommended instead in production). |
-| `UNS_ALLOWED_ORIGINS` | `UNS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | No | Comma-separated list of allowed CORS and WebSocket `Origin` headers for the UNS Console. |
-| `UNS_ALLOW_UNAUTHENTICATED_READS` | `UNS_ALLOW_UNAUTHENTICATED_READS` | `false` | No | Compatibility flag (`true`/`1`/`yes`) permitting unauthenticated HTTP `GET`/`HEAD` on read routes only. Never enables writes, `/readyz`, `/metrics`, or WebSockets. |
-| `UNS_ENABLE_DOCS` | *(None)* | `false` | No | Enables interactive `/docs`, `/redoc`, and `/openapi.json` endpoints when set to `true`. Keep `false` in production. |
+| Variable | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., `sqlite:////var/lib/uns/uns.db`). Use file-backed SQLite for the exercised deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
+| `UNS_ALLOW_IN_MEMORY` | `false` | No | Explicit HTTP demo opt-in (`true`/`1`/`yes`/`on`), also enabled by `uns --in-memory`. Permits missing or volatile database configuration; does not weaken the MCP write guard. |
+| `UNS_API_KEY` | *(None)* | For operator access | Full operator credential (`admin`, `producer`, `responder`, `observer`), required for administrative endpoints and `/metrics`. Scoped credentials can access their permitted endpoints without this key. If no credentials are configured, protected endpoints return `503 write_auth_not_configured`. |
+| `UNS_API_PRINCIPAL` | `uns-api-key` | **Yes** (MCP Writes) | Audited actor/principal identity bound to `UNS_API_KEY` and `uns-mcp --enable-writes`. |
+| `UNS_PRODUCER_API_KEY` | *(None)* | No | Grants `producer` and `observer`: submit/simulate notifications and read status/audit. Cannot acknowledge, dismiss, or administer policies and dead letters. |
+| `UNS_PRODUCER_API_PRINCIPAL` | `uns-producer` | No | Audited principal bound to the producer credential. |
+| `UNS_RESPONDER_API_KEY` | *(None)* | No | Grants `responder` and `observer`: ACK/DISMISS through HTTP or WebSocket commands and read status/audit. Cannot submit notifications or administer policies and dead letters. |
+| `UNS_RESPONDER_API_PRINCIPAL` | `uns-responder` | No | Audited principal bound to the responder credential. |
+| `UNS_OBSERVER_API_KEY` | *(None)* | No | Grants `observer`: Console, status/audit, readiness, and WebSocket stream/replay reads. Does not permit mutations or `/metrics`. |
+| `UNS_OBSERVER_API_PRINCIPAL` | `uns-observer` | No | Principal bound to the observer credential. |
+| `UNS_HOST` | `127.0.0.1` | No | Bind address for the `uns` HTTP/WebSocket server (`--host` CLI override). |
+| `UNS_PORT` | `8000` | No | TCP port for the `uns` HTTP/WebSocket server (`--port` CLI override). |
+| `UNS_POLICY_DIR` | *(None)* | No | Directory of YAML policy definitions loaded and persisted into the durable `notification_policies` store at startup. |
+| `UNS_CREATE_TABLES` | `false` (`true` for explicit in-memory operation) | No | When `true`, runs additive table bootstrap on startup (`uns-migrate` is recommended instead in production). |
+| `UNS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | No | Comma-separated list of allowed CORS and WebSocket `Origin` headers for the UNS Console. |
+| `UNS_ALLOW_UNAUTHENTICATED_READS` | `false` | No | Compatibility flag (`true`/`1`/`yes`) permitting unauthenticated HTTP `GET`/`HEAD` on read routes only. Never enables writes, `/readyz`, `/metrics`, or WebSockets. |
+| `UNS_ENABLE_DOCS` | `false` | No | Enables interactive `/docs`, `/redoc`, and `/openapi.json` endpoints when set to `true`. Keep `false` in production. |
 
 Use distinct secret values for different capability roles; configuring the same secret for multiple roles combines their granted scopes. Capability scopes restrict operations, not tenant or per-producer data access. WebSocket connections require `observer` scope, while each ACK/DISMISS command requires `responder` scope. See the [Security Model](SECURITY-MODEL.md) for the complete authority and attribution contract.
 
 ### MCP Process (`uns-mcp`)
 
-| Variable | Legacy Alias | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` | `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` | *(None)* | **Yes** (`--enable-writes`) | Secret token required by `send_signal` (`operator_confirmation_token`) when `deliver=true` in write-enabled MCP mode. |
+| Variable | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` | *(None)* | **Yes** (`--enable-writes`) | Secret token required by `send_signal` (`operator_confirmation_token`) when `deliver=true` in write-enabled MCP mode. |
 
 ### Channel Providers
 
@@ -74,17 +74,17 @@ Configure only intended providers/recipients:
 - `UNS_PAGERDUTY_ROUTING_KEY`.
 - `UNS_SMTP_HOST`, `UNS_SMTP_PORT`, `UNS_SMTP_USER`, `UNS_SMTP_PASSWORD`, `UNS_EMAIL_FROM`, `UNS_EMAIL_TO`.
 
-| Variable | Legacy Alias | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `UNS_SLACK_BOT_TOKEN` | `UNS_SLACK_BOT_TOKEN` | *(None)* | Slack Bot OAuth token (`xoxb-...`). Registers `SlackAdapter` when set. |
-| `UNS_SLACK_CHANNEL` | `UNS_SLACK_CHANNEL` | `""` | Default target Slack channel ID or name (e.g., `#ops-alerts`). |
-| `UNS_PAGERDUTY_ROUTING_KEY` | `UNS_PAGERDUTY_ROUTING_KEY` | *(None)* | PagerDuty Events API v2 integration/routing key. Registers `PagerDutyAdapter` when set. |
-| `UNS_SMTP_HOST` | `UNS_SMTP_HOST` | *(None)* | SMTP server hostname. Registers `EmailAdapter` when set. |
-| `UNS_SMTP_PORT` | `UNS_SMTP_PORT` | `587` | SMTP server port (integer). |
-| `UNS_SMTP_USER` | `UNS_SMTP_USER` | `""` | SMTP authentication username. |
-| `UNS_SMTP_PASSWORD` | `UNS_SMTP_PASSWORD` | `""` | SMTP authentication password. |
-| `UNS_EMAIL_FROM` | `UNS_EMAIL_FROM` | `""` | Sender email address for `EmailAdapter`. |
-| `UNS_EMAIL_TO` | `UNS_EMAIL_TO` | `""` | Comma-separated list of default recipient email addresses. |
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `UNS_SLACK_BOT_TOKEN` | *(None)* | Slack Bot OAuth token (`xoxb-...`). Registers `SlackAdapter` when set. |
+| `UNS_SLACK_CHANNEL` | `""` | Default target Slack channel ID or name (e.g., `#ops-alerts`). |
+| `UNS_PAGERDUTY_ROUTING_KEY` | *(None)* | PagerDuty Events API v2 integration/routing key. Registers `PagerDutyAdapter` when set. |
+| `UNS_SMTP_HOST` | *(None)* | SMTP server hostname. Registers `EmailAdapter` when set. |
+| `UNS_SMTP_PORT` | `587` | SMTP server port (integer). |
+| `UNS_SMTP_USER` | `""` | SMTP authentication username. |
+| `UNS_SMTP_PASSWORD` | `""` | SMTP authentication password. |
+| `UNS_EMAIL_FROM` | `""` | Sender email address for `EmailAdapter`. |
+| `UNS_EMAIL_TO` | `""` | Comma-separated list of default recipient email addresses. |
 
 Missing adapters produce explicit failures. Canonical producer metadata cannot redirect adapter recipients or lower severity.
 

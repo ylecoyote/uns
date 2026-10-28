@@ -191,7 +191,11 @@ class DeliveryService:
     escalation_callback: Callable[[Notification, dict[Channel, str]], None] | None = None
     dlq_service: DLQService | None = None
     check_deduplication: bool = True
+    check_rate_limit: bool = True
     adapter_timeout_seconds: float = 10.0
+
+    def __post_init__(self) -> None:
+        self._check_rate_limit = self.check_rate_limit
 
     async def deliver(
         self,
@@ -549,7 +553,7 @@ class DeliveryService:
 
         for channel in ordered_channels:
             # Rate limit check per channel
-            if not acquire_rate_limit(channel):
+            if self._check_rate_limit and self.check_rate_limit and not acquire_rate_limit(channel):
                 logger.warning(
                     "Rate limit exceeded for channel %s, trying next",
                     channel.value,
@@ -638,7 +642,7 @@ class DeliveryService:
         async def deliver_to_channel(channel: Channel) -> tuple[Channel, DeliveryResult | str]:
             """Deliver to a single channel, returning result or error."""
             # Rate limit check
-            if not acquire_rate_limit(channel):
+            if self._check_rate_limit and self.check_rate_limit and not acquire_rate_limit(channel):
                 return channel, "Rate limit exceeded"
 
             adapter = self.adapter_registry.get_adapter(channel)

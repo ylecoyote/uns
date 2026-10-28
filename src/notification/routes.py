@@ -314,9 +314,8 @@ async def reload_policies(
     import os
     import tempfile
 
-    configured_root = getattr(http_request.app.state, "policy_dir", None) or os.environ.get(
-        "UNS_POLICY_DIR", os.environ.get("UNS_POLICY_DIR")
-    )
+    configured_policy_dir = os.environ.get("UNS_POLICY_DIR")
+    configured_root = getattr(http_request.app.state, "policy_dir", None) or configured_policy_dir
     if reload_request.policy_dir:
         raw_policy_dir = Path(reload_request.policy_dir)
     elif configured_root:
@@ -330,6 +329,8 @@ async def reload_policies(
         )
     if ".." in raw_policy_dir.parts:
         raise HTTPException(status_code=422, detail="Path traversal is not permitted in policy_dir")
+    if raw_policy_dir.is_symlink():
+        raise HTTPException(status_code=422, detail="Symlinked policy_dir is not permitted")
     resolved_dir = raw_policy_dir.resolve()
     if configured_root:
         allowed_root = Path(str(configured_root)).resolve()
@@ -342,9 +343,7 @@ async def reload_policies(
         temp_base = Path(tempfile.gettempdir()).resolve()
         allowed_roots = [
             Path.cwd().resolve(),
-            Path(__file__).resolve().parents[2],
             temp_base,
-            temp_base.parent,
         ]
         if not any(
             resolved_dir == root or root in resolved_dir.parents for root in allowed_roots

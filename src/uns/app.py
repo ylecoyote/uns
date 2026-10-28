@@ -84,12 +84,21 @@ def _policy_dir_from_env() -> Path | None:
     return Path(raw_path) if raw_path else None
 
 
-def _channel_readiness() -> dict[str, bool]:
+def _channel_readiness(runtime: Any = None) -> dict[str, bool]:
     config = get_notification_config()
+    slack_ready = config.slack_webhook_url is not None or bool(os.environ.get("UNS_SLACK_BOT_TOKEN"))
+    pagerduty_ready = config.pagerduty_routing_key is not None
+    email_ready = config.smtp_host is not None
+    if runtime is not None and hasattr(runtime, "adapters"):
+        from notification.models import Channel
+
+        slack_ready = slack_ready or runtime.adapters.get_adapter(Channel.SLACK) is not None
+        pagerduty_ready = pagerduty_ready or runtime.adapters.get_adapter(Channel.PAGERDUTY) is not None
+        email_ready = email_ready or runtime.adapters.get_adapter(Channel.EMAIL) is not None
     return {
-        "slack": config.slack_webhook_url is not None,
-        "pagerduty": config.pagerduty_routing_key is not None,
-        "email": config.smtp_host is not None,
+        "slack": slack_ready,
+        "pagerduty": pagerduty_ready,
+        "email": email_ready,
     }
 
 
@@ -350,7 +359,7 @@ def create_app(
             "service": "uns",
             "version": __version__,
             "persistence_mode": persistence_mode,
-            "channels_configured": _channel_readiness(),
+            "channels_configured": _channel_readiness(runtime),
             "policy_count": len(runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()),
             "dlq_depth": (
                 operational_progress["unresolved_failure_count"]

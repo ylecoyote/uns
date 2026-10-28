@@ -24,13 +24,18 @@ def value(name: str, default: str = "") -> str:
     return os.environ.get("UNS_" + name, default)
 
 
+def database_url(default: str = "") -> str:
+    return value("DATABASE_URL", os.environ.get("DATABASE_URL", default)).strip()
+
+
 def configured_adapters() -> SimpleAdapterRegistry:
     registry = SimpleAdapterRegistry()
     if value("SLACK_BOT_TOKEN"):
         registry.register(
             SlackAdapter(
                 SlackConfig(
-                    bot_token=value("SLACK_BOT_TOKEN"), default_channel=value("SLACK_CHANNEL")
+                    bot_token=value("SLACK_BOT_TOKEN"),
+                    default_channel=value("SLACK_CHANNEL") or "#general",
                 )
             )
         )
@@ -39,6 +44,7 @@ def configured_adapters() -> SimpleAdapterRegistry:
             PagerDutyAdapter(PagerDutyConfig(routing_key=value("PAGERDUTY_ROUTING_KEY")))
         )
     if value("SMTP_HOST"):
+        to_addresses = [addr.strip() for addr in value("EMAIL_TO").split(",") if addr.strip()]
         registry.register(
             EmailAdapter(
                 EmailConfig(
@@ -46,8 +52,8 @@ def configured_adapters() -> SimpleAdapterRegistry:
                     smtp_port=int(value("SMTP_PORT", "587")),
                     username=value("SMTP_USER"),
                     password=value("SMTP_PASSWORD"),
-                    from_address=value("EMAIL_FROM"),
-                    default_to_addresses=value("EMAIL_TO").split(","),
+                    from_address=value("EMAIL_FROM") or "noreply@uns.local",
+                    default_to_addresses=to_addresses,
                 )
             )
         )
@@ -56,7 +62,7 @@ def configured_adapters() -> SimpleAdapterRegistry:
 
 def ensure_daemon_persistence_configured(*, allow_in_memory: bool = False) -> str:
     """Validate that daemon startup has an explicit persistent database or opt-in volatile flag."""
-    raw_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "")).strip()
+    raw_url = database_url()
     env_allow = value("ALLOW_IN_MEMORY", "false").strip().lower() in {"1", "true", "yes", "on"}
     if is_in_memory_database_url(raw_url) and not (allow_in_memory or env_allow):
         raise RuntimeError(
@@ -72,7 +78,7 @@ def build_runtime(*, require_persistent: bool = False) -> Runtime:
     if require_persistent:
         url = ensure_daemon_persistence_configured()
     else:
-        url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "sqlite://")).strip() or "sqlite://"
+        url = database_url("sqlite://") or "sqlite://"
     runtime = Runtime(
         url,
         adapters=configured_adapters(),

@@ -104,9 +104,9 @@ where = ["src"]
 include = ["uns*", "uns_mcp*", "notification*", "db*", "ui_client*"]
 
 [tool.setuptools.package-data]
-# Ship PEP 561 type-information markers in every package so downstream
-# type checkers (mypy, pyright) honor inline annotations.
-"*" = ["py.typed"]
+# Ship PEP 561 type-information markers and packaged invariant catalog in every
+# package so downstream type checkers and wheel installs have complete metadata.
+"*" = ["py.typed", "*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "apps/ui/tests"]

@@ -472,10 +472,9 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
         }),
         expect.anything()
       );
+      expect(screen.getByTestId('notification-type-input')).toHaveValue('trading.order_placed');
+      expect(screen.getByTestId('intent-select')).toHaveValue('GOVERNANCE');
     });
-
-    expect(screen.getByTestId('notification-type-input')).toHaveValue('trading.order_placed');
-    expect(screen.getByTestId('intent-select')).toHaveValue('GOVERNANCE');
   });
 
   it('populates inspector and simulator when clicking a row in the Active Policies Catalog', async () => {
@@ -582,6 +581,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
         expect.objectContaining({
           notification_type: 'trading.order_placed',
           title: '[TEST] Order placement check',
+          source: 'uns-console-policy-test',
           metadata: {
             source: 'uns_console_policy_test',
             triggered_by: 'producer-user',
@@ -668,10 +668,12 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
           updated_at: '2026-01-23T03:00:00Z',
         },
         {
+          policy_id: 'pol-rev-200',
           notification_type: 'trading.order_placed',
           version: '2.0.0',
           status: 'ACTIVE',
           config_hash: 'cccc1111222233334444',
+          previous_version_id: 'pol-rev-10000000',
           intent: 'GOVERNANCE',
           channels: ['SLACK', 'EMAIL'],
           delivery_mode: 'GUARANTEED',
@@ -681,10 +683,12 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
           updated_at: '2026-01-23T02:00:00Z',
         },
         {
+          policy_id: 'pol-rev-10000000',
           notification_type: 'trading.order_placed',
           version: '1.0.0',
           status: 'RETIRED',
           config_hash: 'dddd1111222233334444',
+          previous_version_id: null,
           intent: 'GOVERNANCE',
           channels: ['SLACK'],
           delivery_mode: 'GUARANTEED',
@@ -719,6 +723,14 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
     expect(
       screen.getByTestId('policy-revision-status-trading.order_placed-1.0.0')
     ).toHaveClass('badge-default');
+
+    // Verify revision lineage column (previous_version_id vs ROOT)
+    expect(
+      screen.getByTestId('policy-revision-lineage-trading.order_placed-2.0.0')
+    ).toHaveTextContent('Supersedes: pol-rev-...');
+    expect(
+      screen.getByTestId('policy-revision-lineage-trading.order_placed-1.0.0')
+    ).toHaveTextContent('ROOT');
 
     // Filter by RETIRED using Modernist .seg segmented toggle
     fireEvent.click(screen.getByTestId('policy-status-filter-RETIRED'));

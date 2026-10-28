@@ -6,7 +6,7 @@
 |---|---|---|
 | `_UNS` | `e084b52d4c02c2b6fcd89fb2813f5d5c94efe924` | Keep history and implementation; adapt public identity/runtime; preserve experimental governance types |
 | `_unified_notification_service` | `c43aa62` | Preserve original product/contracts as provenance; do not duplicate its earlier runtime |
-| `_UNS` | Documentation directory, not a Git checkout | Preserve source documents under archive; reconcile claims into the current product contract |
+| `uns-concepts` | Documentation directory, not a Git checkout | Preserve source documents under archive; reconcile claims into the current product contract |
 
 The original checkout's dirty `docs/ui/contracts/ui-contracts.json` was not imported. Original branches, files and remotes remain unchanged. The isolated UNS repository has no publishing/deployment action attached.
 
@@ -18,13 +18,13 @@ Keep notification adapters, models, policy resolution, SQL stores, console and M
 
 The distribution is now `uns`. Existing Python import namespaces remain present in the wheel: `uns`, `notification`, `uns_mcp`, `db`, and `ui_client`. `uns.Client` is the new async application client; `uns.SignalClient` retains its low-level handler-based interface. Its no-handler status changes from misleading SUCCESS to PENDING and channels_attempted is empty.
 
-The `uns` command remains an alias. `uns`, `uns-mcp`, and `uns-migrate` are canonical commands. Existing HTTP routes and MCP tool names remain available. Public product labels say UNS.
+`uns`, `uns-mcp`, `uns-migrate`, and `uns-maintain` are the canonical CLI commands. Existing HTTP routes and MCP tool names remain available. Public product labels say UNS.
 
 No-handler SDK success, acceptance-only HTTP success, and the GUARANTEED/WebSocket false-success path are intentionally corrected. Callers must inspect delivery status and acknowledgment separately. Legacy test-only fixture composition remains possible with `skip_persistence_config=True`.
 
 ## Historical documents
 
-- [Original UNS README](archive/pre-consolidation/README.md)
+- [Pre-consolidation README](archive/pre-consolidation/README.md)
 - [Earlier authorization PRD](archive/pre-consolidation/agent_governance_control_plane_prd.md)
 - [Original UNS README](archive/uns-original/README.md)
 - [UNS concept PRD](archive/uns-concepts/uns/uns-prd-general.md)

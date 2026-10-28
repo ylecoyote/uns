@@ -359,7 +359,7 @@ def _timestamp(value: str) -> float:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database-url", default=os.environ.get("UNS_DATABASE_URL"))
+    parser.add_argument("--database-url", default=os.environ.get("UNS_DATABASE_URL", os.environ.get("DATABASE_URL")))
     parser.add_argument("--cutoff", required=True, type=_timestamp)
     parser.add_argument("--idempotency-seconds", required=True, type=float)
     parser.add_argument("--batch-size", type=int, default=100)

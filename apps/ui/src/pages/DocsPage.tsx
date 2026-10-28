@@ -114,7 +114,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Session Capability Introspection (GET /ui/session) & Non-Lossy Capability Pills',
     tag: 'AUTH & RBAC',
     keywords:
-      'GET /ui/session ConsoleSessionResponse OPERATOR RESPONDER PRODUCER READ-ONLY observer responder producer admin scopes capability pills persistence_mode INV-UI-001 entry_id notification_id RuntimeDLQ',
+      'GET /ui/session ConsoleSessionResponse OPERATOR RESPONDER PRODUCER OBSERVER READ-ONLY observer responder producer admin scopes capability pills persistence_mode INV-UI-001 entry_id notification_id RuntimeDLQ',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -122,8 +122,11 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
           <code>ConsoleSessionResponse</code>), which returns the verified principal{' '}
           <code>subject</code>, granted <code>scopes</code> (<code>observer</code>,{' '}
           <code>responder</code>, <code>producer</code>, <code>admin</code>), and runtime{' '}
-          <code>persistence_mode</code>. Multi-role principals render all applicable capability
-          pills simultaneously without hiding lower-ranked capabilities.
+          <code>persistence_mode</code>. Principals with <code>admin</code> scope display the{' '}
+          <strong>OPERATOR badge</strong> (which encompasses <code>admin</code>,{' '}
+          <code>producer</code>, <code>responder</code>, and <code>observer</code> scopes), while
+          non-admin scoped principals display their individual role badges (
+          <code>PRODUCER / RESPONDER / OBSERVER</code>).
         </p>
         <div className="table-container" style={{ border: '1px solid var(--color-divider)' }}>
           <table className="data-table">
@@ -213,14 +216,15 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Profile & Mode Banner (LOCAL RECORDING MODE vs. Live External Delivery)',
     tag: 'PROFILE TELEMETRY',
     keywords:
-      'LOCAL RECORDING MODE PROFILE: LOCAL-RECORDING persistence_mode GET /ui/session GET /readyz local_app.py recording_only',
+      'LOCAL RECORDING MODE PROFILE: LOCAL-RECORDING persistence_mode GET /ui/session GET /readyz /operations local_app.py recording_only',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
-          When running under the persistent localhost recording deployment (
-          <code>deploy/local/local_app.py</code>), the console renders a top-of-page{' '}
-          <strong>LOCAL RECORDING MODE</strong> banner (
-          <code>PROFILE: LOCAL-RECORDING</code>) above the navigation bar:
+          The top-of-page <strong>LOCAL RECORDING MODE</strong> banner (
+          <code>PROFILE: LOCAL-RECORDING</code>) is injected by the local-recording deployment
+          profile (<code>deploy/local/local_app.py</code>) when running the local recording stack,
+          while standard deployments expose <code>persistence_mode</code> via{' '}
+          <code>GET /readyz</code> on <code>/operations</code> (and <code>GET /ui/session</code>):
         </p>
         <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
           <li>
@@ -230,12 +234,12 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             providers.
           </li>
           <li>
-            <strong>Complementary to <code>persistence_mode</code>:</strong> While{' '}
-            <code>GET /ui/session</code> and <code>GET /readyz</code> report storage durability (
-            <code>persistence_mode: &quot;persistent&quot;</code> vs.{' '}
-            <code>&quot;in_memory&quot;</code>), the profile banner distinguishes whether{' '}
-            <code>DELIVERED</code> badges represent local recording-sink acceptance or live external
-            provider transmission.
+            <strong>Standard vs. Local-Recording Telemetry:</strong> Standard deployments surface
+            storage durability (<code>persistence_mode: &quot;persistent&quot;</code> vs.{' '}
+            <code>&quot;in_memory&quot;</code>) via <code>GET /readyz</code> on{' '}
+            <code>/operations</code>, whereas the <code>deploy/local/local_app.py</code> banner
+            explicitly signals that <code>DELIVERED</code> badges represent local recording-sink
+            acceptance rather than live external provider transmission.
           </li>
         </ul>
       </>
@@ -557,7 +561,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
     title: 'Policy Workspace: Catalog, Resolution Trace, Revisions, Simulator & Reload (/policy)',
     tag: 'SURFACE 2',
     keywords:
-      'Policy Workspace /policy GET /ui/policies/active GET /ui/policies/effective GET /ui/policies/revisions explicit_override mode_override policy_base sdk_default ACTIVE PREVIEW DRAFT RETIRED simulate [TEST] live dispatch POST /api/v1/policies/reload uns-console-policy-test uns_console_policy_test',
+      'Policy Workspace /policy GET /ui/policies/active GET /ui/policies/effective GET /ui/policies/revisions PolicyRevisionSummary policy_id notification_type version status source config_hash previous_version_id created_at activated_at retired_at explicit_override mode_override policy_base sdk_default ACTIVE PREVIEW DRAFT RETIRED simulate [TEST] live dispatch POST /api/v1/policies/reload uns-console-policy-test uns_console_policy_test',
     render: () => (
       <>
         <p style={{ margin: 0 }}>
@@ -579,11 +583,12 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
           </li>
           <li>
             <strong>Policy Revision History &amp; Governance (<code>GET /ui/policies/revisions</code>):</strong>{' '}
-            Surfaces durable revision records across <code>ACTIVE</code>, <code>PREVIEW</code>,{' '}
-            <code>DRAFT</code>, and <code>RETIRED</code> states, including{' '}
-            <code>policy_revision_id</code>, <code>supersedes_revision_id</code> lineage,{' '}
-            <code>content_hash</code>, and actor attribution (<code>created_by</code>,{' '}
-            <code>published_by</code>).
+            Surfaces durable <code>PolicyRevisionSummary</code> records across <code>ACTIVE</code>,{' '}
+            <code>PREVIEW</code>, <code>DRAFT</code>, and <code>RETIRED</code> states, including{' '}
+            <code>policy_id</code>, <code>notification_type</code>, <code>version</code>,{' '}
+            <code>status</code>, <code>source</code>, <code>config_hash</code>,{' '}
+            <code>previous_version_id</code> lineage, and lifecycle timestamps (
+            <code>created_at</code>, <code>activated_at</code>, <code>retired_at</code>).
           </li>
           <li>
             <strong>Dry-Run Simulator &amp; Synthetically Tagged <code>[TEST]</code> Dispatch:</strong>{' '}
