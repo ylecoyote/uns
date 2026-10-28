@@ -32,43 +32,25 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-
-def _configured_api_key(request: Request) -> str | None:
-    state_key = getattr(request.app.state, "uns_api_key", None)
-    if state_key is not None:
-        return str(state_key)
-    return os.environ.get("UNS_API_KEY")
+from uns.api.auth import _configured_credentials, _header_key
 
 
 def _rate_limit_key(request: Request) -> str:
     """Compose a rate-limit key from the verified principal or remote IP.
 
-    Authenticated callers whose bearer token / API key matches the configured
-    key are keyed by a SHA-256 digest of that key. Unauthenticated or invalid
-    callers fall back to remote IP so rotating spoofed headers cannot bypass
-    rate limits or grow limiter state unboundedly.
+    Authenticated callers whose bearer token / API key matches a configured
+    credential are keyed by a SHA-256 digest of that key. Unauthenticated or
+    invalid callers fall back to remote IP so rotating spoofed headers cannot
+    bypass rate limits or grow limiter state unboundedly.
     """
-    supplied_key: str | None = None
-    auth = request.headers.get("authorization", "")
-    if auth.lower().startswith("bearer "):
-        candidate = auth[7:].strip()
-        if candidate:
-            supplied_key = candidate
-    else:
-        api_key = request.headers.get("x-uns-api-key") or request.headers.get(
-            "x-uns-api-key"
-        )
-        if api_key and api_key.strip():
-            supplied_key = api_key.strip()
-
-    configured_key = _configured_api_key(request)
-    if (
-        supplied_key
-        and configured_key
-        and hmac.compare_digest(supplied_key.encode("utf-8"), configured_key.encode("utf-8"))
-    ):
-        digest = hashlib.sha256(supplied_key.encode("utf-8")).hexdigest()[:32]
-        return f"key:{digest}"
+    provided_key = _header_key(request)
+    if provided_key:
+        provided_key = provided_key.strip()
+    if provided_key:
+        provided_bytes = provided_key.encode()
+        for configured_key, _, _ in _configured_credentials(request):
+            if hmac.compare_digest(provided_bytes, configured_key.encode()):
+                return f"key:{hashlib.sha256(provided_bytes).hexdigest()[:16]}"
     return f"ip:{get_remote_address(request)}"
 
 

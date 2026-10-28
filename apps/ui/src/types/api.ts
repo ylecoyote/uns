@@ -138,6 +138,8 @@ export interface RuntimeDeliveryState {
   ack_status: string | null;
   deadline?: number | null;
   dead_letter: boolean;
+  replay_blocked_by?: string | null;
+  replay_block_reason?: string | null;
   policy_config_hash?: string | null;
   policy_evaluation_id?: string | null;
   require_ack?: boolean;
@@ -374,6 +376,7 @@ export interface PolicyRevisionSummary {
   notification_type: string;
   version: string;
   status: PolicyLifecycleStatus | string;
+  source?: string | null;
   config_hash?: string | null;
   previous_version_id?: string | null;
   intent: NotificationIntent | null;

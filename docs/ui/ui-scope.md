@@ -20,13 +20,13 @@ UNS Console (UNS Console) began in v1 as a **read-first "flight instruments" das
 ### 1. Session Capability Introspection & Auth (`GET /ui/session`)
 
 - **Server-Verified Capability Introspection:** On sign-in, the console authenticates against `GET /ui/session` (`ConsoleSessionResponse`), which returns the authenticated principal `subject`, granted `scopes` (`observer`, `responder`, `producer`, `admin`), and runtime `persistence_mode`.
-- **Non-Lossy Capability Pills:** The top navigation bar renders non-lossy capability pills mapped directly from server-verified scopes:
-  - `OPERATOR` (`admin` scope)
-  - `RESPONDER` (`responder` or `admin` scope)
-  - `PRODUCER` (`producer` or `admin` scope)
-  - `READ-ONLY` (when only `observer` scope is held)
-  Multi-role principals (e.g., `["observer", "responder", "producer"]`) display all applicable capability pills simultaneously without hiding lower-ranked capabilities.
-- **Tab-Memory Credential Storage & Multi-Tab Handshake:** API credentials are held exclusively in JavaScript tab memory (`apps/ui/src/auth/session.ts`) and never persisted to `localStorage`, `sessionStorage`, or cookies. New browser tabs synchronize active credentials and sign-out events in-memory via `BroadcastChannel('uns_console_session')` (`SESSION_REQUEST`, `SESSION_SHARE`, `SESSION_CLEAR` handshake).
+- **Server-Verified Capability Pills:** The top navigation bar renders capability pills mapped directly from server-verified scopes:
+  - `OPERATOR` (`admin` scope — encompasses `admin`, `producer`, `responder`, and `observer` scopes)
+  - `RESPONDER` (`responder` scope for non-admin principals)
+  - `PRODUCER` (`producer` scope for non-admin principals)
+  - `READ-ONLY` (`observer`-only principals)
+  Principals with `admin` scope display the `OPERATOR` badge, while non-admin scoped principals (e.g., `["observer", "responder", "producer"]`) display their individual role badges (`PRODUCER`, `RESPONDER`, `OBSERVER` / `READ-ONLY`).
+- **Tab-Memory Credential Storage & Multi-Tab Handshake:** API credentials are held exclusively in JavaScript tab memory (`apps/ui/src/auth/session.ts`) and never persisted to `localStorage`, `sessionStorage`, or cookies. New browser tabs synchronize active credentials and sign-out events in-memory via `BroadcastChannel('uns_console_session')` (`UNS_SESSION_REQUEST`, `UNS_SESSION_GRANT`, `UNS_SESSION_SYNC`, `UNS_SESSION_EXPIRE`, `UNS_SESSION_CLEAR` handshake).
 
 ### 2. Deliveries & Obligation Triage (`/deliveries` and `/deliveries/:notificationId`)
 
@@ -39,7 +39,7 @@ UNS Console (UNS Console) began in v1 as a **read-first "flight instruments" das
 ### 3. Policy Workspace (`/policy`)
 
 - **Active Policies Catalog (`GET /ui/policies/active`):** Loads the live catalog of registered notification routing policies (`ActivePolicyListResponse` / `ActivePolicySummary`) with clickable rows that populate the inspector and synchronize `?notification_type=` URL deep-links.
-- **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Surfaces the durable revision ledger (`PolicyRevisionListResponse` / `PolicyRevisionSummary`) across `ACTIVE`, `DRAFT`, `PREVIEW`, and `RETIRED` revisions with status filter pills, selection-scoped revision filtering, `policy_revision_id` / `supersedes_revision_id` lineage chains, `content_hash`, actor attribution (`created_by`, `published_by`), and timestamps.
+- **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Surfaces the durable revision ledger (`PolicyRevisionListResponse` / `PolicyRevisionSummary`) across `ACTIVE`, `DRAFT`, `PREVIEW`, and `RETIRED` revisions with status filter pills, selection-scoped revision filtering, and fields including `policy_id`, `notification_type`, `version`, `status`, `source`, `config_hash`, `previous_version_id` lineage chains, and lifecycle timestamps (`created_at`, `activated_at`, `retired_at`).
 - **Two-Column Split Layout for Effective Policy Resolution (`GET /ui/policies/effective`):** Displays resolved effective policy values (`delivery_mode`, `channels`, `require_ack`, `ack_timeout_minutes`, `dedup_window_seconds`) alongside the step-by-step field resolution trace (`explicit_override`, `mode_override`, `policy_base`, `sdk_default`).
 - **Dry-Run Simulation (`POST /api/v1/notifications/simulate`):** Gated by `producer` or `admin` scope; previews resolved routing channels, deduplication keys, and simulation warnings without dispatching to external providers.
 - **Synthetically Tagged `[TEST]` Live Dispatch (`POST /api/v1/notifications`):** Gated by `producer` or `admin` scope; dispatches a live verification notification prefixed with `[TEST]` and tagged with `source: "uns-console-policy-test"` and `metadata.source = "uns_console_policy_test"`, linking directly to the resulting `/deliveries/:notificationId` timeline.

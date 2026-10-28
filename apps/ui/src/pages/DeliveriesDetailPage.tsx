@@ -335,9 +335,12 @@ export function DeliveriesDetailPage() {
   const canActOnCanonicalPending =
     canRespond && !isDeduplicatedFollower && runtimeState?.ack_status === 'PENDING';
   const canRecoverDeadLetter = isAdmin && runtimeState?.dead_letter === true;
+  const replayBlockedBy = runtimeState?.replay_blocked_by ?? null;
+  const replayBlockReason = runtimeState?.replay_block_reason ?? null;
 
   async function submitRecoveryAction(action: 'replay' | 'resolve') {
     if (!notificationId || submittingRecovery) return;
+    if (action === 'replay' && replayBlockedBy) return;
     setSubmittingRecovery(true);
     setActionFeedback(null);
 
@@ -735,13 +738,43 @@ export function DeliveriesDetailPage() {
               <h3 style={{ marginTop: 0, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Operator Dead-Letter Recovery
               </h3>
+              {replayBlockedBy && (
+                <div
+                  role="alert"
+                  data-testid="detail-replay-blocked-warning"
+                  style={{
+                    marginBottom: '12px',
+                    padding: '10px 14px',
+                    border: '1.5px solid var(--color-accent)',
+                    backgroundColor: 'var(--color-accent-100)',
+                    color: 'var(--color-accent-800)',
+                    fontSize: '13px',
+                  }}
+                >
+                  <strong>Replay blocked:</strong> Obligation handled by{' '}
+                  <Link
+                    to={`/deliveries/${replayBlockedBy}`}
+                    className="monospace"
+                    data-testid="detail-replay-blocked-by-link"
+                  >
+                    {replayBlockedBy}
+                  </Link>
+                  {replayBlockReason ? ` (${replayBlockReason})` : ''}. Use{' '}
+                  <strong>Resolve Failure</strong> to retire this dead-letter entry without re-sending.
+                </div>
+              )}
               {confirmingRecovery === null ? (
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn btn-primary"
                     onClick={() => setConfirmingRecovery('replay')}
-                    disabled={submittingRecovery}
+                    disabled={submittingRecovery || Boolean(replayBlockedBy)}
+                    title={
+                      replayBlockedBy
+                        ? `Replay blocked by ${replayBlockedBy}${replayBlockReason ? ` (${replayBlockReason})` : ''}`
+                        : undefined
+                    }
                     data-testid="detail-replay-btn"
                   >
                     Replay Exhausted Delivery

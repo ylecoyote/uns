@@ -29,7 +29,7 @@ UNS provides two layers of integration:
 | **Runtime** | `uns.runtime` | Transactional outbox, leased channel dispatch, deduplication, ACK state machine, DLQ, and callback worker |
 | **Client** | `uns.client` | Principal-bound async client (`send`, `simulate`) sharing a `Runtime` |
 | **PolicyRuntime** | `uns.policy_runtime` | Revision-checked durable ACTIVE policy resolver and override guard |
-| **HTTP Service** | `uns.app` / `uns.app` | Unified FastAPI server mounting `/api/v1/*`, `/v1/notifications/*`, `/ui/*`, and `/ws/agents/{agent_id}` |
+| **HTTP Service** | `uns.app` | Unified FastAPI server mounting `/api/v1/*`, `/v1/notifications/*`, `/ui/*`, and `/ws/agents/{agent_id}` |
 | **MCP Server** | `uns_mcp.factory` | Trusted-local stdio MCP server (`uns-mcp`) with read-only default and write-enabled recovery worker |
 | **Retention CLI** | `uns.maintenance` | Explicit, bounded operational pruning and verified JSON archival (`uns-maintain`) |
 

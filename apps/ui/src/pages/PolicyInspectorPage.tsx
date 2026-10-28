@@ -313,6 +313,10 @@ export function PolicyInspectorPage() {
 
     const rawTitle = simTitle.trim() || 'Policy verification';
     const taggedTitle = rawTitle.startsWith('[TEST]') ? rawTitle : `[TEST] ${rawTitle}`;
+    const effectiveTestSource =
+      !simSource.trim() || simSource.trim() === 'uns-console'
+        ? 'uns-console-policy-test'
+        : simSource.trim();
 
     try {
       const response = await sendTestNotification({
@@ -320,7 +324,7 @@ export function PolicyInspectorPage() {
         intent: simIntent,
         title: taggedTitle,
         message: simMessage.trim() || 'Live policy test notification from UNS Console.',
-        source: simSource.trim() || 'uns-console',
+        source: effectiveTestSource,
         autonomy_context: {
           autonomy_mode: simAutonomyMode,
           agent_id: simAgentId.trim() || DEFAULT_AGENT_ID,
@@ -750,6 +754,7 @@ export function PolicyInspectorPage() {
                     <th>Notification Type</th>
                     <th>Version</th>
                     <th>Status</th>
+                    <th>Lineage</th>
                     <th>Config Hash</th>
                     <th>Default Intent</th>
                     <th>Routing Channels</th>
@@ -790,6 +795,15 @@ export function PolicyInspectorPage() {
                           >
                             {rev.status}
                           </span>
+                        </td>
+                        <td
+                          className="monospace"
+                          title={rev.previous_version_id ?? 'Root revision'}
+                          data-testid={`policy-revision-lineage-${rev.notification_type}-${rev.version}`}
+                        >
+                          {rev.previous_version_id
+                            ? `Supersedes: ${rev.previous_version_id.slice(0, 8)}...`
+                            : 'ROOT'}
                         </td>
                         <td
                           className="monospace"

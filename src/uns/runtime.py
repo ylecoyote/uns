@@ -188,7 +188,9 @@ class Runtime:
         self.clock = clock
         self.callback = callback
         self.lease_seconds = 60.0
-        self.delivery = DeliveryService(self.adapters, check_deduplication=False)
+        self.delivery = DeliveryService(
+            self.adapters, check_deduplication=False, check_rate_limit=False
+        )
 
     def _event(
         self, session: Session, notification_id: str, kind: str, payload: dict[str, Any]
@@ -259,6 +261,9 @@ class Runtime:
             result["ack_inherited"] = inherited
             result["obligation_resolution_status"] = "RESOLVED" if owner is not None else "UNRESOLVED"
             result["obligation_resolution_error"] = resolution_error
+            blocker = self._replay_blocker(session, result) if result.get("dead_letter") else None
+            result["replay_blocked_by"] = blocker[0] if blocker else None
+            result["replay_block_reason"] = blocker[1] if blocker else None
             return result
 
     def events(self, notification_id: UUID | str) -> list[dict[str, Any]]:
@@ -963,6 +968,13 @@ class Runtime:
         if current and current["id"] != row["id"]:
             return current["id"], current["status"]
         return None
+
+    def _replay_block(self, row: Any) -> tuple[str | None, str | None]:
+        if "dead_letter" in row and not row["dead_letter"]:
+            return None, None
+        with self.sessions() as session:
+            blocker = self._replay_blocker(session, row)
+            return (blocker[0], blocker[1]) if blocker else (None, None)
 
     def replay(self, notification_id: UUID | str, *, actor: str) -> None:
         if not actor:

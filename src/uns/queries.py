@@ -267,6 +267,8 @@ async def get_delivery_timeline(
                 "actor": row.get("actor"),
                 "responded_at": row.get("responded_at"),
                 "response_metadata": row.get("response_metadata"),
+                "replay_blocked_by": row.get("replay_blocked_by"),
+                "replay_block_reason": row.get("replay_block_reason"),
                 "events": bounded_events,
                 "events_total_count": len(all_events),
                 "events_truncated": len(all_events) > 100,
@@ -457,6 +459,8 @@ async def list_invariants(
         invariants_path = (
             Path(__file__).parent.parent.parent / "docs" / "verification" / "invariants.yml"
         )
+        if not invariants_path.exists():
+            invariants_path = Path(__file__).with_name("invariants.yml")
         if invariants_path.exists():
             with open(invariants_path) as f:
                 data = yaml.safe_load(f)

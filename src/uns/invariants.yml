@@ -1,0 +1,168 @@
+# System Invariants Registry
+# This file defines the authoritative system invariants for the Unified Notification Service.
+# UI endpoints expose this data via /ui/invariants for compliance and audit purposes.
+
+version: "1.0"
+last_updated: "2026-10-24"
+
+invariants:
+  - id: "INV-AUTH-001"
+    statement: |
+      HTTP and WebSocket acknowledgments and dismissals require responder
+      capability on the verified principal, including full operator credentials.
+      Producer and observer credentials must not mutate response state through
+      either transport. Denied commands preserve response state and audit history.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Shared principal-scope check protects HTTP routes and every WebSocket ACK/DISMISS command; observer scope permits stream reads only"
+    evidence:
+      - path: "src/uns/api/auth.py"
+        note: "require_principal_scope enforces the requested capability on an authenticated principal"
+      - path: "src/notification/websocket_runtime.py"
+        note: "WebSocket response commands require responder scope before invoking the durable runtime"
+      - path: "tests/uns/test_scoped_websocket_auth.py"
+        note: "Bearer and browser-subprotocol tests reject producer/observer ACK/DISMISS without state or audit changes while preserving replay reads"
+      - path: "tests/uns/test_transport_security.py"
+        note: "HTTP scope and actor-attribution regressions verify capability separation"
+    owner: "platform-team"
+    last_reviewed: "2026-10-24"
+
+  - id: "INV-ACK-001"
+    statement: |
+      Acknowledgments must not gate execution. Acks exist for state transitions
+      and audit purposes only - they never block agent operations.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "isolation"
+      description: "Ack tracking is isolated from execution path; timeout callbacks are advisory"
+    evidence:
+      - path: "src/notification/acknowledgment.py"
+        note: "Ack lifecycle is separate from delivery"
+      - path: "tests/notification/test_acknowledgment.py"
+        note: "Tests verify acks don't block delivery"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-POL-001"
+    statement: |
+      Policy absence must not block delivery. When no policy is registered for a
+      notification type, SDK defaults are used.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "SDK defaults are always available; policy lookup returns defaults on miss"
+    evidence:
+      - path: "src/notification/policies.py"
+        note: "get_default_* functions provide fallbacks"
+      - path: "src/notification/sdk.py"
+        note: "SDK uses defaults when policy not found"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-DEL-001"
+    statement: |
+      GUARANTEED delivery mode must attempt all fallback channels. If all persistent
+      channels fail, the system must raise an error and escalate.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Delivery engine iterates through channel fallback chain; raises on total failure"
+    evidence:
+      - path: "src/notification/service.py"
+        note: "Sequential fallback implementation"
+      - path: "tests/notification/test_service.py"
+        note: "Tests verify fallback and escalation behavior"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-WS-001"
+    statement: |
+      WebSocket is non-authoritative. WebSocket delivery is fire-and-forget and
+      does not count toward GUARANTEED delivery success.
+    severity: "MEDIUM"
+    status: "active"
+    enforcement:
+      type: "isolation"
+      description: "WebSocket adapter is marked as non-persistent; excluded from fallback chain"
+    evidence:
+      - path: "src/notification/adapters/websocket.py"
+        note: "is_persistent = False"
+      - path: "src/notification/service.py"
+        note: "Persistent channels checked separately"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-CTX-001"
+    statement: |
+      Notification creation must fail if autonomy_context is missing. This is a
+      hard guard enforced at the schema level.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Pydantic validation requires autonomy_context field"
+    evidence:
+      - path: "src/notification/models.py"
+        note: "autonomy_context field is required"
+      - path: "tests/notification/test_models.py"
+        note: "Tests verify validation failure without context"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-CTX-002"
+    statement: |
+      AutonomyContext must include autonomy_mode and agent_id. These fields are
+      required for routing and attribution.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Pydantic validation requires both fields in AutonomyContext"
+    evidence:
+      - path: "src/notification/models.py"
+        note: "AutonomyContext schema requires autonomy_mode and agent_id"
+      - path: "tests/notification/test_models.py"
+        note: "Tests verify validation failure without required fields"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-MSG-001"
+    statement: |
+      Title and message have length limits. Title is limited to 200 characters,
+      message is limited to 4000 characters.
+    severity: "MEDIUM"
+    status: "active"
+    enforcement:
+      type: "guard"
+      description: "Pydantic Field constraints with max_length validation"
+    evidence:
+      - path: "src/notification/models.py"
+        note: "Field constraints: title<=200, message<=4000"
+      - path: "tests/notification/test_models.py"
+        note: "Tests verify length validation"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"
+
+  - id: "INV-UI-001"
+    statement: |
+      UI endpoints must be read-only. The UI layer is strictly a presentation
+      concern and does not introduce write operations.
+    severity: "HIGH"
+    status: "active"
+    enforcement:
+      type: "isolation"
+      description: "All UI endpoints use GET method only; adapters are read-only"
+    evidence:
+      - path: "src/uns/api/routes_ui.py"
+        note: "All endpoints use @router.get() decorator"
+      - path: "src/uns/api/read_models.py"
+        note: "ReadModelAdapter ABC defines only get_* methods"
+      - path: "tests/uns/api/test_routes_ui_comprehensive.py"
+        note: "Tests verify POST/PUT/PATCH/DELETE return 405"
+    owner: "platform-team"
+    last_reviewed: "2026-01-23"

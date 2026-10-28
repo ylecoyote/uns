@@ -5,7 +5,7 @@ Run from the consolidated repository with its development environment:
 ```sh
 .venv/bin/python -m pytest tests apps/ui/tests
 .venv/bin/ruff check src tests scripts apps
-.venv/bin/mypy -p uns -p uns -p notification -p db -p ui_client -p uns_mcp
+.venv/bin/mypy -p uns -p notification -p db -p ui_client -p uns_mcp
 .venv/bin/bandit -q -r src
 .venv/bin/python examples/uns_demo.py
 cd apps/ui

@@ -10,17 +10,17 @@ This manual explains how human operators, responders, producers, and support eng
   - All `/ui/*` read-model endpoints remain strictly non-mutating (`INV-UI-001`).
   - Responder, producer, and administrative actions are gated by server-verified capability scopes (`GET /ui/session`) and execute against the authoritative `/api/v1/*` endpoints under full backend invariant and audit enforcement.
 - **Server-Verified Capability Pills (`GET /ui/session`):**
-  The top navigation bar displays non-lossy capability pills mapped from the authenticated principal's scopes:
+  The top navigation bar displays capability pills mapped from the authenticated principal's scopes (`admin` principals display the `OPERATOR` badge, which encompasses `admin`, `producer`, `responder`, and `observer` scopes, while non-admin scoped principals display their individual role badges `PRODUCER`, `RESPONDER`, and `OBSERVER` / `READ-ONLY`):
   | Capability Pill | Required Scope(s) | Enabled Console Workflows |
   | :--- | :--- | :--- |
-  | `OPERATOR` | `admin` | Full administrative authority: atomic policy reload (`POST /api/v1/policies/reload`), dead-letter **Replay** (`POST /api/v1/runtime/notifications/{id}/replay`) and **Resolve** (`DELETE /api/v1/dlq/{entry_id}`), plus all Responder, Producer, and Read-Only workflows. |
+  | `OPERATOR` | `admin` | Full administrative authority: atomic policy reload (`POST /api/v1/policies/reload`), dead-letter **Replay** (`POST /api/v1/runtime/notifications/{id}/replay`) and **Resolve** (`DELETE /api/v1/dlq/{entry_id}`), plus all Responder, Producer, and Read-Only (`observer`) workflows. |
   | `RESPONDER` | `responder` (or `admin`) | Inline **Acknowledge** (`POST /api/v1/notifications/{id}/ack`) and **Dismiss** (`POST /api/v1/notifications/{id}/dismiss`) with optional responder notes on `/deliveries/:notificationId`. |
   | `PRODUCER` | `producer` (or `admin`) | Dry-Run Policy Simulator (`POST /api/v1/notifications/simulate`) and synthetically tagged `[TEST]` live verification dispatch (`POST /api/v1/notifications`) in `/policy`. |
   | `READ-ONLY` | `observer` only | Non-mutating telemetry inspection across `/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, and `/docs`. |
 - **Modernist Badge Visual Grammar (Filled Delivery vs. Outlined Response):**
   - **Filled Badges (Machine Delivery State):** Solid fills indicate channel transport outcomes (`DELIVERED` / `SUCCESS` in solid `#201e1d` charcoal ink; `FAILED` / `DEAD-LETTER` in solid `#ec3013` signal vermilion; `DEDUPLICATED` in stone `#eae9e9`; `PENDING` in dashed neutral stroke).
   - **Outlined Badges (Human Obligation & Resolution State):** `1.5px` stroked transparent badges indicate human response status (`ACKED`, `DISMISSED`, `ACK TIMEOUT` / `TIMED_OUT`, `ACK PENDING`) and dead-letter resolution (`RESOLVED` / `FAILURE_RESOLVED`), preventing visual conflation between transport delivery and human acknowledgment.
-- **Profile & Mode Banner (`LOCAL RECORDING MODE`):** When running in the persistent localhost recording deployment (`deploy/local/local_app.py`), a top-of-page banner (`PROFILE: LOCAL-RECORDING`) indicates that Slack, email, and PagerDuty channels record receipts locally rather than sending external messages, complementing `persistence_mode` from `GET /ui/session` and `GET /readyz`.
+- **Profile & Mode Banner (`LOCAL RECORDING MODE`):** The top-of-page `LOCAL RECORDING MODE` banner (`PROFILE: LOCAL-RECORDING`) is injected by the local-recording deployment profile (`deploy/local/local_app.py`) when running the local recording stack (indicating that Slack, email, and PagerDuty channels record receipts locally rather than sending external messages), while standard deployments expose `persistence_mode` via `GET /readyz` on `/operations` (and `GET /ui/session`).
 
 ---
 
@@ -54,7 +54,7 @@ Once signed in, the top navigation bar links to six primary workspaces:
 ### 3.2 Policy Workspace (`/policy`)
 - **Active Policies Catalog (`GET /ui/policies/active`):** Click any registered policy row to populate the inspector and synchronize the `?notification_type=` deep-link.
 - **Effective Policy Resolution Trace (`GET /ui/policies/effective`):** Two-column split layout displaying resolved effective values (`delivery_mode`, `channels`, `require_ack`, `ack_timeout_minutes`, `dedup_window_seconds`) alongside the step-by-step field precedence trace (`explicit_override` -> `mode_override` -> `policy_base` -> `sdk_default`).
-- **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Inspect the durable revision ledger across `ACTIVE`, `PREVIEW`, `DRAFT`, and `RETIRED` revisions with status filter pills, selection-scoped filtering, `policy_revision_id` / `supersedes_revision_id` lineage chains, `content_hash`, and actor attribution (`created_by`, `published_by`).
+- **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Inspect the durable `PolicyRevisionSummary` ledger across `ACTIVE`, `PREVIEW`, `DRAFT`, and `RETIRED` revisions with status filter pills, selection-scoped filtering, and fields including `policy_id`, `notification_type`, `version`, `status`, `source`, `config_hash`, `previous_version_id` lineage chains, and lifecycle timestamps (`created_at`, `activated_at`, `retired_at`).
 - **Dry-Run Simulator & `[TEST]` Live Dispatch (`PRODUCER` / `OPERATOR`):** Preview routing without side effects (`POST /api/v1/notifications/simulate`) or dispatch a synthetically tagged `[TEST]` verification signal (`POST /api/v1/notifications` with `source: "uns-console-policy-test"` and `metadata.source: "uns_console_policy_test"`).
 - **Atomic Policy Reload (`OPERATOR`):** Trigger `POST /api/v1/policies/reload` to validate YAML definitions on disk and atomically advance the active policy snapshot revision.
 
@@ -69,7 +69,7 @@ Once signed in, the top navigation bar links to six primary workspaces:
 
 ### 3.4 System Invariants (`/invariants`)
 - **Purpose:** Verify the architectural and safety invariants registered in [`docs/verification/invariants.yml`](../verification/invariants.yml) (`GET /ui/invariants` and `GET /ui/invariants/summary`).
-- **How to Use:** Inspect aggregate totals and breakdowns by severity (`CRITICAL`, `HIGH`, `MEDIUM`), enforcement type (`RUNTIME`, `STATIC_ANALYSIS`, `TEST`, `SCHEMA`), or keyword search (e.g., `INV-UI-001`), and expand any row to view repository evidence links.
+- **How to Use:** Inspect aggregate totals and breakdowns by severity (`HIGH | MEDIUM | LOW`), enforcement type (`guard | isolation | test | exception`), or keyword search (e.g., `INV-UI-001`), and expand any row to view repository evidence links.
 
 ### 3.5 Audit Timeline (`/audit`)
 - **Dual-Mode Compliance Timeline (`GET /ui/audit`):**

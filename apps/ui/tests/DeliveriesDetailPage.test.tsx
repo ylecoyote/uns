@@ -709,4 +709,47 @@ describe('DeliveriesDetailPage', () => {
       expect(screen.queryByTestId('operator-recovery-bar')).not.toBeInTheDocument();
     });
   });
+
+  it('disables Replay button and renders warning callout when replay_blocked_by is set while keeping Resolve enabled', async () => {
+    startConsoleSession('admin-key', {
+      subject: 'operator-admin',
+      scopes: ['observer', 'responder', 'producer', 'admin'],
+      auth_mode: 'required',
+    });
+
+    const successorId = '888e4567-e89b-12d3-a456-426614174888';
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...mockDeliveryTimelineFailed,
+          runtime_state: {
+            delivery_status: 'FAILED',
+            effective_status: 'DELIVERED',
+            ack_status: null,
+            dead_letter: true,
+            replay_blocked_by: successorId,
+            replay_block_reason: 'DELIVERED',
+          },
+        }),
+    });
+
+    renderWithRouter(mockDeliveryTimelineFailed.notification_id);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('operator-recovery-bar')).toBeInTheDocument();
+    });
+
+    const warning = screen.getByTestId('detail-replay-blocked-warning');
+    expect(warning).toBeInTheDocument();
+    expect(warning).toHaveTextContent(successorId);
+    expect(warning).toHaveTextContent('(DELIVERED)');
+    expect(screen.getByTestId('detail-replay-blocked-by-link')).toHaveAttribute(
+      'href',
+      `/deliveries/${successorId}`
+    );
+
+    expect(screen.getByTestId('detail-replay-btn')).toBeDisabled();
+    expect(screen.getByTestId('detail-resolve-btn')).not.toBeDisabled();
+  });
 });
