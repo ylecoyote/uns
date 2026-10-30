@@ -47,7 +47,7 @@ server = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.22.0",
     "slowapi>=0.1.9",
-    "prometheus-client>=0.20.0",
+    "prometheus-client>=0.26.0",
 ]
 # Production storage backend for idempotency, dedup, DLQ, rate-limit shared state.
 redis = [
