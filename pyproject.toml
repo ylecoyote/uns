@@ -45,7 +45,7 @@ dependencies = [
 # Includes the Prometheus exposition layer and the slowapi-backed rate limiter.
 server = [
     "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.22.0",
+    "uvicorn[standard]>=0.54.0",
     "slowapi>=0.1.9",
     "prometheus-client>=0.20.0",
 ]
