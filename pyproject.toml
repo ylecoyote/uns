@@ -55,7 +55,7 @@ redis = [
 ]
 # SQLAlchemy-backed audit / policy / replay stores.
 sql = [
-    "sqlalchemy>=2.1.5",
+    "sqlalchemy>=2.1.6",
 ]
 # MCP server transports (FastMCP + stdio).
 mcp = [
