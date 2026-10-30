@@ -20,7 +20,7 @@
     "ci": "npm run type-check && npm run lint && npm run test:run && npm run build"
   },
   "dependencies": {
-    "react": "^18.2.0",
+    "react": "^19.3.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.18.4",
     "zod": "^4.6.7"
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^16.3.3",
-    "@types/react": "^18.2.43",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^8.72.0",
     "@typescript-eslint/parser": "^8.72.0",
