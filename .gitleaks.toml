@@ -3,8 +3,8 @@ title = "UNS gitleaks configuration"
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Ignore generated local artifacts that are never published"
+[allowlist]
+description = "Global allowlist for build artifacts, verification hashes, and benign documentation/fixture tokens"
 paths = [
   '''(^|/)__pycache__/''',
   '''(^|/)\.mypy_cache/''',
@@ -12,4 +12,24 @@ paths = [
   '''(^|/)\.ruff_cache/''',
   '''(^|/)htmlcov/''',
   '''\.pyc$''',
+  '''(^|/)verification/(deployment|iteration2)/results\.json$''',
+]
+regexes = [
+  # SHA-256 hash of auth.py in verification receipts
+  '''c302beba7a03c551f5ccdd00555331f1cc8df57b3c30438e598f5f4b8f813c0c''',
+  # Synthetic test token in MIP channel smoke test fixture
+  '''xoxb-123456-abcdef''',
+  # Sample idempotency keys in documentation
+  '''margin-breach-2026-10-22-001''',
+  '''replica-lag-incident-20261022-01''',
+  # Example development keys in deployment documentation
+  '''\bdev-only-key\b''',
+  '''\bdev-only-key-rotate-before-real-use\b''',
+]
+stopwords = [
+  "xoxb-123456-abcdef",
+  "margin-breach-2026-10-22-001",
+  "replica-lag-incident-20261022-01",
+  "dev-only-key",
+  "dev-only-key-rotate-before-real-use",
 ]

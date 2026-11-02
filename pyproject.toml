@@ -44,10 +44,10 @@ dependencies = [
 # HTTP runtime: needed to run UNS Core / UNS Console FastAPI apps.
 # Includes the Prometheus exposition layer and the slowapi-backed rate limiter.
 server = [
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.22.0",
+    "fastapi>=0.162.0",
+    "uvicorn[standard]>=0.54.0",
     "slowapi>=0.1.9",
-    "prometheus-client>=0.20.0",
+    "prometheus-client>=0.26.0",
 ]
 # Production storage backend for idempotency, dedup, DLQ, rate-limit shared state.
 redis = [
@@ -55,7 +55,7 @@ redis = [
 ]
 # SQLAlchemy-backed audit / policy / replay stores.
 sql = [
-    "sqlalchemy>=2.1.5",
+    "sqlalchemy>=2.1.6",
 ]
 # MCP server transports (FastMCP + stdio).
 mcp = [
@@ -76,7 +76,7 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=4.1.0",
     "fakeredis>=2.20.0",
-    "ruff>=0.17.1",
+    "ruff>=0.17.3",
     "mypy>=1.5.0",
     "bandit>=1.9.4",
     "pip-audit>=2.10.1",

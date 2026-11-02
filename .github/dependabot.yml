@@ -29,6 +29,10 @@ updates:
       # Keep ESLint 8 until .eslintrc is migrated to flat config and eslint-plugin-react-hooks is upgraded
       - dependency-name: "eslint"
         versions: [">= 9.0.0"]
+      - dependency-name: "eslint-plugin-react-hooks"
+        versions: [">= 5.0.0"]
+      - dependency-name: "eslint-plugin-react-refresh"
+        versions: [">= 0.5.0"]
       # Keep TypeScript 5.x until @typescript-eslint/parser supports TypeScript 6+/7+
       - dependency-name: "typescript"
         versions: [">= 6.0.0"]
