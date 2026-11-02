@@ -17,8 +17,9 @@ paths = [
 regexes = [
   # SHA-256 hash of auth.py in verification receipts
   '''c302beba7a03c551f5ccdd00555331f1cc8df57b3c30438e598f5f4b8f813c0c''',
-  # Synthetic test token in MIP channel smoke test fixture
+  # Synthetic test tokens in historical tests and MIP channel smoke test fixture
   '''xoxb-123456-abcdef''',
+  '''xoxb-1234567890-1234567890123-abcdefghijklmnop''',
   # Sample idempotency keys in documentation
   '''margin-breach-2026-10-22-001''',
   '''replica-lag-incident-20261022-01''',
@@ -28,6 +29,7 @@ regexes = [
 ]
 stopwords = [
   "xoxb-123456-abcdef",
+  "xoxb-1234567890-1234567890123-abcdefghijklmnop",
   "margin-breach-2026-10-22-001",
   "replica-lag-incident-20261022-01",
   "dev-only-key",
