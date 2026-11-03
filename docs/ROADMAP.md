@@ -1,22 +1,22 @@
 # UNS Roadmap (`v0.2.0` → `v1.0.0`)
 
-This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the current `v0.2.0` release through `v1.0.0`.
+This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` and `v0.3.0` releases through `v1.0.0`.
 
 Live execution progress and individual deliverables are tracked natively in [GitHub Milestones](https://github.com/ylecoyote/uns/milestones). To keep this document accurate without commit churn, task checklists live in the linked GitHub Milestones and Issues rather than in this file.
 
 ---
 
-## Current Baseline: `v0.2.0` (Shipped)
+## Current Baseline: `v0.2.0` & `v0.3.0` (Shipped)
 
-Release [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0) establishes the consolidated, single-repository notification obligation control plane:
+Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0) and [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0) establish the consolidated, single-repository notification obligation control plane:
 
 - **Durable Transactional Outbox (`uns.Runtime`):** Atomic policy resolution, notification acceptance, leader/follower deduplication ownership, and audit provenance across SQLite (WAL) and PostgreSQL 16 (`psycopg[binary]`).
-- **Lease-Fenced Channel Delivery:** Outbound adapters for Slack (`SlackAdapter`), PagerDuty Events API v2 (`PagerDutyAdapter`), Email/SMTP (`EmailAdapter`), and WebSocket (`WebSocketDeliveryAdapter`) with provider-attempt lease guards (`guard_provider_attempt`) and dead-letter replay (`RuntimeDLQ`).
+- **Lease-Fenced Channel Delivery & Bi-Directional Webhooks:** Outbound adapters for Slack (`SlackAdapter`), PagerDuty Events API v2 (`PagerDutyAdapter`), Email/SMTP (`EmailAdapter`), and WebSocket (`WebSocketDeliveryAdapter`) with provider-attempt lease guards (`guard_provider_attempt`), dead-letter replay (`RuntimeDLQ`), and signed inbound Slack (`POST /api/v1/webhooks/slack`) and PagerDuty v3 (`POST /api/v1/webhooks/pagerduty`) webhooks.
 - **Explicit Response & Timeout Lifecycle:** Durable `PENDING -> ACKED | DISMISSED | TIMED_OUT` state machine anchored to first qualifying delivery, with follower inheritance (`obligation_owner_id`, `effective_ack_status`, `ack_inherited`) and retriable host callbacks.
 - **Scoped Credential Authority:** Least-privilege capability keys (`UNS_API_KEY`, `UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`) enforced across HTTP REST, WebSocket, and MCP (`uns-mcp`).
 - **6-Surface Responder & Operator Console (`apps/ui`):** React 19 + TypeScript 5.9 + Vite 8 application covering `/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, and `/docs`.
 
-See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verification](TESTING.md) for the `v0.2.0` acceptance matrix (`1,886` Python tests, `23` PostgreSQL 16 + concurrency/load tests, `345` UI tests, and `66/66` persistent localhost checks).
+See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verification](TESTING.md) for the acceptance matrix (`1,893+` Python tests, `23` PostgreSQL 16 + concurrency/load tests, `345` UI tests, and `66/66` persistent localhost checks).
 
 ---
 
@@ -24,22 +24,21 @@ See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verific
 
 ```mermaid
 flowchart LR
-    v02["v0.2.0 (Shipped)\nDurable Outbox & Console"] --> v03["v0.3.0\nLive-Channel Pilot & Webhooks"]
+    v02["v0.2.0 (Shipped)\nDurable Outbox & Console"] --> v03["v0.3.0 (Shipped)\nBi-Directional Webhooks & Registry"]
     v03 --> v04["v0.4.0\nMulti-Node & Postgres Ops"]
     v04 --> v05["v0.5.0\nGoverned Policy Evolution"]
     v05 --> v10["v1.0.0\nSLO Certification & Action Gate"]
 ```
 
-### 1. [`v0.3.0` — Live-Channel Pilot, Bi-Directional Webhooks & Registry Publishing](https://github.com/ylecoyote/uns/milestone/1)
+### 1. [`v0.3.0` — Bi-Directional Webhooks & Registry Publishing](https://github.com/ylecoyote/uns/milestone/1) *(Shipped)*
 
-**Goal:** Close the gap between synthetic/recording verification and real external provider mileage, and make `uns` installable directly from public package/container registries.
+**Goal:** Enable signed bi-directional Slack and PagerDuty response settlement and automate public package/container registry publishing.
 
 | Deliverable | Architectural Scope | Status & Tracking Issue |
 | :--- | :--- | :--- |
-| **First-Party Live-Channel Operational Pilot** | Run a non-recording `uns` deployment wired to live Slack and PagerDuty endpoints for autonomous producer degradation alerts, validating deduplication coalescing and human response latency under real operational traffic. | **Open** · [#39](https://github.com/ylecoyote/uns/issues/39) |
-| **Inbound Signed Slack Interactivity Webhook** | Add `POST /api/v1/webhooks/slack` (`X-Slack-Signature` HMAC-SHA256 verification) so clicking the Block Kit `Acknowledge` (`ack_<id>`) and `Dismiss` (`dismiss_<id>`) buttons already emitted by `SlackAdapter` settles the canonical obligation directly from Slack. | **Implemented on `main`** · [#40](https://github.com/ylecoyote/uns/issues/40) |
-| **Inbound PagerDuty v3 Webhook Receiver** | Add `POST /api/v1/webhooks/pagerduty` (`X-PagerDuty-Signature` verification) for bi-directional `uns-<dedup_key>` incident acknowledgment and resolution synchronization. | **Implemented on `main`** · [#41](https://github.com/ylecoyote/uns/issues/41) |
-| **PyPI & GHCR Release Automation** | Publish `uns` wheels/sdists to PyPI (`pip install uns[full]`) and multi-arch images (`linux/amd64`, `linux/arm64`) to `ghcr.io/ylecoyote/uns` on release tags. | **Implemented on `main`** · [#42](https://github.com/ylecoyote/uns/issues/42) |
+| **Inbound Signed Slack Interactivity Webhook** | Add `POST /api/v1/webhooks/slack` (`X-Slack-Signature` HMAC-SHA256 verification) so clicking the Block Kit `Acknowledge` (`ack_<id>`) and `Dismiss` (`dismiss_<id>`) buttons already emitted by `SlackAdapter` settles the canonical obligation directly from Slack. | **Shipped (`v0.3.0`)** · [#40](https://github.com/ylecoyote/uns/issues/40) |
+| **Inbound PagerDuty v3 Webhook Receiver** | Add `POST /api/v1/webhooks/pagerduty` (`X-PagerDuty-Signature` verification) for bi-directional `uns-<dedup_key>` incident acknowledgment and resolution synchronization. | **Shipped (`v0.3.0`)** · [#41](https://github.com/ylecoyote/uns/issues/41) |
+| **PyPI & GHCR Release Automation** | Publish `uns` wheels/sdists to PyPI (`pip install uns[full]`) and multi-arch images (`linux/amd64`, `linux/arm64`) to `ghcr.io/ylecoyote/uns` on release tags. | **Shipped (`v0.3.0`)** · [#42](https://github.com/ylecoyote/uns/issues/42) |
 
 ---
 
@@ -78,5 +77,6 @@ flowchart LR
 
 | Deliverable | Architectural Scope | Tracking Issue |
 | :--- | :--- | :--- |
+| **First-Party Live-Channel Operational Pilot** | Run a non-recording `uns` deployment wired to live Slack and PagerDuty endpoints for autonomous producer degradation alerts, validating deduplication coalescing and human response latency under real operational traffic. | [#39](https://github.com/ylecoyote/uns/issues/39) |
 | **Multi-Week Production SLO Certification** | Publish sustained operational telemetry receipts (`oldest_pending_age_seconds`, `oldest_due_attempt_lateness_seconds`, `overdue_ack_count`, `unknown_attempt_count`, and provider error rates) from production workloads. | [#48](https://github.com/ylecoyote/uns/issues/48) |
 | **Complete or Extract `uns.governance`** | Either complete the deterministic `ALLOW / REQUIRE_APPROVAL / DENY` evaluator and signed approval/resume callback workflow as an opt-in pre-execution gate layered on UNS obligations, or extract `uns.governance` into a standalone companion package. | [#49](https://github.com/ylecoyote/uns/issues/49) |

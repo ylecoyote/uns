@@ -18,7 +18,7 @@ from typing import Any
 
 from uns_mcp.runtime import MCPRuntimeConfig
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = ["MCPRuntimeConfig", "__version__", "create_mcp_server"]
 

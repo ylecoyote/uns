@@ -4,7 +4,7 @@ The user selected localhost with recording adapters. The service is deployed at 
 
 ## Sign in
 
-Paste the contents of `$HOME/Library/Application Support/UNS/operator-api-key.txt` into the console's API key field. The file is mode 0600 inside a private configuration directory. The key stays in browser-tab memory; reload or sign-out clears it. Credential values are not in the repository, vault, receipts or URLs.
+Paste the contents of `$HOME/Library/Application Support/UNS/operator-api-key.txt` into the console's API key field. The file is mode 0600 inside a private configuration directory. The key stays in browser-tab memory; reload or sign-out clears it. Credential values are not in the repository, secret store, receipts or URLs.
 
 The visible banner says **Local recording mode**. Slack, email and PagerDuty channels write durable local receipts instead of contacting providers. WebSockets are available to authenticated local clients. DELIVERED in this profile means recording-sink acceptance, not an external message or human receipt. Notification details are in SQLite; lightweight channel receipts and response callbacks are in the same persistent data volume.
 

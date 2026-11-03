@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+### Added
+- **Inbound Signed Slack Interactivity Webhook (`POST /api/v1/webhooks/slack`, `#40`):**
+  - Added HMAC-SHA256 request verification (`X-Slack-Signature` `v0=<hex>` and `X-Slack-Request-Timestamp` `±300s` replay guard with `UNS_SLACK_SIGNING_SECRET`, constant-time `hmac.compare_digest`, 256 KB body size limit, and fail-closed `503 slack_webhook_not_configured` when unset).
+  - Wired `SlackAdapter._build_blocks()` `Acknowledge` (`ack_<id>`) and `Dismiss` (`dismiss_<id>`) buttons to settle the canonical `obligation_owner_id` directly from Slack as actor `slack:<team_id>:<user_id>` and return an in-place Block Kit message update (`replace_original: true`).
+- **Inbound Signed PagerDuty v3 Webhook & Bi-Directional Sync (`POST /api/v1/webhooks/pagerduty`, `#41`):**
+  - Added PagerDuty v3 Generic Webhook verification (`X-PagerDuty-Signature` `v1=<hex>` supporting comma-separated rotation signatures with `UNS_PAGERDUTY_WEBHOOK_SECRET`, constant-time `hmac.compare_digest`, 256 KB body limit, and fail-closed `503 pagerduty_webhook_not_configured` when unset).
+  - Added `Runtime.resolve_pagerduty_target()` and `Runtime.sync_pagerduty_incident()` (`PAGERDUTY_OUTBOUND_SYNC`) so inbound `incident.acknowledged` / `incident.resolved` webhooks settle `uns-<dedup_key>` / `uns-<notification_id>` obligations as `pagerduty:<agent_id>`, while HTTP/Slack `ACK` and `DISMISS` propagate outbound `acknowledge_incident` / `resolve_incident` calls to PagerDuty Events API v2.
+- **Automated PyPI & Multi-Arch GHCR Release Publishing Workflow (`.github/workflows/release.yml`, `#42`):**
+  - Added release automation triggered on `release: [published]` and `workflow_dispatch` to build, smoke-test, and attach Python wheels/sdists, publish multi-arch (`linux/amd64`, `linux/arm64`) images to `ghcr.io/ylecoyote/uns` with `actions/attest-build-provenance@v2`, and publish to PyPI via OIDC Trusted Publishing (`vars.PYPI_TRUSTED_PUBLISHING == 'true'`) or `secrets.PYPI_API_TOKEN`.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added
