@@ -29,6 +29,14 @@ Every WebSocket ACK or DISMISS command separately checks the authenticated princ
 
 The MCP CLI exposes trusted local stdio. It is read-only by default. Write-enabled startup requires an explicit flag, a persistent database, an operator principal and a delivery confirmation token. The host owns access to the process and its environment. This is not an internet-facing MCP authentication scheme.
 
+## Inbound provider webhooks
+
+Inbound provider webhooks (`POST /api/v1/webhooks/slack` and `POST /api/v1/webhooks/pagerduty`) do not use Bearer API keys because external SaaS providers authenticate callbacks with per-request HMAC-SHA256 signatures over the raw HTTP request body:
+
+- **Fail-Closed Default:** Both endpoints return `503 Service Unavailable` when their respective signing secret (`UNS_SLACK_SIGNING_SECRET` or `UNS_PAGERDUTY_WEBHOOK_SECRET`) is unset or empty.
+- **Slack Interactivity (`POST /api/v1/webhooks/slack`):** Enforces a 256 KB body size limit (`413`), verifies `X-Slack-Request-Timestamp` within a `±300` second replay window, and validates `X-Slack-Signature` (`v0=<hex>`) using constant-time `hmac.compare_digest` over `v0:{timestamp}:{raw_body}`. Authenticated `block_actions` attribute the terminal transition to `slack:<team_id>:<user_id>` (with `slack_user_name`, `slack_channel_id`, and `slack_action_id` recorded in audit metadata) and resolve follower notifications to their canonical `obligation_owner_id`.
+- **PagerDuty v3 Webhooks (`POST /api/v1/webhooks/pagerduty`):** Enforces a 256 KB body size limit (`413`) and validates `X-PagerDuty-Signature` (`v1=<hex>`, supporting comma-separated signatures during secret rotation) using constant-time `hmac.compare_digest` over the raw request body. Validated `incident.acknowledged` and `incident.resolved` events resolve `uns-<dedup_key>` / `uns-<notification_id>` to the canonical owner notification and attribute transitions to `pagerduty:<agent_id>`.
+
 ## Policy authority
 
 Canonical intake, simulation and effective-policy inspection use runtime-scoped persisted snapshots. Producer overrides cannot change an ACTIVE policy's resolved delivery mode, channels, acknowledgment requirement, timeout, priority or configured intent. Matching values remain compatible. No producer payload can grant an administrative exception.

@@ -70,15 +70,17 @@ Use distinct secret values for different capability roles; configuring the same 
 
 Configure only intended providers/recipients:
 
-- `UNS_SLACK_BOT_TOKEN`, `UNS_SLACK_CHANNEL`.
-- `UNS_PAGERDUTY_ROUTING_KEY`.
+- `UNS_SLACK_BOT_TOKEN`, `UNS_SLACK_CHANNEL`, `UNS_SLACK_SIGNING_SECRET`.
+- `UNS_PAGERDUTY_ROUTING_KEY`, `UNS_PAGERDUTY_WEBHOOK_SECRET`.
 - `UNS_SMTP_HOST`, `UNS_SMTP_PORT`, `UNS_SMTP_USER`, `UNS_SMTP_PASSWORD`, `UNS_EMAIL_FROM`, `UNS_EMAIL_TO`.
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `UNS_SLACK_BOT_TOKEN` | *(None)* | Slack Bot OAuth token (`xoxb-...`). Registers `SlackAdapter` when set. |
 | `UNS_SLACK_CHANNEL` | `""` | Default target Slack channel ID or name (e.g., `#ops-alerts`). |
+| `UNS_SLACK_SIGNING_SECRET` | *(None)* | Slack app signing secret used to verify `X-Slack-Signature` (`v0=...`) and `X-Slack-Request-Timestamp` on `POST /api/v1/webhooks/slack`. Endpoint fails closed (`503`) when unset. |
 | `UNS_PAGERDUTY_ROUTING_KEY` | *(None)* | PagerDuty Events API v2 integration/routing key. Registers `PagerDutyAdapter` when set. |
+| `UNS_PAGERDUTY_WEBHOOK_SECRET` | *(None)* | PagerDuty v3 webhook signing secret used to verify `X-PagerDuty-Signature` (`v1=...`) on `POST /api/v1/webhooks/pagerduty`. Endpoint fails closed (`503`) when unset. |
 | `UNS_SMTP_HOST` | *(None)* | SMTP server hostname. Registers `EmailAdapter` when set. |
 | `UNS_SMTP_PORT` | `587` | SMTP server port (integer). |
 | `UNS_SMTP_USER` | `""` | SMTP authentication username. |
@@ -86,7 +88,7 @@ Configure only intended providers/recipients:
 | `UNS_EMAIL_FROM` | `""` | Sender email address for `EmailAdapter`. |
 | `UNS_EMAIL_TO` | `""` | Comma-separated list of default recipient email addresses. |
 
-Missing adapters produce explicit failures. Canonical producer metadata cannot redirect adapter recipients or lower severity.
+Missing adapters produce explicit failures. Canonical producer metadata cannot redirect adapter recipients or lower severity. Outbound releases are automated via `.github/workflows/release.yml`, which builds, smoke-tests, and attaches Python wheel/sdist artifacts, publishes multi-arch (`linux/amd64`, `linux/arm64`) images to `ghcr.io/ylecoyote/uns` with build provenance attestations, and publishes to PyPI via OIDC Trusted Publishing (`vars.PYPI_TRUSTED_PUBLISHING == 'true'`) or `secrets.PYPI_API_TOKEN`.
 
 Use `UNS_POLICY_DIR` for an explicit startup YAML snapshot, or the authenticated policy reload endpoint. Successful activation advances the persisted snapshot revision. Every runtime resolves against that durable authority during intake, including cold MCP processes. Already accepted work retains its previous resolved snapshot.
 

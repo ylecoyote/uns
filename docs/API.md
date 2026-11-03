@@ -37,6 +37,8 @@ from uns.runtime import Conflict
 | `runtime.replay(notification_id: UUID \| str, *, actor: str) -> None` | Reset an exhausted dead-letter notification (`dead_letter == True`) to `status="PENDING"`, increment `cycle`, reset `cycle_attempts=0`, reassign any failed successor lineage, and record `REPLAY_REQUESTED`. | `ValueError` (missing actor), `Conflict` (row is not `dead_letter=True`, or blocked by a pending/satisfied successor or unresolved lineage) |
 | `runtime.resolve_failure(notification_id: UUID, *, actor: str) -> bool` | Clear `dead_letter=False` on a dead-lettered notification after external remediation without erasing `FAILED` status or audit, and record `FAILURE_RESOLVED`. | `ValueError` (missing actor) |
 | `runtime.dead_letters() -> list[dict[str, Any]]` | Return all rows in `uns_notifications` where `dead_letter == True`, including `replay_blocked_by` and `replay_block_reason` when recovery is unsafe or redundant. | None |
+| `runtime.resolve_pagerduty_target(dedup_key: str) -> UUID \| None` | Resolve a PagerDuty incident `dedup_key` (`uns-<dedup_key>` or `uns-<notification_id>`) back to the canonical owner notification ID. | None |
+| `await runtime.sync_pagerduty_incident(notification_id: UUID \| str, *, resolve: bool = False) -> DeliveryResult \| None` | Best-effort outbound PagerDuty Events API v2 `acknowledge_incident` / `resolve_incident` synchronization when a PagerDuty-delivered notification is acknowledged or dismissed via HTTP, WebSocket, or Slack, recording a `PAGERDUTY_OUTBOUND_SYNC` runtime event. | None |
 | `await runtime.deliver_callbacks() -> None` | Claim up to 100 events ordered by `(callback_until, at, id)` with `callback_pending == True` and `callback_attempts < 3` under a 30-second lease, invoke `self.callback(event)` with a 10s timeout, and apply `2 ** attempts` backoff on error. | None |
 
 ### Canonical obligation response projection
@@ -103,6 +105,8 @@ When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_stat
 | GET `/api/v1/notifications/{id}` | Notification and response status |
 | GET `/api/v1/notifications/{id}/ack-status` | Stored and effective response state with canonical owner resolution |
 | POST `/api/v1/notifications/{id}/ack` or `/dismiss` | Authenticated actor response to the canonical owner |
+| POST `/api/v1/webhooks/slack` | Inbound signed Slack Block Kit interactivity webhook (`X-Slack-Signature` + `X-Slack-Request-Timestamp` verification) |
+| POST `/api/v1/webhooks/pagerduty` | Inbound signed PagerDuty v3 webhook (`X-PagerDuty-Signature` verification) |
 | POST `/api/v1/policies/reload` | Validate and atomically persist a notification-policy snapshot before swapping registry |
 | GET `/api/v1/runtime/notifications/{id}` | Full state, policy provenance and recovery events |
 | GET `/api/v1/runtime/dead-letters` | Durable exhausted failures |
@@ -213,6 +217,10 @@ All `/ui/*` endpoints are strictly read-only (`INV-UI-001`):
 - `GET /ui/policies/effective`: Query effective policy resolution (`?notification_type=...&intent=...&autonomy_mode=...&irreversible=false`).
 - `GET /ui/invariants` & `GET /ui/invariants/summary`: System invariant registry and pass/fail summary counts.
 - `GET /ui/audit`: Cursor-paginated compliance audit stream with filters (`event_type`, `notification_id`, `agent_id`, `autonomy_mode`, `correlation_id`).
+
+#### 7. Inbound Signed Provider Webhooks (`POST /api/v1/webhooks/slack` & `POST /api/v1/webhooks/pagerduty`)
+- `POST /api/v1/webhooks/slack`: Authenticates Slack Block Kit interactivity callbacks (`block_actions` and `url_verification`) using `UNS_SLACK_SIGNING_SECRET`, `X-Slack-Request-Timestamp` (`±300s` replay guard), and `X-Slack-Signature` (`v0=<hmac_sha256>`). Clicking `Acknowledge` (`ack_<id>`) or `Dismiss` (`dismiss_<id>`) resolves follower lineage to `obligation_owner_id`, transitions the notification as actor `slack:<team_id>:<user_id>`, triggers best-effort outbound PagerDuty synchronization, and returns an in-place Block Kit message update (`replace_original: true`). Fails closed with `503 slack_webhook_not_configured` when `UNS_SLACK_SIGNING_SECRET` is unset.
+- `POST /api/v1/webhooks/pagerduty`: Authenticates PagerDuty v3 Generic Webhook subscriptions (`incident.acknowledged` and `incident.resolved`) using `UNS_PAGERDUTY_WEBHOOK_SECRET` and `X-PagerDuty-Signature` (`v1=<hmac_sha256>`, supporting comma-separated rotation signatures). Resolves `uns-<dedup_key>` / `uns-<notification_id>` to the canonical owner notification and settles `PENDING` obligations as `pagerduty:<agent_id>` (idempotently returning `already_settled: true` when already acknowledged/dismissed). Fails closed with `503 pagerduty_webhook_not_configured` when `UNS_PAGERDUTY_WEBHOOK_SECRET` is unset.
 
 ---
 

@@ -1137,11 +1137,16 @@ uv run python examples/mip_producer_demo.py --base-url http://127.0.0.1:18080 --
             <code>operator_confirmation_token</code>.
           </li>
           <li>
-            <strong>Opt-In Real-Channel Smoke Verifier (<code>scripts/opt_in_channel_smoke.py</code>):</strong>{' '}
-            Defaults to <code>--dry-run</code> (zero external network traffic, masked PII email
-            readiness report). Passing <code>--execute</code> dispatches a tagged{' '}
-            <code>[UNS OPT-IN SMOKE]</code> signal through configured Slack, Email/SMTP, or
-            PagerDuty adapters.
+            <strong>Opt-In Real-Channel Smoke Verifier (<code>scripts/opt_in_channel_smoke.py</code>) &amp; Signed Provider Webhooks:</strong>{' '}
+            <code>scripts/opt_in_channel_smoke.py</code> defaults to <code>--dry-run</code> (zero
+            external network traffic, masked PII email readiness report); passing{' '}
+            <code>--execute</code> dispatches a tagged <code>[UNS OPT-IN SMOKE]</code> signal
+            through configured Slack, Email/SMTP, or PagerDuty adapters. Inbound interactive
+            responses are verified via <code>POST /api/v1/webhooks/slack</code> (
+            <code>UNS_SLACK_SIGNING_SECRET</code>, <code>X-Slack-Signature</code> + 300s timestamp
+            guard) and <code>POST /api/v1/webhooks/pagerduty</code> (
+            <code>UNS_PAGERDUTY_WEBHOOK_SECRET</code>, <code>X-PagerDuty-Signature</code>{' '}
+            bi-directional sync).
           </li>
         </ul>
         <pre className="docs-code-block">

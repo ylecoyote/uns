@@ -34,12 +34,12 @@ flowchart LR
 
 **Goal:** Close the gap between synthetic/recording verification and real external provider mileage, and make `uns` installable directly from public package/container registries.
 
-| Deliverable | Architectural Scope | Tracking Issue |
+| Deliverable | Architectural Scope | Status & Tracking Issue |
 | :--- | :--- | :--- |
-| **First-Party Live-Channel Operational Pilot** | Run a non-recording `uns` deployment wired to live Slack and PagerDuty endpoints for autonomous producer degradation alerts, validating deduplication coalescing and human response latency under real operational traffic. | [#39](https://github.com/ylecoyote/uns/issues/39) |
-| **Inbound Signed Slack Interactivity Webhook** | Add `POST /api/v1/webhooks/slack` (`X-Slack-Signature` HMAC-SHA256 verification) so clicking the Block Kit `Acknowledge` (`ack_<id>`) and `Dismiss` (`dismiss_<id>`) buttons already emitted by `SlackAdapter` settles the canonical obligation directly from Slack. | [#40](https://github.com/ylecoyote/uns/issues/40) |
-| **Inbound PagerDuty v3 Webhook Receiver** | Add `POST /api/v1/webhooks/pagerduty` (`X-PagerDuty-Signature` verification) for bi-directional `uns-<dedup_key>` incident acknowledgment and resolution synchronization. | [#41](https://github.com/ylecoyote/uns/issues/41) |
-| **PyPI & GHCR Release Automation** | Publish `uns` wheels/sdists to PyPI (`pip install uns[full]`) and multi-arch images (`linux/amd64`, `linux/arm64`) to `ghcr.io/ylecoyote/uns` on release tags. | [#42](https://github.com/ylecoyote/uns/issues/42) |
+| **First-Party Live-Channel Operational Pilot** | Run a non-recording `uns` deployment wired to live Slack and PagerDuty endpoints for autonomous producer degradation alerts, validating deduplication coalescing and human response latency under real operational traffic. | **Open** · [#39](https://github.com/ylecoyote/uns/issues/39) |
+| **Inbound Signed Slack Interactivity Webhook** | Add `POST /api/v1/webhooks/slack` (`X-Slack-Signature` HMAC-SHA256 verification) so clicking the Block Kit `Acknowledge` (`ack_<id>`) and `Dismiss` (`dismiss_<id>`) buttons already emitted by `SlackAdapter` settles the canonical obligation directly from Slack. | **Implemented on `main`** · [#40](https://github.com/ylecoyote/uns/issues/40) |
+| **Inbound PagerDuty v3 Webhook Receiver** | Add `POST /api/v1/webhooks/pagerduty` (`X-PagerDuty-Signature` verification) for bi-directional `uns-<dedup_key>` incident acknowledgment and resolution synchronization. | **Implemented on `main`** · [#41](https://github.com/ylecoyote/uns/issues/41) |
+| **PyPI & GHCR Release Automation** | Publish `uns` wheels/sdists to PyPI (`pip install uns[full]`) and multi-arch images (`linux/amd64`, `linux/arm64`) to `ghcr.io/ylecoyote/uns` on release tags. | **Implemented on `main`** · [#42](https://github.com/ylecoyote/uns/issues/42) |
 
 ---
 

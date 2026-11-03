@@ -89,11 +89,13 @@ async def acknowledge_notification(
         from uns.runtime import Conflict
         actor = resolve_requested_actor(principal, request.acked_by)
         try:
-            return runtime.acknowledge(notification_id, actor=actor, dismiss=False, metadata=request.metadata)
+            response = runtime.acknowledge(notification_id, actor=actor, dismiss=False, metadata=request.metadata)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Notification not found") from exc
         except Conflict as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        await runtime.sync_pagerduty_incident(notification_id, resolve=False)
+        return response
 
     acked_by = resolve_requested_actor(principal, request.acked_by)
     get_engine()  # Explicit legacy fixture composition only.
@@ -177,11 +179,13 @@ async def dismiss_notification(
         from uns.runtime import Conflict
         actor = resolve_requested_actor(principal, request.dismissed_by)
         try:
-            return runtime.acknowledge(notification_id, actor=actor, dismiss=True, metadata=request.metadata)
+            response = runtime.acknowledge(notification_id, actor=actor, dismiss=True, metadata=request.metadata)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Notification not found") from exc
         except Conflict as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        await runtime.sync_pagerduty_incident(notification_id, resolve=True)
+        return response
 
     dismissed_by = resolve_requested_actor(principal, request.dismissed_by)
     get_engine()  # Explicit legacy fixture composition only.

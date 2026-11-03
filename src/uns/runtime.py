@@ -16,7 +16,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -941,6 +941,105 @@ class Runtime:
                 acked_at=datetime.fromtimestamp(row["responded_at"], UTC),
                 metadata=row["response_metadata"] or {},
             )
+
+    def resolve_pagerduty_target(
+        self,
+        *,
+        dedup_key: str | None = None,
+        notification_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve a PagerDuty incident dedup_key or notification_id to a Runtime work row."""
+        candidates: list[str] = []
+        if notification_id:
+            candidates.append(notification_id.strip())
+        raw_dedup = (dedup_key or "").strip()
+        stripped_dedup = raw_dedup[4:] if raw_dedup.startswith("uns-") else raw_dedup
+        if stripped_dedup and stripped_dedup not in candidates:
+            candidates.append(stripped_dedup)
+
+        for candidate in candidates:
+            with contextlib.suppress(ValueError, KeyError):
+                parsed = UUID(candidate)
+                return self.get(parsed)
+
+        if not raw_dedup:
+            raise KeyError("No matching PagerDuty notification found")
+
+        normalized_keys = {raw_dedup, f"uns-{stripped_dedup}"}
+        with self.sessions() as session:
+            event_rows = list(
+                session.execute(
+                    select(events.c.notification_id, events.c.payload)
+                    .where(events.c.kind == "CHANNEL_ATTEMPT_RESULT")
+                    .order_by(events.c.at.desc())
+                    .limit(500)
+                ).mappings()
+            )
+            for ev in event_rows:
+                payload = ev["payload"] or {}
+                if payload.get("channel") == Channel.PAGERDUTY.value and (
+                    payload.get("message_id") in normalized_keys
+                    or (payload.get("metadata") or {}).get("pagerduty_dedup_key") in normalized_keys
+                ):
+                    return self.get(ev["notification_id"])
+
+            work_rows = list(
+                session.execute(
+                    select(work.c.id, work.c.notification)
+                    .where(work.c.dedup_owner_id.is_(None))
+                    .order_by(work.c.delivered_at.desc(), work.c.id)
+                    .limit(500)
+                ).mappings()
+            )
+            for wr in work_rows:
+                notif_json = wr["notification"] or {}
+                if notif_json.get("dedup_key") == stripped_dedup:
+                    return self.get(wr["id"])
+
+        raise KeyError(raw_dedup)
+
+    async def sync_pagerduty_incident(
+        self,
+        notification_id: UUID | str,
+        *,
+        resolve: bool = False,
+    ) -> DeliveryResult | None:
+        """Best-effort outbound propagation of an UNS response to PagerDuty Events API v2."""
+        adapter = self.adapters.get_adapter(Channel.PAGERDUTY)
+        if adapter is None:
+            return None
+        method_name = "resolve_incident" if resolve else "acknowledge_incident"
+        method = getattr(adapter, method_name, None)
+        if not callable(method):
+            return None
+        try:
+            row = self.get(notification_id)
+            outcome = row.get("outcome") or {}
+            channels_succeeded = outcome.get("channels_succeeded") or []
+            if Channel.PAGERDUTY.value not in channels_succeeded:
+                return None
+            notif = Notification.model_validate(row["notification"])
+            pd_dedup_key = f"uns-{notif.dedup_key}" if notif.dedup_key else f"uns-{notif.notification_id}"
+            result = await method(pd_dedup_key)
+            with self.sessions.begin() as session:
+                self._event(
+                    session,
+                    str(notification_id),
+                    "PAGERDUTY_OUTBOUND_SYNC",
+                    {
+                        "action": "resolve" if resolve else "acknowledge",
+                        "dedup_key": pd_dedup_key,
+                        "success": bool(getattr(result, "success", False)),
+                    },
+                )
+            return cast(DeliveryResult | None, result)
+        except Exception:
+            log.warning(
+                "Best-effort PagerDuty outbound sync failed for notification_id=%s",
+                notification_id,
+                exc_info=True,
+            )
+            return None
 
     def expire(self, *, now: float | None = None) -> None:
         now = self.clock() if now is None else now

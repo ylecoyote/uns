@@ -449,11 +449,13 @@ class SlackAdapter(BaseAdapter):
                             "text": {"type": "plain_text", "text": "Acknowledge"},
                             "style": "primary",
                             "action_id": f"ack_{notification.notification_id}",
+                            "value": str(notification.notification_id),
                         },
                         {
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Dismiss"},
                             "action_id": f"dismiss_{notification.notification_id}",
+                            "value": str(notification.notification_id),
                         },
                     ],
                 }

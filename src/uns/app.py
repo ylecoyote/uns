@@ -69,6 +69,7 @@ from uns.api.auth import (
 from uns.api.observability import ObservabilityMiddleware
 from uns.api.routes_notification import router as ack_router
 from uns.api.routes_ui import router as ui_router
+from uns.api.routes_webhooks import router as webhooks_router
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,7 @@ def create_app(
     app.include_router(notification_router)              # /api/v1/notifications/*
     app.include_router(ops_router)                       # /api/v1/dlq, /policies/*, /ops/*
     app.include_router(ack_router, prefix="/api")        # /api/v1/notifications/{id}/ack, /dismiss
+    app.include_router(webhooks_router)                  # /api/v1/webhooks/slack, /pagerduty
     app.include_router(ui_router)                        # /ui/*
 
     # Websocket

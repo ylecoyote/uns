@@ -1,20 +1,148 @@
-name: Build release artifacts
+name: Release Publish (PyPI & GHCR)
+
 on:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      publish_pypi:
+        description: "Attempt PyPI publish (requires PYPI_TRUSTED_PUBLISHING=true variable or PYPI_API_TOKEN secret)"
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
+
 jobs:
-  package:
+  build-python-dist:
+    name: Build & Verify Python Distribution
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v7
-      - run: uv build
-      - uses: actions/upload-artifact@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Smoke-test built wheel in isolated venv
+        run: |
+          uv venv /tmp/release-smoke-venv
+          WHEEL_PATH=$(ls dist/uns-*.whl | head -n 1)
+          uv pip install --python /tmp/release-smoke-venv/bin/python "${WHEEL_PATH}[full]"
+          /tmp/release-smoke-venv/bin/python -c "import uns, uns_mcp, notification; assert uns.__version__ == notification.__version__; print('Verified wheel version:', uns.__version__)"
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: uns-distribution
+          name: python-dist
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attach wheel and sdist to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/*.whl dist/*.tar.gz --clobber
+
+  publish-ghcr:
+    name: Publish Multi-Arch Image to GHCR
+    needs: build-python-dist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract OCI metadata and tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push multi-arch container image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+  publish-pypi:
+    name: Publish Package to PyPI
+    needs: build-python-dist
+    if: github.event_name == 'release' || inputs.publish_pypi == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
           path: dist/
-# Publication is intentionally separate from this local consolidation milestone.
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Publish to PyPI (OIDC Trusted Publishing)
+        if: vars.PYPI_TRUSTED_PUBLISHING == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+      - name: Publish to PyPI (API Token fallback)
+        if: vars.PYPI_TRUSTED_PUBLISHING != 'true'
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -n "${UV_PUBLISH_TOKEN}" ]; then
+            uv publish dist/*
+          else
+            echo "::notice::Skipping PyPI upload: neither vars.PYPI_TRUSTED_PUBLISHING=true nor secrets.PYPI_API_TOKEN is configured yet."
+          fi
