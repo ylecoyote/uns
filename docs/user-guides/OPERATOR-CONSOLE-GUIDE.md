@@ -58,6 +58,8 @@ Once signed in, the top navigation bar links to six primary workspaces:
 
 ### 3.2 Policy Workspace (`/policy`)
 
+![Policy Inspector & Resolution Trace](../assets/screenshots/console-policy-inspector.png)
+
 ![Policy Proposals & Shadow Evidence Workspace](../assets/screenshots/console-policy-shadow.png)
 
 - **Active Policies Catalog (`GET /ui/policies/active`):** Click any registered policy row to populate the inspector and synchronize the `?notification_type=` deep-link.
@@ -95,6 +97,9 @@ Once signed in, the top navigation bar links to six primary workspaces:
   - **`1d` All events (Chronological Stream):** Raw chronological audit event stream with filters for `event_type`, `notification_id`, `agent_id`, `autonomy_mode`, `correlation_id`, and UTC time windows.
 
 ### 3.6 In-Portal Documentation & Runbooks (`/docs`)
+
+![In-Portal Documentation & Runbooks Workspace](../assets/screenshots/console-docs.png)
+
 - **Purpose:** Built-in operator manual, state-machine reference, producer/MCP integration cookbook, and TSG-01–06 incident runbooks (`/docs`).
 - **How to Use:**
   - Use the sticky `260px` left index rail or `?section=` URL deep-links (`overview`, `workflows`, `state-machines`, `integration`, `runbooks`, `all`) to jump directly to a domain.

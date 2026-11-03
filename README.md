@@ -49,14 +49,18 @@ The **UNS Console** is a 6-surface React 19 + TypeScript 5.9 application styled 
 ![UNS Console Delivery Timeline & Obligation Triage](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-delivery-detail.png)
 
 ### 2. Policy Workspace, Proposals & Shadow Evidence (`/policy`)
+![UNS Console Policy Inspector & Resolution Trace](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-policy-inspector.png)
+
 ![UNS Console Policy Proposals & Shadow Evidence](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-policy-shadow.png)
 
-### 3. Operations, Dead-Letter Recovery & Audit Timeline (`/operations`, `/audit`, `/invariants`)
+### 3. Operations, Dead-Letter Recovery, Audit Timeline & In-Portal Runbooks (`/operations`, `/audit`, `/invariants`, `/docs`)
 ![UNS Console Operations & Dead-Letter Recovery](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-operations.png)
 
 ![UNS Console Correlated Audit Timeline](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-audit.png)
 
 ![UNS Console System Invariants Registry](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-invariants.png)
+
+![UNS Console In-Portal Documentation & Runbooks](https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/screenshots/console-docs.png)
 
 ## Documentation
 
