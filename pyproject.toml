@@ -97,6 +97,7 @@ all = [
 uns = "uns.app:main"
 uns-migrate = "uns.migrate:main"
 uns-maintain = "uns.maintenance:main"
+uns-slo-certify = "uns.slo:main"
 uns-mcp = "uns_mcp.transports.stdio:main"
 
 [project.urls]

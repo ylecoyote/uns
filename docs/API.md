@@ -311,3 +311,30 @@ Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a 
 | `--operator` | **Yes** (when `--apply`) | `None` | Non-empty operator attribution recorded in the retention receipt and archive file. |
 | `--after-id` | No | `None` | Resume scan after notification UUID from a prior batch's `next_after_id`. |
 | `--archive` | No | `None` | Path to a **new** JSON archive file in an existing trusted directory (created with `O_CREAT \| O_EXCL`, mode `0600`). |
+
+---
+
+## SLO Telemetry & Certification CLI (`uns-slo-certify`)
+
+`uns-slo-certify` (`python -m uns.slo`) computes a deterministic, SHA-256 hash-verifiable operational SLO report (`receipt_sha256`) from a UNS SQLite or PostgreSQL database. It aggregates real-time operational gauges, obligation volume, human response latency percentiles (`p50`, `p95`, `max`), per-channel delivery error rates, and `recording_only` vs. live external provider classification (`#48`).
+
+| Flag | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--database-url` | No | `UNS_DATABASE_URL` | SQLite (`sqlite+pysqlite:///...`) or PostgreSQL (`postgresql+psycopg://...`) database URL. |
+| `--window-days` | No | `14.0` | Observation window in days (`> 0`). |
+| `--min-live-days` | No | `14.0` | Minimum observed live-event span in days required for `v1.0` certification. |
+| `--max-error-rate` | No | `0.05` | Maximum allowed persistent external channel error rate (`0.0..1.0`). |
+| `--markdown` | No | `False` | Emit a Markdown certification receipt table instead of JSON. |
+| `--output` | No | `None` | Write the JSON or Markdown receipt to a file path in addition to stdout. |
+| `--require-certified` | No | `False` | Exit with code `2` if `v1_0_certified` is `False` (for CI/release gating). |
+
+---
+
+## Pre-Execution Governance Engine (`uns.governance`)
+
+`uns.governance` provides an opt-in, deterministic pre-execution policy evaluation gate (`ALLOW` / `REQUIRE_APPROVAL` / `DENY`) layered on top of durable `uns.Runtime` notification obligations (`#49`):
+
+- **Schema & Policy Validation (`uns.governance.context_schema`):** `ContextSchema` Registry, `validate_policy_against_schema()`, `validate_context_capsule()`, `resolve_field_path()`, and `compute_context_hash()` (RFC 8785-style canonical JSON SHA-256).
+- **Pure Evaluator (`uns.governance.decide`):** Pure, side-effect-free `decide(policy, context, ...)` evaluating all rules in canonical YAML order with `DENY > REQUIRE_APPROVAL > ALLOW` precedence and default-`DENY` (`default_deny_no_matching_rule`) when no rule matches.
+- **Impure Shell & Fail-Mode Engine (`uns.governance.DecisionEngine`):** Manages policy hot-reload with last-known-good quarantine, per-intent fail-mode semantics (`SAFETY` / `GOVERNANCE` / `ACTIONABLE` fail-closed `DENY`; `INFORMATIONAL` fail-open `ALLOW` with operational alert emission), and automatic `GovernanceApprovalBridge` invocation on `REQUIRE_APPROVAL`.
+- **Approval Obligation Bridge & Signed Callbacks (`uns.governance.GovernanceApprovalBridge`):** Maps `REQUIRE_APPROVAL` outcomes to durable `uns.Runtime` notification obligations (`idempotency_key="gov-approval:{decision_id}"`), synchronizes `ACKED -> APPROVED`, `DISMISSED -> REJECTED`, and `TIMED_OUT -> TIMED_OUT`, and signs/verifies resume callbacks with HMAC-SHA256 (`sign_approval_callback()`, `verify_approval_callback()` with `X-UNS-Signature` and `X-UNS-Timestamp` `±300s` replay protection).

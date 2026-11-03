@@ -292,6 +292,27 @@ Pruning makes pages reusable; no VACUUM or file-size reduction is claimed. Opera
 
 ---
 
+## SLO Telemetry & Certification (`uns-slo-certify`)
+
+Operators can generate a tamper-evident JSON or Markdown SLO telemetry receipt (`receipt_sha256`) at any time using `uns-slo-certify`:
+
+```sh
+# Emit a Markdown SLO receipt for the last 14 days
+.venv/bin/uns-slo-certify --database-url "$UNS_DATABASE_URL" --window-days 14 --markdown
+
+# Write a JSON receipt and enforce all v1.0 certification gates (exits 2 if not yet certified)
+.venv/bin/uns-slo-certify --database-url "$UNS_DATABASE_URL" \
+  --window-days 14 \
+  --min-live-days 14 \
+  --max-error-rate 0.05 \
+  --output /var/log/uns/slo-receipt.json \
+  --require-certified
+```
+
+The CLI distinguishes local `recording_only` rehearsals from live external provider traffic (`SLACK`, `EMAIL`, `PAGERDUTY`) and verifies all six `v1.0` SLO gates (`zero_overdue_acks`, `zero_unresolved_dead_letters`, `zero_unknown_attempts`, `provider_error_rate_within_budget`, `live_external_delivery_observed`, and `multi_week_window_met`).
+
+---
+
 ## Related Documentation
 
 - [Local Deployment Runbook](LOCAL_DEPLOYMENT.md)
