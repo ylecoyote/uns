@@ -621,25 +621,21 @@ class ShadowPolicyEvaluator:
         delta: PolicyDelta,
         latest_result: ShadowEvaluationResult,
     ) -> ShadowEvaluationAggregate:
-        """Recompute and persist rolling ShadowEvaluationAggregate for delta."""
+        """Recompute and persist rolling ShadowEvaluationAggregate for delta from persisted samples."""
         existing = self.learning_store.get_shadow_aggregate(delta.delta_id)
-        score = latest_result.improvement_score or 0.0
-        inc_improved = 1 if score > 0 else 0
-        inc_degraded = 1 if score < 0 else 0
-        inc_neutral = 1 if score == 0 else 0
-
-        if existing is None:
-            total = 1
-            improved = inc_improved
-            degraded = inc_degraded
-            neutral = inc_neutral
-            aggregate_id = uuid4()
+        samples = self.learning_store.list_shadow_results(delta.delta_id, limit=10_000)
+        if samples:
+            total = len(samples)
+            improved = sum(1 for s in samples if (s.improvement_score or 0.0) > 0)
+            degraded = sum(1 for s in samples if (s.improvement_score or 0.0) < 0)
+            neutral = total - improved - degraded
         else:
-            total = existing.total_decisions + 1
-            improved = existing.improved_decisions + inc_improved
-            degraded = existing.degraded_decisions + inc_degraded
-            neutral = existing.neutral_decisions + inc_neutral
-            aggregate_id = existing.aggregate_id
+            score = latest_result.improvement_score or 0.0
+            total = 1
+            improved = 1 if score > 0 else 0
+            degraded = 1 if score < 0 else 0
+            neutral = 1 if score == 0 else 0
+        aggregate_id = existing.aggregate_id if existing is not None else uuid4()
 
         # Win rate reflects the proportion of non-degraded shadow evaluations
         # when the candidate policy is valid, or improved / total when changes occur.
@@ -996,6 +992,14 @@ class ShadowPolicyEvaluator:
             actor=actor,
             reason=reason,
         )
+        # Retire any PREVIEW or DRAFT candidate revisions if no other active SHADOW/APPROVED delta exists
+        remaining_active = [
+            d
+            for d in self.learning_store.list_deltas(policy_type=delta.policy_type)
+            if d.delta_id != delta_id and d.state in (DeltaState.SHADOW, DeltaState.APPROVED)
+        ]
+        if not remaining_active:
+            self.policy_store.retire_candidate_revisions(delta.policy_type)
         return rejected
 
     def inspect_delta_status(self, delta: PolicyDelta) -> dict[str, Any]:

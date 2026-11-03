@@ -103,6 +103,7 @@ async def test_slo_report_distinguishes_recording_rehearsal_from_multi_week_live
     )
     assert report["v1_0_certified"] is True
     assert report["observed_span_days"] >= 14.9
+    assert report["observed_live_span_days"] >= 14.9
     assert report["notifications"]["total"] == 2
     assert report["notifications"]["delivered"] == 2
     assert report["acknowledgments"]["acked"] == 2
@@ -111,10 +112,21 @@ async def test_slo_report_distinguishes_recording_rehearsal_from_multi_week_live
     assert report["response_latency_seconds"]["p95"] == 30.0
     assert report["provider_classification"]["live_provider_attempts"] >= 2
     assert report["receipt_hash"].startswith("sha256:")
+    assert report["receipt_sha256"] == report["receipt_hash"]
 
     md = format_slo_markdown(report)
     assert "CERTIFIED (`v1.0` GATES PASSED)" in md
     assert report["receipt_hash"] in md
+
+    # Empty future window (where no notifications were accepted inside the window) returns total == 0
+    empty_window_report = compute_slo_report(
+        db_url,
+        window_days=1.0,
+        min_live_days_required=14.0,
+        now_epoch=now + (10 * 86400.0),
+    )
+    assert empty_window_report["notifications"]["total"] == 0
+    assert empty_window_report["v1_0_certified"] is False
 
     # CLI output test (JSON and --require-certified)
     out_json = tmp_path / "slo_receipt.json"

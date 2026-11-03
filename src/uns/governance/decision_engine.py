@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
+from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,7 +30,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 import yaml  # type: ignore[import-untyped]
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from notification.models import NotificationIntent
 from uns import __version__ as uns_version
@@ -91,9 +92,7 @@ class EvaluationOutcome(BaseModel):
     matched_reason_text: str | None = None
     approval_request_id: uuid.UUID | None = None
     obligation_notification_id: str | None = None
-    Operational_alert_notification_id: str | None = Field(
-        default=None, alias="operational_alert_notification_id"
-    )
+    operational_alert_notification_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -312,6 +311,7 @@ class DecisionEngine:
         approval_bridge: GovernanceApprovalBridge | None = None,
         evaluation_timeout_ms: float = 250.0,
         operational_fail_mode_decision: Decision = Decision.DENY,
+        max_audit_entries: int = 1000,
     ) -> None:
         if not context_schemas:
             raise PolicyLoadError("DecisionEngine requires at least one registered ContextSchema")
@@ -325,7 +325,7 @@ class DecisionEngine:
         self._schemas: dict[str, ContextSchema] = dict(context_schemas)
         self._bundles: dict[str, _LoadedPolicyBundle] = {}
         self._quarantined_reloads: dict[str, str] = {}
-        self._audit_ledger: list[EvaluationOutcome] = []
+        self._audit_ledger: deque[EvaluationOutcome] = deque(maxlen=max(1, max_audit_entries))
         self.approval_bridge = approval_bridge
         self.evaluation_timeout_ms = evaluation_timeout_ms
         self.operational_fail_mode_decision = operational_fail_mode_decision
@@ -699,11 +699,20 @@ class DecisionEngine:
             model_id=model_id,
             model_version=model_version,
         )
+        alert_notif_id: str | None = None
+        if fallback_decision == Decision.ALLOW and self.approval_bridge is not None:
+            alert_notif_id = self.approval_bridge.emit_operational_alert(
+                record,
+                fail_type=fail_type.value,
+                detail=detail,
+            )
+
         outcome = EvaluationOutcome(
             record=record,
             fail_mode=True,
             fail_mode_type=fail_type,
             fail_mode_detail=detail,
+            operational_alert_notification_id=alert_notif_id,
         )
         self._audit_ledger.append(outcome)
         return outcome

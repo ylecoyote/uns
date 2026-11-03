@@ -382,6 +382,31 @@ async def test_governance_approval_bridge_with_uns_runtime_and_signed_callbacks(
     assert queried.callback_headers is not None
     assert len(settled_callbacks) == 1
 
+    # Verify cross-restart / stateless GovernanceApprovalBridge recovery from Runtime
+    restarted_bridge = GovernanceApprovalBridge(
+        runtime,
+        default_intent=NotificationIntent.SAFETY,
+        signing_secret=secret,
+    )
+    recovered_after_restart = restarted_bridge.query_approval(outcome.record.decision_id)
+    assert recovered_after_restart is not None
+    assert recovered_after_restart.status == ApprovalStatus.APPROVED
+    assert recovered_after_restart.resolved_by == "pm-alice"
+    assert recovered_after_restart.decision_record.policy_id == "rebalance-approval"
+
+    # Verify INFORMATIONAL fail-open emits an operational alert notification into Runtime
+    info_fail = engine.evaluate(
+        "rebalance-approval",
+        {"instrument": {"symbol": "SPY", "exchange": "ARCA"}},  # missing notional_usd
+        subject_id="rebalance-agent-01",
+        intent=NotificationIntent.INFORMATIONAL,
+    )
+    assert info_fail.fail_mode is True
+    assert info_fail.record.decision == Decision.ALLOW
+    assert info_fail.operational_alert_notification_id is not None
+    alert_row = runtime.get(info_fail.operational_alert_notification_id)
+    assert alert_row["notification"]["notification_type"] == "governance.fail_open_alert"
+
     # Verify HMAC-SHA256 callback signature
     payload_bytes = queried.model_dump_json().encode("utf-8")
     assert verify_approval_callback(payload_bytes, queried.callback_headers, secret) is True

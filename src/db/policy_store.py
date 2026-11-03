@@ -512,6 +512,38 @@ class SQLAlchemyPolicyStore:
                 return None
             return row, self._hydrate_policy(session, row)
 
+    def retire_candidate_revisions(
+        self,
+        notification_type: str,
+        *,
+        statuses: tuple[PolicyStatus, ...] = (PolicyStatus.PREVIEW, PolicyStatus.DRAFT),
+    ) -> int:
+        """Retire non-ACTIVE candidate revisions (PREVIEW / DRAFT) for a notification_type."""
+        self.ensure_snapshot_schema()
+        now = datetime.now(UTC)
+        status_values = [s.value for s in statuses if s != PolicyStatus.ACTIVE]
+        if not status_values:
+            return 0
+        with self._session_factory.begin() as session:
+            rows = (
+                session.execute(
+                    select(PersistedNotificationPolicy).where(
+                        PersistedNotificationPolicy.notification_type == notification_type,
+                        PersistedNotificationPolicy.status.in_(status_values),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for item in rows:
+                item.status = PolicyStatus.RETIRED.value
+                item.is_active = False
+                item.retired_at = now
+                item.updated_at = now
+            session.flush()
+            self._write_seq += 1
+            return len(rows)
+
     def _retire_current_policy(
         self,
         session: Session,

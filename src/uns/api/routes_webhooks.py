@@ -69,13 +69,26 @@ def _sanitize_actor_component(raw: Any, fallback: str = "unknown") -> str:
 
 
 async def _read_bounded_body(request: Request) -> bytes:
-    body = await request.body()
-    if len(body) > MAX_WEBHOOK_BODY_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="Webhook payload exceeds maximum allowed size",
-        )
-    return body
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length.strip()) > MAX_WEBHOOK_BODY_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    detail="Webhook payload exceeds maximum allowed size",
+                )
+        except ValueError:
+            pass
+
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > MAX_WEBHOOK_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="Webhook payload exceeds maximum allowed size",
+            )
+    return bytes(buf)
 
 
 def verify_slack_signature(

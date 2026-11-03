@@ -73,6 +73,8 @@ def compute_slo_report(
     channel_stats: dict[str, dict[str, Any]] = {}
     earliest_event_at: float | None = None
     latest_event_at: float | None = None
+    earliest_live_attempt_at: float | None = None
+    latest_live_attempt_at: float | None = None
     total_live_provider_attempts = 0
     total_recording_only_attempts = 0
 
@@ -129,16 +131,18 @@ def compute_slo_report(
                 bucket["live_provider_attempts"] += 1
                 if is_persistent_external:
                     total_live_provider_attempts += 1
+                    if earliest_live_attempt_at is None or evt_at < earliest_live_attempt_at:
+                        earliest_live_attempt_at = evt_at
+                    if latest_live_attempt_at is None or evt_at > latest_live_attempt_at:
+                        latest_live_attempt_at = evt_at
 
     for bucket in channel_stats.values():
         total = bucket["total_attempts"]
         bucket["error_rate"] = round(bucket["failed_attempts"] / total, 4) if total > 0 else 0.0
 
-    # Filter notifications accepted within window (or all if accepted_at not in event window)
+    # Filter notifications strictly accepted within the observation window
     window_notif_ids = set(accepted_at_by_id.keys())
-    scoped_notifs = [
-        r for r in notif_rows if (not window_notif_ids or str(r["id"]) in window_notif_ids)
-    ]
+    scoped_notifs = [r for r in notif_rows if str(r["id"]) in window_notif_ids]
 
     status_counts = {
         "total": len(scoped_notifs),
@@ -166,6 +170,11 @@ def compute_slo_report(
         if earliest_event_at is not None and latest_event_at is not None
         else 0.0
     )
+    observed_live_span_days = (
+        round(max(0.0, (latest_live_attempt_at - earliest_live_attempt_at) / 86400.0), 4)
+        if earliest_live_attempt_at is not None and latest_live_attempt_at is not None
+        else 0.0
+    )
 
     max_observed_error_rate = max(
         (b["error_rate"] for b in channel_stats.values() if b["persistent_external"]),
@@ -178,7 +187,7 @@ def compute_slo_report(
         "zero_unknown_attempts": gauges["unknown_attempt_count"] == 0,
         "provider_error_rate_within_budget": max_observed_error_rate <= max_error_rate_threshold,
         "live_external_delivery_observed": total_live_provider_attempts > 0,
-        "multi_week_window_met": observed_span_days >= min_live_days_required,
+        "multi_week_window_met": observed_live_span_days >= min_live_days_required,
     }
     certified = all(gates.values())
 
@@ -189,6 +198,7 @@ def compute_slo_report(
         "window_days": window_days,
         "min_live_days_required": min_live_days_required,
         "observed_span_days": observed_span_days,
+        "observed_live_span_days": observed_live_span_days,
         "operational_gauges": gauges,
         "notifications": status_counts,
         "acknowledgments": ack_counts,
@@ -211,7 +221,9 @@ def compute_slo_report(
 
     canonical = json.dumps(report_body, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    report_body["receipt_hash"] = f"sha256:{digest}"
+    sha_token = f"sha256:{digest}"
+    report_body["receipt_hash"] = sha_token
+    report_body["receipt_sha256"] = sha_token
 
     if isinstance(database, str):
         runtime.engine.dispose()

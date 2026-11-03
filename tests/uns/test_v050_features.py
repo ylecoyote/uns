@@ -349,7 +349,7 @@ def test_policy_proposal_validation_and_rejection_guards(
     )
     assert bad_field.status_code == 422
 
-    # Valid proposal that can be rejected by admin
+    # Valid proposal promoted to SHADOW and then rejected retires PREVIEW and does not resurrect
     valid_prop = client.post(
         "/api/v1/policies/proposals",
         headers=headers,
@@ -358,10 +358,12 @@ def test_policy_proposal_validation_and_rejection_guards(
             "field_path": "dedup_window_seconds",
             "proposed_value": 120,
             "reasoning": "Reduce dedup window to 2 minutes",
+            "promote_to_shadow": True,
         },
     )
     assert valid_prop.status_code == 201
     delta_id = valid_prop.json()["delta_id"]
+    assert valid_prop.json()["state"] == "SHADOW"
 
     reject_resp = client.post(
         f"/api/v1/policies/proposals/{delta_id}/reject",
@@ -371,3 +373,24 @@ def test_policy_proposal_validation_and_rejection_guards(
     assert reject_resp.status_code == 200
     assert reject_resp.json()["state"] == "REJECTED"
     assert reject_resp.json()["rejection_reason"] == "Keep 300s default window"
+
+    # Subsequent intake for ops.check must NOT resurrect a zombie SHADOW delta from a leftover PREVIEW
+    send_after_reject = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "notification_type": "ops.check",
+            "intent": "OPERATIONAL",
+            "title": "Post-reject check",
+            "message": "Ensure rejected PREVIEW is retired",
+            "source": "monitor",
+            "autonomy_context": {
+                "autonomy_mode": "LIVE",
+                "agent_id": str(uuid4()),
+            },
+        },
+    )
+    assert send_after_reject.status_code == 202
+    shadow_after = client.get("/ui/policies/proposals?state=SHADOW", headers=headers)
+    assert shadow_after.status_code == 200
+    assert shadow_after.json()["items"] == []
