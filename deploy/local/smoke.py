@@ -17,7 +17,8 @@ from mcp.client.stdio import stdio_client
 
 HOME = Path.home() / "Library/Application Support/UNS"
 SETTINGS = dict(line.split("=", 1) for line in (HOME / "service.env").read_text().splitlines())
-RELEASE = Path((HOME / "active-release.txt").read_text().strip())
+_release_val = (HOME / "active-release.txt").read_text().strip()
+RELEASE = Path(_release_val) if Path(_release_val).is_absolute() else (HOME / "releases" / _release_val)
 BASE = "http://127.0.0.1:18080"
 CLIENT = httpx.Client(
     base_url=BASE, headers={"Authorization": "Bearer " + SETTINGS["UNS_API_KEY"]}, timeout=15
@@ -308,7 +309,7 @@ SQLAlchemyPolicyStore(r.sessions).save_snapshot(policies);r.engine.dispose()
         "type=volume,src=uns-local-data,dst=/data",
         "--mount",
         f"type=bind,src={RELEASE}/profile,dst=/profile,readonly",
-        "uns:07ef52a",
+        f"uns:{RELEASE.name}",
         "python",
         "-c",
         seed,
