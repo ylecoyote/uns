@@ -42,6 +42,7 @@ Simulation has no side effects. Acceptance means recoverable pending work. Deliv
 ## Documentation
 
 - [Product boundary](docs/PRODUCT.md)
+- [Roadmap (`v0.2.0` → `v1.0.0`)](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [API](docs/API.md)
 - [Delivery semantics](docs/sections/delivery-semantics.md)

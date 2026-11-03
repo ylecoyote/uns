@@ -12,6 +12,7 @@ DOCS = [
     "CHANGELOG.md",
     "docs/README.md",
     "docs/PRODUCT.md",
+    "docs/ROADMAP.md",
     "docs/API.md",
     "docs/ARCHITECTURE.md",
     "docs/DEPLOYMENT.md",

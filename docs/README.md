@@ -2,7 +2,7 @@
 
 | Task | Document |
 |---|---|
-| Evaluate UNS | [Product](PRODUCT.md), [architecture](ARCHITECTURE.md), [delivery semantics](sections/delivery-semantics.md) |
+| Evaluate UNS | [Product](PRODUCT.md), [roadmap](ROADMAP.md), [architecture](ARCHITECTURE.md), [delivery semantics](sections/delivery-semantics.md) |
 | Quickstart: send a signal | [README](../README.md) |
 | Configure policies | [Policy lifecycle](sections/policy-lifecycle.md) |
 | Integrate an app | [API](API.md), [integration modes](sections/integration-modes.md), [producer integration guide](user-guides/PRODUCER-INTEGRATION-GUIDE.md) |
@@ -18,6 +18,7 @@
 
 1. **Architecture & Product Contract**
    - [Product Contract](PRODUCT.md) — Core boundaries, obligation semantics, and safety posture
+   - [Roadmap (`v0.2.0` → `v1.0.0`)](ROADMAP.md) — Milestone horizons (`v0.3.0`–`v1.0.0`), in-tree scaffolding rationale, and live GitHub Milestones
    - [Architecture](ARCHITECTURE.md) — Durable SQLite outbox (`uns.Runtime`), policy engine, and transport topology
    - [Delivery Semantics](sections/delivery-semantics.md) — Idempotency, deduplication windows, fallback, and ACK lifecycles
    - [Policy Lifecycle](sections/policy-lifecycle.md) — Policy version states (`DRAFT`, `PREVIEW`, `ACTIVE`, `RETIRED`), autonomy modes (`PREVIEW`, `SHADOW`, `LIVE`), and change proposals (`PROPOSED`, `APPROVED`, `APPLIED`)

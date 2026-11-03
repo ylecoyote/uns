@@ -80,6 +80,7 @@ nav:
   - Home: README.md
   - Core Contracts:
       - Product Contract: PRODUCT.md
+      - Roadmap: ROADMAP.md
       - Architecture: ARCHITECTURE.md
       - Security Model: SECURITY-MODEL.md
       - Delivery Semantics: sections/delivery-semantics.md
