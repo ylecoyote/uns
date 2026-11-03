@@ -124,7 +124,7 @@ Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}
 {
   "status": "alive",
   "service": "uns",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
 ```
 
@@ -136,7 +136,7 @@ Unlike `/health`, the readiness probe requires an authenticated credential with 
 {
   "status": "ready",
   "service": "uns",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "persistence_mode": "persistent",
   "channels_configured": {
     "slack": true,

@@ -6,7 +6,7 @@ This guide covers local and single-node production deployment of the Unified Not
 
 ## Supported local profile
 
-The reproducible profile is Python 3.12, a file-backed SQLite database and recording adapters. Supported Python metadata starts at 3.11. PostgreSQL locking and real-provider acceptance remain separate checks. In-memory SQLite requires explicit opt-in for HTTP demos and is always rejected by write-enabled MCP CLI startup.
+The reproducible profile is Python 3.12, a file-backed SQLite database and recording adapters. Supported Python metadata starts at 3.11. Live PostgreSQL 16 operational acceptance and sustained concurrency/load are verified in CI (`tests/uns/test_postgres_and_load.py`), while real-provider acceptance remains a separate check. In-memory SQLite requires explicit opt-in for HTTP demos and is always rejected by write-enabled MCP CLI startup.
 
 Install `.[full]` in an isolated environment. The server extra includes Uvicorn standard protocol dependencies, including network WebSocket support. The Dockerfile installs its exact built UNS wheel; the Compose readiness probe authenticates with its configured operator key. For a local service:
 
@@ -40,7 +40,7 @@ UNS reads `UNS_*` environment variables (`src/uns/config.py` and `src/uns/api/au
 
 | Variable | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., `sqlite:////var/lib/uns/uns.db`). Use file-backed SQLite for the exercised deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
+| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., SQLite `sqlite:////var/lib/uns/uns.db` or PostgreSQL `postgresql+psycopg://user:pass@host:5432/uns`; `psycopg[binary]>=3.2.0` is shipped in `uns[sql]` / `uns[full]`). Use file-backed SQLite for the local recording deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
 | `UNS_ALLOW_IN_MEMORY` | `false` | No | Explicit HTTP demo opt-in (`true`/`1`/`yes`/`on`), also enabled by `uns --in-memory`. Permits missing or volatile database configuration; does not weaken the MCP write guard. |
 | `UNS_API_KEY` | *(None)* | For operator access | Full operator credential (`admin`, `producer`, `responder`, `observer`), required for administrative endpoints and `/metrics`. Scoped credentials can access their permitted endpoints without this key. If no credentials are configured, protected endpoints return `503 write_auth_not_configured`. |
 | `UNS_API_PRINCIPAL` | `uns-api-key` | **Yes** (MCP Writes) | Audited actor/principal identity bound to `UNS_API_KEY` and `uns-mcp --enable-writes`. |

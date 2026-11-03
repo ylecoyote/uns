@@ -9,7 +9,7 @@ Thank you for your interest in contributing to the **Unified Notification Servic
 **Backend:**
 - Python 3.11 or higher (Python 3.12 recommended)
 - `uv` or `pip` package manager
-- SQLite 3 (bundled with Python; Redis is optional for multi-instance WebSocket fanout tests)
+- SQLite 3 (bundled with Python) and optional PostgreSQL 16 (`psycopg[binary]>=3.2.0` included in `.[dev]` / `.[full]`; set `UNS_TEST_POSTGRES_URL` to run live PostgreSQL acceptance tests; Redis is optional for multi-instance WebSocket fanout tests)
 
 **UNS Console (`apps/ui`):**
 - Node.js `^20.19.0 || ^22.12.0 || >=24.0.0`
@@ -64,7 +64,7 @@ bandit -q -r src
 
 ### UNS Console Development (`apps/ui`)
 
-The **UNS Console** is a read-only React + TypeScript + Vite Single Page Application in `apps/ui/`.
+The **UNS Console** is a read-only React 19 + TypeScript 5.9 + ESLint 9 flat config (`eslint.config.js`) + Vite 8 Single Page Application across the 6 console surfaces (`/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, `/docs`) in `apps/ui/`.
 
 ```bash
 cd apps/ui
@@ -89,15 +89,14 @@ python scripts/ci/check_ui_boundary.py --strict
 
 ```text
 src/
-├── uns/                    # Canonical durable outbox runtime & CLI entrypoints
+├── uns/                    # Canonical durable outbox runtime, HTTP/WebSocket service & CLI entrypoints
 │   ├── runtime.py          # Transactional outbox, leased dispatch, dedup, ACK & callback worker
 │   ├── client.py           # Principal-bound async Client (send, simulate)
 │   ├── policy_runtime.py   # Revision-locked ACTIVE policy resolver & override guard
 │   ├── config.py           # Environment composition (UNS_* environment variables)
 │   ├── routes.py           # /api/v1/runtime/* inspection, DLQ, and replay routes
 │   ├── maintenance.py      # Explicit retention & SHA-256 verified archive CLI (uns-maintain)
-│   └── migrate.py          # Idempotent additive schema bootstrap (uns-migrate)
-├── uns/               # Unified FastAPI HTTP/WebSocket service & read models
+│   ├── migrate.py          # Idempotent additive schema bootstrap (uns-migrate)
 │   ├── app.py              # Unified FastAPI factory (uns CLI entrypoint)
 │   ├── signaling.py        # Shared transport signaling service
 │   ├── queries.py          # Read-model queries for /ui/* and MCP

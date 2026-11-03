@@ -6,7 +6,7 @@
 
 When several autonomous applications or background jobs emit operational alerts, ordinary fire-and-forget webhooks leave operators guessing: *Which policy governed this alert? Did a provider accept it? Was it coalesced with an earlier incident? Did anyone actually respond before the deadline?*
 
-UNS treats an important notification as a **recoverable obligation** backed by a transactional SQLite outbox (`uns.Runtime`). Policy resolution, acceptance, deduplication ownership, and audit provenance commit together at intake so accepted work retains the exact policy revision that governed it—even across process restarts, provider timeouts, or later policy updates.
+UNS treats an important notification as a **recoverable obligation** backed by a transactional SQLite or PostgreSQL outbox (`uns.Runtime`). Policy resolution, acceptance, deduplication ownership, and audit provenance commit together at intake so accepted work retains the exact policy revision that governed it—even across process restarts, provider timeouts, or later policy updates.
 
 | Lifecycle Event | What UNS Establishes |
 | :--- | :--- |
@@ -59,5 +59,7 @@ The canonical development branch is **main**, containing the consolidation and b
 Adversarial remediation adds durable policy revision checks, explicit dedup ownership, replay cycles, per-provider lease guards, independent callback recovery, authenticated transport reads, and bounded archive/retention tooling. The [second remediation iteration](docs/REMEDIATION_ITERATION2.md) strengthens window/replay ownership, channel-result evidence, SMTP timeout semantics, callback fairness, read-only policy loading and direct MCP reads. See [verification](docs/TESTING.md) for checked behavior and remaining deployment limits.
 
 The [deployment smoke report](docs/DEPLOYMENT_SMOKE.md) records the latest container and live HTTP/WebSocket/MCP/browser checks. It distinguishes the local recording-only rehearsal from a lasting deployment and real-provider acceptance. The selected [localhost recording service](docs/LOCAL_DEPLOYMENT.md) is deployed with persistent storage and a private API key. It is explicitly a recording profile, with no real Slack, email or PagerDuty messages.
+
+Release `v0.2.0` establishes hosted GitHub Actions CI across Python 3.11–3.13, live PostgreSQL 16 operational acceptance and sustained concurrency/load validation (`tests/uns/test_postgres_and_load.py`), and the 6-surface React 19 + TypeScript 5.9 + ESLint 9 UNS Console (`344` UI tests).
 
 Apache License 2.0 - see [LICENSE](LICENSE). Local validation is recorded in docs/TESTING.md; real-channel receipt is a separate opt-in smoke check.

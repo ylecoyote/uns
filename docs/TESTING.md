@@ -148,9 +148,25 @@ Local verification used Python 3.12.14 and temporary SQLite databases. The execu
 
 These results establish local behavior. They do not establish real-provider receipt, human comprehension, production load capacity, or deployment of this commit. Hosted CI and the Python 3.11/3.13 matrix are separate checks.
 
-## PostgreSQL 16 Operational Acceptance and Sustained Concurrency Validation
+## Release v0.2.0 Full-Stack, PostgreSQL 16 & Concurrency Verification — 2026-11-02
 
-Live PostgreSQL 16 acceptance and sustained concurrency validation were added in Track 8 and Track 9:
+The `v0.2.0` release consolidates the durable notification runtime, MCP server, and operator console across Python and TypeScript stacks, adding full PostgreSQL 16 support, multi-worker concurrency validation, React 19 / TypeScript 5.9 / ESLint 9 flat config UI modernization, and automated GitHub Actions CI matrices.
+
+### Complete Release v0.2.0 Verification Summary
+
+| Verification Surface | Scope / Runner | Result |
+|---|---|---|
+| Python Test Suite | Python 3.11, 3.12, 3.13 via pytest | **1,877+ passed**, >90% coverage against 75% gate |
+| PostgreSQL 16 & Sustained Load | `postgres:16-alpine` service container + SQLite WAL (`tests/uns/test_postgres_and_load.py`) | **22 passed** (schema, JSONB, lease contention, 100-request bursts, 0 duplicate sends) |
+| UNS Console Test Suite (`apps/ui`) | Vitest 5.x / React Testing Library / jsdom | **344 passed** across all 6 console workspaces |
+| Console Modernization Stack | React 19.3, TypeScript 5.9, ESLint 9.39 (`eslint.config.js`), Vite 8.3 | Type-check, flat lint, and production bundle built with 0 errors |
+| Dependency Security Audits | `npm audit --omit=dev` & `pip-audit` | **0 advisories** (0 critical, 0 high, 0 moderate, 0 low) |
+| Secret Leak Detection | Gitleaks across all commits (`gitleaks detect --config .gitleaks.toml`) | **0 leaks found** across 500+ scanned commits |
+| Documentation Contracts | `tests/docs/` suite verifying cross-document integrity & invariant links | **259+ passed** |
+| Persistent Localhost Deployment | `deploy/local/smoke.py` against `http://127.0.0.1:18080` (SQLite + ingress) | **66/66 checks passed**, including `/operations` and `/docs` |
+| SQLite Backup Verification | Online SQLite backup API under private config volume | `PRAGMA quick_check=ok` verified |
+
+### PostgreSQL 16 Operational Acceptance and Concurrency Details
 
 | Check | Result |
 |---|---|

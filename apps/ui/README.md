@@ -8,11 +8,12 @@ Canonical UI: **React + TypeScript + Vite (SPA)**.
 
 | Technology | Supported line | Purpose |
 |---|---|---|
-| React | 18.x | UI components |
-| TypeScript | 5.x | Static types |
-| Vite | 7.x | Development and production build |
+| React | 19.x | UI components |
+| TypeScript | 5.9.x | Static types |
+| Vite | 8.x | Development and production build |
 | React Router | 7.x | Client-side navigation |
-| Vitest | 4.x | Component and client tests |
+| Vitest | 5.x | Component and client tests |
+| ESLint | 9.x | Flat config linting (eslint.config.js) |
 
 Node must satisfy `^20.19.0 || ^22.12.0 || >=24.0.0`, as declared in package.json. Use the committed lockfile with `npm ci`.
 
@@ -24,11 +25,11 @@ Backend invariants remain authoritative. See [INV-UI-001](../../docs/verificatio
 
 ## Operator access
 
-The console starts at a sign-in form. An operator enters the configured service API key, which is validated with a protected read before pages mount. The key is held only in memory for that tab and sent in the Authorization header. It is not stored in localStorage/sessionStorage, placed in URLs, or embedded in build output. Reloading or signing out clears the key and unmounts sensitive pages.
+The console starts at a sign-in form. An operator enters a configured service API key, which is validated before pages mount via `GET /ui/session` capability introspection (discovering granted roles: `OPERATOR`, `RESPONDER`, `PRODUCER`, `READ-ONLY`), falling back to `GET /ui/audit?limit=1`. The key is held only in memory for that tab and sent in the Authorization header. It is not stored in localStorage/sessionStorage, placed in URLs, or embedded in build output. Reloading or signing out clears the key and unmounts sensitive pages.
 
 A 401 expires the current session; a 403 is shown as an authorization failure without destroying an otherwise valid session. Cancellation and late responses cannot restore a discarded session. Requests reject redirects and bypass browser caches.
 
-The current backend uses an operator API key, not separate read-only roles. A read-only UI does not make that credential read-only. Host the console only on a trusted origin over HTTPS for shared use. The React console currently has no WebSocket client.
+The backend supports scoped role credentials (`UNS_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_PRODUCER_API_KEY`, `UNS_OBSERVER_API_KEY`) alongside the Phase 1 read-first / GET-only inspection baseline. A read-only UI does not make an administrative credential read-only; scoped roles enforce principle-of-least-privilege at the backend API boundary. Host the console only on a trusted origin over HTTPS for shared use. The React console currently has no WebSocket client.
 
 ## Pages
 
@@ -37,8 +38,10 @@ The current backend uses an operator API key, not separate read-only roles. A re
 | `/deliveries` | Deliveries Explorer |
 | `/deliveries/:notification_id` | Delivery, response deadline and policy evidence |
 | `/policy` | Effective Policy Inspector |
+| `/operations` | Operations & Dead-Letter Recovery |
 | `/invariants` | Invariants Viewer |
 | `/audit` | Audit Timeline |
+| `/docs` | In-Portal Documentation & Runbooks |
 
 ## Architecture
 
@@ -51,6 +54,7 @@ apps/ui/
   index.html
   package.json
   package-lock.json
+  eslint.config.js
   vite.config.ts
   vitest.config.ts
   src/
@@ -110,10 +114,13 @@ The client reads the current tab credential. Contract decoders validate the resp
 
 | Endpoint | Purpose |
 |---|---|
+| GET `/ui/session` | Capability introspection (`OPERATOR`, `RESPONDER`, `PRODUCER`, `READ-ONLY`) |
 | GET `/ui/deliveries` | Delivery summaries |
 | GET `/ui/deliveries/{notification_id}` | Delivery and response detail |
 | GET `/ui/audit` | Audit events and sign-in probe |
+| GET `/ui/policies/active` | Active policies catalog |
 | GET `/ui/policies/effective` | Current effective policy |
+| GET `/ui/policies/revisions` | Policy revision history and lineage |
 | GET `/ui/invariants` | Invariant records |
 | GET `/ui/invariants/summary` | Invariant summary |
 

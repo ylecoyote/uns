@@ -57,7 +57,7 @@ Response deadlines begin at qualifying delivery. Same-actor/same-state replay re
 - Embedded Python and local MCP launch configuration are trusted host boundaries. MCP defaults to read-only; CLI writes require explicit opt-in, a principal, persistent DB and confirmation token.
 - The compatibility flag for anonymous legacy HTTP reads is explicit and limited. It never permits WS, mutations, runtime inspection, readiness or metrics.
 - Callbacks and custom adapters are trusted code. Custom retrying adapters must obey the provider-attempt guard contract; arbitrary blocking host code can still block an event loop.
-- SQLite is operationally exercised. PostgreSQL behavior, real-provider delivery, human receipt, representative load and hosted CI are not established by local tests.
+- SQLite WAL and PostgreSQL 16 (`postgres:16-alpine`), sustained multi-worker concurrency/load tests, and hosted GitHub Actions CI are verified, whereas real external provider delivery, human comprehension, and multi-node production capacity remain separate operational boundaries.
 - Old ownerless dedup suppression and policy fields already lost by historical versions cannot be reconstructed automatically.
 - Retention is row-bounded, not byte/time-bounded. It does not prescribe audit/compliance periods or perform automatic VACUUM. Archive storage and restore policy remain operator responsibilities.
 

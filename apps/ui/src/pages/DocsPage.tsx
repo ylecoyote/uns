@@ -733,7 +733,8 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
       <>
         <p style={{ margin: 0 }}>
           Every accepted notification in <code>uns_notifications</code> transitions through a
-          lease-fenced transactional outbox state machine managed by <code>uns.Runtime</code>. Click
+          lease-fenced transactional outbox state machine managed by <code>uns.Runtime</code> (backed
+          by transactional SQLite WAL or PostgreSQL 16 via <code>UNS_DATABASE_URL</code>). Click
           any delivery state badge below to filter <code>/deliveries</code> by that status:
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1175,8 +1176,11 @@ uv run python scripts/opt_in_channel_smoke.py --execute --channel slack`}
         <pre className="docs-code-block">
           {`export UNS_BASE_URL="http://127.0.0.1:18080"
 export UNS_API_KEY="<YOUR_UNS_API_KEY>"
+# SQLite WAL outbox (default):
 export UNS_DATABASE_URL="sqlite:////data/uns.db"
 export UNS_DB_FILE="\${UNS_DATABASE_URL#sqlite:///}"
+# Or PostgreSQL 16 outbox:
+# export UNS_DATABASE_URL="postgresql+psycopg://uns:pass@postgres:5432/uns"
 export NOTIF_ID="<notification-uuid>"`}
         </pre>
       </>

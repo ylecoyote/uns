@@ -49,4 +49,4 @@ Custom adapters, callbacks and direct Python integrations execute trusted code. 
 
 Use HTTPS/WSS and a trusted hosting origin for shared access. The console keeps its key only in tab memory and never embeds it in browser build configuration. Avoid secrets or unnecessary personal data in notification metadata.
 
-SQLite is the operationally exercised profile. PostgreSQL-specific locking and deployment behavior require separate acceptance. Dependency audits are dated evidence, not a permanent guarantee; see [testing](TESTING.md). No regulatory compliance, human comprehension, exactly-once external delivery or production-security certification is claimed.
+SQLite WAL and PostgreSQL 16 (`postgres:16-alpine`), sustained multi-worker concurrency/load tests, and hosted GitHub Actions CI are verified, whereas real external provider delivery, human comprehension, and multi-node production capacity remain separate operational boundaries. Dependency audits are dated evidence, not a permanent guarantee; see [testing](TESTING.md). No regulatory compliance, human comprehension, exactly-once external delivery or production-security certification is claimed.

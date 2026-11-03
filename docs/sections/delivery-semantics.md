@@ -54,4 +54,4 @@ Timeout expiry runs separately from dispatch and callback batches. Callback fail
 
 No startup purge occurs. Idempotency remains effective while its record is retained. Explicit retention requires a cutoff and minimum idempotency horizon, protects unsettled work and linked obligations, and records archival/pruning decisions. See [deployment](../DEPLOYMENT.md).
 
-Process-level token buckets are not a verified fleet-wide rate limiter. PostgreSQL operation, real-provider behavior and representative production load require separate acceptance. A provider success or actor response is not proof of human comprehension or business-action authorization.
+Process-level token buckets are not a verified fleet-wide rate limiter. SQLite WAL and PostgreSQL 16 (`postgres:16-alpine`), sustained multi-worker concurrency/load tests, and hosted GitHub Actions CI are verified, whereas real external provider delivery, human comprehension, and multi-node production capacity remain separate operational boundaries. A provider success or actor response is not proof of human comprehension or business-action authorization.

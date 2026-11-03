@@ -10,10 +10,10 @@ The visible banner says **Local recording mode**. Slack, email and PagerDuty cha
 
 ## Installed components
 
-- Application image: `uns:8156cb6`, pinned by image ID `sha256:1cf4d7cf73aaafcd484dd1c42657dc3ea5bc602c792a7d8ff4908f02a00823e6`. Core code is `8156cb6b6b699e37f01ba8b729f6be3c4935e100`.
-- Recording composition: `deploy/local/recording_runtime.py`, `local_app.py`, and `local_mcp.py`, deployed as a read-only release snapshot under `$HOME/Library/Application Support/UNS/releases/8156cb6`.
-- Fixed reverse proxy: `deploy/local/nginx.conf` from `9fd53d8`, with the Nginx image pinned by digest in the installed Compose configuration.
-- Configuration and immutable profile/console snapshot: `$HOME/Library/Application Support/UNS/`. Active release is recorded in `active-release.txt`; active deployment is `compose.json`.
+- Application image: `uns:aeb7cca`, pinned by image ID `sha256:26059b30ed2e0129fd4a62be55ae20b2d45a7e27a7aed915e3aa9e9da125be8c`. Core code is `aeb7ccabed1baa16ff06d2609732bafa4d6ed046` (`v0.2.0`).
+- Recording composition: `deploy/local/recording_runtime.py`, `local_app.py`, and `local_mcp.py`, deployed as a read-only release snapshot under `$HOME/Library/Application Support/UNS/releases/aeb7cca`.
+- Fixed reverse proxy: `deploy/local/nginx.conf`, with the Nginx image pinned by digest (`sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5`) in the installed Compose configuration.
+- Configuration and immutable profile/console snapshot: `$HOME/Library/Application Support/UNS/`. Active release is recorded in `active-release.txt` (`aeb7cca`); active deployment is `compose.json`.
 - Database, local channel receipts and response receipts: Docker volume `uns-local-data`. Source-checkout changes do not mutate the running release.
 
 Containers `uns-local` and `uns-local-ingress` use `unless-stopped` restart policies. They restart with Docker after an engine restart unless deliberately stopped. Docker Desktop startup on Mac login and OS-reboot behavior were not changed or separately tested.
@@ -35,10 +35,10 @@ Read-only local MCP can be started with `docker exec -i uns-local python /profil
 
 ## Backup and verification
 
-An initial consistent SQLite backup was created through SQLite's backup API and passed `PRAGMA quick_check`. It is under `$HOME/Library/Application Support/UNS/backups/`, mode 0600; its filename and SHA-256 are in the deployment receipt. This is an initial recovery copy, not an automatic backup/retention schedule. Restore into a stopped service with a compatible code/profile release and preserve the existing volume until the restored copy is verified.
+A verified consistent SQLite backup was created through SQLite's backup API and passed `PRAGMA quick_check=ok`. It is under `$HOME/Library/Application Support/UNS/backups/`, mode 0600; its filename and SHA-256 are in the deployment receipt. This is an initial recovery copy, not an automatic backup/retention schedule. Restore into a stopped service with a compatible code/profile release and preserve the existing volume until the restored copy is verified.
 
-**62 checks passed against this persistent deployment**, including protected/public endpoints, visible recording banners, simulation, recorded Slack/email/PagerDuty acceptance, idempotency/dedup/conflicts, actor-bound ACK/dismiss, UTC audit projection, actual proxied WebSockets, read-only and write-enabled MCP, cross-transport idempotency, a real one-minute timeout, durable local callbacks, persisted pending-work recovery and ACK survival after an application restart. The final demo notification was acknowledged after the run. The earlier isolated full rehearsal passed 99 checks against the same application image, including fault injection, retries and copied-data retention.
+**66 checks passed against this persistent deployment**, including protected/public endpoints, visible recording banners, simulation, recorded Slack/email/PagerDuty acceptance, idempotency/dedup/conflicts, actor-bound ACK/dismiss, UTC audit projection, actual proxied WebSockets, read-only and write-enabled MCP, cross-transport idempotency, a real one-minute timeout, durable local callbacks, persisted pending-work recovery and ACK survival after an application restart, alongside console route coverage including `/operations` and `/docs`. The final demo notification was acknowledged after the run. The earlier isolated full rehearsal passed 99 checks against the application image, including fault injection, retries and copied-data retention.
 
 `deploy/local/smoke.py` is the executed persistent-profile verifier. It creates labeled demo notifications and policies and briefly restarts only its local UNS container. Run it only when that interruption is acceptable. The rehearsal's deliberately failing adapters/callbacks are not installed in this persistent profile.
 
-See [deployment receipts](../verification/local-deployment/results.json), [earlier rehearsal](DEPLOYMENT_SMOKE.md), and [testing](TESTING.md). Real-provider delivery, public hosting/TLS, live PostgreSQL and representative load remain unverified and are outside the selected deployment scope.
+See [deployment receipts](../verification/local-deployment/results.json), [earlier rehearsal](DEPLOYMENT_SMOKE.md), and [testing](TESTING.md). Live PostgreSQL 16 operational acceptance and sustained concurrency/load are now verified in CI via `tests/uns/test_postgres_and_load.py`, while real external provider delivery and public TLS hosting remain outside the localhost recording scope.
