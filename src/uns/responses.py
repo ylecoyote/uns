@@ -636,6 +636,145 @@ class PolicyRevisionListResponse(BaseModel):
     total_count: int = Field(description="Total number of policy revisions")
 
 
+class PolicyProposalCreateRequest(BaseModel):
+    """Request body for proposing a governed policy delta."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    policy_type: str = Field(min_length=1, max_length=255, description="Target notification_type")
+    field_path: str = Field(min_length=1, max_length=512, description="Dotted policy field path")
+    proposed_value: Any = Field(description="Proposed replacement value")
+    reasoning: str = Field(min_length=1, max_length=2000, description="Human-readable rationale")
+    confidence: float = Field(default=0.9, ge=0.0, le=1.0, description="Proposal confidence score")
+    evidence_count: int = Field(default=1, ge=1, description="Number of supporting observations")
+    promote_to_shadow: bool = Field(
+        default=False,
+        description="Immediately promote to SHADOW and materialize PREVIEW revision",
+    )
+
+
+class PolicyProposalActionRequest(BaseModel):
+    """Optional reason payload for proposal state transitions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=1000, description="Transition rationale")
+
+
+class ShadowEvaluationSummaryItem(BaseModel):
+    """Aggregate shadow evaluation summary for a policy delta."""
+
+    aggregate_id: UUID
+    delta_id: UUID
+    baseline_hash: str | None = None
+    candidate_hash: str | None = None
+    evaluated_by: str | None = None
+    total_decisions: int
+    improved_decisions: int
+    degraded_decisions: int
+    neutral_decisions: int
+    win_rate: float
+    min_sample_met: bool
+    accuracy_threshold_met: bool
+    status: str
+    can_promote_to_approval: bool
+    computed_at: datetime
+
+
+class ShadowEvaluationSampleItem(BaseModel):
+    """Individual shadow evaluation decision sample."""
+
+    result_id: UUID
+    delta_id: UUID
+    decision_id: str
+    original_outcome: dict[str, Any] = Field(default_factory=dict)
+    shadow_outcome: dict[str, Any] = Field(default_factory=dict)
+    changed: bool
+    improvement_score: float | None = None
+    evaluated_at: datetime
+
+
+class PolicyGuardResultItem(BaseModel):
+    """Guard check evidence for a policy delta transition."""
+
+    candidate_hash: str | None = None
+    stage: str
+    allowed: bool
+    reason: str | None = None
+    reason_detail: str | None = None
+    checks: dict[str, Any] = Field(default_factory=dict)
+    checked_at: datetime
+
+
+class PolicyTransitionItem(BaseModel):
+    """Audit entry for a policy delta state transition."""
+
+    from_state: str | None = None
+    to_state: str
+    actor: str
+    reason: str | None = None
+    guard_stage: str | None = None
+    transitioned_at: datetime
+
+
+class PolicyProposalSummary(BaseModel):
+    """Full representation of a PolicyDelta proposal, shadow evidence, and guard status."""
+
+    delta_id: UUID
+    policy_type: str
+    field_path: str
+    current_value: Any
+    proposed_value: Any
+    reasoning: str
+    confidence: float
+    evidence_count: int
+    state: str
+    baseline_hash: str | None = None
+    baseline_version: int | None = None
+    candidate_hash: str
+    approval_candidate_hash: str | None = None
+    current_active_hash: str | None = None
+    current_active_version: int | None = None
+    baseline_hash_matches: bool = False
+    evidence_hash_matches: bool = False
+    can_promote_to_shadow: bool = False
+    can_approve: bool = False
+    can_activate: bool = False
+    draft_policy_id: str | None = None
+    draft_version: str | None = None
+    required_guards: list[str] = Field(default_factory=list)
+    guard_results: list[PolicyGuardResultItem] = Field(default_factory=list)
+    transition_history: list[PolicyTransitionItem] = Field(default_factory=list)
+    shadow_aggregate: ShadowEvaluationSummaryItem | None = None
+    shadow_results: list[ShadowEvaluationSampleItem] = Field(default_factory=list)
+    proposed_by: str
+    approved_by: str | None = None
+    rejected_by: str | None = None
+    rejection_reason: str | None = None
+    applied_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PolicyProposalListResponse(BaseModel):
+    """List of governed policy delta proposals and shadow evidence."""
+
+    items: list[PolicyProposalSummary] = Field(default_factory=list)
+    total_count: int
+
+
+class PolicyPromotionResponse(BaseModel):
+    """Response from approving a delta into DRAFT or activating DRAFT -> ACTIVE."""
+
+    delta: PolicyProposalSummary | None = None
+    policy_id: UUID | None = None
+    notification_type: str
+    version: str
+    status: str
+    config_hash: str
+    message: str
+
+
 class EvidenceLink(BaseModel):
     """Link to evidence for an invariant."""
 
@@ -762,7 +901,16 @@ __all__ = [
     "InvariantEntry",
     "InvariantListResponse",
     "InvariantSummaryResponse",
+    "PolicyGuardResultItem",
+    "PolicyPromotionResponse",
+    "PolicyProposalActionRequest",
+    "PolicyProposalCreateRequest",
+    "PolicyProposalListResponse",
+    "PolicyProposalSummary",
     "PolicyRevisionListResponse",
     "PolicyRevisionSummary",
+    "PolicyTransitionItem",
+    "ShadowEvaluationSampleItem",
+    "ShadowEvaluationSummaryItem",
     "UIErrorResponse",
 ]

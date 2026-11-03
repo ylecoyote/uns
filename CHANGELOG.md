@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-03
+
+### Added
+- **Automated `PREVIEW` Shadow Evaluation Runner (`uns.shadow_evaluator.ShadowPolicyEvaluator`, `#46`):**
+  - Added `ShadowPolicyEvaluator` (`src/uns/shadow_evaluator.py`) wired into `Runtime.accept()` (`src/uns/runtime.py`) and `create_app()` (`src/uns/app.py`) to asynchronously evaluate `SHADOW` policy deltas and `PREVIEW` policy revisions (`_ensure_shadow_deltas_for_preview_policies`) against live notification intake without external channel sends or live obligation mutation.
+  - Added deterministic candidate vs. baseline policy routing comparison (`policy_to_envelope`, `envelope_to_policy`, `_candidate_policy`), allow-listed policy field-path validation (`ALLOWED_POLICY_FIELD_PATHS`), O(1) `_write_seq` fast-path skipping when no `PREVIEW`/`SHADOW` candidates exist, and automatic `ShadowEvaluationResult` + `ShadowEvaluationAggregate` persistence in `SQLAlchemyPolicyLearningStore` (`UNS_SHADOW_EVALUATION_ENABLED`, `UNS_SHADOW_MIN_SAMPLES`, `UNS_SHADOW_ACCURACY_THRESHOLD`).
+- **Console `/policy` Promotion Workflow & Governed Policy Delta API (`#47`):**
+  - Added read endpoints (`GET /ui/policies/proposals`, `GET /ui/policies/proposals/{delta_id}`, `GET /api/v1/policies/proposals`, `GET /api/v1/policies/proposals/{delta_id}`) and operator-authenticated promotion endpoints (`POST /api/v1/policies/proposals`, `POST /api/v1/policies/proposals/{delta_id}/shadow`, `/approve`, `/activate`, `/reject`, and `POST /api/v1/policies/revisions/{policy_id}/activate`) in `src/uns/api/routes_ui.py` and `src/notification/routes.py`.
+  - Enforced `PolicyChangeProposalService.evaluate_guards()` (`BOUNDS`, `CONFLICT`, `INVARIANTS`), baseline config hash (`baseline_config_hash`) drift checks (`409 policy_baseline_drift`), and shadow sample/accuracy threshold gates (`409 policy_promotion_conflict`) before promoting `SHADOW` deltas into `DRAFT` revisions (`notification_policy_revisions`) and explicitly activating `DRAFT -> ACTIVE` (retiring prior `ACTIVE`/`PREVIEW` revisions and broadcasting cross-process reload notifications).
+  - Updated `apps/ui/src/pages/PolicyInspectorPage.tsx` with the `Proposals & Shadow Evidence` workspace tab, interactive `PolicyDelta` proposal builder, shadow sample/accuracy progress pills, baseline-hash/guard status badges, one-click `Promote to SHADOW` / `Approve to DRAFT` / `Activate DRAFT -> ACTIVE` actions, and the `Shadow Evidence & Guard Ledger` inspection drawer.
+
 ## [0.4.0] - 2026-11-03
 
 ### Added

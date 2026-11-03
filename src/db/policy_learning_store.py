@@ -6,8 +6,9 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import Table, select, update
 from sqlalchemy.orm import Session, object_session, sessionmaker
+from sqlalchemy.schema import CreateTable
 
 from db.models import (
     PersistedPolicyDelta,
@@ -33,6 +34,24 @@ class SQLAlchemyPolicyLearningStore:
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
+        self._write_seq: int = 0
+        self.ensure_schema()
+
+    def ensure_schema(self) -> None:
+        """Ensure policy learning tables exist in the bound database engine."""
+        from typing import cast
+
+        engine = self._session_factory.kw.get("bind")
+        if engine is None:
+            return
+        with engine.begin() as connection:
+            for model in (
+                PersistedPolicyDelta,
+                PersistedShadowEvaluationResult,
+                PersistedShadowEvaluationAggregate,
+                PolicyEvidenceBinding,
+            ):
+                connection.execute(CreateTable(cast(Table, model.__table__), if_not_exists=True))
 
     def _get_session(self) -> Session:
         return self._session_factory()
@@ -80,6 +99,7 @@ class SQLAlchemyPolicyLearningStore:
                 )
             )
             session.commit()
+            self._write_seq += 1
             return _row_to_delta(row)
         except Exception:
             session.rollback()
@@ -221,6 +241,7 @@ class SQLAlchemyPolicyLearningStore:
                 }
             _apply_delta_to_row(row, transitioned)
             session.commit()
+            self._write_seq += 1
             return _row_to_delta(row)
         except Exception:
             session.rollback()

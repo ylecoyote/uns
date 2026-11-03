@@ -74,6 +74,8 @@ class SQLAlchemyPolicyStore:
         self._session_factory = session_factory
         self._cached_snapshot: PolicySnapshot | None = None
         self._activation_listeners: list[Callable[[PolicySnapshot], None]] = []
+        self._schema_ensured: bool = False
+        self._write_seq: int = 0
 
     def register_activation_listener(
         self, listener: Callable[[PolicySnapshot], None]
@@ -94,6 +96,8 @@ class SQLAlchemyPolicyStore:
 
     def ensure_snapshot_schema(self) -> None:
         """Add only new policy tables; legacy policy rows remain untouched."""
+        if self._schema_ensured:
+            return
         engine = self._session_factory.kw["bind"]
         # Database-native IF NOT EXISTS avoids checkfirst's check/CREATE race
         # when multiple fresh processes upgrade an already deployed database.
@@ -104,6 +108,7 @@ class SQLAlchemyPolicyStore:
                 NotificationPolicyContent,
             ):
                 connection.execute(CreateTable(cast(Table, model.__table__), if_not_exists=True))
+        self._schema_ensured = True
 
     def load_snapshot(self) -> PolicySnapshot:
         """Read committed authority without joining the intake/activation lock.
@@ -338,6 +343,7 @@ class SQLAlchemyPolicyStore:
                 activated = self._activate(session, previous, list(current.values()))
         if activated is not None:
             self._notify_activation_listeners(activated)
+        self._write_seq += 1
         return result
 
     def save_snapshot(self, policies: list[NotificationPolicy]) -> int:
@@ -373,6 +379,7 @@ class SQLAlchemyPolicyStore:
             created_count = sum(result.created for result in results)
         if activated is not None:
             self._notify_activation_listeners(activated)
+        self._write_seq += 1
         return created_count
 
     def _save_policy(self, session: Session, policy: NotificationPolicy) -> PolicySaveResult:
@@ -494,13 +501,28 @@ class SQLAlchemyPolicyStore:
         finally:
             session.close()
 
+    def get_policy_by_id(
+        self, policy_id: UUID
+    ) -> tuple[PersistedNotificationPolicy, NotificationPolicy] | None:
+        """Return a persisted policy row and its hydrated NotificationPolicy by UUID."""
+        self.ensure_snapshot_schema()
+        with self._get_session() as session:
+            row = session.get(PersistedNotificationPolicy, policy_id)
+            if row is None:
+                return None
+            return row, self._hydrate_policy(session, row)
+
     def _retire_current_policy(
         self,
         session: Session,
         policy: NotificationPolicy,
         now: datetime,
     ) -> UUID | None:
-        if policy.status not in (PolicyStatus.ACTIVE, PolicyStatus.PREVIEW):
+        if policy.status not in (
+            PolicyStatus.ACTIVE,
+            PolicyStatus.PREVIEW,
+            PolicyStatus.DRAFT,
+        ):
             return None
 
         current_rows = (
@@ -529,6 +551,23 @@ class SQLAlchemyPolicyStore:
                         PersistedNotificationPolicy.status.in_(
                             (PolicyStatus.PREVIEW.value, PolicyStatus.DRAFT.value)
                         ),
+                    )
+                    .order_by(
+                        PersistedNotificationPolicy.created_at.desc(),
+                        PersistedNotificationPolicy.policy_id.desc(),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        elif policy.status == PolicyStatus.DRAFT:
+            promoted_rows = list(
+                session.execute(
+                    select(PersistedNotificationPolicy)
+                    .where(
+                        PersistedNotificationPolicy.notification_type == policy.notification_type,
+                        PersistedNotificationPolicy.version == policy.version,
+                        PersistedNotificationPolicy.status == PolicyStatus.PREVIEW.value,
                     )
                     .order_by(
                         PersistedNotificationPolicy.created_at.desc(),

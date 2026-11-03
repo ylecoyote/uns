@@ -765,4 +765,199 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
     );
     expect(screen.getByTestId('sim-autonomy-mode-select')).toHaveValue('LIVE');
   });
+
+  it('renders Proposals & Shadow Evidence workspace, verifies sample & baseline badges, and executes Approve to DRAFT + Activate DRAFT -> ACTIVE', async () => {
+    startConsoleSession('admin-key', {
+      subject: 'operator-admin',
+      scopes: ['observer', 'producer', 'admin'],
+      auth_mode: 'required',
+    });
+
+    const shadowDeltaId = '11111111-2222-4333-8444-555555555555';
+    const approvedDeltaId = '66666666-7777-4888-8999-aaaaaaaaaaaa';
+
+    vi.mocked(api.fetchPolicyProposals).mockResolvedValue({
+      total_count: 2,
+      items: [
+        {
+          delta_id: shadowDeltaId,
+          policy_type: 'trading.order_placed',
+          field_path: 'channels',
+          current_value: ['SLACK'],
+          proposed_value: ['SLACK', 'PAGERDUTY'],
+          reasoning: 'Add PagerDuty redundancy for order alerts',
+          confidence: 0.95,
+          evidence_count: 4,
+          state: 'SHADOW',
+          baseline_hash: 'basehash1234567890',
+          baseline_version: 1,
+          candidate_hash: 'candhash1234567890',
+          current_active_hash: 'basehash1234567890',
+          current_active_version: 1,
+          baseline_hash_matches: true,
+          evidence_hash_matches: true,
+          can_promote_to_shadow: false,
+          can_approve: true,
+          can_activate: false,
+          required_guards: ['bounds', 'schema_valid'],
+          guard_results: [
+            {
+              candidate_hash: 'candhash1234567890',
+              stage: 'PROMOTE_SHADOW',
+              allowed: true,
+              checks: { bounds: true, schema_valid: true },
+              checked_at: '2026-11-03T12:00:00Z',
+            },
+          ],
+          transition_history: [],
+          shadow_aggregate: {
+            aggregate_id: 'agg-1111',
+            delta_id: shadowDeltaId,
+            baseline_hash: 'basehash1234567890',
+            candidate_hash: 'candhash1234567890',
+            evaluated_by: 'uns.shadow_evaluator',
+            total_decisions: 12,
+            improved_decisions: 12,
+            degraded_decisions: 0,
+            neutral_decisions: 0,
+            win_rate: 1.0,
+            min_sample_met: true,
+            accuracy_threshold_met: true,
+            status: 'PASSED',
+            can_promote_to_approval: true,
+            computed_at: '2026-11-03T12:05:00Z',
+          },
+          proposed_by: 'producer-user',
+          created_at: '2026-11-03T11:55:00Z',
+          updated_at: '2026-11-03T12:05:00Z',
+        },
+        {
+          delta_id: approvedDeltaId,
+          policy_type: 'ops.alert',
+          field_path: 'dedup_window_seconds',
+          current_value: 300,
+          proposed_value: 120,
+          reasoning: 'Tighten dedup window',
+          confidence: 0.9,
+          evidence_count: 3,
+          state: 'APPROVED',
+          baseline_hash: 'opsbasehash999999',
+          baseline_version: 2,
+          candidate_hash: 'opscandhash999999',
+          current_active_hash: 'opsbasehash999999',
+          current_active_version: 2,
+          baseline_hash_matches: true,
+          evidence_hash_matches: true,
+          can_promote_to_shadow: false,
+          can_approve: false,
+          can_activate: true,
+          draft_policy_id: 'draft-pol-999',
+          draft_version: '3',
+          required_guards: ['bounds'],
+          guard_results: [
+            {
+              candidate_hash: 'opscandhash999999',
+              stage: 'APPROVE',
+              allowed: true,
+              checks: { bounds: true, shadow_passed: true },
+              checked_at: '2026-11-03T12:10:00Z',
+            },
+          ],
+          transition_history: [],
+          shadow_aggregate: {
+            aggregate_id: 'agg-2222',
+            delta_id: approvedDeltaId,
+            baseline_hash: 'opsbasehash999999',
+            candidate_hash: 'opscandhash999999',
+            evaluated_by: 'uns.shadow_evaluator',
+            total_decisions: 5,
+            improved_decisions: 5,
+            degraded_decisions: 0,
+            neutral_decisions: 0,
+            win_rate: 1.0,
+            min_sample_met: true,
+            accuracy_threshold_met: true,
+            status: 'PASSED',
+            can_promote_to_approval: true,
+            computed_at: '2026-11-03T12:08:00Z',
+          },
+          proposed_by: 'operator-admin',
+          approved_by: 'operator-admin',
+          created_at: '2026-11-03T11:50:00Z',
+          updated_at: '2026-11-03T12:10:00Z',
+        },
+      ],
+    });
+
+    vi.mocked(api.approveProposalToDraft).mockResolvedValue({
+      policy_id: 'draft-pol-111',
+      notification_type: 'trading.order_placed',
+      version: '2',
+      status: 'DRAFT',
+      config_hash: 'drafthash1234567890',
+      message: 'Approved delta into DRAFT revision trading.order_placed v2',
+    });
+
+    vi.mocked(api.activateApprovedProposal).mockResolvedValue({
+      policy_id: 'active-pol-999',
+      notification_type: 'ops.alert',
+      version: '3',
+      status: 'ACTIVE',
+      config_hash: 'activehash99999999',
+      message: 'Activated ops.alert v3 (DRAFT -> ACTIVE)',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/policy']}>
+        <PolicyInspectorPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('policy-proposals-section')).toBeInTheDocument();
+    });
+
+    // Verify sample counts, threshold badges, guard stage badge, and baseline hash verification badge
+    expect(screen.getByTestId(`proposal-samples-${shadowDeltaId}`)).toHaveTextContent(
+      '12 samples (100% win)'
+    );
+    expect(
+      screen.getByTestId(`proposal-min-samples-badge-${shadowDeltaId}`)
+    ).toHaveTextContent('SAMPLES: PASS');
+    expect(
+      screen.getByTestId(`proposal-accuracy-badge-${shadowDeltaId}`)
+    ).toHaveTextContent('ACCURACY: PASS');
+    expect(screen.getByTestId(`proposal-guard-badge-${shadowDeltaId}`)).toHaveTextContent(
+      'PROMOTE_SHADOW: PASS'
+    );
+    expect(
+      screen.getByTestId(`proposal-baseline-badge-${shadowDeltaId}`)
+    ).toHaveTextContent('BASELINE VERIFIED');
+
+    // Click Approve to DRAFT on the qualifying SHADOW proposal
+    fireEvent.click(screen.getByTestId(`approve-proposal-btn-${shadowDeltaId}`));
+
+    await waitFor(() => {
+      expect(api.approveProposalToDraft).toHaveBeenCalledWith(
+        shadowDeltaId,
+        expect.any(String)
+      );
+      expect(screen.getByTestId('policy-promotion-banner')).toHaveTextContent(
+        'Approved delta into DRAFT revision trading.order_placed v2'
+      );
+    });
+
+    // Click Activate DRAFT -> ACTIVE on the APPROVED proposal
+    fireEvent.click(screen.getByTestId(`activate-draft-btn-${approvedDeltaId}`));
+
+    await waitFor(() => {
+      expect(api.activateApprovedProposal).toHaveBeenCalledWith(
+        approvedDeltaId,
+        expect.any(String)
+      );
+      expect(screen.getByTestId('policy-promotion-banner')).toHaveTextContent(
+        'Activated ops.alert v3 (DRAFT -> ACTIVE)'
+      );
+    });
+  });
 });

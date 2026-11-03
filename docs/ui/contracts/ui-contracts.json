@@ -3,7 +3,7 @@
   "title": "UNS Console Contracts",
   "description": "Machine-readable contract snapshot for UNS Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-11-03T19:41:48.244852+00:00",
+  "generated_at": "2026-11-03T20:42:40.796368+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [

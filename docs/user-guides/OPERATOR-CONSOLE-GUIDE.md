@@ -43,6 +43,11 @@ This manual explains how human operators, responders, producers, and support eng
 Once signed in, the top navigation bar links to six primary workspaces:
 
 ### 3.1 Deliveries & Obligation Triage (`/deliveries` and `/deliveries/:notificationId`)
+
+![Deliveries Explorer](../assets/screenshots/console-deliveries.png)
+
+![Delivery Detail & Obligation Triage](../assets/screenshots/console-delivery-detail.png)
+
 - **Deliveries Explorer (`/deliveries`):** Browse and filter notification obligations (`GET /ui/deliveries`) by delivery `status`, `intent`, `delivery_mode`, `autonomy_mode`, `channel`, `notification_type`, and `agent_id`.
 - **Delivery Detail & Obligation Triage (`/deliveries/:notificationId`):**
   1. **Header & Autonomy Context:** Notification UUID, `notification_type`, `intent`, `source`, `correlation_id`, `agent_id`, `autonomy_mode`, `plan_id`, and `decision_snapshot_id`.
@@ -52,13 +57,20 @@ Once signed in, the top navigation bar links to six primary workspaces:
   5. **Bounded Runtime Event Ledger:** Displays the chronological `uns_events` stream (`events`, `events_total_count`, `events_truncated`) capped at the most recent 100 events.
 
 ### 3.2 Policy Workspace (`/policy`)
+
+![Policy Proposals & Shadow Evidence Workspace](../assets/screenshots/console-policy-shadow.png)
+
 - **Active Policies Catalog (`GET /ui/policies/active`):** Click any registered policy row to populate the inspector and synchronize the `?notification_type=` deep-link.
 - **Effective Policy Resolution Trace (`GET /ui/policies/effective`):** Two-column split layout displaying resolved effective values (`delivery_mode`, `channels`, `require_ack`, `ack_timeout_minutes`, `dedup_window_seconds`) alongside the step-by-step field precedence trace (`explicit_override` -> `mode_override` -> `policy_base` -> `sdk_default`).
 - **Policy Revision History & Governance (`GET /ui/policies/revisions`):** Inspect the durable `PolicyRevisionSummary` ledger across `ACTIVE`, `PREVIEW`, `DRAFT`, and `RETIRED` revisions with status filter pills, selection-scoped filtering, and fields including `policy_id`, `notification_type`, `version`, `status`, `source`, `config_hash`, `previous_version_id` lineage chains, and lifecycle timestamps (`created_at`, `activated_at`, `retired_at`).
+- **Proposals & Shadow Evidence (`GET /ui/policies/proposals` & `POST /api/v1/policies/proposals*`):** Propose governed `PolicyDelta` changes, promote candidates to `SHADOW` (`PREVIEW` intake evaluation via `ShadowPolicyEvaluator`), inspect sample win rates and guard stages (`BOUNDS`, `CONFLICT`, `INVARIANTS`), approve qualifying deltas into `DRAFT`, and explicitly activate `DRAFT -> ACTIVE`.
 - **Dry-Run Simulator & `[TEST]` Live Dispatch (`PRODUCER` / `OPERATOR`):** Preview routing without side effects (`POST /api/v1/notifications/simulate`) or dispatch a synthetically tagged `[TEST]` verification signal (`POST /api/v1/notifications` with `source: "uns-console-policy-test"` and `metadata.source: "uns_console_policy_test"`).
 - **Atomic Policy Reload (`OPERATOR`):** Trigger `POST /api/v1/policies/reload` to validate YAML definitions on disk and atomically advance the active policy snapshot revision.
 
 ### 3.3 Operations & Dead-Letter Recovery (`/operations`)
+
+![Operations & Dead-Letter Recovery](../assets/screenshots/console-operations.png)
+
 - **Fault-Isolated Telemetry Polling:** Independently polls four operational endpoints via `Promise.allSettled`:
   - `GET /readyz` (`503`-tolerant readiness, database connectivity, persistence mode, and DLQ depth)
   - `GET /api/v1/channels/health` (per-channel adapter health status and consecutive failure counts)
@@ -68,10 +80,16 @@ Once signed in, the top navigation bar links to six primary workspaces:
   - **Resolve (`DELETE /api/v1/dlq/{entry_id}`):** Clears `dead_letter = false` while keeping `status = "FAILED"` and recording an audited `FAILURE_RESOLVED` event.
 
 ### 3.4 System Invariants (`/invariants`)
+
+![System Invariants Registry](../assets/screenshots/console-invariants.png)
+
 - **Purpose:** Verify the architectural and safety invariants registered in [`docs/verification/invariants.yml`](../verification/invariants.yml) (`GET /ui/invariants` and `GET /ui/invariants/summary`).
 - **How to Use:** Inspect aggregate totals and breakdowns by severity (`HIGH | MEDIUM | LOW`), enforcement type (`guard | isolation | test | exception`), or keyword search (e.g., `INV-UI-001`), and expand any row to view repository evidence links.
 
 ### 3.5 Audit Timeline (`/audit`)
+
+![Audit Timeline Correlated View](../assets/screenshots/console-audit.png)
+
 - **Dual-Mode Compliance Timeline (`GET /ui/audit`):**
   - **`1e` By notification (Default Lifecycle View):** Correlates all audit events for each `notification_id` into an expandable lifecycle row (`NOTIFICATION | STARTED | DELIVERED | RESPONSE | TIME TO RESPOND`), automatically calculating elapsed response time (`ack.received` / `ack.dismissed` / `ack.timed_out` minus `notification.created`).
   - **`1d` All events (Chronological Stream):** Raw chronological audit event stream with filters for `event_type`, `notification_id`, `agent_id`, `autonomy_mode`, `correlation_id`, and UTC time windows.

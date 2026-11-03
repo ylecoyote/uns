@@ -312,6 +312,8 @@ def create_app(
         if runtime.adapters.get_adapter(Channel.WEBSOCKET) is None:
             runtime.adapters.register(WebSocketDeliveryAdapter(app))
         app.state.policy_store = runtime.policy_runtime.store
+        app.state.learning_store = runtime.learning_store
+        app.state.shadow_evaluator = runtime.shadow_evaluator
         if redis_client is not None:
             from uns.policy_runtime import (
                 RedisPolicyReloadBroadcaster,

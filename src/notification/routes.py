@@ -58,12 +58,18 @@ from uns.responses import (
     DeliveryStatusResponse,
     DLQListResponse,
     DLQRemoveResponse,
+    PolicyPromotionResponse,
+    PolicyProposalActionRequest,
+    PolicyProposalCreateRequest,
+    PolicyProposalListResponse,
+    PolicyProposalSummary,
     PolicyReloadRequest,
     PolicyReloadResponse,
     SendNotificationRequest,
     SendNotificationResponse,
     SimulateNotificationResponse,
 )
+from uns.shadow_evaluator import resolve_shadow_evaluator
 from uns.signaling import send_signal as service_send_signal
 from uns.signaling import simulate_signal as service_simulate_signal
 
@@ -391,6 +397,276 @@ async def reload_policies(
             configure_policy_registry(registry=runtime_registry)
         return PolicyReloadResponse(loaded_count=loaded_count, persisted_count=persisted_count,
             policy_count=len(runtime_registry), notification_types=sorted(runtime_registry.list_notification_types()))
+
+
+@ops_router.get("/policies/proposals", response_model=PolicyProposalListResponse)
+async def list_policy_proposals_api(
+    http_request: Request,
+    policy_type: str | None = None,
+    state: str | None = None,
+    limit: int = 50,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> PolicyProposalListResponse:
+    """List policy delta proposals and shadow evaluation aggregates."""
+    from notification.policy_learning import DeltaState
+
+    if policy_type:
+        require_source_and_namespace(principal, notification_type=policy_type)
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        return PolicyProposalListResponse(items=[], total_count=0)
+    try:
+        state_enum = DeltaState(state.upper()) if state else None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid proposal state: {state}") from exc
+    deltas = evaluator.learning_store.list_deltas(
+        policy_type=policy_type,
+        state=state_enum,
+        limit=max(1, min(limit, 200)),
+    )
+    items = [
+        evaluator.format_proposal_summary(d, include_samples=False)
+        for d in deltas
+        if principal is None or principal.allows_namespace(d.policy_type)
+    ]
+    return PolicyProposalListResponse(items=items, total_count=len(items))
+
+
+@ops_router.get("/policies/proposals/{delta_id}", response_model=PolicyProposalSummary)
+async def get_policy_proposal_api(
+    delta_id: UUID,
+    http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> PolicyProposalSummary:
+    """Return full detail for one policy delta proposal including shadow samples."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    delta = evaluator.learning_store.get_delta(delta_id)
+    if delta is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=delta.policy_type)
+    return evaluator.format_proposal_summary(delta, include_samples=True)
+
+
+@ops_router.post(
+    "/policies/proposals",
+    response_model=PolicyProposalSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_policy_proposal(
+    proposal: PolicyProposalCreateRequest,
+    http_request: Request,
+    principal: WritePrincipal = Depends(require_producer_principal),
+) -> PolicyProposalSummary:
+    """Create a governed PolicyDelta proposal and optionally promote to SHADOW (PREVIEW)."""
+    require_source_and_namespace(principal, notification_type=proposal.policy_type)
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Policy learning store is not available",
+        )
+    try:
+        delta = evaluator.propose_delta(
+            policy_type=proposal.policy_type,
+            field_path=proposal.field_path,
+            proposed_value=proposal.proposed_value,
+            reasoning=proposal.reasoning,
+            actor=principal.subject,
+            confidence=proposal.confidence,
+            evidence_count=proposal.evidence_count,
+            promote_to_shadow=proposal.promote_to_shadow,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return evaluator.format_proposal_summary(delta, include_samples=True)
+
+
+@ops_router.post(
+    "/policies/proposals/{delta_id}/shadow",
+    response_model=PolicyProposalSummary,
+)
+async def promote_proposal_to_shadow(
+    delta_id: UUID,
+    http_request: Request,
+    body: PolicyProposalActionRequest | None = None,
+    principal: WritePrincipal = Depends(require_admin_principal),
+) -> PolicyProposalSummary:
+    """Promote a PROPOSED delta to SHADOW and materialize a PREVIEW policy revision."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=503, detail="Policy learning store is not available")
+    existing = evaluator.learning_store.get_delta(delta_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    try:
+        promoted = evaluator.promote_to_shadow(
+            delta_id,
+            actor=principal.subject,
+            reason=body.reason if body else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return evaluator.format_proposal_summary(promoted, include_samples=True)
+
+
+@ops_router.post(
+    "/policies/proposals/{delta_id}/approve",
+    response_model=PolicyPromotionResponse,
+)
+async def approve_proposal_to_draft(
+    delta_id: UUID,
+    http_request: Request,
+    body: PolicyProposalActionRequest | None = None,
+    principal: WritePrincipal = Depends(require_admin_principal),
+) -> PolicyPromotionResponse:
+    """Verify shadow evidence and guard gates, approve SHADOW -> APPROVED, and create a DRAFT revision."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=503, detail="Policy learning store is not available")
+    existing = evaluator.learning_store.get_delta(delta_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    try:
+        approved, save_result, draft_policy = evaluator.approve_to_draft(
+            delta_id,
+            actor=principal.subject,
+            reason=body.reason if body else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return PolicyPromotionResponse(
+        delta=evaluator.format_proposal_summary(approved, include_samples=True),
+        policy_id=save_result.policy_id,
+        notification_type=draft_policy.notification_type,
+        version=draft_policy.version,
+        status=draft_policy.status.value,
+        config_hash=save_result.content_hash,
+        message=(
+            f"Approved delta {delta_id} into DRAFT revision "
+            f"{draft_policy.notification_type} v{draft_policy.version}"
+        ),
+    )
+
+
+@ops_router.post(
+    "/policies/proposals/{delta_id}/activate",
+    response_model=PolicyPromotionResponse,
+)
+async def activate_approved_proposal(
+    delta_id: UUID,
+    http_request: Request,
+    body: PolicyProposalActionRequest | None = None,
+    principal: WritePrincipal = Depends(require_admin_principal),
+) -> PolicyPromotionResponse:
+    """Explicitly promote an approved proposal's DRAFT revision to ACTIVE (DRAFT -> ACTIVE)."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=503, detail="Policy learning store is not available")
+    existing = evaluator.learning_store.get_delta(delta_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    try:
+        save_result, active_policy, applied_delta = evaluator.activate_draft(
+            actor=principal.subject,
+            delta_id=delta_id,
+            reason=body.reason if body else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return PolicyPromotionResponse(
+        delta=(
+            evaluator.format_proposal_summary(applied_delta, include_samples=True)
+            if applied_delta is not None
+            else None
+        ),
+        policy_id=save_result.policy_id,
+        notification_type=active_policy.notification_type,
+        version=active_policy.version,
+        status=active_policy.status.value,
+        config_hash=save_result.content_hash,
+        message=(
+            f"Activated {active_policy.notification_type} v{active_policy.version} "
+            f"(DRAFT -> ACTIVE)"
+        ),
+    )
+
+
+@ops_router.post(
+    "/policies/proposals/{delta_id}/reject",
+    response_model=PolicyProposalSummary,
+)
+async def reject_policy_proposal(
+    delta_id: UUID,
+    http_request: Request,
+    body: PolicyProposalActionRequest | None = None,
+    principal: WritePrincipal = Depends(require_admin_principal),
+) -> PolicyProposalSummary:
+    """Reject a policy delta proposal."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=503, detail="Policy learning store is not available")
+    existing = evaluator.learning_store.get_delta(delta_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    try:
+        rejected = evaluator.reject_delta(
+            delta_id,
+            actor=principal.subject,
+            reason=(body.reason if body and body.reason else "Rejected by operator"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return evaluator.format_proposal_summary(rejected, include_samples=True)
+
+
+@ops_router.post(
+    "/policies/revisions/{policy_id}/activate",
+    response_model=PolicyPromotionResponse,
+)
+async def activate_draft_policy_revision(
+    policy_id: UUID,
+    http_request: Request,
+    body: PolicyProposalActionRequest | None = None,
+    principal: WritePrincipal = Depends(require_admin_principal),
+) -> PolicyPromotionResponse:
+    """Explicitly promote a persisted DRAFT policy revision to ACTIVE by policy_id."""
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=503, detail="Policy store is not available")
+    found = evaluator.policy_store.get_policy_by_id(policy_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Policy revision not found")
+    require_source_and_namespace(principal, notification_type=found[1].notification_type)
+    try:
+        save_result, active_policy, applied_delta = evaluator.activate_draft(
+            actor=principal.subject,
+            policy_id=policy_id,
+            reason=body.reason if body else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return PolicyPromotionResponse(
+        delta=(
+            evaluator.format_proposal_summary(applied_delta, include_samples=True)
+            if applied_delta is not None
+            else None
+        ),
+        policy_id=save_result.policy_id,
+        notification_type=active_policy.notification_type,
+        version=active_policy.version,
+        status=active_policy.status.value,
+        config_hash=save_result.content_hash,
+        message=(
+            f"Activated {active_policy.notification_type} v{active_policy.version} "
+            f"(DRAFT -> ACTIVE)"
+        ),
+    )
 
 
 # Re-export for backward compatibility. uns_mcp.tools and any other

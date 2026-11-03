@@ -201,20 +201,31 @@ Returns the complete raw `uns_notifications` row plus its ordered `uns_events` r
 - `POST /api/v1/runtime/notifications/{id}/replay`: Starts a new delivery cycle (`cycle + 1`, `cycle_attempts = 0`, `status = "PENDING"`). Raises `409 Conflict` if `replay_blocked_by` is present.
 - `DELETE /api/v1/dlq/{entry_id}`: Resolves/clears `dead_letter = false` without re-sending (`FAILURE_RESOLVED`).
 
-#### 5. `POST /api/v1/policies/reload` (Status `200 OK`)
+#### 5. `POST /api/v1/policies/reload` & Governed Policy Promotion (`POST /api/v1/policies/proposals*`)
 ```json
-// Request Body
+// POST /api/v1/policies/reload Request Body
 {
   "policy_dir": "examples/policies/mip-uns"
 }
 ```
 Validates all YAML policy files in `policy_dir`, enforces `PolicyDelta` transition guards against the current durable snapshot (`409` on invalid promotion/lifecycle transition, `422` on schema error, `404` on missing directory), and atomically persists the new revision.
 
+In addition, UNS `v0.5.0+` exposes governed policy delta proposal, shadow evaluation inspection, and promotion endpoints:
+- `GET /api/v1/policies/proposals` & `GET /ui/policies/proposals`: Lists durable `PolicyDelta` proposals (`?notification_type=...&status=...`) paired with `ShadowEvaluationSummaryItem` (`sample_count`, `matching_count`, `accuracy_rate`, `threshold`, `min_samples`, `meets_threshold`), guard check results (`BOUNDS`, `CONFLICT`, `INVARIANTS`), baseline hash drift state (`baseline_matches_current`), and promotion eligibility (`can_approve_to_draft`).
+- `GET /api/v1/policies/proposals/{delta_id}` & `GET /ui/policies/proposals/{delta_id}`: Returns a single proposal with its recent `shadow_samples` (`ShadowEvaluationSampleItem`) and `transitions` (`PolicyTransitionItem`).
+- `POST /api/v1/policies/proposals` (`admin` scope): Creates a `PROPOSED` (or immediately `SHADOW` when `start_shadow: true`) `PolicyDelta` against the current active/latest policy for `notification_type`, validating allow-listed field paths (`ALLOWED_POLICY_FIELD_PATHS`) and executing `PolicyChangeProposalService.evaluate_guards()`.
+- `POST /api/v1/policies/proposals/{delta_id}/shadow` (`admin` scope): Transitions a `PROPOSED` delta into `SHADOW` so `ShadowPolicyEvaluator` evaluates it asynchronously against live intake.
+- `POST /api/v1/policies/proposals/{delta_id}/approve` (`admin` scope): Verifies guard stages, baseline hash consistency (`409 policy_baseline_drift` on mismatch), and shadow sample/accuracy thresholds (`409 policy_promotion_conflict` if unmet), transitions the delta to `APPROVED`, and persists a `DRAFT` policy revision in `notification_policy_revisions`.
+- `POST /api/v1/policies/proposals/{delta_id}/activate` & `POST /api/v1/policies/revisions/{policy_id}/activate` (`admin` scope): Promotes a `DRAFT` revision to `ACTIVE` (retiring prior `ACTIVE`/`PREVIEW` revisions and broadcasting a cross-process policy reload notification) and marks the corresponding `APPROVED` delta `APPLIED`.
+- `POST /api/v1/policies/proposals/{delta_id}/reject` (`admin` scope): Transitions a `PROPOSED`, `SHADOW`, or `APPROVED` delta to `REJECTED` with operator attribution and audit trail.
+
 #### 6. Console Read-Model Endpoints (`GET /ui/*`)
 All `/ui/*` endpoints are strictly read-only (`INV-UI-001`):
 - `GET /ui/deliveries`: Cursor-paginated delivery summaries with filters (`status`, `intent`, `delivery_mode`, `agent_id`, `autonomy_mode`, `notification_type`, `channel`, `start_time`, `end_time`).
 - `GET /ui/deliveries/{notification_id}`: Full delivery timeline and policy resolution steps for one notification.
 - `GET /ui/policies/effective`: Query effective policy resolution (`?notification_type=...&intent=...&autonomy_mode=...&irreversible=false`).
+- `GET /ui/policies/active` & `GET /ui/policies/revisions`: Active policy catalog and revision history (`ACTIVE`, `PREVIEW`, `DRAFT`, `RETIRED`).
+- `GET /ui/policies/proposals` & `GET /ui/policies/proposals/{delta_id}`: Governed `PolicyDelta` proposals, shadow evaluation aggregates, recent shadow samples, guard checks, and transition history.
 - `GET /ui/invariants` & `GET /ui/invariants/summary`: System invariant registry and pass/fail summary counts.
 - `GET /ui/audit`: Cursor-paginated compliance audit stream with filters (`event_type`, `notification_id`, `agent_id`, `autonomy_mode`, `correlation_id`).
 

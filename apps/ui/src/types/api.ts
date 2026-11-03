@@ -453,3 +453,116 @@ export interface PolicyReloadResponsePayload {
   policy_count: number;
   notification_types: string[];
 }
+
+export type DeltaState = 'PROPOSED' | 'SHADOW' | 'APPROVED' | 'APPLIED' | 'REJECTED';
+export type ShadowStatus = 'PENDING' | 'PASSED' | 'FAILED';
+
+export interface ShadowEvaluationSummaryItem {
+  aggregate_id: string;
+  delta_id: string;
+  baseline_hash?: string | null;
+  candidate_hash?: string | null;
+  evaluated_by?: string | null;
+  total_decisions: number;
+  improved_decisions: number;
+  degraded_decisions: number;
+  neutral_decisions: number;
+  win_rate: number;
+  min_sample_met: boolean;
+  accuracy_threshold_met: boolean;
+  status: ShadowStatus | string;
+  can_promote_to_approval: boolean;
+  computed_at: string;
+}
+
+export interface ShadowEvaluationSampleItem {
+  result_id: string;
+  delta_id: string;
+  decision_id: string;
+  original_outcome: Record<string, unknown>;
+  shadow_outcome: Record<string, unknown>;
+  changed: boolean;
+  improvement_score?: number | null;
+  evaluated_at: string;
+}
+
+export interface PolicyGuardResultItem {
+  candidate_hash?: string | null;
+  stage: string;
+  allowed: boolean;
+  reason?: string | null;
+  reason_detail?: string | null;
+  checks: Record<string, unknown>;
+  checked_at: string;
+}
+
+export interface PolicyTransitionItem {
+  from_state?: string | null;
+  to_state: string;
+  actor: string;
+  reason?: string | null;
+  guard_stage?: string | null;
+  transitioned_at: string;
+}
+
+export interface PolicyProposalSummary {
+  delta_id: string;
+  policy_type: string;
+  field_path: string;
+  current_value: unknown;
+  proposed_value: unknown;
+  reasoning: string;
+  confidence: number;
+  evidence_count: number;
+  state: DeltaState | string;
+  baseline_hash?: string | null;
+  baseline_version?: number | null;
+  candidate_hash: string;
+  approval_candidate_hash?: string | null;
+  current_active_hash?: string | null;
+  current_active_version?: number | null;
+  baseline_hash_matches: boolean;
+  evidence_hash_matches: boolean;
+  can_promote_to_shadow: boolean;
+  can_approve: boolean;
+  can_activate: boolean;
+  draft_policy_id?: string | null;
+  draft_version?: string | null;
+  required_guards: string[];
+  guard_results: PolicyGuardResultItem[];
+  transition_history: PolicyTransitionItem[];
+  shadow_aggregate?: ShadowEvaluationSummaryItem | null;
+  shadow_results?: ShadowEvaluationSampleItem[];
+  proposed_by: string;
+  approved_by?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
+  applied_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyProposalListResponse {
+  items: PolicyProposalSummary[];
+  total_count: number;
+}
+
+export interface PolicyProposalCreateRequest {
+  policy_type: string;
+  field_path: string;
+  proposed_value: unknown;
+  reasoning: string;
+  confidence?: number;
+  evidence_count?: number;
+  promote_to_shadow?: boolean;
+}
+
+export interface PolicyPromotionResponse {
+  delta?: PolicyProposalSummary | null;
+  policy_id?: string | null;
+  notification_type: string;
+  version: string;
+  status: string;
+  config_hash: string;
+  message: string;
+}

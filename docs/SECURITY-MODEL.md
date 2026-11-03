@@ -54,7 +54,7 @@ Canonical intake, simulation and effective-policy inspection use runtime-scoped 
 
 Canonical intake also rejects adapter-control metadata such as `slack_channel`, `email_to`, `pagerduty_severity`, and WebSocket recipient controls. Other metadata remains event data. Direct low-level adapter integrations remain trusted code and must not be mistaken for a protected producer API.
 
-Notification policy approval governs configuration changes, not business actions. Shadow measurements come from trusted external evaluators. Hashes bind content and revisions; they are not signatures or proof that the measurements are honest.
+Notification policy approval governs configuration changes, not business actions. Automated `ShadowPolicyEvaluator` measurements (`ShadowEvaluationResult` and `ShadowEvaluationAggregate`) run asynchronously in-process against live intake without external channel side effects, and `SHADOW -> DRAFT -> ACTIVE` promotion requires `admin` operator authority, passing `BOUNDS`/`CONFLICT`/`INVARIANTS` guards, matching `baseline_config_hash` (preventing stale-baseline promotion), and satisfied `UNS_SHADOW_MIN_SAMPLES` / `UNS_SHADOW_ACCURACY_THRESHOLD` gates. Hashes bind content and revisions; they are not cryptographic signatures.
 
 ## Persistence and external effects
 

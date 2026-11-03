@@ -147,7 +147,9 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                 </td>
                 <td>
                   Full administrative authority: atomic policy reload (
-                  <code>POST /api/v1/policies/reload</code>), dead-letter <strong>Replay</strong> (
+                  <code>POST /api/v1/policies/reload</code>), governed policy delta proposal,
+                  shadow promotion, draft approval, and activation (
+                  <code>POST /api/v1/policies/proposals*</code>), dead-letter <strong>Replay</strong> (
                   <code>POST /api/v1/runtime/notifications/&#123;id&#125;/replay</code>) and{' '}
                   <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code> —
                   where in canonical <code>uns.Runtime</code> / <code>RuntimeDLQ</code> mode,{' '}
@@ -602,6 +604,18 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             <code>source: &quot;uns-console-policy-test&quot;</code> (request field) and{' '}
             <code>metadata.source: &quot;uns_console_policy_test&quot;</code> (metadata tag) via{' '}
             <code>POST /api/v1/notifications</code>.
+          </li>
+          <li>
+            <strong>Proposals &amp; Shadow Evidence Workspace (<code>GET /ui/policies/proposals</code>):</strong>{' '}
+            Surfaces durable <code>PolicyDelta</code> proposals across <code>PROPOSED</code>,{' '}
+            <code>SHADOW</code>, <code>APPROVED</code>, <code>APPLIED</code>, and{' '}
+            <code>REJECTED</code> states, live intake shadow sample progress (
+            <code>sample_count / min_samples</code> and <code>accuracy_rate</code> via{' '}
+            <code>ShadowPolicyEvaluator</code>), guard check results (<code>BOUNDS</code>,{' '}
+            <code>CONFLICT</code>, <code>INVARIANTS</code>), baseline hash drift detection (
+            <code>baseline_matches_current</code>), and operator-gated promotion actions (
+            <code>Promote to SHADOW</code>, <code>Approve to DRAFT</code>, and{' '}
+            <code>Activate DRAFT &rarr; ACTIVE</code>).
           </li>
           <li>
             <strong>Atomic Policy Reload (<code>POST /api/v1/policies/reload</code>):</strong>{' '}

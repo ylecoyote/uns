@@ -43,6 +43,7 @@ from sqlalchemy.pool import StaticPool
 from db.audit_store import SQLAlchemyAuditStore, delivery_audit_row
 from db.models import AckAuditRecord as AckRow
 from db.models import Base
+from db.policy_learning_store import SQLAlchemyPolicyLearningStore
 from notification.adapters.base import DeliveryLeaseLostError, DeliveryResult
 from notification.audit import create_audit_record
 from notification.models import (
@@ -63,6 +64,7 @@ from uns.database import is_in_memory_database_url
 from uns.policy_runtime import PolicyRuntime
 from uns.responses import AckResponse, SendNotificationRequest, SendNotificationResponse
 from uns.schema import migrate_runtime_schema
+from uns.shadow_evaluator import ShadowPolicyEvaluator
 
 log = logging.getLogger(__name__)
 
@@ -153,6 +155,9 @@ class Runtime:
         retry_seconds: float = 1,
         clock: Callable[[], float] = time.time,
         callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        shadow_evaluation_enabled: bool | None = None,
+        shadow_min_samples: int | None = None,
+        shadow_accuracy_threshold: float | None = None,
     ) -> None:
         options: dict[str, Any] = {}
         is_in_memory = is_in_memory_database_url(database_url)
@@ -181,6 +186,14 @@ class Runtime:
         self.audit_store = SQLAlchemyAuditStore(self.sessions)
         self.adapters = adapters or SimpleAdapterRegistry()
         self.policy_runtime = PolicyRuntime(self.sessions, adapters=self.adapters)
+        self.learning_store = SQLAlchemyPolicyLearningStore(self.sessions)
+        self.shadow_evaluator = ShadowPolicyEvaluator(
+            self.policy_runtime.store,
+            self.learning_store,
+            enabled=shadow_evaluation_enabled,
+            min_samples=shadow_min_samples,
+            accuracy_threshold=shadow_accuracy_threshold,
+        )
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         self.max_attempts = max_attempts
@@ -446,6 +459,9 @@ class Runtime:
             if _retry >= 3:
                 raise
             return self.accept(request, principal=principal, _retry=_retry + 1)
+        if self.shadow_evaluator.enabled:
+            with contextlib.suppress(Exception):
+                self.shadow_evaluator.evaluate_intake(request, decision_id=identifier)
         return self.response(identifier)
 
     async def send(

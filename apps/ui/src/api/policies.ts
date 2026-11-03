@@ -15,6 +15,10 @@ import type {
   ActivePolicyListResponse,
   EffectivePolicyResponse,
   PolicyInspectorParams,
+  PolicyPromotionResponse,
+  PolicyProposalCreateRequest,
+  PolicyProposalListResponse,
+  PolicyProposalSummary,
   PolicyReloadResponsePayload,
   PolicyRevisionListResponse,
   PolicyRevisionsFilter,
@@ -150,6 +154,142 @@ export async function reloadPolicies(
     'POST',
     '/api/v1/policies/reload',
     {},
+    options
+  );
+}
+
+/**
+ * Fetch governed PolicyDelta proposals and shadow evaluation aggregates.
+ */
+export async function fetchPolicyProposals(
+  filters?: { policy_type?: string; state?: string },
+  options?: RequestOptions
+): Promise<PolicyProposalListResponse> {
+  const params: Record<string, string | undefined> = {};
+  if (filters?.policy_type) {
+    params.policy_type = filters.policy_type;
+  }
+  if (filters?.state) {
+    params.state = filters.state;
+  }
+  return apiGet<PolicyProposalListResponse>(
+    '/policies/proposals',
+    Object.keys(params).length > 0 ? params : undefined,
+    options
+  );
+}
+
+/**
+ * Fetch a single PolicyDelta proposal including shadow decision samples and guard history.
+ */
+export async function fetchPolicyProposalDetail(
+  deltaId: string,
+  options?: RequestOptions
+): Promise<PolicyProposalSummary> {
+  return apiGet<PolicyProposalSummary>(
+    `/policies/proposals/${encodeURIComponent(deltaId)}`,
+    undefined,
+    options
+  );
+}
+
+/**
+ * Create a new PolicyDelta proposal against the current ACTIVE baseline.
+ * Requires producer or admin scope.
+ */
+export async function createPolicyProposal(
+  payload: PolicyProposalCreateRequest,
+  options?: RequestOptions
+): Promise<PolicyProposalSummary> {
+  return apiRootRequest<PolicyProposalSummary>(
+    'POST',
+    '/api/v1/policies/proposals',
+    payload,
+    options
+  );
+}
+
+/**
+ * Promote a PROPOSED delta to SHADOW and materialize a PREVIEW policy revision.
+ * Requires admin scope.
+ */
+export async function promoteProposalToShadow(
+  deltaId: string,
+  reason?: string,
+  options?: RequestOptions
+): Promise<PolicyProposalSummary> {
+  return apiRootRequest<PolicyProposalSummary>(
+    'POST',
+    `/api/v1/policies/proposals/${encodeURIComponent(deltaId)}/shadow`,
+    reason ? { reason } : {},
+    options
+  );
+}
+
+/**
+ * Approve a qualifying SHADOW delta into a DRAFT policy revision (SHADOW -> APPROVED).
+ * Requires admin scope.
+ */
+export async function approveProposalToDraft(
+  deltaId: string,
+  reason?: string,
+  options?: RequestOptions
+): Promise<PolicyPromotionResponse> {
+  return apiRootRequest<PolicyPromotionResponse>(
+    'POST',
+    `/api/v1/policies/proposals/${encodeURIComponent(deltaId)}/approve`,
+    reason ? { reason } : {},
+    options
+  );
+}
+
+/**
+ * Explicitly activate an APPROVED proposal's DRAFT revision into ACTIVE (DRAFT -> ACTIVE).
+ * Requires admin scope.
+ */
+export async function activateApprovedProposal(
+  deltaId: string,
+  reason?: string,
+  options?: RequestOptions
+): Promise<PolicyPromotionResponse> {
+  return apiRootRequest<PolicyPromotionResponse>(
+    'POST',
+    `/api/v1/policies/proposals/${encodeURIComponent(deltaId)}/activate`,
+    reason ? { reason } : {},
+    options
+  );
+}
+
+/**
+ * Reject a policy delta proposal.
+ * Requires admin scope.
+ */
+export async function rejectPolicyProposal(
+  deltaId: string,
+  reason?: string,
+  options?: RequestOptions
+): Promise<PolicyProposalSummary> {
+  return apiRootRequest<PolicyProposalSummary>(
+    'POST',
+    `/api/v1/policies/proposals/${encodeURIComponent(deltaId)}/reject`,
+    reason ? { reason } : {},
+    options
+  );
+}
+
+/**
+ * Explicitly promote a DRAFT policy revision to ACTIVE by policy_id.
+ * Requires admin scope.
+ */
+export async function activateDraftRevision(
+  policyId: string,
+  reason?: string,
+  options?: RequestOptions
+): Promise<PolicyPromotionResponse> {
+  return apiRootRequest<PolicyPromotionResponse>(
+    'POST',
+    `/api/v1/policies/revisions/${encodeURIComponent(policyId)}/activate`,
+    reason ? { reason } : {},
     options
   );
 }

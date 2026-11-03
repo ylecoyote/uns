@@ -1,23 +1,23 @@
 # UNS Roadmap (`v0.2.0` → `v1.0.0`)
 
-This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.4.0` releases toward `v1.0.0`.
+This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.5.0` releases toward `v1.0.0`.
 
 Live execution progress and individual deliverables are tracked natively in [GitHub Milestones](https://github.com/ylecoyote/uns/milestones). To keep this document accurate without commit churn, task checklists live in the linked GitHub Milestones and Issues rather than in this file.
 
 ---
 
-## Current Baseline: `v0.2.0` – `v0.4.0` (Shipped)
+## Current Baseline: `v0.2.0` – `v0.5.0` (Shipped)
 
-Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), and [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0) establish the consolidated, single-repository notification obligation control plane:
+Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0), and [`v0.5.0`](https://github.com/ylecoyote/uns/releases/tag/v0.5.0) establish the consolidated, single-repository notification obligation control plane:
 
 - **Durable Transactional Outbox & PostgreSQL Parity (`uns.Runtime` & `uns-maintain`):** Atomic policy resolution, notification acceptance, leader/follower deduplication ownership, audit provenance, and `uns-maintain` retention + SHA-256 verified archive-before-prune across both SQLite (WAL) and PostgreSQL 16 (`psycopg[binary]`).
 - **Lease-Fenced Channel Delivery & Bi-Directional Webhooks:** Outbound adapters for Slack (`SlackAdapter`), PagerDuty Events API v2 (`PagerDutyAdapter`), Email/SMTP (`EmailAdapter`), and WebSocket (`WebSocketDeliveryAdapter`) with provider-attempt lease guards (`guard_provider_attempt`), dead-letter replay (`RuntimeDLQ`), and signed inbound Slack (`POST /api/v1/webhooks/slack`) and PagerDuty v3 (`POST /api/v1/webhooks/pagerduty`) webhooks.
-- **Cross-Process Policy Authority (`uns.policy_runtime.PolicyRuntime`):** Revision-locked policy snapshots with PostgreSQL `LISTEN/NOTIFY` (`uns_policy_reload`) and Redis pub/sub (`uns:policies:reload`) broadcast for immediate multi-node cache synchronization.
+- **Cross-Process Policy Authority & Governed Shadow Evolution (`uns.policy_runtime.PolicyRuntime` & `uns.shadow_evaluator.ShadowPolicyEvaluator`):** Revision-locked policy snapshots with PostgreSQL `LISTEN/NOTIFY` (`uns_policy_reload`) and Redis pub/sub (`uns:policies:reload`) broadcast, plus automated `PREVIEW`/`SHADOW` intake shadow evaluation, guard verification (`BOUNDS`, `CONFLICT`, `INVARIANTS`), and gated `SHADOW -> DRAFT -> ACTIVE` promotion.
 - **Explicit Response & Timeout Lifecycle:** Durable `PENDING -> ACKED | DISMISSED | TIMED_OUT` state machine anchored to first qualifying delivery, with follower inheritance (`obligation_owner_id`, `effective_ack_status`, `ack_inherited`) and retriable host callbacks.
 - **Source- & Namespace-Scoped Credential Authority:** Least-privilege capability keys (`UNS_API_KEY`, `UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`, `UNS_SCOPED_API_KEYS`) with wildcard/prefix `allowed_sources` and `allowed_namespaces` bounds enforced across HTTP REST, WebSocket, and MCP (`uns-mcp`).
-- **6-Surface Responder & Operator Console (`apps/ui`):** React 19 + TypeScript 5.9 + Vite 8 application covering `/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, and `/docs`.
+- **6-Surface Responder & Operator Console (`apps/ui`):** React 19 + TypeScript 5.9 + Vite 8 application covering `/deliveries`, `/policy` (including the `Proposals & Shadow Evidence` promotion workspace), `/operations`, `/invariants`, `/audit`, and `/docs`.
 
-See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verification](TESTING.md) for the acceptance matrix (`1,900+` Python tests, `23` PostgreSQL 16 + concurrency/load tests, `345` UI tests, and `66/66` persistent localhost checks).
+See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verification](TESTING.md) for the acceptance matrix (`1,900+` Python tests, `23` PostgreSQL 16 + concurrency/load tests, `346` UI tests, and `66/66` persistent localhost checks).
 
 ---
 
@@ -27,7 +27,7 @@ See [Product Contract](PRODUCT.md) for current boundaries and [Testing & Verific
 flowchart LR
     v02["v0.2.0 (Shipped)\nDurable Outbox & Console"] --> v03["v0.3.0 (Shipped)\nBi-Directional Webhooks & Registry"]
     v03 --> v04["v0.4.0 (Shipped)\nMulti-Node & Postgres Ops"]
-    v04 --> v05["v0.5.0\nGoverned Policy Evolution"]
+    v04 --> v05["v0.5.0 (Shipped)\nGoverned Policy Evolution"]
     v05 --> v10["v1.0.0\nSLO Certification & Action Gate"]
 ```
 
@@ -55,17 +55,17 @@ flowchart LR
 
 ---
 
-### 3. [`v0.5.0` — Governed Policy Evolution & Shadow Evaluation Workspace](https://github.com/ylecoyote/uns/milestone/3)
+### 3. [`v0.5.0` — Governed Policy Evolution & Shadow Evaluation Workspace](https://github.com/ylecoyote/uns/milestone/3) *(Shipped)*
 
 **Goal:** Turn the in-tree `policy_learning` and `policy_learning_store` foundations into an end-to-end shadow evaluation and promotion workflow.
 
 > [!NOTE]
-> **Why `policy_learning` is in the repository today:** `src/notification/policy_learning.py` and `src/db/policy_learning_store.py` already implement immutable config envelopes, `PolicyDelta` state transitions (`PROPOSED -> APPROVED -> APPLIED`), guard checks, and `ShadowEvaluationAggregate` gates. In `v0.2.0`, shadow evaluation aggregates are supplied by external evaluators. Milestone `v0.5.0` brings automated shadow execution and operator promotion into the runtime and Console.
+> **How governed policy evolution works (`v0.5.0`):** `src/notification/policy_learning.py`, `src/db/policy_learning_store.py`, and `src/uns/shadow_evaluator.py` implement immutable config envelopes, `PolicyDelta` state transitions (`PROPOSED -> SHADOW -> APPROVED -> APPLIED`), guard checks (`BOUNDS`, `CONFLICT`, `INVARIANTS`), and live intake `ShadowEvaluationAggregate` gates.
 
-| Deliverable | Architectural Scope | Tracking Issue |
+| Deliverable | Architectural Scope | Status & Tracking Issue |
 | :--- | :--- | :--- |
-| **Automated `PREVIEW` Shadow Evaluation Runner** | Evaluate `PREVIEW` candidate policies asynchronously against live intake without triggering external channel sends or mutating live obligation state, recording `ShadowEvaluationResult` samples automatically. | [#46](https://github.com/ylecoyote/uns/issues/46) |
-| **Console `/policy` Promotion Workflow** | Add a `Proposals & Shadow Evidence` workspace in `/policy` (`PolicyInspectorPage.tsx`) to inspect sample aggregates, verify guard stages, approve qualifying deltas into `DRAFT`, and explicitly activate `DRAFT -> ACTIVE`. | [#47](https://github.com/ylecoyote/uns/issues/47) |
+| **Automated `PREVIEW` Shadow Evaluation Runner** | Evaluate `PREVIEW` candidate policies and `SHADOW` deltas asynchronously against live intake (`ShadowPolicyEvaluator`) without triggering external channel sends or mutating live obligation state, recording `ShadowEvaluationResult` samples automatically. | **Shipped (`v0.5.0`)** · [#46](https://github.com/ylecoyote/uns/issues/46) |
+| **Console `/policy` Promotion Workflow** | Add a `Proposals & Shadow Evidence` workspace in `/policy` (`PolicyInspectorPage.tsx`) and `/api/v1/policies/proposals/*` endpoints to inspect sample aggregates, verify guard stages, approve qualifying deltas into `DRAFT`, and explicitly activate `DRAFT -> ACTIVE`. | **Shipped (`v0.5.0`)** · [#47](https://github.com/ylecoyote/uns/issues/47) |
 
 ---
 

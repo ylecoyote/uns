@@ -61,6 +61,9 @@ UNS reads `UNS_*` environment variables (`src/uns/config.py` and `src/uns/api/au
 | `UNS_HOST` | `127.0.0.1` | No | Bind address for the `uns` HTTP/WebSocket server (`--host` CLI override). |
 | `UNS_PORT` | `8000` | No | TCP port for the `uns` HTTP/WebSocket server (`--port` CLI override). |
 | `UNS_POLICY_DIR` | *(None)* | No | Directory of YAML policy definitions loaded and persisted into the durable `notification_policies` store at startup. |
+| `UNS_SHADOW_EVALUATION_ENABLED` | `true` | No | Enables asynchronous `ShadowPolicyEvaluator` execution (`true`/`1`/`yes`) against live intake for `SHADOW` policy deltas and `PREVIEW` policy revisions without external channel side effects. |
+| `UNS_SHADOW_MIN_SAMPLES` | `20` | No | Minimum shadow evaluation sample count required before a `SHADOW` delta can be approved into a `DRAFT` revision (`1..100000`). |
+| `UNS_SHADOW_ACCURACY_THRESHOLD` | `0.95` | No | Minimum shadow routing agreement/accuracy threshold (`0.0..1.0`) required for `SHADOW -> DRAFT` approval. |
 | `UNS_CREATE_TABLES` | `false` (`true` for explicit in-memory operation) | No | When `true`, runs additive table bootstrap on startup (`uns-migrate` is recommended instead in production). |
 | `UNS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | No | Comma-separated list of allowed CORS and WebSocket `Origin` headers for the UNS Console. |
 | `UNS_ALLOW_UNAUTHENTICATED_READS` | `false` | No | Compatibility flag (`true`/`1`/`yes`) permitting unauthenticated HTTP `GET`/`HEAD` on read routes only. Never enables writes, `/readyz`, `/metrics`, or WebSockets. |

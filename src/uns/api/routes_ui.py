@@ -45,6 +45,7 @@ from notification.models import (
     NotificationIntent,
 )
 from notification.policies import PolicyStatus
+from notification.policy_learning import DeltaState
 from uns.api.auth import (
     WritePrincipal,
     require_authenticated_observer,
@@ -100,6 +101,8 @@ from uns.responses import (
     InvariantStatus,
     InvariantSummaryResponse,
     PaginationInfo,
+    PolicyProposalListResponse,
+    PolicyProposalSummary,
     PolicyRevisionListResponse,
     PolicyRevisionSummary,
     ResolutionContext,
@@ -109,6 +112,7 @@ from uns.responses import (
 from uns.responses import (
     UIErrorResponse as ErrorResponse,
 )
+from uns.shadow_evaluator import resolve_shadow_evaluator
 
 logger = get_structured_logger(__name__)
 
@@ -553,6 +557,73 @@ async def list_policy_revisions(
             if principal.allows_namespace(item.notification_type)
         ]
     return PolicyRevisionListResponse(items=items, total_count=len(items))
+
+
+@router.get(
+    "/policies/proposals",
+    response_model=PolicyProposalListResponse,
+    summary="List policy delta proposals and shadow evaluation evidence",
+    description="Return governed policy delta proposals, shadow evaluation aggregates, and guard results.",
+)
+async def list_policy_proposals(
+    http_request: Request,
+    policy_type: str | None = Query(
+        default=None, description="Filter by notification_type / policy_type"
+    ),
+    state: DeltaState | None = Query(
+        default=None, description="Filter by delta lifecycle state"
+    ),
+    limit: int = Query(default=50, ge=1, le=200, description="Maximum proposals to return"),
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> PolicyProposalListResponse:
+    """Return governed policy delta proposals and shadow evaluation summaries."""
+    if policy_type:
+        require_source_and_namespace(principal, notification_type=policy_type)
+    log_endpoint_call(
+        logger,
+        "list_policy_proposals",
+        policy_type=policy_type,
+        state=state.value if state else None,
+        limit=limit,
+    )
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        return PolicyProposalListResponse(items=[], total_count=0)
+
+    deltas = evaluator.learning_store.list_deltas(
+        policy_type=policy_type,
+        state=state,
+        limit=limit,
+    )
+    items: list[PolicyProposalSummary] = []
+    for delta in deltas:
+        if principal is not None and not principal.allows_namespace(delta.policy_type):
+            continue
+        items.append(evaluator.format_proposal_summary(delta, include_samples=False))
+    return PolicyProposalListResponse(items=items, total_count=len(items))
+
+
+@router.get(
+    "/policies/proposals/{delta_id}",
+    response_model=PolicyProposalSummary,
+    summary="Inspect a policy delta proposal and shadow evaluation samples",
+    description="Return full detail for a policy delta proposal, including shadow decision samples and guard history.",
+)
+async def get_policy_proposal(
+    delta_id: UUID,
+    http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> PolicyProposalSummary:
+    """Return full detail for one policy delta proposal."""
+    log_endpoint_call(logger, "get_policy_proposal", delta_id=str(delta_id))
+    evaluator = resolve_shadow_evaluator(http_request.app.state)
+    if evaluator is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    delta = evaluator.learning_store.get_delta(delta_id)
+    if delta is None:
+        raise HTTPException(status_code=404, detail="Policy proposal not found")
+    require_source_and_namespace(principal, notification_type=delta.policy_type)
+    return evaluator.format_proposal_summary(delta, include_samples=True)
 
 
 @router.get(
