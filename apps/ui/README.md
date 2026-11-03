@@ -9,7 +9,7 @@ Canonical UI: **React + TypeScript + Vite (SPA)**.
 | Technology | Supported line | Purpose |
 |---|---|---|
 | React | 19.x | UI components |
-| TypeScript | 5.9.x | Static types |
+| TypeScript | 5.8+ (5.9.x) | Static types |
 | Vite | 8.x | Development and production build |
 | React Router | 7.x | Client-side navigation |
 | Vitest | 5.x | Component and client tests |
@@ -19,7 +19,7 @@ Node must satisfy `^20.19.0 || ^22.12.0 || >=24.0.0`, as declared in package.jso
 
 ## Design Principles
 
-The console provides flight instruments for operators. It has no direct backend imports and consumes HTTP GET-only endpoints under `/ui/*`. Phase 1 posture remains read-only dashboards, effective-policy inspection and audit history. Authentication does not turn the UI into an approval or execution surface.
+The console provides flight instruments for operators. It has no direct backend imports and consumes HTTP GET-only endpoints under `/ui/*`. Phase 1 posture remains read-only dashboards, effective-policy inspection and audit history. While `/ui/*` endpoints are `GET-only` read models (`Phase 1` read-only baseline), `Phase 2` responder and operator workflows invoke capability-gated `/api/v1/*` endpoints (`POST /api/v1/notifications/{id}/ack`, `/dismiss`, `POST /api/v1/runtime/notifications/{id}/replay`, `DELETE /api/v1/dlq/{entry_id}`, `POST /api/v1/notifications/simulate`, `POST /api/v1/notifications`, `POST /api/v1/policies/reload`, `GET /readyz`, `GET /api/v1/channels/health`, `GET /api/v1/dlq`, `GET /api/v1/runtime/dead-letters`). In both postures, the backend is authoritative; the UI is non-authoritative and has no mutation actions without explicit server verification. Authentication does not turn the UI into an unverified approval or execution surface.
 
 Backend invariants remain authoritative. See [INV-UI-001](../../docs/verification/invariants.yml) and [UI scope](../../docs/ui/ui-scope.md). Degraded responses produce a degraded banner; successful HTTP status is not proof of provider delivery or human comprehension.
 
@@ -112,6 +112,10 @@ The client reads the current tab credential. Contract decoders validate the resp
 
 ## API Endpoints Consumed
 
+### Read Model Endpoints (`/ui/*` — Phase 1 Read-Only Baseline)
+
+`/ui/*` endpoints are `GET-only` read models representing the Phase 1 read-only baseline:
+
 | Endpoint | Purpose |
 |---|---|
 | GET `/ui/session` | Capability introspection (`OPERATOR`, `RESPONDER`, `PRODUCER`, `READ-ONLY`) |
@@ -123,6 +127,24 @@ The client reads the current tab credential. Contract decoders validate the resp
 | GET `/ui/policies/revisions` | Policy revision history and lineage |
 | GET `/ui/invariants` | Invariant records |
 | GET `/ui/invariants/summary` | Invariant summary |
+
+### Responder & Operator Workflows (`/api/v1/*` & Telemetry — Phase 2 Capability-Gated)
+
+Phase 2 responder and operator workflows invoke capability-gated `/api/v1/*` endpoints and operational telemetry:
+
+| Endpoint | Purpose |
+|---|---|
+| POST `/api/v1/notifications/{id}/ack` | Acknowledge pending notification |
+| POST `/api/v1/notifications/{id}/dismiss` | Dismiss notification |
+| POST `/api/v1/runtime/notifications/{id}/replay` | Replay dead-letter notification |
+| DELETE `/api/v1/dlq/{entry_id}` | Purge / resolve dead-letter queue entry |
+| POST `/api/v1/notifications/simulate` | Policy evaluation dry-run simulation |
+| POST `/api/v1/notifications` | Tagged test notification send |
+| POST `/api/v1/policies/reload` | Hot-reload policies from disk |
+| GET `/readyz` | System readiness telemetry with degraded tolerance |
+| GET `/api/v1/channels/health` | Channel health inspection |
+| GET `/api/v1/dlq` | Dead-letter queue inspection |
+| GET `/api/v1/runtime/dead-letters` | Runtime dead-letter recovery eligibility |
 
 ## Related Documentation
 

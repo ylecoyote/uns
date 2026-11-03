@@ -96,7 +96,7 @@ When you identify an operational incident in the console, consult the `/docs?sec
 
 ## Related Documentation
 
-- [Console Developer README](../../apps/ui/README.md)
+- [Console Developer README](https://github.com/ylecoyote/uns/blob/main/apps/ui/README.md)
 - [UI Data Contracts](../ui/ui-data-contracts.md)
 - [UI Scope](../ui/ui-scope.md)
 - [Producer Integration Guide](PRODUCER-INTEGRATION-GUIDE.md)

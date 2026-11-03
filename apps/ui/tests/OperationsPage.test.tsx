@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { OperationsPage } from '../src/pages/OperationsPage';
 import { clearConsoleSession, startConsoleSession } from '../src/auth/session';
@@ -14,7 +14,7 @@ global.fetch = mockFetch;
 const mockReadyzPayload = {
   status: 'ready',
   service: 'uns',
-  version: '0.1.0',
+  version: '0.2.0',
   persistence_mode: 'persistent',
   policy_count: 14,
   dlq_depth: 2,
@@ -452,5 +452,89 @@ describe('OperationsPage', () => {
         `Resolved dead-letter entry ${entryBlocked}.`
       );
     });
+  });
+
+  it('resumes polling and fetches fresh snapshot on visibilitychange when poll timer fired while hidden', async () => {
+    vi.useFakeTimers();
+    try {
+      startConsoleSession('observer-key', {
+        subject: 'observer-user',
+        scopes: ['observer'],
+        auth_mode: 'required',
+      });
+
+      const queueSnapshotMocks = () => {
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(mockReadyzPayload),
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(mockChannelHealthPayload),
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(mockDlqPayload),
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(mockRuntimeDeadLettersPayload),
+          });
+      };
+
+      queueSnapshotMocks();
+      renderOperationsPage();
+
+      // Complete initial snapshot
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+
+      // Transition document visibility to 'hidden'
+      const originalVisibility = document.visibilityState;
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      });
+
+      // Advance by poll interval (15s) while tab is hidden
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15000);
+      });
+
+      // Polling should NOT have fetched another snapshot while hidden
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+
+      // Now transition document visibility to 'visible'
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+
+      queueSnapshotMocks();
+
+      // Dispatch visibilitychange event
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Polling immediately resumed and fetched a fresh snapshot
+      expect(mockFetch).toHaveBeenCalledTimes(8);
+
+      // Cleanup
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => originalVisibility,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

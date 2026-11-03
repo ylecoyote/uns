@@ -345,6 +345,7 @@ export function OperationsPage() {
 
     if (mountedRef.current && autoRefreshRef.current) {
       pollTimeoutRef.current = setTimeout(() => {
+        pollTimeoutRef.current = null;
         if (!mountedRef.current || !autoRefreshRef.current) return;
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
           void fetchSnapshotRef.current(false);
@@ -356,6 +357,21 @@ export function OperationsPage() {
   useEffect(() => {
     fetchSnapshotRef.current = fetchSnapshot;
   }, [fetchSnapshot]);
+
+  useEffect(() => {
+    if (!autoRefresh || typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !pollTimeoutRef.current) {
+        void fetchSnapshotRef.current(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [autoRefresh]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -377,6 +393,7 @@ export function OperationsPage() {
       pollTimeoutRef.current = null;
     } else if (autoRefresh && !pollTimeoutRef.current && !isLoading && !isRefreshing) {
       pollTimeoutRef.current = setTimeout(() => {
+        pollTimeoutRef.current = null;
         if (!mountedRef.current || !autoRefreshRef.current) return;
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
           void fetchSnapshot(false);

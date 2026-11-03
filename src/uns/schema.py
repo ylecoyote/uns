@@ -95,11 +95,30 @@ def _backfill_successors(connection: Connection) -> None:
         import uns.runtime  # noqa: F401 - populate Base.metadata
         work = Base.metadata.tables["uns_notifications"]
         events = Base.metadata.tables["uns_events"]
-    rows = {r["id"]: r for r in connection.execute(select(work)).mappings()}
+    promoted = list(
+        connection.execute(
+            select(events).where(events.c.kind == "DEDUP_OWNER_PROMOTED")
+        ).mappings()
+    )
+    if not promoted:
+        return
+    referenced_ids: set[str] = set()
+    for event in promoted:
+        predecessor = event["payload"].get("previous_owner_id")
+        successor = event["notification_id"]
+        if isinstance(predecessor, str) and predecessor != successor:
+            referenced_ids.add(predecessor)
+            referenced_ids.add(successor)
+    if not referenced_ids:
+        return
+    rows = {
+        r["id"]: r
+        for r in connection.execute(
+            select(work).where(work.c.id.in_(referenced_ids))
+        ).mappings()
+    }
     links: dict[str, set[str]] = {}
-    for event in connection.execute(
-        select(events).where(events.c.kind == "DEDUP_OWNER_PROMOTED")
-    ).mappings():
+    for event in promoted:
         predecessor = event["payload"].get("previous_owner_id")
         successor = event["notification_id"]
         if not isinstance(predecessor, str) or predecessor == successor:

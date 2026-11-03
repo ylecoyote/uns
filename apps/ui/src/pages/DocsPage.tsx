@@ -1465,7 +1465,7 @@ export function DocsPage() {
   const [searchQuery, setSearchQuery] = useState(urlQuery);
 
   useEffect(() => {
-    setSearchQuery(urlQuery);
+    setSearchQuery((prev) => (prev !== urlQuery ? urlQuery : prev));
   }, [urlQuery]);
 
   const selectedSection = parseSectionParam(searchParams.get('section'));

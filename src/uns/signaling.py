@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -321,17 +321,29 @@ async def send_signal(
     )
 
     ack_status: AckStatus | None = None
-    if notification.require_ack:
+    should_register_ack = bool(notification.require_ack)
+    if delivery_service is not None and result.status not in (
+        DeliveryStatus.SUCCESS,
+        DeliveryStatus.DELIVERED,
+    ):
+        should_register_ack = False
+
+    if should_register_ack:
         try:
             engine = get_ack_engine()
         except RuntimeError:
             engine = configure_ack_engine()
+        ack_created_at = (
+            (getattr(result, "delivered_at", None) or datetime.now(UTC))
+            if delivery_service is not None
+            else notification.created_at
+        )
         engine.register_notification(
             notification_id=notification.notification_id,
             intent=notification.intent,
             autonomy_context=notification.autonomy_context,
             timeout_minutes=notification.ack_timeout_minutes,
-            created_at=notification.created_at,
+            created_at=ack_created_at,
         )
         ack_status = engine.get_status(notification.notification_id)
 

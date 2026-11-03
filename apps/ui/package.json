@@ -13,8 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint src --fix",
+    "lint": "eslint src tests --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src tests --fix",
     "type-check": "tsc --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
     "ci": "npm run type-check && npm run lint && npm run test:run && npm run build"

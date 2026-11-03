@@ -28,7 +28,10 @@ export function useDeliveries(filter: DeliveryFilter): UseDeliveriesResult {
       setError(null);
 
       try {
-        const filterWithCursor = loadingMore ? { ...filter, cursor } : filter;
+        const filterWithCursor: DeliveryFilter = {
+          ...filter,
+          cursor: loadingMore && cursor ? cursor : undefined,
+        };
         const response = await getDeliveries(filterWithCursor);
 
         if (loadingMore) {

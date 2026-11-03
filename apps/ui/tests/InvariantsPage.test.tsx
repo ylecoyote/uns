@@ -282,9 +282,10 @@ describe('InvariantsPage', () => {
 
   describe('Error handling', () => {
     it('displays error message when API fails', async () => {
-      const mockError = new Error('Network error') as any;
-      mockError.code = 'network_error';
-      mockError.request_id = 'req-123';
+      const mockError = Object.assign(new Error('Network error'), {
+        code: 'network_error',
+        request_id: 'req-123',
+      });
       vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
 
       render(<InvariantsPage />);
@@ -297,8 +298,9 @@ describe('InvariantsPage', () => {
     });
 
     it('displays degraded state warning when appropriate', async () => {
-      const mockError = new Error('Service degraded') as any;
-      mockError.code = 'service_degraded';
+      const mockError = Object.assign(new Error('Service degraded'), {
+        code: 'service_degraded',
+      });
       vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
 
       render(<InvariantsPage />);
@@ -309,9 +311,10 @@ describe('InvariantsPage', () => {
     });
 
     it('handles invariants_source_unavailable error gracefully', async () => {
-      const mockError = new Error('Invariants source unavailable') as any;
-      mockError.code = 'invariants_source_unavailable';
-      mockError.request_id = 'req-456';
+      const mockError = Object.assign(new Error('Invariants source unavailable'), {
+        code: 'invariants_source_unavailable',
+        request_id: 'req-456',
+      });
       vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
       vi.mocked(api.fetchInvariantsSummary).mockRejectedValue(mockError);
 
@@ -333,8 +336,9 @@ describe('InvariantsPage', () => {
     });
 
     it('does not show degraded state for not_found errors', async () => {
-      const mockError = new Error('Not found') as any;
-      mockError.code = 'not_found';
+      const mockError = Object.assign(new Error('Not found'), {
+        code: 'not_found',
+      });
       vi.mocked(api.fetchInvariants).mockRejectedValue(mockError);
 
       render(<InvariantsPage />);

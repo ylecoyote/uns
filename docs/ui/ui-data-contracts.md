@@ -15,7 +15,8 @@ adds that public proxy.
 | Phase | Status | Endpoints |
 |-------|--------|-----------|
 | **Phase 0/1** | Implemented | Delivery timelines, effective policy, invariants, audit events |
-| **Phase 2** | Planned | Escalations, audit statistics, policy simulation |
+| **v0.2.0** | Implemented | Policy simulation (`POST /ui/policies/simulate`) |
+| **Phase 2** | Planned | Escalations, audit statistics |
 
 ## Machine-Readable Contract Snapshot
 
@@ -27,7 +28,7 @@ This snapshot is generated deterministically from the Pydantic models in `src/un
 
 ## Design Principles
 
-1. **Read-only** - All endpoints are read-only per [UI Scope v1](ui-scope.md)
+1. **Read-only / Evaluation** - UI read endpoints are read-only per [UI Scope v1](ui-scope.md); policy simulation is an idempotent evaluation endpoint implemented in v0.2.0
 2. **Consistent pagination** - All list endpoints use cursor-based pagination
 3. **Consistent filtering** - Filter parameters follow a standard pattern
 4. **Consistent errors** - Error responses use a uniform structure
@@ -800,7 +801,7 @@ interface BatchTimelineResponse {
 
 UNS Console endpoints do not currently add HTTP rate-limit headers. Channel
 delivery rate limiting is documented separately in
-[Delivery Semantics](../sections/delivery-semantics.md) and [API Reference](../API.md#rate-limiting).
+[Delivery Semantics](../sections/delivery-semantics.md) and [API Reference](../API.md).
 
 ## Cursor Semantics
 
@@ -816,4 +817,4 @@ delivery rate limiting is documented separately in
 - [UI Scope](ui-scope.md) - v1 scope and constraints
 - [Delivery Semantics](../sections/delivery-semantics.md) - Delivery behavior details
 - [Policy Lifecycle](../sections/policy-lifecycle.md) - Policy resolution rules
-- [Invariants](../verification/invariants.md) - Invariant enforcement process
+- [Invariants](../support/STATE-MACHINE-AND-SCHEMA.md) - Invariant enforcement process and schema (replaces historical invariants.md)

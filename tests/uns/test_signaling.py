@@ -308,13 +308,17 @@ async def test_send_signal_enqueues_to_dlq_when_guaranteed_delivery_fails() -> N
     """send_signal() pushes to dlq_service when GUARANTEED delivery fails all persistent channels."""
     from unittest.mock import MagicMock
 
+    from notification.acknowledgment import get_ack_engine
     from notification.audit import InMemoryAuditStore
     from notification.models import Channel, DeliveryMode, DeliveryStatus, NotificationResult
     from notification.routes import SendNotificationRequest
     from uns.signaling import send_signal
 
     audit_store = InMemoryAuditStore()
-    request_payload = _build_send_request_payload(delivery_mode=DeliveryMode.GUARANTEED)
+    request_payload = _build_send_request_payload(
+        delivery_mode=DeliveryMode.GUARANTEED,
+        require_ack=True,
+    )
     request = SendNotificationRequest.model_validate(request_payload)
 
     class FailingDeliveryService:
@@ -341,6 +345,8 @@ async def test_send_signal_enqueues_to_dlq_when_guaranteed_delivery_fails() -> N
 
     assert response.status == DeliveryStatus.FAILED
     assert response.message == "notification delivery failed"
+    assert response.ack_status is None
+    assert get_ack_engine().get_status(response.notification_id) is None
     dlq_service.enqueue.assert_called_once()
     call_args, call_kwargs = dlq_service.enqueue.call_args
     assert call_args[0].notification_id == response.notification_id
@@ -364,5 +370,52 @@ async def test_send_signal_enqueues_to_dlq_when_guaranteed_delivery_fails() -> N
         dlq_service=dlq_service_add,
     )
     assert response_add.status == DeliveryStatus.FAILED
+    assert response_add.ack_status is None
+    assert get_ack_engine().get_status(response_add.notification_id) is None
     dlq_service_add.add.assert_called_once()
     assert dlq_service_add.add.call_args[1]["reason"] == "guaranteed_delivery_failed"
+
+
+@pytest.mark.asyncio
+async def test_send_signal_registers_ack_with_delivered_at_on_delivery_success() -> None:
+    """When delivery succeeds, ack registration created_at uses result.delivered_at."""
+    from datetime import UTC, datetime, timedelta
+
+    from notification.acknowledgment import get_ack_engine
+    from notification.audit import InMemoryAuditStore
+    from notification.models import Channel, DeliveryMode, DeliveryStatus, NotificationResult
+    from notification.routes import SendNotificationRequest
+    from uns.signaling import send_signal
+
+    audit_store = InMemoryAuditStore()
+    request_payload = _build_send_request_payload(
+        delivery_mode=DeliveryMode.GUARANTEED,
+        require_ack=True,
+    )
+    request = SendNotificationRequest.model_validate(request_payload)
+    delivered_timestamp = datetime.now(UTC) + timedelta(seconds=10)
+
+    class SuccessfulDeliveryService:
+        async def deliver(self, notification: Any) -> NotificationResult:
+            return NotificationResult(
+                notification_id=notification.notification_id,
+                status=DeliveryStatus.DELIVERED,
+                channels_attempted=[Channel.SLACK],
+                channels_succeeded=[Channel.SLACK],
+                channels_failed=[],
+                delivered_at=delivered_timestamp,
+            )
+
+    response = await send_signal(
+        request=request,
+        audit_store=audit_store,
+        idempotency_store={},
+        delivery_service=SuccessfulDeliveryService(),
+    )
+
+    assert response.status == DeliveryStatus.DELIVERED
+    assert response.ack_status is not None
+    engine = get_ack_engine()
+    state = engine._storage.get_ack_state(response.notification_id)
+    assert state is not None
+    assert state.created_at == delivered_timestamp

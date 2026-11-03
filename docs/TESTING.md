@@ -3,7 +3,7 @@
 Run from the consolidated repository with its development environment:
 
 ```sh
-.venv/bin/python -m pytest tests apps/ui/tests
+.venv/bin/python -m pytest tests
 .venv/bin/ruff check src tests scripts apps
 .venv/bin/mypy -p uns -p notification -p db -p ui_client -p uns_mcp
 .venv/bin/bandit -q -r src
@@ -130,7 +130,7 @@ Base: `7cf5c12c7a25607fff8242b2bdfe115a145dc485`. This follow-up closes the WebS
 
 | Check | Result |
 |---|---|
-| Full Python suite (`tests` and `apps/ui/tests`) | **1,854 passed**, 90.99% combined coverage against the 75% gate |
+| Full Python suite (`tests`) | **1,854 passed**, 90.99% combined coverage against the 75% gate |
 | New regressions | 16 scoped WebSocket cases, 37 persistence/entrypoint cases, 6 owner/projection cases, and 6 operational-progress cases |
 | Python static checks | Ruff passed; mypy passed for 92 source files; Bandit passed |
 | Console | 305 tests passed; TypeScript, ESLint, production build, and strict UI boundary passed |

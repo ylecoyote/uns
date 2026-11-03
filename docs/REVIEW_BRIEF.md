@@ -99,7 +99,7 @@ Start in an isolated checkout of the target code. The recording demo sends nothi
 python3.12 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/python -m pytest tests/uns -q
-.venv/bin/python -m pytest tests apps/ui/tests
+.venv/bin/python -m pytest tests
 .venv/bin/python examples/uns_demo.py
 ```
 

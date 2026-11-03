@@ -658,6 +658,9 @@ class Runtime:
     ) -> bool | int:
         if notification_id is None:
             batch_limit = limit if limit is not None else 100
+            if batch_limit <= 0:
+                return 0
+            candidate_limit = max(batch_limit * 4, 32)
             now = self.clock()
             with self.sessions() as session:
                 ids = list(
@@ -670,13 +673,15 @@ class Runtime:
                             work.c.lease_until <= now,
                         )
                         .order_by(work.c.next_attempt, work.c.id)
-                        .limit(batch_limit)
+                        .limit(candidate_limit)
                     ).scalars()
                 )
             dispatched = 0
             for identifier in ids:
                 if await self.dispatch(identifier):
                     dispatched += 1
+                    if dispatched >= batch_limit:
+                        break
             return dispatched
 
         identifier, token, now = str(notification_id), str(uuid4()), self.clock()

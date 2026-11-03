@@ -131,7 +131,7 @@ flowchart LR
 
 From `apps/ui`, use `npm ci` then `npm run dev`. Node must satisfy `^20.19.0 || ^22.12.0 || >=24.0.0`. The development proxy forwards same-origin `/ui/*` to localhost:8000. For production, serve the SPA and route `/ui/*` to the backend on the same trusted origin.
 
-Operators enter an API key at runtime. Use `UNS_OBSERVER_API_KEY` for the read-only Console; other credentials with `observer` scope also work. A full operator key retains administrative authority even when entered into a read-only UI. The key lives in tab memory only; logout or reload removes it. Do not put keys in VITE variables, browser storage or URLs. See [console instructions](../apps/ui/README.md) and the [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md).
+Operators enter an API key at runtime. Use `UNS_OBSERVER_API_KEY` for the read-only Console; other credentials with `observer` scope also work. A full operator key retains administrative authority even when entered into a read-only UI. The key lives in tab memory only; logout or reload removes it. Do not put keys in VITE variables, browser storage or URLs. See [console instructions](https://github.com/ylecoyote/uns/blob/main/apps/ui/README.md) and the [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md).
 
 ### Building the Console for Production
 

@@ -14,6 +14,8 @@ and ``SignalClient``. Service-layer read functions (``get_invariants_summary``,
 
 from typing import Any
 
+__version__ = "0.2.0"
+
 from notification.acknowledgment import (
     AcknowledgmentEngine,
     AckState,
@@ -179,6 +181,7 @@ __all__ = [
     "SignalIntent",
     "SignalPolicy",
     "ValidationError",
+    "__version__",
     "acknowledge",
     "apply_policy_delta",
     "canonical_config_json",

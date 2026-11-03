@@ -643,7 +643,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
       items: [
         {
           notification_type: 'ops.canary_check',
-          version: '0.1.0',
+          version: '0.2.0',
           status: 'DRAFT',
           config_hash: 'aaaa1111222233334444',
           intent: 'OPERATIONAL',
@@ -718,7 +718,7 @@ describe('PolicyWorkspace Surface 4 (Catalog, Deep-Link, Simulator, Tagged Test 
       screen.getByTestId('policy-revision-status-trading.order_placed-2.1.0')
     ).toHaveClass('tag-delivery-pending');
     expect(
-      screen.getByTestId('policy-revision-status-ops.canary_check-0.1.0')
+      screen.getByTestId('policy-revision-status-ops.canary_check-0.2.0')
     ).toHaveClass('tag-delivery-pending');
     expect(
       screen.getByTestId('policy-revision-status-trading.order_placed-1.0.0')

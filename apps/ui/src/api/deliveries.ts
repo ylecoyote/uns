@@ -64,8 +64,16 @@ export async function getDeliveryTimeline(
   notificationId: string,
   options?: RequestOptions
 ): Promise<DeliveryTimelineResponse> {
-  const data = await apiGet<DeliveryTimelineResponse>(`/deliveries/${notificationId}`, undefined, options);
-  return decodeWithMode(decodeDeliveryTimeline, data, `GET /ui/deliveries/${notificationId}`);
+  const data = await apiGet<DeliveryTimelineResponse>(
+    `/deliveries/${encodeURIComponent(notificationId)}`,
+    undefined,
+    options
+  );
+  return decodeWithMode(
+    decodeDeliveryTimeline,
+    data,
+    `GET /ui/deliveries/${encodeURIComponent(notificationId)}`
+  );
 }
 
 export async function acknowledgeNotification(
@@ -75,7 +83,7 @@ export async function acknowledgeNotification(
 ): Promise<AckResponse> {
   return apiRootRequest<AckResponse>(
     'POST',
-    `/api/v1/notifications/${notificationId}/ack`,
+    `/api/v1/notifications/${encodeURIComponent(notificationId)}/ack`,
     body ?? {},
     options
   );
@@ -88,7 +96,7 @@ export async function dismissNotification(
 ): Promise<AckResponse> {
   return apiRootRequest<AckResponse>(
     'POST',
-    `/api/v1/notifications/${notificationId}/dismiss`,
+    `/api/v1/notifications/${encodeURIComponent(notificationId)}/dismiss`,
     body ?? {},
     options
   );

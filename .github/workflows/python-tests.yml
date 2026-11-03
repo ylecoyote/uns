@@ -64,7 +64,7 @@ jobs:
 
       - name: Run Python tests
         run: >
-          uv run pytest tests apps/ui/tests --tb=short
+          uv run pytest tests --tb=short
           --cov=src/uns
           --cov=src/notification
           --cov=src/db

@@ -517,4 +517,4 @@ This pattern ensures:
 - [API Reference](../API.md) - Complete API documentation
 - [Policy Lifecycle](policy-lifecycle.md) - Policy management
 - [Producer Integration Guide](../user-guides/PRODUCER-INTEGRATION-GUIDE.md) - End-to-end producer cookbook
-- [README](../../README.md) - Quick start guide
+- [Documentation Index](../README.md) - Documentation index

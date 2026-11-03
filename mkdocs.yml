@@ -6,6 +6,26 @@ repo_name: ylecoyote/uns
 docs_dir: docs
 site_dir: site
 
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: info
+    anchors: warn
+    unrecognized_links: warn
+
+exclude_docs: |
+  archive/**
+
+not_in_nav: |
+  decisions/**
+  testing/**
+  uns/**
+  policy-engine-migration.md
+  post-v0.2-followups.md
+
 theme:
   name: material
   features:

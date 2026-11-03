@@ -78,3 +78,12 @@ def test_all_entries_are_resolvable() -> None:
         assert hasattr(uns, name), (
             f"uns.__all__ lists {name!r} but it is not defined on the module"
         )
+
+
+def test_public_api_version_alignment() -> None:
+    """uns and uns_mcp export matching __version__ == '0.2.0'."""
+    import uns_mcp
+
+    assert uns.__version__ == uns_mcp.__version__ == "0.2.0"
+    assert "__version__" in uns.__all__
+    assert "__version__" in uns_mcp.__all__

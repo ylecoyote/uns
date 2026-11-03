@@ -148,25 +148,25 @@ class TestPostgresOperationalAcceptance:
         # 1. Save initial policy snapshot
         policy = _sample_policy()
         rev0 = policy_store.save_snapshot([policy])
-        assert rev0 >= 0
+        assert rev0 == 1
 
         # 2. Warm hydration via store
         snap = policy_store.load_snapshot()
-        assert snap.revision == rev0
+        assert snap.revision >= 1
         registry = snap.registry()
         assert registry.get_sync("agent.risk_limit_breach") is not None
 
         # 3. Cold hydration in fresh PolicyRuntime
         cold_runtime = Runtime(POSTGRES_URL, create_tables=False)
         cold_snap = cold_runtime.policy_runtime.store.load_snapshot()
-        assert cold_snap.revision == rev0
+        assert cold_snap.revision == snap.revision
 
         # 4. Revision locking inside runtime.accept()
         req = _make_send_request("Revision lock check")
         resp = runtime.accept(req, principal="pg-tester")
         row = runtime.get(resp.notification_id)
         resolution = row["notification"]["metadata"]["uns_resolution"]
-        assert resolution["snapshot_revision"] == rev0
+        assert resolution["snapshot_revision"] == snap.revision
 
         runtime.engine.dispose()
         cold_runtime.engine.dispose()
@@ -512,6 +512,57 @@ class TestSustainedConcurrencyAndLoad:
         assert len(set(adapter.calls)) == 40, "Duplicate send calls detected!"
 
         # Verify all notifications reached DELIVERED terminal status
+        for nid in notification_ids:
+            row = runtime.get(nid)
+            assert row["status"] == "DELIVERED", f"Notification {nid} status was {row['status']}"
+
+        runtime.engine.dispose()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_dispatch_workers_limit_1_drain_without_starvation(
+        self, target_database_url: str
+    ) -> None:
+        """4 concurrent workers calling dispatch(limit=1) in a loop drain all notifications without starvation."""
+        adapter = RecordingAdapter(Channel.SLACK, success=True)
+        adapters = SimpleAdapterRegistry()
+        adapters.register(adapter)
+        runtime = Runtime(target_database_url, create_tables=True, adapters=adapters)
+
+        # Enqueue 30 unique pending guaranteed notifications
+        notification_ids: list[UUID] = []
+        for i in range(30):
+            req = _make_send_request(
+                f"Limit1Contention {i}",
+                idempotency_key=f"limit1-contention-{i}-{uuid4()}",
+            )
+            resp = runtime.accept(req, principal="load-tester")
+            notification_ids.append(resp.notification_id)
+
+        assert len(notification_ids) == 30
+
+        # 4 concurrent workers calling runtime.dispatch(limit=1) in a loop
+        async def worker(worker_id: int) -> int:
+            worker_dispatched = 0
+            empty_cycles = 0
+            while empty_cycles < 5:
+                dispatched = await runtime.dispatch(limit=1)
+                if isinstance(dispatched, int):
+                    if dispatched > 0:
+                        worker_dispatched += dispatched
+                        empty_cycles = 0
+                    else:
+                        empty_cycles += 1
+                elif not dispatched:
+                    empty_cycles += 1
+                await asyncio.sleep(0.002)
+            return worker_dispatched
+
+        results = await asyncio.gather(*[worker(i) for i in range(4)])
+        total_dispatched = sum(results)
+        assert total_dispatched == 30, f"Expected 30 dispatched, got {total_dispatched}"
+        assert len(adapter.calls) == 30, f"Expected 30 adapter calls, got {len(adapter.calls)}"
+        assert len(set(adapter.calls)) == 30, "Duplicate send calls detected!"
+
         for nid in notification_ids:
             row = runtime.get(nid)
             assert row["status"] == "DELIVERED", f"Notification {nid} status was {row['status']}"

@@ -26,7 +26,6 @@ import {
   getValidationMode,
   setValidationMode,
   decodeWithMode,
-  type DecodeResult,
 } from '../src/api/validators';
 
 // ============================================================================

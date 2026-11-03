@@ -40,7 +40,7 @@ pytest
 pytest tests/docs/
 
 # Run with coverage
-pytest tests apps/ui/tests --cov=src/uns --cov=src/notification --cov=src/db --cov=src/uns_mcp
+pytest tests --cov=src/uns --cov=src/notification --cov=src/db --cov=src/uns_mcp
 
 # Run a specific test file
 pytest tests/uns/test_remediation_runtime.py
