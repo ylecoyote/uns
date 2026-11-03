@@ -182,6 +182,12 @@ pre,
   color: var(--color-text);
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.nav-brand-mark {
+  flex-shrink: 0;
+  display: block;
 }
 
 .nav-links {

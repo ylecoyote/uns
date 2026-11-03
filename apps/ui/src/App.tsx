@@ -16,6 +16,7 @@ import {
   type CapabilityPill,
 } from './auth/session';
 import { ConsoleSignIn } from './components/ConsoleSignIn';
+import { UnsLogoMark } from './components/UnsLogoMark';
 import './App.css';
 
 function pillClassName(pill: CapabilityPill): string {
@@ -44,7 +45,10 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <nav className="app-nav">
-          <div className="nav-brand">UNS Console</div>
+          <div className="nav-brand">
+            <UnsLogoMark size={24} />
+            <span>UNS Console</span>
+          </div>
           <ul className="nav-links">
             {navRoutes.map((route) => (
               <li key={route.path}>

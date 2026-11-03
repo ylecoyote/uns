@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, apiGet } from '../api/client';
 import { requestPeerConsoleSession, startConsoleSession } from '../auth/session';
 import type { ConsoleSessionResponse } from '../types/api';
+import { UnsLogoMark } from './UnsLogoMark';
 
 function accessError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -76,7 +77,12 @@ export function ConsoleSignIn({ expired }: { expired: boolean }) {
 
   return (
     <div className="app">
-      <header className="app-nav"><div className="nav-brand">UNS Console</div></header>
+      <header className="app-nav">
+        <div className="nav-brand">
+          <UnsLogoMark size={24} />
+          <span>UNS Console</span>
+        </div>
+      </header>
       <main className="auth-main">
         <h1>Connect to UNS Console</h1>
         <p>Enter the API key supplied by your service administrator to view deliveries, policies, and audit events.</p>

@@ -1,5 +1,11 @@
 # UNS, Unified Notification Service
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup.svg" />
+  <img alt="UNS — Unified Notification Service" src="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup.svg" height="56" />
+</picture>
+
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 
 **Durable notifications with policy provenance and response history.**

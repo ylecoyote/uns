@@ -28,6 +28,8 @@ not_in_nav: |
 
 theme:
   name: material
+  logo: assets/logo/uns-mark-on-dark.svg
+  favicon: assets/logo/uns-mark.svg
   features:
     - navigation.tabs
     - navigation.sections

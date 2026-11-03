@@ -1,5 +1,11 @@
 # UNS documentation
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo/uns-lockup-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="assets/logo/uns-lockup.svg" />
+  <img alt="UNS — Unified Notification Service" src="assets/logo/uns-lockup.svg" height="56" />
+</picture>
+
 | Task | Document |
 |---|---|
 | Evaluate UNS | [Product](PRODUCT.md), [roadmap](ROADMAP.md), [architecture](ARCHITECTURE.md), [delivery semantics](sections/delivery-semantics.md) |
