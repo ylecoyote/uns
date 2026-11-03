@@ -13,40 +13,46 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "lint:fix": "eslint src --ext ts,tsx --fix",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --fix",
     "type-check": "tsc --noEmit",
     "generate-types": "tsx scripts/generate-types.ts",
     "ci": "npm run type-check && npm run lint && npm run test:run && npm run build"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "react-router-dom": "^7.18.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.25.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
-    "@typescript-eslint/parser": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.1",
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "^5.0.5",
     "@vitest/ui": "^5.0.5",
-    "eslint": "^8.57.1",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^16.0.0",
     "jsdom": "^30.1.3",
     "msw": "^2.0.11",
     "openapi-typescript": "^7.13.0",
     "tsx": "^4.23.15",
-    "typescript": "^5.3.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.4",
     "vitest": "^5.0.5"
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }

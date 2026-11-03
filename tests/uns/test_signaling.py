@@ -222,3 +222,147 @@ async def test_simulate_signal_has_no_ack_or_audit_side_effects() -> None:
     assert response.simulated is True
     assert response.ack_status is None
     assert response.message == "notification simulated"
+
+
+@pytest.mark.asyncio
+async def test_send_signal_dispatches_through_delivery_service_and_returns_delivered() -> None:
+    """send_signal() invokes delivery_service and returns DELIVERED on channel success."""
+    from unittest.mock import AsyncMock
+
+    from notification.audit import InMemoryAuditStore
+    from notification.models import Channel, DeliveryStatus, NotificationResult
+    from uns.signaling import send_signal
+
+    audit_store = InMemoryAuditStore()
+    request = _build_send_request()
+
+    delivery_service = AsyncMock()
+    delivery_service.deliver.side_effect = lambda n: NotificationResult(
+        notification_id=n.notification_id,
+        status=DeliveryStatus.DELIVERED,
+        channels_attempted=[Channel.SLACK],
+        channels_succeeded=[Channel.SLACK],
+        channels_failed=[],
+    )
+
+    dlq_service = AsyncMock()
+
+    response = await send_signal(
+        request=request,
+        audit_store=audit_store,
+        idempotency_store={},
+        delivery_service=delivery_service,
+        dlq_service=dlq_service,
+    )
+
+    assert response.status == DeliveryStatus.DELIVERED
+    assert response.channels_succeeded == [Channel.SLACK]
+    assert response.message == "notification delivered"
+    delivery_service.deliver.assert_called_once()
+    assert dlq_service.enqueue.call_count == 0
+    assert dlq_service.add.call_count == 0
+
+    rows = audit_store.get_delivery_audits_for_notification(response.notification_id)
+    assert len(rows) == 1
+    assert rows[0].status == DeliveryStatus.DELIVERED
+
+
+@pytest.mark.asyncio
+async def test_send_signal_dispatches_through_sync_delivery_service() -> None:
+    """send_signal() supports synchronous delivery_service.deliver."""
+    from notification.audit import InMemoryAuditStore
+    from notification.models import Channel, DeliveryStatus, Notification, NotificationResult
+    from uns.signaling import send_signal
+
+    class SyncDeliveryService:
+        def __init__(self) -> None:
+            self.delivered: list[Notification] = []
+
+        def deliver(self, notification: Notification) -> NotificationResult:
+            self.delivered.append(notification)
+            return NotificationResult(
+                notification_id=notification.notification_id,
+                status=DeliveryStatus.DELIVERED,
+                channels_attempted=[Channel.EMAIL],
+                channels_succeeded=[Channel.EMAIL],
+                channels_failed=[],
+            )
+
+    audit_store = InMemoryAuditStore()
+    request = _build_send_request()
+    service = SyncDeliveryService()
+
+    response = await send_signal(
+        request=request,
+        audit_store=audit_store,
+        idempotency_store={},
+        delivery_service=service,
+    )
+
+    assert response.status == DeliveryStatus.DELIVERED
+    assert len(service.delivered) == 1
+
+
+@pytest.mark.asyncio
+async def test_send_signal_enqueues_to_dlq_when_guaranteed_delivery_fails() -> None:
+    """send_signal() pushes to dlq_service when GUARANTEED delivery fails all persistent channels."""
+    from unittest.mock import MagicMock
+
+    from notification.audit import InMemoryAuditStore
+    from notification.models import Channel, DeliveryMode, DeliveryStatus, NotificationResult
+    from notification.routes import SendNotificationRequest
+    from uns.signaling import send_signal
+
+    audit_store = InMemoryAuditStore()
+    request_payload = _build_send_request_payload(delivery_mode=DeliveryMode.GUARANTEED)
+    request = SendNotificationRequest.model_validate(request_payload)
+
+    class FailingDeliveryService:
+        async def deliver(self, notification: Any) -> NotificationResult:
+            return NotificationResult(
+                notification_id=notification.notification_id,
+                status=DeliveryStatus.FAILED,
+                channels_attempted=[Channel.SLACK, Channel.PAGERDUTY],
+                channels_succeeded=[],
+                channels_failed=[Channel.SLACK, Channel.PAGERDUTY],
+                error_message="All persistent delivery channels unreachable",
+            )
+
+    dlq_service = MagicMock()
+    dlq_service.enqueue = MagicMock(return_value=None)
+
+    response = await send_signal(
+        request=request,
+        audit_store=audit_store,
+        idempotency_store={},
+        delivery_service=FailingDeliveryService(),
+        dlq_service=dlq_service,
+    )
+
+    assert response.status == DeliveryStatus.FAILED
+    assert response.message == "notification delivery failed"
+    dlq_service.enqueue.assert_called_once()
+    call_args, call_kwargs = dlq_service.enqueue.call_args
+    assert call_args[0].notification_id == response.notification_id
+    assert call_kwargs["reason"] == "guaranteed_delivery_failed"
+    metadata = call_kwargs["metadata"]
+    assert Channel.SLACK.value in metadata["channels_attempted"]
+    assert Channel.PAGERDUTY.value in metadata["channels_attempted"]
+    assert Channel.SLACK.value in metadata["channels_failed"]
+    assert Channel.PAGERDUTY.value in metadata["channels_failed"]
+    assert metadata["channel_errors"][Channel.SLACK.value] == "All persistent delivery channels unreachable"
+
+    # Also test dlq_service with .add instead of .enqueue
+    dlq_service_add = MagicMock(spec=["add"])
+    dlq_service_add.add = MagicMock(return_value=None)
+
+    response_add = await send_signal(
+        request=request,
+        audit_store=audit_store,
+        idempotency_store={},
+        delivery_service=FailingDeliveryService(),
+        dlq_service=dlq_service_add,
+    )
+    assert response_add.status == DeliveryStatus.FAILED
+    dlq_service_add.add.assert_called_once()
+    assert dlq_service_add.add.call_args[1]["reason"] == "guaranteed_delivery_failed"

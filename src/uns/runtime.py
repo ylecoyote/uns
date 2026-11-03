@@ -650,7 +650,35 @@ class Runtime:
             self._audit(session, n, result, event=kind, **payload)
             self._event(session, follower["id"], kind, payload)
 
-    async def dispatch(self, notification_id: UUID | str) -> bool:
+    async def dispatch(
+        self,
+        notification_id: UUID | str | None = None,
+        *,
+        limit: int | None = None,
+    ) -> bool | int:
+        if notification_id is None:
+            batch_limit = limit if limit is not None else 100
+            now = self.clock()
+            with self.sessions() as session:
+                ids = list(
+                    session.execute(
+                        select(work.c.id)
+                        .where(
+                            work.c.status == "PENDING",
+                            work.c.dedup_owner_id.is_(None),
+                            work.c.next_attempt <= now,
+                            work.c.lease_until <= now,
+                        )
+                        .order_by(work.c.next_attempt, work.c.id)
+                        .limit(batch_limit)
+                    ).scalars()
+                )
+            dispatched = 0
+            for identifier in ids:
+                if await self.dispatch(identifier):
+                    dispatched += 1
+            return dispatched
+
         identifier, token, now = str(notification_id), str(uuid4()), self.clock()
         with self.sessions.begin() as session:
             claimed = (
@@ -808,24 +836,8 @@ class Runtime:
                 self._settle_followers(session, row, succeeded=succeeded)
         return True
 
-    async def run_once(self) -> None:
-        now = self.clock()
-        with self.sessions() as session:
-            ids = list(
-                session.execute(
-                    select(work.c.id)
-                    .where(
-                        work.c.status == "PENDING",
-                        work.c.dedup_owner_id.is_(None),
-                        work.c.next_attempt <= now,
-                        work.c.lease_until <= now,
-                    )
-                    .order_by(work.c.next_attempt, work.c.id)
-                    .limit(100)
-                ).scalars()
-            )
-        for identifier in ids:
-            await self.dispatch(identifier)
+    async def run_once(self, *, limit: int = 100) -> None:
+        await self.dispatch(limit=limit)
         self.expire()
 
     async def worker(self) -> None:

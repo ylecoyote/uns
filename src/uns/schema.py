@@ -55,21 +55,30 @@ def migrate_runtime_schema(engine: Engine, *, create_tables: bool = False) -> No
                         )
         for table_name in ("uns_notifications", "uns_events"):
             if table_name in present:
-                for index in Base.metadata.tables[table_name].indexes:
-                    index.create(connection, checkfirst=True)
+                table = Base.metadata.tables.get(table_name)
+                if table is None:
+                    import uns.runtime  # noqa: F401 - populate Base.metadata
+                    table = Base.metadata.tables.get(table_name)
+                if table is not None:
+                    for index in table.indexes:
+                        index.create(connection, checkfirst=True)
 
         if "uns_events" in present:
-            events = Base.metadata.tables["uns_events"]
-            # Old unattempted callbacks used zero, unfairly preceding old retries.
-            connection.execute(
-                update(events)
-                .where(
-                    events.c.callback_pending.is_(True),
-                    events.c.callback_until == 0,
-                    events.c.callback_token.is_(None),
+            events_table = Base.metadata.tables.get("uns_events")
+            if events_table is None:
+                import uns.runtime  # noqa: F401 - populate Base.metadata
+                events_table = Base.metadata.tables.get("uns_events")
+            if events_table is not None:
+                # Old unattempted callbacks used zero, unfairly preceding old retries.
+                connection.execute(
+                    update(events_table)
+                    .where(
+                        events_table.c.callback_pending.is_(True),
+                        events_table.c.callback_until == 0,
+                        events_table.c.callback_token.is_(None),
+                    )
+                    .values(callback_until=events_table.c.at)
                 )
-                .values(callback_until=events.c.at)
-            )
 
 
 def _backfill_successors(connection: Connection) -> None:
@@ -80,8 +89,12 @@ def _backfill_successors(connection: Connection) -> None:
     evidence, then live recovery. All-failed complete groups remain recoverable.
     Event timestamps/UUID ordering cannot distinguish tied replay cycles.
     """
-    work = Base.metadata.tables["uns_notifications"]
-    events = Base.metadata.tables["uns_events"]
+    work = Base.metadata.tables.get("uns_notifications")
+    events = Base.metadata.tables.get("uns_events")
+    if work is None or events is None:
+        import uns.runtime  # noqa: F401 - populate Base.metadata
+        work = Base.metadata.tables["uns_notifications"]
+        events = Base.metadata.tables["uns_events"]
     rows = {r["id"]: r for r in connection.execute(select(work)).mappings()}
     links: dict[str, set[str]] = {}
     for event in connection.execute(

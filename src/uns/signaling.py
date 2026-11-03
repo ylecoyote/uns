@@ -8,6 +8,7 @@ of truth for the write path.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -22,6 +23,8 @@ from notification.audit import (
 )
 from notification.models import (
     AckStatus,
+    DeliveryMode,
+    DeliveryStatus,
     Notification,
     NotificationResult,
 )
@@ -178,12 +181,22 @@ async def send_signal(
     audit_store: AuditStore,
     idempotency_store: Any,
     transport_metadata: dict[str, Any] | None = None,
+    delivery_service: Any | None = None,
+    dlq_service: Any | None = None,
 ) -> SendNotificationResponse:
-    """Accept and persist an UNS governance signal.
+    """Accept, dispatch, and persist an UNS governance signal.
 
-    Canonical accept path that consolidates the previously duplicated
-    accept-side logic. The legacy HTTP and MCP send paths now both delegate
-    here.
+    Canonical accept and dispatch path. When ``delivery_service`` is supplied,
+    actual channel delivery is executed and, if a ``DeliveryMode.GUARANTEED``
+    notification fails across all persistent channels and ``dlq_service`` is
+    present, the failure is dead-lettered.
+
+    When ``delivery_service`` is omitted (``None``), preserves lightweight
+    accept-only behavior (resolving notification, registering ack tracking,
+    persisting the initial audit record, and returning an accepted response).
+
+    Note: Canonical HTTP and MCP routes use ``uns.Runtime.send()``;
+    ``send_signal()`` provides the standalone service-layer dispatch interface.
 
     Idempotency is preserved via the caller-supplied ``idempotency_store``.
     Each transport keeps its own store (in-process dict on ``RuntimeState``
@@ -197,16 +210,6 @@ async def send_signal(
     rely on the distinction between ``{"runtime": "standalone_http"}`` and
     ``{"runtime": "uns_mcp"}`` — the function does not unify the tags,
     only round-trips what the caller supplies.
-
-    Note: this function ACCEPTS the signal (resolves the notification,
-    registers with the ack engine if ``require_ack``, persists the audit
-    row, returns the response). It does NOT perform actual channel
-    delivery — Slack/PagerDuty/email dispatch lives in
-    ``notification.service.dispatch_notification``, and DLQ-on-failure is
-    wired there for ``GUARANTEED``-mode failures. Unifying the accept-only
-    path with the dispatch+DLQ path is tracked in
-    ``docs/post-v0.2-followups.md`` item F-1, deferred until after
-    v0.2 Phase 5 ships.
 
     The route-layer ``send_notification`` additionally performs websocket
     fanout (replay store, connection manager, fanout publisher). That
@@ -223,6 +226,12 @@ async def send_signal(
         transport_metadata: Optional audit metadata round-tripped onto the
             delivery audit record. Each transport supplies its own
             ``{"runtime": ...}`` tag.
+        delivery_service: Optional delivery dispatcher implementing
+            ``.deliver(notification)`` (async or sync). When supplied,
+            actual channel dispatch is executed.
+        dlq_service: Optional dead-letter queue writer. When supplied alongside
+            ``delivery_service``, notifications with ``DeliveryMode.GUARANTEED``
+            that fail all persistent channels are enqueued here.
 
     Returns:
         :class:`SendNotificationResponse` summarizing the accepted signal.
@@ -231,11 +240,6 @@ async def send_signal(
         ValidationError: If the SDK rejects the resolved notification.
         AuditPersistenceError: If the delivery audit cannot be persisted.
     """
-    # TODO(post-v0.2): channel delivery + DLQ-on-failure live in
-    # notification.service.dispatch_notification. Unifying the two send
-    # paths and re-introducing a dlq_service parameter with real behavior
-    # is tracked in docs/plans/post-v0.2-followups.md item F-1.
-
     # Idempotency replay: if a prior response is recorded, return it with
     # idempotent_replay flipped on. Keyed on (source, idempotency_key) to
     # match both legacy paths.
@@ -246,6 +250,56 @@ async def send_signal(
             return existing_response.model_copy(update={"idempotent_replay": True})
 
     result, notification = _resolve_notification(request)
+
+    if delivery_service is not None:
+        deliver_out = delivery_service.deliver(notification)
+        if inspect.isawaitable(deliver_out):
+            result = await deliver_out
+        else:
+            result = deliver_out
+
+        if (
+            dlq_service is not None
+            and notification.delivery_mode == DeliveryMode.GUARANTEED
+            and result.status == DeliveryStatus.FAILED
+        ):
+            channel_errors = getattr(result, "channel_errors", None)
+            if channel_errors is None:
+                channel_errors = {}
+                if getattr(result, "error_message", None):
+                    for ch in getattr(result, "channels_failed", []):
+                        ch_key = ch.value if hasattr(ch, "value") else str(ch)
+                        channel_errors[ch_key] = result.error_message
+
+            metadata = {
+                "channel_errors": {
+                    (ch.value if hasattr(ch, "value") else str(ch)): err
+                    for ch, err in channel_errors.items()
+                },
+                "channels_attempted": [
+                    ch.value if hasattr(ch, "value") else str(ch)
+                    for ch in getattr(result, "channels_attempted", [])
+                ],
+                "channels_failed": [
+                    ch.value if hasattr(ch, "value") else str(ch)
+                    for ch in getattr(result, "channels_failed", [])
+                ],
+            }
+
+            dlq_fn = getattr(dlq_service, "enqueue", None)
+            if dlq_fn is None:
+                dlq_fn = getattr(dlq_service, "add", None)
+            if dlq_fn is None and callable(dlq_service):
+                dlq_fn = dlq_service
+
+            if dlq_fn is not None:
+                dlq_res = dlq_fn(
+                    notification,
+                    reason="guaranteed_delivery_failed",
+                    metadata=metadata,
+                )
+                if inspect.isawaitable(dlq_res):
+                    await dlq_res
 
     # Metric tag derived from the supplied transport metadata; preserves the
     # legacy split (route -> "http", runtime -> "mcp"). Unknown tags fall
@@ -303,9 +357,24 @@ async def send_signal(
         )
         raise
 
+    response_status = (
+        DeliveryStatus.DELIVERED
+        if (
+            delivery_service is not None
+            and result.status in (DeliveryStatus.SUCCESS, DeliveryStatus.DELIVERED)
+        )
+        else result.status
+    )
+    if delivery_service is None:
+        message = "notification accepted"
+    elif response_status == DeliveryStatus.DELIVERED:
+        message = "notification delivered"
+    else:
+        message = "notification delivery failed"
+
     response = SendNotificationResponse(
         notification_id=result.notification_id,
-        status=result.status,
+        status=response_status,
         channels_attempted=result.channels_attempted,
         channels_succeeded=result.channels_succeeded,
         channels_failed=result.channels_failed,
@@ -314,7 +383,7 @@ async def send_signal(
         idempotency_key=request.idempotency_key,
         idempotent_replay=False,
         created_at=notification.created_at,
-        message="notification accepted",
+        message=message,
     )
     if request.idempotency_key is not None:
         _idempotency_set(

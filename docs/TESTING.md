@@ -146,4 +146,18 @@ The two legacy MCP response-shape failures observed in the base commit's GitHub 
 
 Local verification used Python 3.12.14 and temporary SQLite databases. The executor's default asyncio loop stalled an unrelated minimal TestClient request and the MCP child-process test; a temporary **test-virtualenv-only** uvloop policy for parent and child interpreters allowed the unchanged tests to run. No event-loop workaround was added to repository or package code. The full run retained two framework deprecation warnings; Bandit and packaging also emitted existing non-failing annotation/license warnings.
 
-These results establish local behavior. They do not establish real-provider receipt, human comprehension, PostgreSQL operation, production load capacity, or deployment of this commit. Hosted CI and the Python 3.11/3.13 matrix are separate checks.
+These results establish local behavior. They do not establish real-provider receipt, human comprehension, production load capacity, or deployment of this commit. Hosted CI and the Python 3.11/3.13 matrix are separate checks.
+
+## PostgreSQL 16 Operational Acceptance and Sustained Concurrency Validation
+
+Live PostgreSQL 16 acceptance and sustained concurrency validation were added in Track 8 and Track 9:
+
+| Check | Result |
+|---|---|
+| PostgreSQL 16 Live Operational Acceptance (`TestPostgresOperationalAcceptance`) | Schema bootstrap, idempotent migration, SQLite-only retention guard, warm/cold policy hydration, revision locking, idempotency replay, conflict detection, dedup coalescing/promotion, guarded replay, ACK/dismiss/TIMED_OUT lifecycle, and `SQLAlchemyReadModelAdapter` queries (with PostgreSQL JSONB containment channel filter) all passed. |
+| 100-Request Concurrent Intake Burst & Deduplication Storm (`test_concurrent_intake_burst_and_deduplication_storm`) | 100 producer requests across 10 deduplication keys + 20 unique guaranteed requests (120 total) completed concurrently with zero lock errors, exactly 10 leaders + 90 followers, and sub-second P95 intake latency on both SQLite WAL and PostgreSQL 16. |
+| Multi-Worker Lease Contention Zero Duplicate Sends (`test_multi_worker_lease_contention_zero_duplicate_sends`) | 40 pending guaranteed notifications raced by 4 concurrent `runtime.dispatch(limit=20)` workers reached `DELIVERED` with exactly 40 external send calls recorded by the adapter (0 duplicate sends) on both SQLite WAL and PostgreSQL 16. |
+| Concurrent Policy Reload Under Active Intake (`test_concurrent_policy_reload_under_active_intake`) | 50 producer intake calls interleaved with 5 concurrent `save_snapshot()` policy reloads changing `ack_timeout_minutes` completed with 0 exceptions and 100% self-consistent `(policy_revision_id, policy_config_hash, ack_timeout_minutes)` provenance records. |
+| PostgreSQL Driver Packaging | `psycopg[binary]>=3.2.0` added to the `sql` optional dependency extra in `pyproject.toml`, enabling `uns[full]` PostgreSQL support out of the box. |
+| CI Integration | Dedicated `postgres` service container job using `postgres:16-alpine` running `tests/uns/test_postgres_and_load.py` integrated into `.github/workflows/python-tests.yml` under the `ci` required gate. |
+

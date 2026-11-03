@@ -164,6 +164,43 @@ jobs:
           print("Full install: all server entrypoints construct cleanly")
           PYEOF
 
+  postgres:
+    name: PostgreSQL 16 Acceptance & Load
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: uns
+          POSTGRES_PASSWORD: uns_test_pw
+          POSTGRES_DB: uns_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install package
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run PostgreSQL acceptance & sustained load tests
+        env:
+          UNS_TEST_POSTGRES_URL: postgresql+psycopg://uns:uns_test_pw@localhost:5432/uns_test
+        run: uv run pytest tests/uns/test_postgres_and_load.py -q
+
   ui:
     name: Console and Boundary
     runs-on: ubuntu-latest
@@ -185,7 +222,7 @@ jobs:
     name: CI
     if: always()
     runs-on: ubuntu-latest
-    needs: [lint, test, install-smoke, ui]
+    needs: [lint, test, install-smoke, postgres, ui]
     steps:
       - name: Verify all required jobs passed
         run: |
@@ -199,6 +236,10 @@ jobs:
           fi
           if [ "${{ needs.install-smoke.result }}" != "success" ]; then
             echo "Clean-room wheel install job failed"
+            exit 1
+          fi
+          if [ "${{ needs.postgres.result }}" != "success" ]; then
+            echo "PostgreSQL Acceptance & Load job failed"
             exit 1
           fi
           if [ "${{ needs.ui.result }}" != "success" ]; then

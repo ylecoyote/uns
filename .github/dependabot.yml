@@ -26,25 +26,12 @@ updates:
           - "vite"
           - "@vitejs/*"
     ignore:
-      # Keep ESLint 8 until .eslintrc is migrated to flat config and eslint-plugin-react-hooks is upgraded
+      # Keep ESLint 9.x until ESLint 10 is adopted across plugins
       - dependency-name: "eslint"
-        versions: [">= 9.0.0"]
-      - dependency-name: "eslint-plugin-react-hooks"
-        versions: [">= 5.0.0"]
-      - dependency-name: "eslint-plugin-react-refresh"
-        versions: [">= 0.5.0"]
+        versions: [">= 10.0.0"]
       # Keep TypeScript 5.x until @typescript-eslint/parser supports TypeScript 6+/7+
       - dependency-name: "typescript"
         versions: [">= 6.0.0"]
-      # Keep React 18 until a coordinated React 19 upgrade
-      - dependency-name: "react"
-        versions: [">= 19.0.0"]
-      - dependency-name: "react-dom"
-        versions: [">= 19.0.0"]
-      - dependency-name: "@types/react"
-        versions: [">= 19.0.0"]
-      - dependency-name: "@types/react-dom"
-        versions: [">= 19.0.0"]
 
   - package-ecosystem: github-actions
     directory: /

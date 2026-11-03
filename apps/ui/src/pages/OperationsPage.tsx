@@ -243,7 +243,11 @@ export function OperationsPage() {
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const autoRefreshRef = useRef(autoRefresh);
-  autoRefreshRef.current = autoRefresh;
+  const fetchSnapshotRef = useRef<(isInitial?: boolean) => Promise<void>>(() => Promise.resolve());
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh;
+  }, [autoRefresh]);
 
   const fetchSnapshot = useCallback(async (isInitial = false) => {
     if (pollTimeoutRef.current) {
@@ -343,11 +347,15 @@ export function OperationsPage() {
       pollTimeoutRef.current = setTimeout(() => {
         if (!mountedRef.current || !autoRefreshRef.current) return;
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-          void fetchSnapshot(false);
+          void fetchSnapshotRef.current(false);
         }
       }, POLL_INTERVAL_MS);
     }
   }, []);
+
+  useEffect(() => {
+    fetchSnapshotRef.current = fetchSnapshot;
+  }, [fetchSnapshot]);
 
   useEffect(() => {
     mountedRef.current = true;
