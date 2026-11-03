@@ -1,14 +1,14 @@
 # UNS Roadmap (`v0.2.0` → `v1.0.0`)
 
-This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.5.0` releases toward `v1.0.0`.
+This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.6.0` releases toward `v1.0.0`.
 
 Live execution progress and individual deliverables are tracked natively in [GitHub Milestones](https://github.com/ylecoyote/uns/milestones). To keep this document accurate without commit churn, task checklists live in the linked GitHub Milestones and Issues rather than in this file.
 
 ---
 
-## Current Baseline: `v0.2.0` – `v0.5.0` (Shipped)
+## Current Baseline: `v0.2.0` – `v0.6.0` (Shipped)
 
-Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0), and [`v0.5.0`](https://github.com/ylecoyote/uns/releases/tag/v0.5.0) establish the consolidated, single-repository notification obligation control plane:
+Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0), [`v0.5.0`](https://github.com/ylecoyote/uns/releases/tag/v0.5.0), and [`v0.6.0`](https://github.com/ylecoyote/uns/releases/tag/v0.6.0) establish the consolidated, single-repository notification obligation control plane:
 
 - **Durable Transactional Outbox & PostgreSQL Parity (`uns.Runtime` & `uns-maintain`):** Atomic policy resolution, notification acceptance, leader/follower deduplication ownership, audit provenance, and `uns-maintain` retention + SHA-256 verified archive-before-prune across both SQLite (WAL) and PostgreSQL 16 (`psycopg[binary]`).
 - **Lease-Fenced Channel Delivery & Bi-Directional Webhooks:** Outbound adapters for Slack (`SlackAdapter`), PagerDuty Events API v2 (`PagerDutyAdapter`), Email/SMTP (`EmailAdapter`), and WebSocket (`WebSocketDeliveryAdapter`) with provider-attempt lease guards (`guard_provider_attempt`), dead-letter replay (`RuntimeDLQ`), and signed inbound Slack (`POST /api/v1/webhooks/slack`) and PagerDuty v3 (`POST /api/v1/webhooks/pagerduty`) webhooks.

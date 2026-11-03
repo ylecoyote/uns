@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-03
+
 ### Added
 - **In-Tree Pre-Execution Governance Engine & Approval Obligation Bridge (`uns.governance`, `#49`):**
   - Completed `src/uns/governance/context_schema.py` (`ContextSchema`, `parse_field_path()`, `validate_policy_against_schema()`, `validate_context_capsule()`, `resolve_field_path()`, and RFC 8785-style canonical JSON `compute_context_hash()`).
@@ -14,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `src/uns/governance/approval_workflow.py` (`GovernanceApprovalBridge`, `ApprovalRequestRecord`, `ApprovalStatus`, `sign_approval_callback()`, `verify_approval_callback()`) wiring `REQUIRE_APPROVAL` decisions to durable `uns.Runtime` notification obligations (`idempotency_key="gov-approval:{decision_id}"`), cross-restart obligation recovery (`_recover_from_runtime()`), and HMAC-SHA256 signed resume callbacks (`X-UNS-Signature`, `X-UNS-Timestamp` with `±300s` replay guard).
 - **SLO Telemetry & Certification CLI Harness (`uns-slo-certify` / `src/uns/slo.py`, `#48`):**
   - Added `compute_slo_report()`, `format_slo_markdown()`, and the `uns-slo-certify` console script entry point to compute SHA-256 hash-verifiable operational SLO receipts (`receipt_sha256` / `receipt_hash`), human response latency percentiles (`p50`, `p95`, `max`), persistent external provider error rates, `recording_only` vs. live external provider classification (`observed_live_span_days`), and 6-gate `v1.0` certification checks.
+
+### Fixed
+- **MPDD v2.5 Post-Milestone 4 Hardening:**
+  - Enforced upfront `Content-Length` check and streaming `MAX_WEBHOOK_BODY_BYTES` (`262,144`) cap in `src/uns/api/routes_webhooks.py:_read_bounded_body()`.
+  - Added `SQLAlchemyPolicyStore.retire_candidate_revisions()` and wired `ShadowPolicyEvaluator.reject_delta()` to retire `PREVIEW`/`DRAFT` revisions on rejection so rejected proposals cannot resurrect on subsequent intakes.
+  - Replaced deprecated `HTTP_422_UNPROCESSABLE_ENTITY` status constant with `HTTP_422_UNPROCESSABLE_CONTENT` in `src/notification/routes.py`.
 
 ## [0.5.0] - 2026-11-03
 

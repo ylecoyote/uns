@@ -127,7 +127,7 @@ async def send_notification(
         )
     except (ValidationError, ValueError) as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"error": "validation_error", "message": str(exc)},
         ) from exc
     except AuditPersistenceError as exc:
@@ -213,7 +213,7 @@ async def simulate_notification(
             principal=principal.subject)
     except (ValidationError, ValueError) as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"error": "validation_error", "message": str(exc)},
         ) from exc
 
