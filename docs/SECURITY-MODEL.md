@@ -15,6 +15,17 @@ The primary `UNS_API_KEY` grants full operator authority (`admin`, `producer`, `
 
 Out-of-scope HTTP calls with a valid scoped key return `403 Forbidden` (`insufficient_scope`). Shared keys still identify a configured principal rather than individual end-user identities.
 
+### Source- and namespace-scoped credentials
+
+Role credentials (`UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`) and multi-team JSON credentials (`UNS_SCOPED_API_KEYS`) can be restricted to specific producer `source` patterns and `notification_type` namespace patterns (`*`, prefix `deploy.*` / `ci-*`, or exact match):
+
+- **Role-level environment bounds:** `UNS_PRODUCER_ALLOWED_SOURCES`, `UNS_PRODUCER_ALLOWED_NAMESPACES`, `UNS_RESPONDER_ALLOWED_SOURCES`, `UNS_RESPONDER_ALLOWED_NAMESPACES`, `UNS_OBSERVER_ALLOWED_SOURCES`, `UNS_OBSERVER_ALLOWED_NAMESPACES`.
+- **Multi-team JSON array (`UNS_SCOPED_API_KEYS`):** Each entry specifies `key`, `principal` (or `subject`), `role` (`admin`, `producer`, `responder`, `observer`) or `scopes`, `allowed_sources`, and `allowed_namespaces`.
+- **Enforcement across transports:**
+  - **HTTP REST & Console (`/ui/*`):** Out-of-scope `send`, `simulate`, `ack`, `dismiss`, `status`, `/ui/deliveries/{id}`, and `/ui/policies/effective` calls return `403 Forbidden` (`namespace_or_source_forbidden`). Collection endpoints (`/ui/deliveries`, `/ui/policies/active`, `/ui/policies/revisions`) filter results to the principal's allowed namespaces.
+  - **WebSocket (`/ws/agents/{agent_id}`):** Both live push delivery and `subscribe` replay filter notifications by the connected principal's `allowed_sources` and `allowed_namespaces`, and out-of-scope `ack` frames return `{type: "error", error: "namespace_or_source_forbidden"}`.
+  - **MCP (`uns-mcp`):** `UNS_MCP_ALLOWED_SOURCES` and `UNS_MCP_ALLOWED_NAMESPACES` enforce the same source and namespace bounds on `simulate_signal`, `send_signal`, `ack_notification`, `dismiss_notification`, `get_effective_policy`, and `list_deliveries`.
+
 Mandatory event emission and classification belong in trusted host code (for example, an application worker or agent supervisor emitting a signal when a job exhausts its retry budget), rather than relying on an untrusted model prompt to self-report failures. UNS's durability guarantee begins at its acceptance boundary (`202 Accepted`).
 
 ACK/DISMISS attribution derives from the verified principal. Payload identities must match it. A different actor cannot replay another actor's terminal response as their own: it conflicts while preserving original attribution. In-process Python callers and MCP launch configuration are trusted host boundaries, not authentication for arbitrary payload-supplied principals.

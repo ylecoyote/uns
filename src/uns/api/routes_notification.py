@@ -36,6 +36,7 @@ from uns.api.auth import (
     WritePrincipal,
     require_read_principal,
     require_responder_principal,
+    require_source_and_namespace,
     resolve_requested_actor,
 )
 from uns.queries import get_ack_status as _query_ack_status
@@ -88,6 +89,16 @@ async def acknowledge_notification(
     if runtime is not None:
         from uns.runtime import Conflict
         actor = resolve_requested_actor(principal, request.acked_by)
+        try:
+            row = runtime.get(notification_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Notification not found") from exc
+        notif_data = row.get("notification", {})
+        require_source_and_namespace(
+            principal,
+            source=notif_data.get("source"),
+            notification_type=notif_data.get("notification_type"),
+        )
         try:
             response = runtime.acknowledge(notification_id, actor=actor, dismiss=False, metadata=request.metadata)
         except KeyError as exc:
@@ -179,6 +190,16 @@ async def dismiss_notification(
         from uns.runtime import Conflict
         actor = resolve_requested_actor(principal, request.dismissed_by)
         try:
+            row = runtime.get(notification_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Notification not found") from exc
+        notif_data = row.get("notification", {})
+        require_source_and_namespace(
+            principal,
+            source=notif_data.get("source"),
+            notification_type=notif_data.get("notification_type"),
+        )
+        try:
             response = runtime.acknowledge(notification_id, actor=actor, dismiss=True, metadata=request.metadata)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Notification not found") from exc
@@ -251,6 +272,7 @@ async def dismiss_notification(
 async def get_notification_status(
     notification_id: UUID,
     http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> NotificationStatusResponse:
     """HTTP adapter — delegates to uns.queries.get_notification_status."""
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
@@ -260,6 +282,11 @@ async def get_notification_status(
         except KeyError:
             return NotificationStatusResponse(notification_id=notification_id, found=False)
         n = row["notification"]
+        require_source_and_namespace(
+            principal,
+            source=n.get("source"),
+            notification_type=n.get("notification_type"),
+        )
         owner_id = row.get("obligation_owner_id")
         return NotificationStatusResponse(
             notification_id=notification_id,
@@ -290,12 +317,19 @@ async def get_notification_status(
 async def get_ack_status(
     notification_id: UUID,
     http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> AckStatusResponse:
     """HTTP adapter — delegates to uns.queries.get_ack_status."""
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         try:
             row = runtime.get(notification_id)
+            n = row.get("notification", {})
+            require_source_and_namespace(
+                principal,
+                source=n.get("source"),
+                notification_type=n.get("notification_type"),
+            )
             owner_id = row.get("obligation_owner_id")
             return AckStatusResponse(
                 notification_id=notification_id,

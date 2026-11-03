@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import time
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,7 +31,7 @@ from notification.service import SimpleAdapterRegistry
 from uns.api.read_models import AuditEventFilter, DeliveryFilter, SQLAlchemyReadModelAdapter
 from uns.maintenance import maintain
 from uns.responses import SendNotificationRequest
-from uns.runtime import Conflict, Runtime, work
+from uns.runtime import Conflict, Runtime, dedup, work
 from uns.schema import migrate_runtime_schema
 
 POSTGRES_URL = os.environ.get("UNS_TEST_POSTGRES_URL")
@@ -118,8 +119,11 @@ class TestPostgresOperationalAcceptance:
         assert POSTGRES_URL is not None
         _reset_postgres_db(POSTGRES_URL)
 
-    def test_schema_bootstrap_and_maintenance_rejection(self) -> None:
-        """Verifies schema bootstrap, idempotent migration, and SQLite-only retention check."""
+    def test_schema_bootstrap_and_postgresql_maintenance(self, tmp_path: Path) -> None:
+        """Verifies schema bootstrap, idempotent migration, and PostgreSQL retention/archival."""
+        import hashlib
+        import json
+
         assert POSTGRES_URL is not None
         engine = create_engine(POSTGRES_URL)
 
@@ -129,12 +133,62 @@ class TestPostgresOperationalAcceptance:
         migrate_runtime_schema(engine, create_tables=True)
 
         # 2. Runtime construction on existing PostgreSQL database
-        runtime = Runtime(POSTGRES_URL, create_tables=False)
+        now_val = 2_000_000.0
+        old_val = now_val - 1_000.0
+        runtime = Runtime(POSTGRES_URL, create_tables=False, clock=lambda: old_val)
         assert runtime.engine.dialect.name == "postgresql"
 
-        # 3. maintain() explicitly enforces SQLite-only retention validation
-        with pytest.raises(ValueError, match="Retention is validated for SQLite only"):
-            maintain(engine, cutoff=time.time(), idempotency_seconds=60)
+        # 3. Accept, deliver, and acknowledge a settled notification at old_val
+        req = _make_send_request(
+            idempotency_key="pg-maint-1",
+            dedup_key="pg-maint-dedup-1",
+            require_ack=True,
+        )
+        accepted = runtime.accept(req, principal="pg-maint-op")
+        nid = str(accepted.notification_id)
+        with runtime.engine.begin() as conn:
+            conn.execute(
+                work.update()
+                .where(work.c.id == nid)
+                .values(
+                    status="DELIVERED",
+                    delivered_at=old_val,
+                    ack_status="ACKED",
+                    actor="pg-responder",
+                    responded_at=old_val,
+                )
+            )
+            conn.execute(dedup.update().where(dedup.c.owner_id == nid).values(until=old_val + 10.0))
+
+        # 4. Dry-run preview on PostgreSQL identifies the settled notification without mutating
+        preview = maintain(
+            engine,
+            cutoff=now_val - 10.0,
+            idempotency_seconds=100.0,
+            now=now_val,
+        )
+        assert preview["applied"] is False
+        assert preview["notification_ids"] == [nid]
+
+        # 5. Archive-before-prune on PostgreSQL writes mode-0600 SHA-256 verified JSON archive and prunes
+        archive_path = tmp_path / "pg-archive.json"
+        applied = maintain(
+            engine,
+            cutoff=now_val - 10.0,
+            idempotency_seconds=100.0,
+            now=now_val,
+            apply=True,
+            operator="pg-archivist",
+            archive=archive_path,
+        )
+        assert applied["applied"] is True
+        assert applied["notification_ids"] == [nid]
+        assert applied["receipt_id"] is not None
+        assert archive_path.is_file()
+        assert (archive_path.stat().st_mode & 0o777) == 0o600
+        archive_data = json.loads(archive_path.read_text())
+        assert archive_data["tables"]["uns_notifications"][0]["id"] == nid
+        assert applied["archive"]["sha256"] == hashlib.sha256(archive_path.read_bytes()).hexdigest()
 
         runtime.engine.dispose()
         engine.dispose()

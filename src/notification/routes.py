@@ -50,6 +50,7 @@ from uns.api.auth import (
     require_admin_principal,
     require_producer_principal,
     require_read_principal,
+    require_source_and_namespace,
 )
 from uns.responses import (
     AutonomyContextRequest,
@@ -94,6 +95,11 @@ async def send_notification(
     succeeds because the websocket runtime state is FastAPI-app-scoped
     transport infrastructure that does not belong in the service layer.
     """
+    require_source_and_namespace(
+        principal,
+        source=request.source,
+        notification_type=request.notification_type,
+    )
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         from uns.runtime import Conflict
@@ -189,6 +195,11 @@ async def simulate_notification(
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
     """
+    require_source_and_namespace(
+        principal,
+        source=request.source,
+        notification_type=request.notification_type,
+    )
     try:
         runtime = getattr(http_request.app.state, "runtime", None)
         return await service_simulate_signal(request=request,

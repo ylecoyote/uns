@@ -201,7 +201,11 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   <Link to={ROUTES.INVARIANTS}>
                     <code>INV-UI-001</code>
                   </Link>
-                  ).
+                  ). Role and multi-team credentials (<code>UNS_SCOPED_API_KEYS</code>) can also
+                  bind wildcard/prefix <code>allowed_sources</code> and{' '}
+                  <code>allowed_namespaces</code> bounds across HTTP, WebSocket, and{' '}
+                  <code>uns-mcp</code> (returning <code>403 namespace_or_source_forbidden</code> on
+                  out-of-scope access).
                 </td>
               </tr>
             </tbody>
@@ -1353,10 +1357,13 @@ sqlite3 -cmd ".timeout 5000" "\${UNS_DB_FILE:?Set UNS_DB_FILE}" \\
         </p>
         <p style={{ margin: 0 }}>
           <strong>Mechanics (<code>F-05</code>):</strong> Active policies are stored in
-          revision-locked snapshots (<code>notification_policy_snapshots</code>). Re-activating a
-          previously <code>RETIRED</code> content hash returns <code>409 Conflict</code> until the
-          YAML <code>version</code> is incremented. Pass <code>-d &apos;&#123;&#125;&apos;</code> to
-          reload from the server&apos;s configured <code>UNS_POLICY_DIR</code> (an optional{' '}
+          revision-locked snapshots (<code>notification_policy_snapshots</code>) and broadcast
+          across worker processes via PostgreSQL <code>LISTEN/NOTIFY</code> (
+          <code>uns_policy_reload</code>) and Redis pub/sub (<code>uns:policies:reload</code> /{' '}
+          <code>UNS_POLICY_REDIS_CHANNEL</code>). Re-activating a previously <code>RETIRED</code>{' '}
+          content hash returns <code>409 Conflict</code> until the YAML <code>version</code> is
+          incremented. Pass <code>-d &apos;&#123;&#125;&apos;</code> to reload from the
+          server&apos;s configured <code>UNS_POLICY_DIR</code> (an optional{' '}
           <code>&#123;&quot;policy_dir&quot;: &quot;...&quot;&#125;</code> body is only for
           subdirectories within the server&apos;s allowed policy root).
         </p>
@@ -1433,16 +1440,19 @@ print("MCP Write Config Valid:", cfg.mode, "principal=", cfg.operator_principal)
           non-archive mode leaves <code>uns_events</code> / audit row counts unchanged.
         </p>
         <p style={{ margin: 0 }}>
-          <strong>Mechanics (<code>F-08a</code> / <code>F-08b</code>):</strong> Without{' '}
-          <code>--archive</code>, <code>uns-maintain --apply</code> expires settled operational rows
-          from <code>uns_notifications</code> and <code>uns_dedup</code> while preserving audit
-          history and embedding removed rows in a <code>RETENTION_APPLIED</code> receipt. With{' '}
-          <code>--archive &lt;new-file.json&gt;</code>, it exclusively creates a mode{' '}
+          <strong>Mechanics (<code>F-08a</code> / <code>F-08b</code>):</strong> Supported on both
+          SQLite WAL (<code>BEGIN IMMEDIATE</code>) and PostgreSQL 16 (
+          <code>SET LOCAL lock_timeout = &apos;30s&apos;</code>,{' '}
+          <code>pg_advisory_xact_lock</code>, and <code>FOR UPDATE</code> candidate row locking).
+          Without <code>--archive</code>, <code>uns-maintain --apply</code> expires settled
+          operational rows from <code>uns_notifications</code> and <code>uns_dedup</code> while
+          preserving audit history and embedding removed rows in a <code>RETENTION_APPLIED</code>{' '}
+          receipt. With <code>--archive &lt;new-file.json&gt;</code>, it exclusively creates a mode{' '}
           <code>0600</code> archive file (<code>O_CREAT | O_EXCL</code>), <code>fsync</code>s and
           verifies its SHA-256 digest, prunes all 5 tables, and records a compact archive receipt.
           Pair retention runs with verified online SQLite backups (
           <code>uns-maintain-and-backup.sh</code> / <code>sqlite3 .backup</code> +{' '}
-          <code>PRAGMA quick_check</code>).
+          <code>PRAGMA quick_check</code>) or PostgreSQL <code>pg_dump</code> snapshots.
         </p>
         <pre className="docs-code-block">
           {`# 1. Dry-run retention preview (no rows modified)

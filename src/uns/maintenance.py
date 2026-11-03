@@ -1,4 +1,4 @@
-"""Explicit, bounded retention for SQLite notification stores.
+"""Explicit, bounded retention for SQLite and PostgreSQL notification stores.
 
 Nothing runs at startup. The operator chooses both the inactivity cutoff and
 the minimum idempotency window. Expiring an outbox row expires its idempotency
@@ -7,9 +7,10 @@ key; a subsequent request with that key may create a new notification.
 Without an archive, events and delivery/ACK audits remain in the database and
 the removal receipt preserves the removed operational rows. With an archive,
 whole settled notification groups are exported, fsynced, hash-verified, then
-pruned in one SQLite writer transaction. Policy history and retention receipts
-are never pruned. This reuses database pages; it does not shrink the SQLite file
-or establish an audit/compliance retention policy. Oversized groups are kept.
+pruned in one database writer transaction (SQLite BEGIN IMMEDIATE or PostgreSQL
+advisory + row lock). Policy history and retention receipts are never pruned.
+This reuses database pages; it does not shrink the database file or establish
+an audit/compliance retention policy. Oversized groups are kept.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from sqlalchemy import (
     Connection,
     Engine,
     Table,
+    Uuid,
     create_engine,
     event,
     exists,
@@ -37,19 +39,27 @@ from sqlalchemy import (
     or_,
     select,
 )
+from sqlalchemy import (
+    cast as sa_cast,
+)
 from sqlalchemy.engine import make_url
 
 from db.models import AckAuditRecord, NotificationAuditRecord
 from uns.runtime import dedup, events, work
 
 MAX_BATCH_SIZE = 1_000
+_PG_RETENTION_ADVISORY_LOCK_ID = 758_392_014
 _AUDIT = cast(Table, NotificationAuditRecord.__table__)
 _ACK = cast(Table, AckAuditRecord.__table__)
 
 
-def _eligible(cutoff: float, now: float) -> list[Any]:
+def _eligible(cutoff: float, now: float, *, dialect_name: str = "sqlite") -> list[Any]:
     follower = work.alias("retained_follower")
-    audit_id = func.replace(work.c.id, "-", "")  # SQLite UUID storage is CHAR(32).
+    audit_id: Any = (
+        sa_cast(work.c.id, Uuid)
+        if dialect_name == "postgresql"
+        else func.replace(work.c.id, "-", "")  # SQLite UUID storage is CHAR(32).
+    )
     audit_cutoff = datetime.fromtimestamp(cutoff, UTC)
     return [
         work.c.status.in_(("DELIVERED", "SUCCESS", "DEDUPLICATED", "FAILED")),
@@ -200,8 +210,9 @@ def maintain(
     retention is deliberately unsupported until its locking path is validated.
     """
     now = time.time() if now is None else now
-    if engine.dialect.name != "sqlite":
-        raise ValueError("Retention is validated for SQLite only")
+    dialect_name = engine.dialect.name
+    if dialect_name not in ("sqlite", "postgresql"):
+        raise ValueError("Retention is validated for SQLite and PostgreSQL only")
     if not all(math.isfinite(value) for value in (now, cutoff, idempotency_seconds)):
         raise ValueError("Retention timestamps and window must be finite")
     if cutoff > now or idempotency_seconds <= 0:
@@ -234,17 +245,25 @@ def maintain(
         "archive": {"path": str(archive)} if archive is not None else None,
     }
     with engine.begin() as connection:
-        connection.exec_driver_sql("PRAGMA busy_timeout=30000")
-        if apply:
-            connection.exec_driver_sql("BEGIN IMMEDIATE")
+        if dialect_name == "sqlite":
+            connection.exec_driver_sql("PRAGMA busy_timeout=30000")
+            if apply:
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
+        else:
+            connection.exec_driver_sql("SET LOCAL lock_timeout = '30s'")
+            if apply:
+                connection.exec_driver_sql(
+                    f"SELECT pg_advisory_xact_lock({_PG_RETENTION_ADVISORY_LOCK_ID})"
+                )
         _schema_check(connection)
-        conditions = _eligible(effective_cutoff, now)
+        conditions = _eligible(effective_cutoff, now, dialect_name=dialect_name)
         if after_id is not None:
             conditions.append(work.c.id > after_id)
+        candidate_stmt = select(work).where(*conditions).order_by(work.c.id).limit(batch_size)
+        if apply and dialect_name == "postgresql":
+            candidate_stmt = candidate_stmt.with_for_update()
         candidates = (
-            connection.execute(
-                select(work).where(*conditions).order_by(work.c.id).limit(batch_size)
-            )
+            connection.execute(candidate_stmt)
             .mappings()
             .all()
         )
@@ -377,21 +396,25 @@ def main(argv: list[str] | None = None) -> None:
     if not args.database_url:
         parser.error("Provide --database-url or set UNS_DATABASE_URL")
     url = make_url(args.database_url)
-    if url.get_backend_name() != "sqlite":
-        parser.error("Retention is validated for SQLite only")
-    if not url.database or not Path(url.database).is_file():
-        parser.error("Retention requires an existing SQLite database file")
-    engine = create_engine(url, connect_args={"timeout": 30.0})
+    backend = url.get_backend_name()
+    if backend not in ("sqlite", "postgresql"):
+        parser.error("Retention is validated for SQLite and PostgreSQL only")
+    if backend == "sqlite":
+        if not url.database or not Path(url.database).is_file():
+            parser.error("Retention requires an existing SQLite database file")
+        engine = create_engine(url, connect_args={"timeout": 30.0})
 
-    @event.listens_for(engine, "connect")
-    def _configure_sqlite_connection(dbapi_connection: Any, _record: Any) -> None:
-        cursor = dbapi_connection.cursor()
-        try:
-            cursor.execute("PRAGMA busy_timeout=30000")
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-        finally:
-            cursor.close()
+        @event.listens_for(engine, "connect")
+        def _configure_sqlite_connection(dbapi_connection: Any, _record: Any) -> None:
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+            finally:
+                cursor.close()
+    else:
+        engine = create_engine(url)
 
     try:
         report = maintain(

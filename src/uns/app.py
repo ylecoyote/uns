@@ -279,6 +279,10 @@ def create_app(
     app.state.websocket_replay_store = websocket_replay_store or InMemoryWebSocketReplayStore()
     app.state.websocket_fanout = None
     app.state.websocket_subscriber = None
+    app.state.policy_reload_broadcaster = None
+    app.state.policy_reload_subscriber = None
+    app.state.policy_postgres_listener = None
+    redis_client: RedisWebSocketClient | None = None
     if config.websocket_redis_enabled:
         factory = redis_client_factory or _create_redis_client
         redis_client = factory(config.redis_url)
@@ -307,8 +311,20 @@ def create_app(
         from notification.models import Channel
         if runtime.adapters.get_adapter(Channel.WEBSOCKET) is None:
             runtime.adapters.register(WebSocketDeliveryAdapter(app))
-        app.state.policy_store = SQLAlchemyPolicyStore(runtime.sessions)
+        app.state.policy_store = runtime.policy_runtime.store
+        if redis_client is not None:
+            from uns.policy_runtime import (
+                RedisPolicyReloadBroadcaster,
+                RedisPolicyReloadSubscriber,
+            )
 
+            broadcaster = RedisPolicyReloadBroadcaster(redis_client)
+            runtime.policy_runtime.set_broadcaster(broadcaster)
+            app.state.policy_reload_broadcaster = broadcaster
+            app.state.policy_reload_subscriber = RedisPolicyReloadSubscriber(
+                runtime.policy_runtime,
+                origin_id=broadcaster.instance_id,
+            )
     # Mount routers
     app.include_router(notification_router)              # /api/v1/notifications/*
     app.include_router(ops_router)                       # /api/v1/dlq, /policies/*, /ops/*

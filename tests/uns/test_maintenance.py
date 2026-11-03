@@ -493,9 +493,9 @@ def test_forward_schema_fails_closed_instead_of_archiving_incomplete_rows(store)
     assert len(rows(store, work)) == 1
 
 
-def test_postgresql_retention_is_explicitly_unsupported():
-    engine = create_mock_engine("postgresql://", lambda *_args, **_kwargs: None)
-    with pytest.raises(ValueError, match="SQLite only"):
+def test_unsupported_dialect_retention_is_explicitly_rejected():
+    engine = create_mock_engine("mysql://", lambda *_args, **_kwargs: None)
+    with pytest.raises(ValueError, match="SQLite and PostgreSQL only"):
         maintain(engine, cutoff=OLD, idempotency_seconds=100, now=NOW)
 
 

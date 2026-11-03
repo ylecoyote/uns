@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-03
+
+### Added
+- **PostgreSQL Retention & Archive-Before-Prune (`uns-maintain`, `#43`):**
+  - Extended `uns-maintain` (`src/uns/maintenance.py`) to support `postgresql+psycopg://` databases alongside SQLite.
+  - Added PostgreSQL native UUID casting in `_eligible()` (`sa_cast(work.c.id, Uuid)`), `SET LOCAL lock_timeout = '30s'`, transactional advisory locking (`SELECT pg_advisory_xact_lock(758392014)`), and `FOR UPDATE` candidate row locking before exporting mode-`0600` SHA-256 verified JSON archives and pruning settled notification groups.
+- **Cross-Process Policy Reload Broadcast (`LISTEN/NOTIFY` & Redis Pub/Sub, `#44`):**
+  - Added `PolicyReloadEnvelope`, `RedisPolicyReloadBroadcaster`, `RedisPolicyReloadSubscriber` (`uns:policies:reload` / `UNS_POLICY_REDIS_CHANNEL`), and `PostgresPolicyReloadListener` (`LISTEN uns_policy_reload`) in `src/uns/policy_runtime.py` and `src/db/policy_store.py`.
+  - Added parsed `NotificationPolicy` caching on `PolicySnapshot` and warm snapshot caching + activation listeners on `SQLAlchemyPolicyStore` and `PolicyRuntime` so `save_policy()`, `bootstrap_policies()`, and `POST /api/v1/policies/reload` broadcast revision changes immediately across multi-worker deployments.
+- **Source- & Namespace-Scoped Credentials Across HTTP, WebSocket, & `uns-mcp` (`#45`):**
+  - Extended `WritePrincipal` (`src/uns/api/auth.py`) with `allowed_sources` and `allowed_namespaces` wildcard/prefix patterns (`*`, `ci-*`, `deploy.*`), configured via `UNS_PRODUCER_ALLOWED_SOURCES`, `UNS_PRODUCER_ALLOWED_NAMESPACES`, `UNS_RESPONDER_ALLOWED_SOURCES`, `UNS_RESPONDER_ALLOWED_NAMESPACES`, `UNS_OBSERVER_ALLOWED_SOURCES`, `UNS_OBSERVER_ALLOWED_NAMESPACES`, and multi-team JSON credentials (`UNS_SCOPED_API_KEYS`).
+  - Enforced source and namespace scopes (`403 namespace_or_source_forbidden`) across `POST /api/v1/notifications`, `/simulate`, `/ack`, `/dismiss`, `GET /api/v1/notifications/{id}`, `/ack-status`, `/api/v1/runtime/notifications/{id}`, `/ui/deliveries`, `/ui/deliveries/{id}`, `/ui/policies/effective`, `/ui/policies/active`, `/ui/policies/revisions`, WebSocket `/ws/agents/{agent_id}` live push + replay + ack frames, and `uns-mcp` (`UNS_MCP_ALLOWED_SOURCES`, `UNS_MCP_ALLOWED_NAMESPACES`).
+
 ## [0.3.0] - 2026-11-03
 
 ### Added

@@ -9,6 +9,8 @@ from uns.api.auth import (
     WritePrincipal,
     require_admin_principal,
     require_authenticated_observer,
+    require_read_principal,
+    require_source_and_namespace,
 )
 from uns.runtime import Conflict
 
@@ -16,12 +18,21 @@ router = APIRouter(prefix="/api/v1/runtime", dependencies=[Depends(require_authe
 
 
 @router.get("/notifications/{notification_id}")
-def inspect_notification(notification_id: UUID, request: Request) -> dict[str, Any]:
+def inspect_notification(
+    notification_id: UUID,
+    request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> dict[str, Any]:
     try:
         row = request.app.state.runtime.get(notification_id)
-        return {**row, "events": request.app.state.runtime.events(notification_id)}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Notification not found") from exc
+    require_source_and_namespace(
+        principal,
+        source=row.get("source"),
+        notification_type=row.get("notification_type"),
+    )
+    return {**row, "events": request.app.state.runtime.events(notification_id)}
 
 
 @router.get("/dead-letters")

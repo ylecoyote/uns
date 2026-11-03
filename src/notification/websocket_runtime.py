@@ -21,6 +21,7 @@ from notification.models import AckStatus, Channel
 from uns.api.auth import (
     WritePrincipal,
     require_principal_scope,
+    require_source_and_namespace,
     require_websocket_principal,
     resolve_requested_actor,
 )
@@ -132,6 +133,7 @@ class WebSocketConnectionManager:
 
     def __init__(self, subscriber: WebSocketSubscriber | None = None) -> None:
         self._connections_by_agent: dict[UUID, dict[str, WebSocket | None]] = {}
+        self._principals_by_connection: dict[str, WritePrincipal | None] = {}
         self._subscriber = subscriber
 
     def set_subscriber(self, subscriber: WebSocketSubscriber | None) -> None:
@@ -149,10 +151,13 @@ class WebSocketConnectionManager:
         agent_id: UUID,
         connection_id: str,
         websocket: WebSocket | None = None,
+        principal: WritePrincipal | None = None,
     ) -> None:
         self._connections_by_agent.setdefault(agent_id, {})[connection_id] = websocket
+        self._principals_by_connection[connection_id] = principal
 
     def unregister(self, agent_id: UUID, connection_id: str) -> None:
+        self._principals_by_connection.pop(connection_id, None)
         connections = self._connections_by_agent.get(agent_id)
         if connections is None:
             return
@@ -164,8 +169,26 @@ class WebSocketConnectionManager:
         """Send a JSON payload to all local WebSocket sessions for an agent."""
         connections = self._connections_by_agent.get(agent_id, {}).copy()
         delivered = 0
+        notification_obj = payload.get("notification")
+        notif_source: str | None = None
+        notif_type: str | None = None
+        if isinstance(notification_obj, Mapping):
+            raw_source = notification_obj.get("source")
+            raw_type = notification_obj.get("notification_type")
+            notif_source = str(raw_source) if raw_source is not None else None
+            notif_type = str(raw_type) if raw_type is not None else None
         for connection_id, websocket in connections.items():
             if websocket is None:
+                continue
+            principal = self._principals_by_connection.get(connection_id)
+            if (
+                principal is not None
+                and isinstance(notification_obj, Mapping)
+                and (
+                    not principal.allows_source(notif_source)
+                    or not principal.allows_namespace(notif_type)
+                )
+            ):
                 continue
             try:
                 await websocket.send_json(payload)
@@ -422,7 +445,7 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
     manager: WebSocketConnectionManager = websocket.app.state.websocket_manager
     connection_id = str(uuid4())
     await websocket.accept(subprotocol=subprotocol)
-    manager.register(agent_id, connection_id, websocket)
+    manager.register(agent_id, connection_id, websocket, principal=principal)
     await manager.ensure_agent_subscription(agent_id)
     await websocket.send_json(
         {
@@ -452,6 +475,19 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: UUID) -> None:
                     str(message["last_seen"]) if message.get("last_seen") is not None else None,
                     replay_store=replay_store,
                 )
+                if principal.allowed_sources or principal.allowed_namespaces:
+                    missed = [
+                        entry
+                        for entry in missed
+                        if principal.allows_source(
+                            str(entry["source"]) if entry.get("source") is not None else None
+                        )
+                        and principal.allows_namespace(
+                            str(entry["notification_type"])
+                            if entry.get("notification_type") is not None
+                            else None
+                        )
+                    ]
                 await websocket.send_json(
                     {
                         "type": "subscribed",
@@ -495,6 +531,13 @@ async def _handle_ack_message(
         if runtime is None:
             await websocket.send_json({"type": "error", "error": "runtime_unavailable", "message": "Durable ACK runtime is not configured"})
             return
+        row = runtime.get(notification_id)
+        notif_data = row.get("notification", {})
+        require_source_and_namespace(
+            principal,
+            source=notif_data.get("source"),
+            notification_type=notif_data.get("notification_type"),
+        )
         event = runtime.acknowledge(
             notification_id, actor=actor, dismiss=requested_status == AckStatus.DISMISSED,
             metadata={"transport": "websocket"},

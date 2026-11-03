@@ -27,6 +27,8 @@ class MCPRuntimeConfig:
     require_delivery_confirmation: bool = True
     operator_principal: str | None = None
     delivery_confirmation_token: str | None = None
+    allowed_sources: frozenset[str] = frozenset()
+    allowed_namespaces: frozenset[str] = frozenset()
 
 
 @dataclass

@@ -50,6 +50,14 @@ UNS reads `UNS_*` environment variables (`src/uns/config.py` and `src/uns/api/au
 | `UNS_RESPONDER_API_PRINCIPAL` | `uns-responder` | No | Audited principal bound to the responder credential. |
 | `UNS_OBSERVER_API_KEY` | *(None)* | No | Grants `observer`: Console, status/audit, readiness, and WebSocket stream/replay reads. Does not permit mutations or `/metrics`. |
 | `UNS_OBSERVER_API_PRINCIPAL` | `uns-observer` | No | Principal bound to the observer credential. |
+| `UNS_PRODUCER_ALLOWED_SOURCES` | *(None)* | No | Optional comma-separated source wildcard/prefix patterns (e.g., `ci-*,agent-*`) restricting `UNS_PRODUCER_API_KEY`. |
+| `UNS_PRODUCER_ALLOWED_NAMESPACES` | *(None)* | No | Optional comma-separated `notification_type` patterns (e.g., `deploy.*,security.*`) restricting `UNS_PRODUCER_API_KEY`. |
+| `UNS_RESPONDER_ALLOWED_SOURCES` | *(None)* | No | Optional comma-separated source patterns restricting `UNS_RESPONDER_API_KEY`. |
+| `UNS_RESPONDER_ALLOWED_NAMESPACES` | *(None)* | No | Optional comma-separated `notification_type` patterns restricting `UNS_RESPONDER_API_KEY`. |
+| `UNS_OBSERVER_ALLOWED_SOURCES` | *(None)* | No | Optional comma-separated source patterns restricting `UNS_OBSERVER_API_KEY`. |
+| `UNS_OBSERVER_ALLOWED_NAMESPACES` | *(None)* | No | Optional comma-separated `notification_type` patterns restricting `UNS_OBSERVER_API_KEY`. |
+| `UNS_SCOPED_API_KEYS` | *(None)* | No | Optional JSON array of multi-team scoped credentials (`[{"key":"...","principal":"...","role":"producer","allowed_sources":["ci-*"],"allowed_namespaces":["deploy.*"]}]`). |
+| `UNS_POLICY_REDIS_CHANNEL` | `uns:policies:reload` | No | Redis pub/sub channel used by `RedisPolicyReloadBroadcaster` and `RedisPolicyReloadSubscriber` for cross-process policy snapshot invalidation. |
 | `UNS_HOST` | `127.0.0.1` | No | Bind address for the `uns` HTTP/WebSocket server (`--host` CLI override). |
 | `UNS_PORT` | `8000` | No | TCP port for the `uns` HTTP/WebSocket server (`--port` CLI override). |
 | `UNS_POLICY_DIR` | *(None)* | No | Directory of YAML policy definitions loaded and persisted into the durable `notification_policies` store at startup. |
@@ -65,6 +73,8 @@ Use distinct secret values for different capability roles; configuring the same 
 | Variable | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` | *(None)* | **Yes** (`--enable-writes`) | Secret token required by `send_signal` (`operator_confirmation_token`) when `deliver=true` in write-enabled MCP mode. |
+| `UNS_MCP_ALLOWED_SOURCES` | *(None)* | No | Optional comma-separated source patterns restricting `uns-mcp` tool operations. |
+| `UNS_MCP_ALLOWED_NAMESPACES` | *(None)* | No | Optional comma-separated `notification_type` namespace patterns restricting `uns-mcp` tool operations. |
 
 ### Channel Providers
 
@@ -271,7 +281,7 @@ Apply requires `--apply --operator <actor>`. Without `--archive`, existing event
 
 Optional `--archive /absolute/new-file.json` exports an entire eligible settled group, creates a new file exclusively with mode0600, fsyncs the file and parent directory, verifies its SHA256, then prunes the corresponding rows in the same SQLite writer transaction. A no-content database receipt records archive path/hash, ids, counts and operator. Existing files and symlinks are not overwritten. Export or commit failure preserves database state but may leave an archive/partial file; inspect it and choose a new path before retrying.
 
-Pending delivery, unsettled ACK, open dead letters, callback work, live leases, recent activity and retained dedup/follower/successor references are protected. Policy history and retention receipts are not pruned. The command supports SQLite only and requires the current schema.
+Pending delivery, unsettled ACK, open dead letters, callback work, live leases, recent activity and retained dedup/follower/successor references are protected. Policy history and retention receipts are not pruned. The command supports both persistent SQLite files (`BEGIN IMMEDIATE`) and PostgreSQL (`SET LOCAL lock_timeout = '30s'`, `pg_advisory_xact_lock`, and `FOR UPDATE` candidate locking) and requires the current schema.
 
 A batch limits candidate/deletion rows, not bytes, SQL work or elapsed time. Oversized groups remain. Use `--after-id` with the returned `next_after_id` to advance past examined groups; applying a preview reuses that preview's INPUT cursor, not its returned continuation. A null continuation ends that scan pass. Start a new pass to revisit oversized/newly eligible or earlier-inserted records. Apply always recomputes safety; a cursor is not a snapshot or authorization.
 

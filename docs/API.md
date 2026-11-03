@@ -255,7 +255,7 @@ The factory and CLI default to read-only. `uns-mcp --enable-writes` requires a p
 
 ## Policy authority and compatibility
 
-Canonical intake locks the ACTIVE revision in its acceptance transaction; steady-state simulation and inspection read revision plus immutable snapshot in a single SELECT without a write lock. Producer overrides that differ from resolved ACTIVE policy are rejected, including configured intent. Adapter-control metadata cannot bypass this boundary. No producer-level administrative exception exists. Direct low-level handler/adapter APIs remain trusted integration code, not a substitute for the protected intake API.
+Canonical intake locks the ACTIVE revision in its acceptance transaction; steady-state simulation and inspection read revision plus immutable snapshot in a single SELECT without a write lock. When a snapshot is activated (`save_policy()`, `bootstrap_policies()`, or `POST /api/v1/policies/reload`), `SQLAlchemyPolicyStore` emits `SELECT pg_notify('uns_policy_reload', ...)` on PostgreSQL and `PolicyRuntime` broadcasts a `PolicyReloadEnvelope` on Redis pub/sub (`uns:policies:reload` / `UNS_POLICY_REDIS_CHANNEL`) when configured, allowing peer worker processes (`PostgresPolicyReloadListener` and `RedisPolicyReloadSubscriber`) to refresh their warm `PolicySnapshot` caches immediately. Producer overrides that differ from resolved ACTIVE policy are rejected, including configured intent. Adapter-control metadata cannot bypass this boundary. No producer-level administrative exception exists. Direct low-level handler/adapter APIs remain trusted integration code, not a substitute for the protected intake API.
 
 ---
 
@@ -292,11 +292,11 @@ Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a 
 
 | Flag | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--database-url` | **Yes** (or `UNS_DATABASE_URL`) | `UNS_DATABASE_URL` | SQLite database URL (`sqlite:///path/to/uns.db`). |
+| `--database-url` | **Yes** (or `UNS_DATABASE_URL`) | `UNS_DATABASE_URL` | SQLite (`sqlite:///path/to/uns.db`) or PostgreSQL (`postgresql+psycopg://...`) database URL. |
 | `--cutoff` | **Yes** | — | ISO-8601 timestamp with explicit timezone (e.g., `2026-10-01T00:00:00Z`). |
 | `--idempotency-seconds` | **Yes** | — | Minimum positive idempotency preservation window in seconds. Effective cutoff is `min(cutoff, now - idempotency_seconds)`. |
 | `--batch-size` | No | `100` | Row budget per invocation (`1..1000`). Includes event/audit rows when `--archive` is used. |
-| `--apply` | No | `False` | Commit deletions and `RETENTION_APPLIED` receipt inside `BEGIN IMMEDIATE`. Omit for dry-run preview. |
+| `--apply` | No | `False` | Commit deletions and `RETENTION_APPLIED` receipt inside an exclusive writer transaction (`BEGIN IMMEDIATE` on SQLite or `pg_advisory_xact_lock` + `FOR UPDATE` on PostgreSQL). Omit for dry-run preview. |
 | `--operator` | **Yes** (when `--apply`) | `None` | Non-empty operator attribution recorded in the retention receipt and archive file. |
 | `--after-id` | No | `None` | Resume scan after notification UUID from a prior batch's `next_after_id`. |
 | `--archive` | No | `None` | Path to a **new** JSON archive file in an existing trusted directory (created with `O_CREAT \| O_EXCL`, mode `0600`). |

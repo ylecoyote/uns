@@ -9,6 +9,7 @@ import signal
 
 from mcp.server.fastmcp import FastMCP
 
+from uns.api.auth import _parse_pattern_csv
 from uns.config import value
 from uns.database import is_in_memory_database_url
 from uns_mcp.factory import create_mcp_server
@@ -17,8 +18,13 @@ from uns_mcp.runtime import MCPRuntimeConfig
 
 def runtime_config(*, enable_writes: bool = False) -> MCPRuntimeConfig:
     """Read host configuration without placing secrets in arguments or URLs."""
+    allowed_sources = _parse_pattern_csv(value("MCP_ALLOWED_SOURCES"))
+    allowed_namespaces = _parse_pattern_csv(value("MCP_ALLOWED_NAMESPACES"))
     if not enable_writes:
-        return MCPRuntimeConfig()
+        return MCPRuntimeConfig(
+            allowed_sources=allowed_sources,
+            allowed_namespaces=allowed_namespaces,
+        )
     database_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", "")).strip()
     if not database_url:
         raise ValueError("Set UNS_DATABASE_URL before enabling MCP writes")
@@ -31,8 +37,12 @@ def runtime_config(*, enable_writes: bool = False) -> MCPRuntimeConfig:
     if not confirmation:
         raise ValueError("Set UNS_MCP_DELIVERY_CONFIRMATION_TOKEN before enabling MCP writes")
     return MCPRuntimeConfig(
-        mode="stdio-persistent", read_only=False, operator_principal=principal,
+        mode="stdio-persistent",
+        read_only=False,
+        operator_principal=principal,
         delivery_confirmation_token=confirmation,
+        allowed_sources=allowed_sources,
+        allowed_namespaces=allowed_namespaces,
     )
 
 

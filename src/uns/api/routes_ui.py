@@ -49,6 +49,7 @@ from uns.api.auth import (
     WritePrincipal,
     require_authenticated_observer,
     require_read_principal,
+    require_source_and_namespace,
 )
 from uns.api.observability import (
     create_error_response_with_request_id,
@@ -175,8 +176,11 @@ async def list_deliveries(
     autonomy_mode: AutonomyMode | None = Query(default=None, description="Filter by autonomy mode"),
     notification_type: str | None = Query(default=None, description="Filter by notification type"),
     channel: Channel | None = Query(default=None, description="Filter by channel attempted"),
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> DeliveryTimelineListResponse:
     """HTTP adapter — delegates to uns.queries.list_deliveries."""
+    if notification_type is not None:
+        require_source_and_namespace(principal, notification_type=notification_type)
     log_endpoint_call(
         logger,
         "list_deliveries",
@@ -188,7 +192,7 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode.value if autonomy_mode else None,
     )
 
-    return await _query_list_deliveries(
+    result = await _query_list_deliveries(
         cursor=cursor,
         limit=limit,
         start_time=start_time,
@@ -202,6 +206,14 @@ async def list_deliveries(
         channel=channel,
         read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
     )
+    if principal is not None and principal.allowed_namespaces:
+        filtered = [
+            item
+            for item in result.items
+            if principal.allows_namespace(item.notification_type)
+        ]
+        result = result.model_copy(update={"items": filtered})
+    return result
 
 
 @router.get(
@@ -217,6 +229,7 @@ async def list_deliveries(
 async def get_delivery_timeline(
     notification_id: UUID,
     http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> DeliveryTimelineResponse:
     """HTTP adapter — delegates to uns.queries.get_delivery_timeline.
 
@@ -232,7 +245,7 @@ async def get_delivery_timeline(
     )
 
     try:
-        return await _query_delivery_timeline(
+        timeline = await _query_delivery_timeline(
             notification_id=notification_id,
             read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
         )
@@ -254,6 +267,11 @@ async def get_delivery_timeline(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_response,
         ) from exc
+    require_source_and_namespace(
+        principal,
+        notification_type=timeline.notification_type,
+    )
+    return timeline
 
 
 @router.get(
@@ -275,8 +293,10 @@ async def get_effective_policy(
     ),
     autonomy_mode: AutonomyMode = Query(..., description="The autonomy mode"),
     irreversible: bool = Query(default=False, description="Whether the action is irreversible"),
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> EffectivePolicyResponse:
     """HTTP adapter — delegates to uns.queries.get_effective_policy."""
+    require_source_and_namespace(principal, notification_type=notification_type)
     log_endpoint_call(
         logger,
         "get_effective_policy",
@@ -307,6 +327,7 @@ async def get_effective_policy(
 )
 async def list_active_policies(
     http_request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> ActivePolicyListResponse:
     """Return all active notification policies from the runtime or process registry."""
     from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
@@ -320,6 +341,8 @@ async def list_active_policies(
     )
     items: list[ActivePolicySummary] = []
     for policy in sorted(registry.get_all().values(), key=lambda p: p.notification_type):
+        if principal is not None and not principal.allows_namespace(policy.notification_type):
+            continue
         default_intent = policy.intent or NotificationIntent.OPERATIONAL
         channels = policy.get_channels_for_mode(AutonomyMode.LIVE, default_intent) or list(
             policy.channels
@@ -377,11 +400,14 @@ async def list_policy_revisions(
     limit: int = Query(
         default=200, ge=1, le=500, description="Maximum revisions to return"
     ),
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> PolicyRevisionListResponse:
     """Return stored notification policy revisions across lifecycle statuses."""
     from notification.policies import DEFAULT_DEDUP_WINDOW_SECONDS, get_policy_registry
     from notification.policy_loader import compute_policy_content_hash
 
+    if notification_type:
+        require_source_and_namespace(principal, notification_type=notification_type)
     log_endpoint_call(
         logger,
         "list_policy_revisions",
@@ -520,6 +546,12 @@ async def list_policy_revisions(
                     dedup_window_seconds=dedup_window_seconds,
                 )
             )
+    if principal is not None and principal.allowed_namespaces:
+        items = [
+            item
+            for item in items
+            if principal.allows_namespace(item.notification_type)
+        ]
     return PolicyRevisionListResponse(items=items, total_count=len(items))
 
 

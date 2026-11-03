@@ -19,7 +19,7 @@ class TestPackageStructure:
 
         assert src.notification is not None
         assert hasattr(src.notification, "__version__")
-        assert src.notification.__version__ == "0.3.0"
+        assert src.notification.__version__ == "0.4.0"
 
     def test_notification_adapters_package_imports(self):
         """Test that the adapters subpackage can be imported."""

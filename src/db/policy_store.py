@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import Table, insert, select, update
+from sqlalchemy import Table, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.schema import CreateTable
@@ -28,6 +29,8 @@ from notification.policies import (
 )
 from notification.policy_loader import compute_policy_content_hash
 
+PG_POLICY_RELOAD_CHANNEL = "uns_policy_reload"
+
 
 @dataclass(frozen=True)
 class PolicySaveResult:
@@ -46,11 +49,21 @@ class PolicySnapshot:
     revision: int
     content_json: str
     content_hash: str
+    _parsed: tuple[NotificationPolicy, ...] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def registry(self) -> PolicyRegistry:
+        parsed = self._parsed
+        if parsed is None:
+            parsed = tuple(
+                NotificationPolicy.model_validate(content)
+                for content in json.loads(self.content_json)
+            )
+            object.__setattr__(self, "_parsed", parsed)
         registry = PolicyRegistry()
-        for content in json.loads(self.content_json):
-            registry.register(NotificationPolicy.model_validate(content))
+        for policy in parsed:
+            registry.register(policy.model_copy(deep=True))
         return registry
 
 
@@ -59,6 +72,25 @@ class SQLAlchemyPolicyStore:
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
+        self._cached_snapshot: PolicySnapshot | None = None
+        self._activation_listeners: list[Callable[[PolicySnapshot], None]] = []
+
+    def register_activation_listener(
+        self, listener: Callable[[PolicySnapshot], None]
+    ) -> None:
+        """Register a callback invoked after a new policy snapshot commits."""
+        if listener not in self._activation_listeners:
+            self._activation_listeners.append(listener)
+
+    @property
+    def cached_snapshot(self) -> PolicySnapshot | None:
+        """Return the last loaded or activated PolicySnapshot in this process."""
+        return self._cached_snapshot
+
+    def _notify_activation_listeners(self, snapshot: PolicySnapshot) -> None:
+        self._cached_snapshot = snapshot
+        for listener in list(self._activation_listeners):
+            listener(snapshot)
 
     def ensure_snapshot_schema(self) -> None:
         """Add only new policy tables; legacy policy rows remain untouched."""
@@ -95,11 +127,15 @@ class SQLAlchemyPolicyStore:
                 .where(NotificationPolicyRevision.singleton == 1)
             ).one_or_none()
             if row is not None:
-                return PolicySnapshot(
+                snapshot = PolicySnapshot(
                     row.revision, json.dumps(row.content, sort_keys=True), row.content_hash
                 )
+                self._cached_snapshot = snapshot
+                return snapshot
         with self._session_factory.begin() as transaction:
-            return self.lock_snapshot(transaction)
+            snapshot = self.lock_snapshot(transaction)
+            self._cached_snapshot = snapshot
+            return snapshot
 
     def lock_snapshot(self, session: Session) -> PolicySnapshot:
         """Lock the revision until caller commit, then read its immutable content.
@@ -180,17 +216,29 @@ class SQLAlchemyPolicyStore:
             .values(revision=revision)
         )
         session.flush()
+        conn = session.connection()
+        if conn.dialect.name == "postgresql":
+            notify_payload = json.dumps(
+                {"revision": revision, "content_hash": content_hash},
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            conn.execute(
+                text("SELECT pg_notify(:channel, :payload)"),
+                {"channel": PG_POLICY_RELOAD_CHANNEL, "payload": notify_payload},
+            )
         return PolicySnapshot(revision, json.dumps(content, sort_keys=True), content_hash)
 
     def _activate(
         self, session: Session, previous: PolicySnapshot, policies: list[NotificationPolicy]
-    ) -> None:
+    ) -> PolicySnapshot | None:
         content = [
             policy.model_dump(mode="json")
             for policy in sorted(policies, key=lambda policy: policy.notification_type)
         ]
         if compute_policy_content_hash({"policies": content}) != previous.content_hash:
-            self._write_snapshot(session, previous.revision + 1, policies)
+            return self._write_snapshot(session, previous.revision + 1, policies)
+        return None
 
     def _get_session(self) -> Session:
         return self._session_factory()
@@ -278,6 +326,7 @@ class SQLAlchemyPolicyStore:
     def save_policy(self, policy: NotificationPolicy) -> PolicySaveResult:
         """Persist and activate one policy atomically with its runtime revision."""
         self.ensure_snapshot_schema()
+        activated: PolicySnapshot | None = None
         with self._session_factory.begin() as session:
             previous = self.lock_snapshot(session)
             result = self._save_policy(session, policy)
@@ -286,8 +335,10 @@ class SQLAlchemyPolicyStore:
                 current[policy.notification_type] = policy.model_copy(
                     update={"config_id": result.policy_id, "config_hash": result.content_hash}
                 )
-                self._activate(session, previous, list(current.values()))
-            return result
+                activated = self._activate(session, previous, list(current.values()))
+        if activated is not None:
+            self._notify_activation_listeners(activated)
+        return result
 
     def save_snapshot(self, policies: list[NotificationPolicy]) -> int:
         """Atomically replace ACTIVE authority; retain immutable revision history."""
@@ -295,6 +346,7 @@ class SQLAlchemyPolicyStore:
         if len(identities) != len(set(identities)):
             raise ValueError("Duplicate notification type/status in policy snapshot")
         self.ensure_snapshot_schema()
+        activated: PolicySnapshot | None = None
         with self._session_factory.begin() as session:
             previous = self.lock_snapshot(session)
             results = [self._save_policy(session, policy) for policy in policies]
@@ -317,8 +369,11 @@ class SQLAlchemyPolicyStore:
                     status=PolicyStatus.RETIRED.value, is_active=False, retired_at=datetime.now(UTC)
                 )
             )
-            self._activate(session, previous, active)
-            return sum(result.created for result in results)
+            activated = self._activate(session, previous, active)
+            created_count = sum(result.created for result in results)
+        if activated is not None:
+            self._notify_activation_listeners(activated)
+        return created_count
 
     def _save_policy(self, session: Session, policy: NotificationPolicy) -> PolicySaveResult:
         content = _policy_to_persisted_content(policy)

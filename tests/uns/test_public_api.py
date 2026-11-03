@@ -81,9 +81,9 @@ def test_all_entries_are_resolvable() -> None:
 
 
 def test_public_api_version_alignment() -> None:
-    """uns and uns_mcp export matching __version__ == '0.3.0'."""
+    """uns and uns_mcp export matching __version__ == '0.4.0'."""
     import uns_mcp
 
-    assert uns.__version__ == uns_mcp.__version__ == "0.3.0"
+    assert uns.__version__ == uns_mcp.__version__ == "0.4.0"
     assert "__version__" in uns.__all__
     assert "__version__" in uns_mcp.__all__

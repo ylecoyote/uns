@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from notification.models import AutonomyMode, NotificationIntent
 from uns import signaling as uns_signaling
+from uns.api.auth import matches_scope_patterns
 from uns.queries import (
     get_ack_status as query_get_ack_status,
 )
@@ -36,6 +37,24 @@ from uns.queries import (
 )
 from uns.responses import SendNotificationRequest
 from uns_mcp.runtime import MCPRuntimeConfig, RuntimeState
+
+
+def _enforce_mcp_scope_bounds(
+    config: MCPRuntimeConfig | None,
+    *,
+    source: str | None = None,
+    notification_type: str | None = None,
+) -> None:
+    if config is None:
+        return
+    if source is not None and not matches_scope_patterns(source, config.allowed_sources):
+        raise ValueError(f"MCP principal is not authorized for source '{source}'")
+    if notification_type is not None and not matches_scope_patterns(
+        notification_type, config.allowed_namespaces
+    ):
+        raise ValueError(
+            f"MCP principal is not authorized for notification_type '{notification_type}'"
+        )
 
 
 class SendSignalInput(BaseModel):
@@ -109,8 +128,14 @@ def _json_safe(value: Any) -> Any:
 async def simulate_signal(
     payload: SendSignalInput,
     runtime_state: RuntimeState | None = None,
+    config: MCPRuntimeConfig | None = None,
 ) -> dict[str, Any]:
     """Preview routing and policy behavior without delivery side effects."""
+    _enforce_mcp_scope_bounds(
+        config,
+        source=payload.source,
+        notification_type=payload.notification_type,
+    )
     runtime = runtime_state.runtime if runtime_state is not None else None
     response = await uns_signaling.simulate_signal(
         request=_signaling_request(payload),
@@ -129,9 +154,14 @@ async def send_signal(
 ) -> dict[str, Any]:
     """Preview or send an UNS signal through MCP."""
     if not payload.deliver:
-        return await simulate_signal(payload, runtime_state=runtime_state)
+        return await simulate_signal(payload, runtime_state=runtime_state, config=config)
 
     active_config = config or MCPRuntimeConfig()
+    _enforce_mcp_scope_bounds(
+        active_config,
+        source=payload.source,
+        notification_type=payload.notification_type,
+    )
     if active_config.read_only or active_config.mode == "read-only":
         raise ValueError("send_signal is disabled in read-only mode")
     if payload.operator_intent != "deliver":
@@ -183,6 +213,14 @@ async def ack_notification(
 
     state = runtime_state or RuntimeState()
     if state.runtime is not None:
+        if active_config.allowed_sources or active_config.allowed_namespaces:
+            row = state.runtime.get(payload.notification_id)
+            n = row.get("notification", {})
+            _enforce_mcp_scope_bounds(
+                active_config,
+                source=n.get("source"),
+                notification_type=n.get("notification_type"),
+            )
         response = state.runtime.acknowledge(payload.notification_id,
             actor=active_config.operator_principal, dismiss=False, metadata=payload.metadata)
         return response.model_dump(mode="json")
@@ -221,6 +259,14 @@ async def dismiss_notification(
 
     state = runtime_state or RuntimeState()
     if state.runtime is not None:
+        if active_config.allowed_sources or active_config.allowed_namespaces:
+            row = state.runtime.get(payload.notification_id)
+            n = row.get("notification", {})
+            _enforce_mcp_scope_bounds(
+                active_config,
+                source=n.get("source"),
+                notification_type=n.get("notification_type"),
+            )
         response = state.runtime.acknowledge(payload.notification_id,
             actor=active_config.operator_principal, dismiss=True, metadata=payload.metadata)
         return response.model_dump(mode="json")
@@ -388,11 +434,13 @@ async def get_effective_policy(
     autonomy_mode: str,
     irreversible: bool = False,
     runtime_state: RuntimeState | None = None,
+    config: MCPRuntimeConfig | None = None,
 ) -> dict[str, Any]:
     """Return effective policy resolution for a signal shape.
 
     Delegates to ``uns.queries.get_effective_policy``.
     """
+    _enforce_mcp_scope_bounds(config, notification_type=notification_type)
     response = await query_get_effective_policy(
         notification_type=notification_type,
         intent=NotificationIntent(intent),
@@ -423,7 +471,10 @@ async def get_invariants_summary() -> dict[str, Any]:
 
 
 async def list_deliveries(
-    limit: int = 25, *, runtime_state: RuntimeState | None = None,
+    limit: int = 25,
+    *,
+    runtime_state: RuntimeState | None = None,
+    config: MCPRuntimeConfig | None = None,
 ) -> dict[str, Any]:
     """Return delivery read-model entries.
 
@@ -443,6 +494,13 @@ async def list_deliveries(
         channel=None,
         read_adapter=runtime_state.read_model_adapter if runtime_state is not None else None,
     )
+    if config is not None and config.allowed_namespaces:
+        filtered = [
+            item
+            for item in response.items
+            if matches_scope_patterns(item.notification_type, config.allowed_namespaces)
+        ]
+        response = response.model_copy(update={"items": filtered})
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 

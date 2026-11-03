@@ -92,7 +92,7 @@ def create_mcp_server(
     @mcp.tool(name="simulate_signal")
     async def simulate_signal_tool(payload: SendSignalInput) -> dict[str, object]:
         """Preview UNS routing and policy behavior without side effects."""
-        return await simulate_signal_impl(payload, runtime_state=state)
+        return await simulate_signal_impl(payload, runtime_state=state, config=config)
 
     @mcp.tool(name="send_signal")
     async def send_signal_tool(payload: SendSignalInput) -> dict[str, object]:
@@ -127,7 +127,7 @@ def create_mcp_server(
     @mcp.tool(name="list_deliveries")
     async def list_deliveries_tool(limit: int = 25) -> dict[str, object]:
         """Return delivery read-model entries."""
-        return await list_deliveries_impl(limit=limit, runtime_state=state)
+        return await list_deliveries_impl(limit=limit, runtime_state=state, config=config)
 
     @mcp.tool(name="list_audit_events")
     async def list_audit_events_tool(limit: int = 25) -> dict[str, object]:
@@ -148,6 +148,7 @@ def create_mcp_server(
             autonomy_mode=autonomy_mode,
             irreversible=irreversible,
             runtime_state=state,
+            config=config,
         )
 
     @mcp.tool(name="list_invariants")

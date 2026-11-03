@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hmac
+import json
 import os
 from dataclasses import dataclass
 
@@ -19,12 +20,80 @@ from starlette.requests import HTTPConnection
 ALL_SCOPES: frozenset[str] = frozenset({"admin", "producer", "responder", "observer"})
 
 
+def matches_scope_patterns(value: str | None, patterns: frozenset[str]) -> bool:
+    """Return True if ``value`` matches any configured source/namespace pattern.
+
+    An empty ``patterns`` set (or a pattern of ``"*"``) permits all values.
+    Each pattern may be an exact identifier (``"mip.risk"``), a segment prefix
+    (``"mip"`` or ``"mip.*"`` or ``"mip."`` matching ``"mip"`` and ``"mip.*"``),
+    or a wildcard prefix (``"mip*"``).
+    """
+    if not patterns or "*" in patterns:
+        return True
+    if not value:
+        return False
+    target = value.strip()
+    if not target:
+        return False
+    for raw_pat in patterns:
+        pat = raw_pat.strip()
+        if not pat:
+            continue
+        if pat == "*":
+            return True
+        if pat.endswith(".*"):
+            prefix = pat[:-2]
+            if target == prefix or target.startswith(f"{prefix}."):
+                return True
+        elif pat.endswith("*"):
+            prefix = pat[:-1]
+            if target.startswith(prefix):
+                return True
+        elif pat.endswith("."):
+            prefix = pat[:-1]
+            if target == prefix or target.startswith(pat):
+                return True
+        else:
+            if target == pat or target.startswith(f"{pat}."):
+                return True
+    return False
+
+
+def _parse_pattern_csv(raw: str | None) -> frozenset[str]:
+    if not raw:
+        return frozenset()
+    return frozenset(part.strip() for part in str(raw).split(",") if part.strip())
+
+
 @dataclass(frozen=True)
 class WritePrincipal:
-    """Verified actor and capability scopes for API calls."""
+    """Verified actor, capability scopes, and optional source/namespace bounds."""
 
     subject: str
     scopes: frozenset[str] = ALL_SCOPES
+    allowed_sources: frozenset[str] = frozenset()
+    allowed_namespaces: frozenset[str] = frozenset()
+
+    def allows_source(self, source: str | None) -> bool:
+        """Check whether this principal is authorized for ``source``."""
+        if "admin" in self.scopes and not self.allowed_sources:
+            return True
+        return matches_scope_patterns(source, self.allowed_sources)
+
+    def allows_namespace(self, notification_type: str | None) -> bool:
+        """Check whether this principal is authorized for ``notification_type``."""
+        if "admin" in self.scopes and not self.allowed_namespaces:
+            return True
+        return matches_scope_patterns(notification_type, self.allowed_namespaces)
+
+
+@dataclass(frozen=True)
+class _CredentialSpec:
+    key: str
+    subject: str
+    scopes: frozenset[str]
+    allowed_sources: frozenset[str] = frozenset()
+    allowed_namespaces: frozenset[str] = frozenset()
 
 
 def _state_or_env(connection: HTTPConnection, state_name: str, env_name: str) -> str | None:
@@ -43,47 +112,142 @@ def _bearer_token(header_value: str | None) -> str | None:
     return token
 
 
-def _configured_credentials(connection: HTTPConnection) -> list[tuple[str, str, frozenset[str]]]:
-    """Return configured (key, subject, scopes) tuples in priority order."""
-    specs = (
-        (
-            _state_or_env(connection, "uns_api_key", "UNS_API_KEY"),
-            _state_or_env(connection, "uns_api_principal", "UNS_API_PRINCIPAL")
+def _configured_credential_specs(connection: HTTPConnection) -> list[_CredentialSpec]:
+    """Return configured credential specs in priority order."""
+    raw_specs = (
+        _CredentialSpec(
+            key=_state_or_env(connection, "uns_api_key", "UNS_API_KEY") or "",
+            subject=_state_or_env(connection, "uns_api_principal", "UNS_API_PRINCIPAL")
             or "uns-api-key",
-            ALL_SCOPES,
+            scopes=ALL_SCOPES,
         ),
-        (
-            _state_or_env(connection, "uns_producer_api_key", "UNS_PRODUCER_API_KEY"),
-            _state_or_env(
+        _CredentialSpec(
+            key=_state_or_env(connection, "uns_producer_api_key", "UNS_PRODUCER_API_KEY") or "",
+            subject=_state_or_env(
                 connection,
                 "uns_producer_api_principal",
                 "UNS_PRODUCER_API_PRINCIPAL",
             )
             or "uns-producer",
-            frozenset({"producer", "observer"}),
+            scopes=frozenset({"producer", "observer"}),
+            allowed_sources=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_producer_allowed_sources",
+                    "UNS_PRODUCER_ALLOWED_SOURCES",
+                )
+            ),
+            allowed_namespaces=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_producer_allowed_namespaces",
+                    "UNS_PRODUCER_ALLOWED_NAMESPACES",
+                )
+            ),
         ),
-        (
-            _state_or_env(connection, "uns_responder_api_key", "UNS_RESPONDER_API_KEY"),
-            _state_or_env(
+        _CredentialSpec(
+            key=_state_or_env(connection, "uns_responder_api_key", "UNS_RESPONDER_API_KEY") or "",
+            subject=_state_or_env(
                 connection,
                 "uns_responder_api_principal",
                 "UNS_RESPONDER_API_PRINCIPAL",
             )
             or "uns-responder",
-            frozenset({"responder", "observer"}),
+            scopes=frozenset({"responder", "observer"}),
+            allowed_sources=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_responder_allowed_sources",
+                    "UNS_RESPONDER_ALLOWED_SOURCES",
+                )
+            ),
+            allowed_namespaces=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_responder_allowed_namespaces",
+                    "UNS_RESPONDER_ALLOWED_NAMESPACES",
+                )
+            ),
         ),
-        (
-            _state_or_env(connection, "uns_observer_api_key", "UNS_OBSERVER_API_KEY"),
-            _state_or_env(
+        _CredentialSpec(
+            key=_state_or_env(connection, "uns_observer_api_key", "UNS_OBSERVER_API_KEY") or "",
+            subject=_state_or_env(
                 connection,
                 "uns_observer_api_principal",
                 "UNS_OBSERVER_API_PRINCIPAL",
             )
             or "uns-observer",
-            frozenset({"observer"}),
+            scopes=frozenset({"observer"}),
+            allowed_sources=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_observer_allowed_sources",
+                    "UNS_OBSERVER_ALLOWED_SOURCES",
+                )
+            ),
+            allowed_namespaces=_parse_pattern_csv(
+                _state_or_env(
+                    connection,
+                    "uns_observer_allowed_namespaces",
+                    "UNS_OBSERVER_ALLOWED_NAMESPACES",
+                )
+            ),
         ),
     )
-    return [(key, subject, scopes) for key, subject, scopes in specs if key]
+    specs = [spec for spec in raw_specs if spec.key]
+    extra_json = _state_or_env(connection, "uns_scoped_api_keys", "UNS_SCOPED_API_KEYS")
+    if extra_json:
+        try:
+            parsed = json.loads(extra_json)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if not isinstance(item, dict):
+                        continue
+                    key = str(item.get("key", "")).strip()
+                    subject = str(item.get("principal") or item.get("subject") or "").strip()
+                    raw_scopes = item.get("scopes")
+                    if raw_scopes is None:
+                        role = str(item.get("role", "observer")).strip().lower()
+                        if role == "admin":
+                            raw_scopes = list(ALL_SCOPES)
+                        elif role in ("producer", "responder"):
+                            raw_scopes = [role, "observer"]
+                        else:
+                            raw_scopes = [role]
+                    scopes = frozenset(
+                        str(s).strip() for s in raw_scopes if str(s).strip() in ALL_SCOPES
+                    )
+                    if not key or not subject or not scopes:
+                        continue
+                    raw_sources = item.get("allowed_sources", [])
+                    raw_namespaces = item.get("allowed_namespaces", [])
+                    sources = (
+                        _parse_pattern_csv(raw_sources)
+                        if isinstance(raw_sources, str)
+                        else frozenset(str(s).strip() for s in raw_sources if str(s).strip())
+                    )
+                    namespaces = (
+                        _parse_pattern_csv(raw_namespaces)
+                        if isinstance(raw_namespaces, str)
+                        else frozenset(str(n).strip() for n in raw_namespaces if str(n).strip())
+                    )
+                    specs.append(
+                        _CredentialSpec(
+                            key=key,
+                            subject=subject,
+                            scopes=scopes,
+                            allowed_sources=sources,
+                            allowed_namespaces=namespaces,
+                        )
+                    )
+        except ValueError:
+            pass
+    return specs
+
+
+def _configured_credentials(connection: HTTPConnection) -> list[tuple[str, str, frozenset[str]]]:
+    """Return configured (key, subject, scopes) tuples in priority order."""
+    return [(s.key, s.subject, s.scopes) for s in _configured_credential_specs(connection)]
 
 
 def require_principal_scope(principal: WritePrincipal, required_scope: str) -> WritePrincipal:
@@ -99,13 +263,40 @@ def require_principal_scope(principal: WritePrincipal, required_scope: str) -> W
     return principal
 
 
+def require_source_and_namespace(
+    principal: WritePrincipal | None,
+    *,
+    source: str | None = None,
+    notification_type: str | None = None,
+) -> None:
+    """Enforce source and notification_type namespace restrictions for a scoped principal."""
+    if principal is None:
+        return
+    if source is not None and not principal.allows_source(source):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "namespace_or_source_forbidden",
+                "message": f"Credential principal '{principal.subject}' is not authorized for source '{source}'.",
+            },
+        )
+    if notification_type is not None and not principal.allows_namespace(notification_type):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "namespace_or_source_forbidden",
+                "message": f"Credential principal '{principal.subject}' is not authorized for notification_type '{notification_type}'.",
+            },
+        )
+
+
 def _authenticate(
     connection: HTTPConnection,
     supplied_key: str | None,
     *,
     required_scope: str = "admin",
 ) -> WritePrincipal:
-    credentials = _configured_credentials(connection)
+    credentials = _configured_credential_specs(connection)
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -119,19 +310,36 @@ def _authenticate(
         )
     matched_subject: str | None = None
     matched_scopes: set[str] = set()
+    matched_sources: set[str] = set()
+    matched_namespaces: set[str] = set()
+    unrestricted_sources = False
+    unrestricted_namespaces = False
     supplied_bytes = supplied_key.encode()
-    for configured_key, subject, scopes in credentials:
-        if hmac.compare_digest(supplied_bytes, configured_key.encode()):
+    for spec in credentials:
+        if hmac.compare_digest(supplied_bytes, spec.key.encode()):
             if matched_subject is None:
-                matched_subject = subject
-            matched_scopes.update(scopes)
+                matched_subject = spec.subject
+            matched_scopes.update(spec.scopes)
+            if not spec.allowed_sources:
+                unrestricted_sources = True
+            else:
+                matched_sources.update(spec.allowed_sources)
+            if not spec.allowed_namespaces:
+                unrestricted_namespaces = True
+            else:
+                matched_namespaces.update(spec.allowed_namespaces)
     if matched_subject is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": "unauthorized", "message": "A valid UNS API key is required."},
             headers={"WWW-Authenticate": "Bearer"},
         )
-    principal = WritePrincipal(subject=matched_subject, scopes=frozenset(matched_scopes))
+    principal = WritePrincipal(
+        subject=matched_subject,
+        scopes=frozenset(matched_scopes),
+        allowed_sources=frozenset() if unrestricted_sources else frozenset(matched_sources),
+        allowed_namespaces=frozenset() if unrestricted_namespaces else frozenset(matched_namespaces),
+    )
     return require_principal_scope(principal, required_scope)
 
 

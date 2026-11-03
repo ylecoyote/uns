@@ -15,7 +15,7 @@ This historical `notification` package provides the core infrastructure includin
 - Audit logging and persistence
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from .acknowledgment import (
     AcknowledgmentEngine,
