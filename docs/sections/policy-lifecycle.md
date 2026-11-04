@@ -30,4 +30,4 @@ The system validates evidence binding and declared criteria, not an external eva
 
 ## Migration limits
 
-Concurrent first-upgrade schema creation is idempotent. Current writes preserve complete policy serialization. Fields already discarded by older persistence versions cannot be reconstructed from missing data; operators must restore authoritative source content when necessary. SQLite process ordering is tested; live PostgreSQL acceptance remains separate.
+Concurrent first-upgrade schema creation is idempotent. Current writes preserve complete policy serialization. Fields already discarded by older persistence versions cannot be reconstructed from missing data; operators must restore authoritative source content when necessary. Both SQLite (`BEGIN IMMEDIATE` revision lock) and PostgreSQL 16 (`SELECT ... FOR UPDATE` revision lock plus `NOTIFY uns_policy_revision` cross-process cache invalidation) are verified in CI (`tests/uns/test_postgres_and_load.py`).

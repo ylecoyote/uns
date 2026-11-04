@@ -25,7 +25,7 @@ import uuid
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -199,7 +199,7 @@ def decide(
 
     resolved_policy_hash = policy_config_hash or _policy_hash_from_model(policy)
     context_hash = compute_context_hash(validated_context)
-    now = evaluated_at or datetime.now(timezone.utc)
+    now = evaluated_at or datetime.now(UTC)
     resolved_decision_id = decision_id or _deterministic_decision_id(
         policy_config_hash=resolved_policy_hash,
         context_hash=context_hash,
@@ -669,7 +669,7 @@ class DecisionEngine:
             ctx_hash = "sha256:unhashable"
 
         fallback_decision = self._fail_mode_decision_for_intent(intent)
-        now = evaluated_at or datetime.now(timezone.utc)
+        now = evaluated_at or datetime.now(UTC)
         resolved_id = decision_id or uuid.uuid4()
 
         record = DecisionRecord(

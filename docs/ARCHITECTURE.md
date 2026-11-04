@@ -24,7 +24,7 @@ Delivery status and acknowledgment state remain separate. The first qualifying d
 
 ## Transports and console
 
-Python, HTTP and MCP share the durable application service. Public transport authentication is centralized; WebSocket response mutations use Runtime instead of a separate legacy engine. The React console is a read-first presentation surface with runtime-memory operator authentication.
+Python, HTTP and MCP share the durable application service. Public transport authentication is centralized; WebSocket response mutations use Runtime instead of a separate legacy engine. The React console consumes strictly read-only `/ui/*` read models (`INV-UI-001`) with runtime-memory operator authentication and invokes capability-gated `/api/v1/*` endpoints for operator/responder mutations (ACK, Snooze, Dismiss, Escalate, DLQ Replay, and Policy Lifecycle transitions).
 
 Compatibility modules retain historical import/tool names. Explicit low-level fixture composition remains available for tests; it is not an alternative unauthenticated deployment profile. Transport-owned read adapters must stay tied to their runtime, not a mutable process-global reader.
 

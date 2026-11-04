@@ -718,6 +718,119 @@ interface TimeSeriesBucket {
 
 ---
 
+## 6. Console Session & Policy Lifecycle Read Models
+
+The UNS Console also consumes five read-only `/ui/*` endpoints for principal session capability discovery (`GET /ui/session`) and policy lifecycle / shadow-evaluation inspection (`GET /ui/policies/active`, `GET /ui/policies/revisions`, `GET /ui/policies/proposals`, and `GET /ui/policies/proposals/{delta_id}`).
+
+### Console Session Capabilities
+
+```
+GET /ui/session
+```
+
+```typescript
+interface ConsoleSessionResponse {
+  subject: string;
+  scopes: string[];
+  persistence_mode?: string | null;
+}
+```
+
+### Active Policy Catalog & Policy Revisions
+
+```
+GET /ui/policies/active
+GET /ui/policies/revisions?notification_type={type}&status={ACTIVE|DRAFT|PREVIEW|RETIRED}&limit={limit}
+```
+
+```typescript
+interface ActivePolicySummary {
+  notification_type: string;
+  version: string;
+  status: string;
+  intent?: NotificationIntent | null;
+  channels: Channel[];
+  delivery_mode: DeliveryMode;
+  require_ack: boolean;
+  ack_timeout_minutes?: number | null;
+  ack_timeout_seconds?: number | null;
+  dedup_window_seconds: number;
+}
+
+interface ActivePolicyListResponse {
+  items: ActivePolicySummary[];
+  total_count: number;
+}
+
+interface PolicyRevisionSummary extends ActivePolicySummary {
+  policy_id: string;
+  config_hash: string;
+  previous_version_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  activated_at?: string | null;
+  retired_at?: string | null;
+}
+
+interface PolicyRevisionListResponse {
+  items: PolicyRevisionSummary[];
+  total_count: number;
+}
+```
+
+### Policy Delta Proposals & Shadow Evaluation Evidence
+
+```
+GET /ui/policies/proposals?policy_type={type}&state={PROPOSED|SHADOW|APPROVED|REJECTED|APPLIED}&limit={limit}
+GET /ui/policies/proposals/{delta_id}
+```
+
+```typescript
+interface PolicyProposalSummary {
+  delta_id: string;
+  policy_type: string;
+  field_path: string;
+  current_value: unknown;
+  proposed_value: unknown;
+  reasoning: string;
+  confidence: number;
+  evidence_count: number;
+  state: "PROPOSED" | "SHADOW" | "APPROVED" | "REJECTED" | "APPLIED";
+  baseline_hash?: string | null;
+  baseline_version?: number | null;
+  candidate_hash: string;
+  approval_candidate_hash?: string | null;
+  current_active_hash?: string | null;
+  current_active_version?: number | null;
+  baseline_hash_matches: boolean;
+  evidence_hash_matches: boolean;
+  can_promote_to_shadow: boolean;
+  can_approve: boolean;
+  can_activate: boolean;
+  draft_policy_id?: string | null;
+  draft_version?: string | null;
+  required_guards: string[];
+  guard_results: PolicyGuardResultItem[];
+  transition_history: PolicyTransitionItem[];
+  shadow_aggregate?: ShadowEvaluationSummaryItem | null;
+  shadow_results: ShadowEvaluationSampleItem[];
+  proposed_by: string;
+  approved_by?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
+  applied_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PolicyProposalListResponse {
+  items: PolicyProposalSummary[];
+  total_count: number;
+}
+```
+
+---
+
 # Future Endpoints (Planned)
 
 The following endpoints are designed but not yet fully implemented. They are documented here for planning purposes.

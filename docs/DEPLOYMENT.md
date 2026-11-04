@@ -40,7 +40,7 @@ UNS reads `UNS_*` environment variables (`src/uns/config.py` and `src/uns/api/au
 
 | Variable | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., SQLite `sqlite:////var/lib/uns/uns.db` or PostgreSQL `postgresql+psycopg://user:pass@host:5432/uns`; `psycopg[binary]>=3.2.0` is shipped in `uns[sql]` / `uns[full]`). Use file-backed SQLite for the local recording deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` requires a persistent SQLite file. |
+| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | No implicit service database | **Yes**, except explicit HTTP memory mode | SQLAlchemy database URL (e.g., SQLite `sqlite:////var/lib/uns/uns.db` or PostgreSQL `postgresql+psycopg://user:pass@host:5432/uns`; `psycopg[binary]>=3.2.0` is shipped in `uns[sql]` / `uns[full]`). Use file-backed SQLite for the local recording deployment profile. Write-enabled MCP rejects volatile storage; `uns-maintain` supports both persistent SQLite files and PostgreSQL databases. |
 | `UNS_ALLOW_IN_MEMORY` | `false` | No | Explicit HTTP demo opt-in (`true`/`1`/`yes`/`on`), also enabled by `uns --in-memory`. Permits missing or volatile database configuration; does not weaken the MCP write guard. |
 | `UNS_API_KEY` | *(None)* | For operator access | Full operator credential (`admin`, `producer`, `responder`, `observer`), required for administrative endpoints and `/metrics`. Scoped credentials can access their permitted endpoints without this key. If no credentials are configured, protected endpoints return `503 write_auth_not_configured`. |
 | `UNS_API_PRINCIPAL` | `uns-api-key` | **Yes** (MCP Writes) | Audited actor/principal identity bound to `UNS_API_KEY` and `uns-mcp --enable-writes`. |
@@ -282,7 +282,7 @@ No universal retention duration is prescribed. Expiring a notification row also 
 
 Apply requires `--apply --operator <actor>`. Without `--archive`, existing event/audit history stays in the database and a retained receipt preserves removed operational state. This is operational-table pruning, not database-size compaction.
 
-Optional `--archive /absolute/new-file.json` exports an entire eligible settled group, creates a new file exclusively with mode0600, fsyncs the file and parent directory, verifies its SHA256, then prunes the corresponding rows in the same SQLite writer transaction. A no-content database receipt records archive path/hash, ids, counts and operator. Existing files and symlinks are not overwritten. Export or commit failure preserves database state but may leave an archive/partial file; inspect it and choose a new path before retrying.
+Optional `--archive /absolute/new-file.json` exports an entire eligible settled group, creates a new file exclusively with mode 0600, fsyncs the file and parent directory, verifies its SHA256, then prunes the corresponding rows in the same database transaction. A no-content database receipt records archive path/hash, ids, counts and operator. Existing files and symlinks are not overwritten. Export or commit failure preserves database state but may leave an archive/partial file; inspect it and choose a new path before retrying.
 
 Pending delivery, unsettled ACK, open dead letters, callback work, live leases, recent activity and retained dedup/follower/successor references are protected. Policy history and retention receipts are not pruned. The command supports both persistent SQLite files (`BEGIN IMMEDIATE`) and PostgreSQL (`SET LOCAL lock_timeout = '30s'`, `pg_advisory_xact_lock`, and `FOR UPDATE` candidate locking) and requires the current schema.
 
@@ -309,7 +309,7 @@ Operators can generate a tamper-evident JSON or Markdown SLO telemetry receipt (
   --require-certified
 ```
 
-The CLI distinguishes local `recording_only` rehearsals from live external provider traffic (`SLACK`, `EMAIL`, `PAGERDUTY`) and verifies all six `v1.0` SLO gates (`zero_overdue_acks`, `zero_unresolved_dead_letters`, `zero_unknown_attempts`, `provider_error_rate_within_budget`, `live_external_delivery_observed`, and `multi_week_window_met`).
+The CLI distinguishes local `recording_only` rehearsals from live external provider traffic (`SLACK`, `EMAIL`, `PAGERDUTY`) and verifies all seven `v1.0` SLO gates (`zero_overdue_acks`, `zero_unresolved_dead_letters`, `zero_unknown_attempts`, `zero_stalled_pending_backlog`, `provider_error_rate_within_budget`, `live_external_delivery_observed`, and `multi_week_window_met`).
 
 ---
 

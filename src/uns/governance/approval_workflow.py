@@ -21,7 +21,7 @@ import hmac
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -91,7 +91,7 @@ class ApprovalRequestRecord(BaseModel):
     target_reviewer_role: str | None = None
     reason: str | None = None
     callback_url: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     resolved_by: str | None = None
     resolved_at: datetime | None = None
     resolution_note: str | None = None
@@ -232,7 +232,7 @@ class GovernanceApprovalBridge:
             return recovered
 
         approval_id = uuid.uuid4()
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         notification_id: str | None = None
         if self.runtime is not None:
             agent_uuid = _deterministic_agent_uuid(record.subject_id)
@@ -436,7 +436,7 @@ class GovernanceApprovalBridge:
             approval,
             status=new_status,
             actor=status_row.get("actor"),
-            resolved_at=datetime.now(timezone.utc),
+            resolved_at=datetime.now(UTC),
             note=(status_row.get("response_metadata") or {}).get("note")
             if isinstance(status_row.get("response_metadata"), dict)
             else None,
@@ -482,7 +482,7 @@ class GovernanceApprovalBridge:
             approval,
             status=status,
             actor=actor,
-            resolved_at=datetime.now(timezone.utc),
+            resolved_at=datetime.now(UTC),
             note=note,
         )
 

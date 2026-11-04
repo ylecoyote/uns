@@ -170,10 +170,26 @@ The `v0.2.0` release consolidates the durable notification runtime, MCP server, 
 
 | Check | Result |
 |---|---|
-| PostgreSQL 16 Live Operational Acceptance (`TestPostgresOperationalAcceptance`) | Schema bootstrap, idempotent migration, SQLite-only retention guard, warm/cold policy hydration, revision locking, idempotency replay, conflict detection, dedup coalescing/promotion, guarded replay, ACK/dismiss/TIMED_OUT lifecycle, and `SQLAlchemyReadModelAdapter` queries (with PostgreSQL JSONB containment channel filter) all passed. |
+| PostgreSQL 16 Live Operational Acceptance (`TestPostgresOperationalAcceptance`) | Schema bootstrap, idempotent migration, SQLite + PostgreSQL retention guard (`uns-maintain`), warm/cold policy hydration, revision locking, idempotency replay, conflict detection, dedup coalescing/promotion, guarded replay, ACK/dismiss/TIMED_OUT lifecycle, and `SQLAlchemyReadModelAdapter` queries (with PostgreSQL JSONB containment channel filter) all passed. |
 | 100-Request Concurrent Intake Burst & Deduplication Storm (`test_concurrent_intake_burst_and_deduplication_storm`) | 100 producer requests across 10 deduplication keys + 20 unique guaranteed requests (120 total) completed concurrently with zero lock errors, exactly 10 leaders + 90 followers, and sub-second P95 intake latency on both SQLite WAL and PostgreSQL 16. |
 | Multi-Worker Lease Contention Zero Duplicate Sends (`test_multi_worker_lease_contention_zero_duplicate_sends`) | 40 pending guaranteed notifications raced by 4 concurrent `runtime.dispatch(limit=20)` workers reached `DELIVERED` with exactly 40 external send calls recorded by the adapter (0 duplicate sends) on both SQLite WAL and PostgreSQL 16. |
 | Concurrent Policy Reload Under Active Intake (`test_concurrent_policy_reload_under_active_intake`) | 50 producer intake calls interleaved with 5 concurrent `save_snapshot()` policy reloads changing `ack_timeout_minutes` completed with 0 exceptions and 100% self-consistent `(policy_revision_id, policy_config_hash, ack_timeout_minutes)` provenance records. |
 | PostgreSQL Driver Packaging | `psycopg[binary]>=3.2.0` added to the `sql` optional dependency extra in `pyproject.toml`, enabling `uns[full]` PostgreSQL support out of the box. |
 | CI Integration | Dedicated `postgres` service container job using `postgres:16-alpine` running `tests/uns/test_postgres_and_load.py` integrated into `.github/workflows/python-tests.yml` under the `ci` required gate. |
+
+---
+
+## Release `v0.6.1` Governance, Provider Sync & Adversarial Remediation Verification
+
+Release `v0.6.1` extends the verification suite across `v0.3.0`-`v0.6.1` capabilities (`uns.governance` pre-execution authorization and approval bridge, inline `ShadowPolicyEvaluator` and governed `PolicyDelta` promotion, signed inbound Slack/PagerDuty webhooks, PostgreSQL `LISTEN/NOTIFY` cross-process policy invalidation, PostgreSQL `uns-maintain` parity, and `uns-slo-certify` 7-gate readiness receipts):
+
+| Suite / Gate | Target / Command | Status |
+|---|---|---|
+| Full Python Test Matrix | `pytest` (Python 3.11, 3.12, 3.13) | **1,964 passed**, 0 failed |
+| Adversarial Remediation Regression (`F01`-`F15`) | `pytest tests/uns/test_mpdd_2026_11_03_remediations.py` (SQLite + PostgreSQL 16) | **52 passed** (26 SQLite + 26 PostgreSQL 16) |
+| PostgreSQL 16 & Sustained Load | `pytest tests/uns/test_postgres_and_load.py` (`postgres:16-alpine` + SQLite WAL) | **23 passed** (including `LISTEN/NOTIFY` cross-process invalidation and PostgreSQL `uns-maintain`) |
+| Pre-Execution Action Governance | `pytest tests/governance/` | **48 passed** (`decide()`, fail-closed/fail-open semantics, RFC 8785 context hashes, `GovernanceApprovalBridge`) |
+| UNS Console Test Suite (`apps/ui`) | `npm --prefix apps/ui run ci` (Vitest 5.x / React 19.3 / TypeScript 5.9 / Vite 8.3) | **346 passed** across all 6 console surfaces |
+| Persistent Localhost Deployment (`uns:0.6.1`) | `python3 deploy/local/smoke.py --base-url http://127.0.0.1:18080 --key-file ~/.local/state/uns-local/config/api.key` | **66/66 checks passed** |
+
 

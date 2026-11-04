@@ -4,7 +4,7 @@ Register: product.
 
 UNS serves platform developers integrating autonomous applications and operators reviewing notification delivery and human response. Its product boundary is the notification obligation: resolve a policy, accept durable work, attempt delivery, record a response or timeout, and retain the policy and event history explaining the result.
 
-The console uses plain operational language and existing table/detail layouts. Preserve the established light theme and typography; use text labels as well as status color. Delivery and acknowledgment must be distinguishable at a glance. No approval or agent-control affordances belong in the console.
+The console uses plain operational language and existing table/detail layouts. Preserve the established light theme and typography; use text labels as well as status color. Delivery and acknowledgment must be distinguishable at a glance. All `/ui/*` endpoints remain strictly read-only (`INV-UI-001`), while capability-gated operator and responder actions in the console (ACK, Snooze, Dismiss, Escalate, DLQ Replay, and Policy Lifecycle `PolicyDelta` review/promotion/rollback) execute through `/api/v1/*` endpoints. Direct agent process-execution controls remain outside the console.
 
 ## Supported mechanisms
 

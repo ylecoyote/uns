@@ -1,7 +1,7 @@
 """Tests for the DecisionRecord Pydantic model and supporting types."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -61,7 +61,7 @@ class TestDecisionRecord:
             "context_hash": "sha256:def456",
             "decision": Decision.ALLOW,
             "reasons": [],
-            "evaluated_at": datetime.now(timezone.utc),
+            "evaluated_at": datetime.now(UTC),
             "schema_version": "0.4",
             "subject_id": "agent-123",
         }

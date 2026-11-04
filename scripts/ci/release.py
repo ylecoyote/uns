@@ -8,10 +8,9 @@ import json
 import os
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 from typing import Any
-
-import tomllib
 
 REQUIRED_CHECKS = ("CI", "Build MkDocs Site")
 

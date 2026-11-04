@@ -7,7 +7,7 @@
 #   docker run --rm -p 127.0.0.1:8000:8000 \
 #     -e UNS_API_KEY=<secret> \
 #     -e UNS_API_PRINCIPAL=ops-rotation \
-#     -e DATABASE_URL=postgresql+psycopg2://... \
+#     -e DATABASE_URL=postgresql+psycopg://... \
 #     -e UNS_REDIS_URL=redis://... \
 #     uns:dev
 #
@@ -39,7 +39,8 @@ RUN uv build --wheel
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
-# libpq is needed at runtime by psycopg2-binary.
+# libpq5 is kept for optional native Postgres tooling; psycopg[binary]>=3.2.0
+# is installed via uns[full] -> uns[sql].
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 \
     && rm -rf /var/lib/apt/lists/*
@@ -50,13 +51,12 @@ RUN groupadd --system --gid 1001 uns \
         --create-home --home-dir /home/uns --shell /sbin/nologin uns
 
 # Install UNS from the built wheel with the [full] meta-extra so all
-# runtime surfaces (HTTP server, Redis, SQL, MCP, channel adapters) are
-# available, plus the Postgres driver. Derivative images that only need a
+# runtime surfaces (HTTP server, Redis, SQL with psycopg[binary]>=3.2.0, MCP,
+# channel adapters) are available. Derivative images that only need a
 # subset (e.g. SDK-only producers) can install with no extras instead.
 COPY --from=builder /build/dist/ /tmp/dist/
 RUN set -- /tmp/dist/uns-*.whl \
     && pip install --no-cache-dir "$1[full]" \
-        "psycopg2-binary>=2.9.0" \
     && rm -rf /tmp/dist
 
 USER uns

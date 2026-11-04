@@ -36,7 +36,7 @@ Use read-only mode when an agent only needs to preview policies (`simulate_signa
 ```
 
 ### 2.2 Write-Enabled Configuration (Sending & Acknowledging Signals)
-First, ensure the SQLite database has been migrated (`uns-migrate`). Then configure the MCP host with `--enable-writes` and the three mandatory environment variables:
+First, ensure the persistent SQLite or PostgreSQL database (`UNS_DATABASE_URL`) has been migrated (`uns-migrate`). Then configure the MCP host with `--enable-writes` and the three mandatory environment variables:
 
 ```json
 {

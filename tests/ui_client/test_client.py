@@ -1,6 +1,6 @@
 """Tests for UI API client."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -130,7 +130,7 @@ class TestListDeliveries:
 
     def test_list_deliveries_basic(self, client):
         """Test basic list deliveries call."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         agent_id = str(uuid4())
         notification_id = str(uuid4())
 
@@ -219,7 +219,7 @@ class TestGetDeliveryTimeline:
 
     def test_get_timeline_success(self, client):
         """Test successful timeline retrieval."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         agent_id = str(uuid4())
         notification_id = uuid4()
 
@@ -450,7 +450,7 @@ class TestListAuditEvents:
 
     def test_list_audit_events_basic(self, client):
         """Test basic audit events listing."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         agent_id = str(uuid4())
         notification_id = str(uuid4())
         audit_id = str(uuid4())
@@ -514,7 +514,7 @@ class TestIterators:
 
     def test_iter_deliveries(self, client):
         """Test iterating through all deliveries."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         agent_id = str(uuid4())
 
         # Simulate 2 pages of results

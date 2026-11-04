@@ -1,6 +1,6 @@
 """Tests for UI API client filters."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -37,8 +37,8 @@ class TestDeliveryFilters:
 
     def test_all_filters(self):
         """Test all filters are converted to params."""
-        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        end = datetime(2024, 1, 31, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 1, 31, tzinfo=UTC)
         agent_id = uuid4()
 
         filters = DeliveryFilters(
@@ -99,8 +99,8 @@ class TestAuditFilters:
 
     def test_all_filters(self):
         """Test all filters are converted to params."""
-        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        end = datetime(2024, 1, 31, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 1, 31, tzinfo=UTC)
         agent_id = uuid4()
         notification_id = uuid4()
 
