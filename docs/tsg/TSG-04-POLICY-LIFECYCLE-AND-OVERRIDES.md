@@ -69,9 +69,9 @@ sqlite3 "$UNS_DB_FILE" "
 ## 4. Safe Remediation Steps
 
 ### Scenario A: `POST /api/v1/policies/reload` returns `409 Conflict`
-- **Cause 1 — Re-activating a `RETIRED` policy content hash:** `SQLAlchemyPolicyStore._save_policy` blocks reactivating an identical content hash that was previously marked `RETIRED` (`"A retired policy version cannot be reactivated; publish a new version"`).
+- **Cause 1 - Re-activating a `RETIRED` policy content hash:** `SQLAlchemyPolicyStore._save_policy` blocks reactivating an identical content hash that was previously marked `RETIRED` (`"A retired policy version cannot be reactivated; publish a new version"`).
   - **Fix:** Increment the `version` field in the YAML policy file so its canonical content hash is new, then re-run `/api/v1/policies/reload`.
-- **Cause 2 — Duplicate `(notification_type, status)` in directory:** Multiple YAML files define the same `notification_type` and `status`.
+- **Cause 2 - Duplicate `(notification_type, status)` in directory:** Multiple YAML files define the same `notification_type` and `status`.
   - **Fix:** Ensure at most one `ACTIVE` and one `PREVIEW` definition exist per `notification_type`.
 
 ### Scenario B: `POST /api/v1/policies/reload` returns `422 Unprocessable Entity`

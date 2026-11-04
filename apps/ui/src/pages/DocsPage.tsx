@@ -1,5 +1,5 @@
 /**
- * DocsPage — In-Portal Documentation & Runbooks Workspace (/docs)
+ * DocsPage - In-Portal Documentation & Runbooks Workspace (/docs)
  *
  * Implements a Modernist two-column split layout (260px sticky left section index
  * + main documentation reader) with URL deep-linking (?section= and ?q=) and instant
@@ -151,7 +151,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
                   shadow promotion, draft approval, and activation (
                   <code>POST /api/v1/policies/proposals*</code>), dead-letter <strong>Replay</strong> (
                   <code>POST /api/v1/runtime/notifications/&#123;id&#125;/replay</code>) and{' '}
-                  <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code> —
+                  <strong>Resolve</strong> (<code>DELETE /api/v1/dlq/&#123;entry_id&#125;</code>:
                   where in canonical <code>uns.Runtime</code> / <code>RuntimeDLQ</code> mode,{' '}
                   <code>entry_id === notification_id</code>, whereas in legacy non-runtime{' '}
                   <code>DLQService</code> fixtures, <code>entry_id</code> is the DLQ entry UUID
@@ -701,7 +701,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
         </p>
         <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
           <li>
-            <strong>Audit Timeline — <code>1e</code> By Notification Lifecycle Table:</strong>{' '}
+            <strong>Audit Timeline (<code>1e</code>) By Notification Lifecycle Table:</strong>{' '}
             Correlates all audit events for each <code>notification_id</code> into a single
             lifecycle row (
             <code>NOTIFICATION | STARTED | DELIVERED | RESPONSE | TIME TO RESPOND</code>), computing
@@ -710,7 +710,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
             per-event drill-down.
           </li>
           <li>
-            <strong>Audit Timeline — <code>1d</code> All Events Stream:</strong> Chronological
+            <strong>Audit Timeline (<code>1d</code>) All Events Stream:</strong> Chronological
             compliance event stream with filtering by <code>event_type</code>,{' '}
             <code>notification_id</code>, <code>agent_id</code>, <code>autonomy_mode</code>,{' '}
             <code>correlation_id</code>, and UTC time bounds.
@@ -775,7 +775,7 @@ const DOCS_CARDS: readonly DocsCardEntry[] = [
    ├── Active PENDING leader in window ─────► PENDING (Follower: dedup_owner_id = <leader_uuid>)
    └── Active DELIVERED leader in window ───► DEDUPLICATED (dedup_owner_id = <leader_uuid>)
 
-[Worker Dispatch: Runtime.dispatch() — 60s lease_token]
+[Worker Dispatch: Runtime.dispatch(), 60s lease_token]
    PENDING (Leader)
    ├── Adapter succeeds before lease expiry ► DELIVERED (Followers settle as DEDUPLICATED)
    ├── Adapter fails (cycle_attempts < max) ► PENDING (Exponential backoff retry)
@@ -1093,7 +1093,7 @@ uv run python examples/mip_producer_demo.py --base-url http://127.0.0.1:18080 --
           Remote producers submit obligations to <code>POST /api/v1/notifications</code> (or
           side-effect-free previews to <code>POST /api/v1/notifications/simulate</code>) with a
           structured <code>autonomy_context</code>. Remember: <strong>Notification is not action
-          approval</strong>—delivery or <code>ACKED</code> status records receipt of the obligation,
+          approval</strong>: delivery or <code>ACKED</code> status records receipt of the obligation,
           not execution capability authorization.
         </p>
         <pre className="docs-code-block">

@@ -1,5 +1,5 @@
 /**
- * InvariantsList component — Modernist 3-Column Specification Rows (1c)
+ * InvariantsList component - Modernist 3-Column Specification Rows (1c)
  *
  * Displays a list of invariants with details, enforcement description, and source evidence.
  */
@@ -130,7 +130,7 @@ function InvariantCard({ invariant }: InvariantCardProps) {
                   </span>
                 )}
                 <span style={{ color: 'var(--color-neutral-700)', marginLeft: '8px' }}>
-                  — {evidence.note}
+                  - {evidence.note}
                 </span>
               </div>
             ))}

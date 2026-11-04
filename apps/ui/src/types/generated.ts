@@ -65,7 +65,7 @@ export interface paths {
         put?: never;
         /**
          * Send Notification
-         * @description HTTP adapter — delegates to uns.signaling.send_signal.
+         * @description HTTP adapter - delegates to uns.signaling.send_signal.
          *
          *     Translates typed signaling errors to HTTP responses:
          *     - :class:`ValidationError` -> 422 validation_error
@@ -94,7 +94,7 @@ export interface paths {
         put?: never;
         /**
          * Simulate Notification
-         * @description HTTP adapter — delegates to uns.signaling.simulate_signal.
+         * @description HTTP adapter - delegates to uns.signaling.simulate_signal.
          *
          *     Translates typed signaling errors to HTTP responses:
          *     - :class:`ValidationError` -> 422 validation_error
@@ -217,7 +217,7 @@ export interface paths {
         put?: never;
         /**
          * Acknowledge Notification
-         * @description HTTP adapter — delegates to uns.signaling.acknowledge.
+         * @description HTTP adapter - delegates to uns.signaling.acknowledge.
          *
          *     Translates typed signaling errors to HTTP responses:
          *     - ``KeyError`` -> 404 not_found
@@ -242,7 +242,7 @@ export interface paths {
         put?: never;
         /**
          * Dismiss Notification
-         * @description HTTP adapter — delegates to uns.signaling.dismiss.
+         * @description HTTP adapter - delegates to uns.signaling.dismiss.
          *
          *     Translates typed signaling errors to HTTP responses:
          *     - ``KeyError`` -> 404 not_found
@@ -265,7 +265,7 @@ export interface paths {
         };
         /**
          * Get Notification Status
-         * @description HTTP adapter — delegates to uns.queries.get_notification_status.
+         * @description HTTP adapter - delegates to uns.queries.get_notification_status.
          */
         get: operations["get_notification_status_api_v1_notifications__notification_id__get"];
         put?: never;
@@ -285,7 +285,7 @@ export interface paths {
         };
         /**
          * Get Ack Status
-         * @description HTTP adapter — delegates to uns.queries.get_ack_status.
+         * @description HTTP adapter - delegates to uns.queries.get_ack_status.
          */
         get: operations["get_ack_status_api_v1_notifications__notification_id__ack_status_get"];
         put?: never;

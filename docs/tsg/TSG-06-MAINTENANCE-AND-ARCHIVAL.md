@@ -130,5 +130,5 @@ done
 
 ## Related Documentation
 
-- [Deployment Guide — Explicit Retention](../DEPLOYMENT.md)
+- [Deployment Guide - Explicit Retention](../DEPLOYMENT.md)
 - [Support Reference: State Machines & Schema](../support/STATE-MACHINE-AND-SCHEMA.md)

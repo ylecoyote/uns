@@ -1,5 +1,5 @@
 /**
- * AuditEventCard component — Modernist 5-Column Event Row (1d)
+ * AuditEventCard component - Modernist 5-Column Event Row (1d)
  *
  * Uses the Delivery (filled) vs. Response (outlined) badge visual grammar
  * while preserving existing test class tokens and data-testids.
@@ -242,7 +242,7 @@ export function AuditEventCard({ event }: AuditEventCardProps) {
           </details>
         ) : (
           <span className="monospace" style={{ fontSize: '11px', color: 'var(--color-neutral-500)' }}>
-            —
+            -
           </span>
         )}
       </div>

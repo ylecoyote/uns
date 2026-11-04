@@ -1,5 +1,5 @@
 /**
- * PolicyInspectorPage — Policy Workspace (/policy)
+ * PolicyInspectorPage - Policy Workspace (/policy)
  *
  * Surface 4 of the UNS Console Responder & Operator Workflows specification:
  * - Active Policies Catalog table (GET /ui/policies/active) with one-click selection
@@ -792,7 +792,7 @@ export function PolicyInspectorPage() {
           {/* Empty State Poster (1b) */}
           {!result && !loading && !error && (
             <div className="policy-empty-poster" data-testid="empty-state">
-              <div className="policy-empty-eyebrow">Resolution Trace — Awaiting Query</div>
+              <div className="policy-empty-eyebrow">Resolution Trace: Awaiting Query</div>
               <p className="policy-empty-statement">
                 Enter a notification type and click "Inspect Policy" to view resolution details.
               </p>
@@ -995,7 +995,7 @@ export function PolicyInspectorPage() {
                   Policy Revision History &amp; Lineage ({policyRevisions.length})
                 </h2>
                 <span style={{ fontSize: '12px', color: 'var(--color-neutral-700)' }}>
-                  Inspect ACTIVE, PREVIEW, DRAFT, and RETIRED revisions — click any row to load into Inspector &amp; Simulator
+                  Inspect ACTIVE, PREVIEW, DRAFT, and RETIRED revisions. Click any row to load into Inspector &amp; Simulator
                 </span>
               </div>
 
@@ -1206,7 +1206,7 @@ export function PolicyInspectorPage() {
                   backgroundColor: 'var(--color-surface)',
                 }}
               >
-                <strong>{promotionBanner.message}</strong> — Revision{' '}
+                <strong>{promotionBanner.message}</strong>: Revision{' '}
                 <span className="monospace">v{promotionBanner.version}</span> (
                 <span className="monospace">{promotionBanner.status}</span>, hash{' '}
                 <span className="monospace">
@@ -1639,7 +1639,7 @@ export function PolicyInspectorPage() {
                   }}
                 >
                   <h3 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase' }}>
-                    Shadow Evidence &amp; Guard Ledger — {selectedProposalDetail.policy_type} (
+                    Shadow Evidence &amp; Guard Ledger: {selectedProposalDetail.policy_type} (
                     {selectedProposalDetail.field_path})
                   </h3>
                   <button

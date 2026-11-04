@@ -112,7 +112,7 @@ The client reads the current tab credential. Contract decoders validate the resp
 
 ## API Endpoints Consumed
 
-### Read Model Endpoints (`/ui/*` — Phase 1 Read-Only Baseline)
+### Read Model Endpoints (`/ui/*` - Phase 1 Read-Only Baseline)
 
 `/ui/*` endpoints are `GET-only` read models representing the Phase 1 read-only baseline:
 
@@ -128,7 +128,7 @@ The client reads the current tab credential. Contract decoders validate the resp
 | GET `/ui/invariants` | Invariant records |
 | GET `/ui/invariants/summary` | Invariant summary |
 
-### Responder & Operator Workflows (`/api/v1/*` & Telemetry — Phase 2 Capability-Gated)
+### Responder & Operator Workflows (`/api/v1/*` & Telemetry - Phase 2 Capability-Gated)
 
 Phase 2 responder and operator workflows invoke capability-gated `/api/v1/*` endpoints and operational telemetry:
 

@@ -7,7 +7,7 @@ adapters that parse `Request`, delegate here, and return the response.
 
 Each function in this module is the canonical implementation of its
 operation. `uns.api.routes_ui` and `uns_mcp.tools` both call
-into these — there is no other source of truth.
+into these - there is no other source of truth.
 
 Service-layer error handling: these functions raise typed domain errors
 from :mod:`uns.errors` (e.g. :class:`~uns.errors.NotFoundError`)
@@ -125,7 +125,7 @@ async def list_deliveries(
     limit: int = 25,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
-    status: DeliveryStatus | None = None,  # noqa: A002 — preserves route signature
+    status: DeliveryStatus | None = None,  # noqa: A002 - preserves route signature
     intent: NotificationIntent | None = None,
     delivery_mode: DeliveryMode | None = None,
     agent_id: UUID | None = None,
@@ -717,7 +717,7 @@ async def get_ack_status(
     """
     # Body extracted verbatim from uns.api.routes_notification.get_ack_status
     # (minus the @router.get decorator; an explicit `AckStatus | None` type
-    # annotation has been added on the local for clarity — behavior-equivalent).
+    # annotation has been added on the local for clarity - behavior-equivalent).
     engine = get_engine()
     ack_status: AckStatus | None = engine.get_status(notification_id)
 

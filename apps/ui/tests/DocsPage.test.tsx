@@ -1,5 +1,5 @@
 /**
- * Tests for DocsPage (/docs) — In-Portal Documentation & Runbooks Workspace.
+ * Tests for DocsPage (/docs) - In-Portal Documentation & Runbooks Workspace.
  *
  * Verifies:
  * - Rendering the Overview & Visual Grammar section by default (including Modernist delivery vs. response badges, ACK PENDING, RESOLVED, and Profile Banner)

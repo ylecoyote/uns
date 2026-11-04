@@ -1,4 +1,4 @@
-# UNS Console Scope — Responder & Operator Console
+# UNS Console Scope - Responder & Operator Console
 
 ## Design Philosophy
 
@@ -21,7 +21,7 @@ UNS Console (UNS Console) began in v1 as a **read-first "flight instruments" das
 
 - **Server-Verified Capability Introspection:** On sign-in, the console authenticates against `GET /ui/session` (`ConsoleSessionResponse`), which returns the authenticated principal `subject`, granted `scopes` (`observer`, `responder`, `producer`, `admin`), and runtime `persistence_mode`.
 - **Server-Verified Capability Pills:** The top navigation bar renders capability pills mapped directly from server-verified scopes:
-  - `OPERATOR` (`admin` scope — encompasses `admin`, `producer`, `responder`, and `observer` scopes)
+  - `OPERATOR` (`admin` scope - encompasses `admin`, `producer`, `responder`, and `observer` scopes)
   - `RESPONDER` (`responder` scope for non-admin principals)
   - `PRODUCER` (`producer` scope for non-admin principals)
   - `READ-ONLY` (`observer`-only principals)

@@ -5,8 +5,8 @@ on UNS Core and Console. Limits are keyed by API principal when a Bearer
 token (or ``X-UNS-API-Key`` / legacy ``X-UNS-API-Key``) is present, and
 fall back to the remote IP otherwise.
 
-Probe traffic — Kubernetes ``/healthz`` / ``/readyz`` (~6 req/min) and
-Prometheus ``/metrics`` scrapes (~4 req/min) — runs well below the default
+Probe traffic - Kubernetes ``/healthz`` / ``/readyz`` (~6 req/min) and
+Prometheus ``/metrics`` scrapes (~4 req/min) - runs well below the default
 limit (``1000/minute``), so probes are unaffected without explicit exemption.
 Operators who want stricter behavior should tighten the limit; operators who
 want different limits per route should layer reverse-proxy limits in front
@@ -74,7 +74,7 @@ def _build_limiter() -> Limiter:
 def install_rate_limiter(app: FastAPI) -> None:
     """Install slowapi-based rate limiting on a FastAPI app.
 
-    Idempotent — repeated calls on the same app are no-ops. Reads environment
+    Idempotent - repeated calls on the same app are no-ops. Reads environment
     on each fresh installation, so each ``create_app()`` call gets a Limiter
     matched to the current env (important for tests that mutate env via
     monkeypatch).

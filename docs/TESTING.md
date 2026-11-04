@@ -124,7 +124,7 @@ The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/prob
 
 The user accepted localhost plus recording adapters. The pinned application image is unchanged from `07ef52a`; the permanent recording composition and fixed ingress are versioned under `deploy/local/`. All 62 persistent-deployment checks passed, including real network transports, local provider recordings, one-minute timeout, callbacks and restart recovery. App isolation, loopback-only ingress and a consistent SQLite backup were checked. [Runbook](LOCAL_DEPLOYMENT.md) and [receipts](https://github.com/ylecoyote/uns/blob/main/verification/local-deployment/results.json) record the running deployment. No real-provider or remote-production acceptance is implied.
 
-## Review follow-up verification — 2026-10-24
+## Review follow-up verification - 2026-10-24
 
 Base: `7cf5c12c7a25607fff8242b2bdfe115a145dc485`. This follow-up closes the WebSocket response-scope gap, applies the persistence guard to the default ASGI/application-factory path, shares SQLite URL classification across startup and diagnostics, resolves complete obligation lineage, aligns runtime-bound MCP response evidence, and aggregates readiness progress without loading work histories.
 
@@ -148,7 +148,7 @@ Local verification used Python 3.12.14 and temporary SQLite databases. The execu
 
 These results establish local behavior. They do not establish real-provider receipt, human comprehension, production load capacity, or deployment of this commit. Hosted CI and the Python 3.11/3.13 matrix are separate checks.
 
-## Release v0.2.0 Full-Stack, PostgreSQL 16 & Concurrency Verification — 2026-11-02
+## Release v0.2.0 Full-Stack, PostgreSQL 16 & Concurrency Verification - 2026-11-02
 
 The `v0.2.0` release consolidates the durable notification runtime, MCP server, and operator console across Python and TypeScript stacks, adding full PostgreSQL 16 support, multi-worker concurrency validation, React 19 / TypeScript 5.9 / ESLint 9 flat config UI modernization, and automated GitHub Actions CI matrices.
 

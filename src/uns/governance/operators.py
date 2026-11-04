@@ -118,7 +118,7 @@ def _check_iterable(rhs: Any, op: Operator) -> None:
 
     Strings and bytes are rejected explicitly because `"a" in "ab"` is a frequent
     YAML-author footgun where they meant `IN ["ab"]`. The `__contains__` fallback
-    accepts any container (including dict, where `in` checks keys) — YAML loaders
+    accepts any container (including dict, where `in` checks keys) - YAML loaders
     typically produce list, so this only matters in programmatic construction.
     """
     if isinstance(rhs, (str, bytes)) or not hasattr(rhs, "__contains__"):

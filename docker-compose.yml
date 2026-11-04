@@ -8,7 +8,7 @@
 # Phase 3 unified the two FastAPI apps; reintroduce a split via reverse-proxy
 # routing if needed for production.
 #
-# UNS binds to 127.0.0.1 on the host. NOT FOR PRODUCTION — see
+# UNS binds to 127.0.0.1 on the host. NOT FOR PRODUCTION - see
 # docs/DEPLOYMENT.md for the production recipe (reverse proxy, TLS, real
 # secret management, restricted /metrics network exposure, etc.).
 #
@@ -58,8 +58,8 @@ services:
       UNS_API_KEY: dev-only-key-rotate-before-real-use
       UNS_API_PRINCIPAL: dev-operator
       UNS_HOST: 0.0.0.0
-      UNS_CREATE_TABLES: "true"   # FIRST RUN ONLY — flip to "false" after schema exists
-      UNS_ENABLE_DOCS: "true"     # /docs visible in dev only — never in production
+      UNS_CREATE_TABLES: "true"   # FIRST RUN ONLY - flip to "false" after schema exists
+      UNS_ENABLE_DOCS: "true"     # /docs visible in dev only - never in production
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

@@ -16,7 +16,7 @@ from __future__ import annotations
 class InMemoryRedisList:
     """Minimal Redis-list compatible store for standalone local operation.
 
-    Implements lpush, lrange, lrem, llen — the surface that
+    Implements lpush, lrange, lrem, llen - the surface that
     DLQService and the websocket-replay store consume. Not thread-safe
     and not durable. For real deployments, configure a real Redis client.
     """

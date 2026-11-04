@@ -1,5 +1,5 @@
 /**
- * InvariantsFilter component — Modernist Modular Filter Bar (1c)
+ * InvariantsFilter component - Modernist Modular Filter Bar (1c)
  *
  * Filter controls for invariants list.
  * Supports filtering by severity, enforcement_type, status, and search text.

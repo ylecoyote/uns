@@ -33,7 +33,7 @@ docs/internal/
 # Tests are not needed in the production image (we rely on CI for testing).
 tests/
 
-# UI source: not part of the Python wheel — its own deploy story.
+# UI source: not part of the Python wheel - its own deploy story.
 apps/
 
 # CI/dev tooling unrelated to the wheel

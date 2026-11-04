@@ -77,7 +77,7 @@ async def acknowledge_notification(
     principal: WritePrincipal = Depends(require_responder_principal),
     request: AckRequest | None = None,
 ) -> AckResponse:
-    """HTTP adapter — delegates to uns.signaling.acknowledge.
+    """HTTP adapter - delegates to uns.signaling.acknowledge.
 
     Translates typed signaling errors to HTTP responses:
     - ``KeyError`` -> 404 not_found
@@ -177,7 +177,7 @@ async def dismiss_notification(
     principal: WritePrincipal = Depends(require_responder_principal),
     request: DismissRequest | None = None,
 ) -> AckResponse:
-    """HTTP adapter — delegates to uns.signaling.dismiss.
+    """HTTP adapter - delegates to uns.signaling.dismiss.
 
     Translates typed signaling errors to HTTP responses:
     - ``KeyError`` -> 404 not_found
@@ -274,7 +274,7 @@ async def get_notification_status(
     http_request: Request,
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> NotificationStatusResponse:
-    """HTTP adapter — delegates to uns.queries.get_notification_status."""
+    """HTTP adapter - delegates to uns.queries.get_notification_status."""
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         try:
@@ -319,7 +319,7 @@ async def get_ack_status(
     http_request: Request,
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> AckStatusResponse:
-    """HTTP adapter — delegates to uns.queries.get_ack_status."""
+    """HTTP adapter - delegates to uns.queries.get_ack_status."""
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         try:

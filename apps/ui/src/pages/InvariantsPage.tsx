@@ -1,5 +1,5 @@
 /**
- * InvariantsPage component — System Invariants (/invariants)
+ * InvariantsPage component - System Invariants (/invariants)
  *
  * Restyled with the Modernist Swiss-grid layout (1c):
  * - Architectural 2-column page header

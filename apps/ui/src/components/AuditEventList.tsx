@@ -1,5 +1,5 @@
 /**
- * AuditEventList component — Supports both:
+ * AuditEventList component - Supports both:
  * - 1e: "By notification" lifecycle table (NOTIFICATION | STARTED | DELIVERED | RESPONSE | TIME TO RESPOND)
  * - 1d: "All events" horizontal event stream
  *
@@ -113,7 +113,7 @@ function formatShortTime(isoString: string): string {
 function formatResponseDuration(startIso: string, endIso: string): string {
   const startMs = Date.parse(startIso);
   const endMs = Date.parse(endIso);
-  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return '—';
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return '-';
   const diffSec = Math.max(0, Math.round((endMs - startMs) / 1000));
   if (diffSec < 60) return `${diffSec}s`;
   const mins = Math.floor(diffSec / 60);
@@ -198,7 +198,7 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
     const responseEvent =
       responseEvents.length > 0 ? responseEvents[responseEvents.length - 1] : null;
 
-    let timeToRespondLabel = '—';
+    let timeToRespondLabel = '-';
     let isTimedOut = false;
 
     if (responseEvent) {
@@ -215,7 +215,7 @@ function groupEventsByNotification(events: AuditEvent[]): NotificationLifecycleR
         const baselineIso = deliveredEvent?.event_time ?? startedEvent?.event_time ?? null;
         timeToRespondLabel = baselineIso
           ? formatResponseDuration(baselineIso, responseEvent.event_time)
-          : '—';
+          : '-';
       }
     }
 
@@ -420,7 +420,7 @@ export function AuditEventList({
                           fontSize: row.isTimedOut ? '14px' : '18px',
                           color: row.isTimedOut
                             ? 'var(--color-accent)'
-                            : row.timeToRespondLabel === '—'
+                            : row.timeToRespondLabel === '-'
                               ? 'var(--color-neutral-500)'
                               : 'var(--color-text)',
                           fontVariantNumeric: 'tabular-nums',

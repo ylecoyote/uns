@@ -1,5 +1,5 @@
 /**
- * InvariantsSummary component — Modernist Modular Summary Grid (1c)
+ * InvariantsSummary component - Modernist Modular Summary Grid (1c)
  *
  * Displays summary statistics for system invariants using /ui/invariants/summary.
  * Shows counts by severity, enforcement type, and status.

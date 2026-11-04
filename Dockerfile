@@ -19,7 +19,7 @@
 ARG PYTHON_VERSION=3.12
 
 # ---------------------------------------------------------------------------
-# Stage 1: builder — produce the wheel with uv
+# Stage 1: builder - produce the wheel with uv
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
 
@@ -35,7 +35,7 @@ COPY src/ ./src/
 RUN uv build --wheel
 
 # ---------------------------------------------------------------------------
-# Stage 2: runtime — minimal image with the wheel installed
+# Stage 2: runtime - minimal image with the wheel installed
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
@@ -73,7 +73,7 @@ ENV UNS_HOST=0.0.0.0 \
 EXPOSE 8000
 
 # Container-internal liveness probe. Compose / k8s should still hit /readyz
-# externally — this is just for `docker run --health` users.
+# externally - this is just for `docker run --health` users.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)" \
         || exit 1

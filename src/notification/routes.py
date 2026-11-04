@@ -95,7 +95,7 @@ async def send_notification(
     request: SendNotificationRequest,
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SendNotificationResponse:
-    """HTTP adapter — delegates to uns.signaling.send_signal.
+    """HTTP adapter - delegates to uns.signaling.send_signal.
 
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error
@@ -203,7 +203,7 @@ async def simulate_notification(
     http_request: Request,
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SimulateNotificationResponse:
-    """HTTP adapter — delegates to uns.signaling.simulate_signal.
+    """HTTP adapter - delegates to uns.signaling.simulate_signal.
 
     Translates typed signaling errors to HTTP responses:
     - :class:`ValidationError` -> 422 validation_error

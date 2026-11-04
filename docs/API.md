@@ -76,12 +76,12 @@ When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_stat
 
 | Field | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `notification_type` | `str` | **Yes** | — | Dot-separated notification identifier (e.g., `"system.alert"`). |
-| `intent` | `NotificationIntent` | **Yes** | — | `"SAFETY"`, `"GOVERNANCE"`, `"OPERATIONAL"`, or `"INFORMATIONAL"`. |
-| `title` | `str` | **Yes** | — | Human-readable summary (1–200 chars). |
-| `message` | `str` | **Yes** | — | Full notification body. |
-| `source` | `str` | **Yes** | — | Originating subsystem name. Scopes idempotency and deduplication keys. |
-| `autonomy_context` | `AutonomyContextRequest` | **Yes** | — | Contains `autonomy_mode` (`"LIVE"`, `"SHADOW"`, `"PREVIEW"`, `"SUPERVISED"`, `"AUTONOMOUS"`), `agent_id` (`UUID`), optional `plan_id`, `step_id`, `run_id`. |
+| `notification_type` | `str` | **Yes** | `None` | Dot-separated notification identifier (e.g., `"system.alert"`). |
+| `intent` | `NotificationIntent` | **Yes** | `None` | `"SAFETY"`, `"GOVERNANCE"`, `"OPERATIONAL"`, or `"INFORMATIONAL"`. |
+| `title` | `str` | **Yes** | `None` | Human-readable summary (1–200 chars). |
+| `message` | `str` | **Yes** | `None` | Full notification body. |
+| `source` | `str` | **Yes** | `None` | Originating subsystem name. Scopes idempotency and deduplication keys. |
+| `autonomy_context` | `AutonomyContextRequest` | **Yes** | `None` | Contains `autonomy_mode` (`"LIVE"`, `"SHADOW"`, `"PREVIEW"`, `"SUPERVISED"`, `"AUTONOMOUS"`), `agent_id` (`UUID`), optional `plan_id`, `step_id`, `run_id`. |
 | `irreversible` | `bool` | No | `False` | Whether the triggering agent action is irreversible. |
 | `idempotency_key` | `str \| None` | No | `None` | Producer retry key (`1..255` chars). Scoped by `(principal, source, idempotency_key)`. |
 | `dedup_key` | `str \| None` | No | `None` | Explicit coalescing key. Defaults to content-derived hash if omitted. |
@@ -316,8 +316,8 @@ Authenticate before connecting to `/ws/agents/{agent_id}`. Native clients use a 
 | Flag | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `--database-url` | **Yes** (or `UNS_DATABASE_URL`) | `UNS_DATABASE_URL` | SQLite (`sqlite:///path/to/uns.db`) or PostgreSQL (`postgresql+psycopg://...`) database URL. |
-| `--cutoff` | **Yes** | — | ISO-8601 timestamp with explicit timezone (e.g., `2026-10-01T00:00:00Z`). |
-| `--idempotency-seconds` | **Yes** | — | Minimum positive idempotency preservation window in seconds. Effective cutoff is `min(cutoff, now - idempotency_seconds)`. |
+| `--cutoff` | **Yes** | `None` | ISO-8601 timestamp with explicit timezone (e.g., `2026-10-01T00:00:00Z`). |
+| `--idempotency-seconds` | **Yes** | `None` | Minimum positive idempotency preservation window in seconds. Effective cutoff is `min(cutoff, now - idempotency_seconds)`. |
 | `--batch-size` | No | `100` | Row budget per invocation (`1..1000`). Includes event/audit rows when `--archive` is used. |
 | `--apply` | No | `False` | Commit deletions and `RETENTION_APPLIED` receipt inside an exclusive writer transaction (`BEGIN IMMEDIATE` on SQLite or `pg_advisory_xact_lock` + `FOR UPDATE` on PostgreSQL). Omit for dry-run preview. |
 | `--operator` | **Yes** (when `--apply`) | `None` | Non-empty operator attribution recorded in the retention receipt and archive file. |
