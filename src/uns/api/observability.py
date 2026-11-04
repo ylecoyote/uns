@@ -25,9 +25,34 @@ from typing import Any
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.routing import Match
 
 logger = logging.getLogger(__name__)
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_ALLOWED_HTTP_METHODS = frozenset({"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"})
+_KNOWN_UI_ENDPOINTS = frozenset(
+    {
+        "/ui/session",
+        "/ui/deliveries",
+        "/ui/deliveries/{id}",
+        "/ui/policies/effective",
+        "/ui/policies/active",
+        "/ui/policies/revisions",
+        "/ui/policies/proposals",
+        "/ui/policies/proposals/{id}",
+        "/ui/invariants",
+        "/ui/invariants/summary",
+        "/ui/audit",
+    }
+)
+
+
+def _normalize_http_method(method: str | None) -> str:
+    if not isinstance(method, str):
+        return "OTHER"
+    upper = method.upper()
+    return upper if upper in _ALLOWED_HTTP_METHODS else "OTHER"
+
 
 # Context variable for request ID propagation
 _request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
@@ -101,12 +126,21 @@ class MetricsCollector:
     For production, replace with Prometheus, StatsD, or similar.
     """
 
-    def __init__(self, max_samples: int = 10_000) -> None:
+    def __init__(self, max_samples: int = 10_000, max_endpoints: int = 128) -> None:
         self._max_samples = max_samples
+        self._max_endpoints = max_endpoints
         self._metrics: deque[RequestMetric] = deque(maxlen=max_samples)
         self._request_counts: dict[str, int] = {}
         self._error_counts: dict[str, int] = {}
         self._latency_samples: dict[str, deque[float]] = {}
+
+    @property
+    def _latencies(self) -> dict[str, deque[float]]:
+        return self._latency_samples
+
+    @property
+    def _requests_by_endpoint(self) -> dict[str, int]:
+        return self._request_counts
 
     def record_request(
         self,
@@ -126,9 +160,13 @@ class MetricsCollector:
             labels: Additional labels for the metric.
         """
         labels = labels or {}
+        method = _normalize_http_method(method)
 
-        # Record total request count
+        # Record total request count (bounded cardinality)
         key = f"{method}:{endpoint}"
+        if key not in self._latency_samples and len(self._latency_samples) >= self._max_endpoints:
+            endpoint = "__unmatched__"
+            key = f"{method}:__unmatched__"
         self._request_counts[key] = self._request_counts.get(key, 0) + 1
 
         # Record latency
@@ -376,8 +414,8 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         set_request_id(request_id)
 
         # Extract endpoint pattern (normalize path parameters)
-        endpoint = self._normalize_endpoint(request.url.path)
-        method = request.method
+        endpoint = self._resolve_endpoint(request)
+        method = _normalize_http_method(request.method)
 
         # Start timing
         start_time = time.perf_counter()
@@ -395,6 +433,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
         try:
             response = await call_next(request)
+            endpoint = self._resolve_endpoint(request)
 
             # Calculate latency
             latency_ms = (time.perf_counter() - start_time) * 1000
@@ -425,6 +464,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
+            endpoint = self._resolve_endpoint(request)
             # Calculate latency
             latency_ms = (time.perf_counter() - start_time) * 1000
 
@@ -461,10 +501,34 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             # Clear request context
             set_request_id(None)  # type: ignore[arg-type]
 
+    def _resolve_endpoint(self, request: Request) -> str:
+        """Resolve a bounded route template for the request, or ``__unmatched__``."""
+        route = request.scope.get("route")
+        template = getattr(route, "path", None)
+        if isinstance(template, str) and template:
+            return re.sub(r"\{[^}]+\}", "{id}", template)
+        app = request.scope.get("app")
+        routes = getattr(app, "routes", None)
+        if routes is not None:
+            for candidate in routes:
+                matches = getattr(candidate, "matches", None)
+                if callable(matches):
+                    try:
+                        match, _ = matches(request.scope)
+                    except Exception:  # nosec B112
+                        continue
+                    if match == Match.FULL:
+                        cand_path = getattr(candidate, "path", None)
+                        if isinstance(cand_path, str) and cand_path:
+                            return re.sub(r"\{[^}]+\}", "{id}", cand_path)
+            return "__unmatched__"
+        return self._normalize_endpoint(request.url.path)
+
     def _normalize_endpoint(self, path: str) -> str:
         """Normalize path to endpoint pattern.
 
-        Replaces UUID path parameters with placeholders for consistent metrics.
+        Replaces UUID path parameters with placeholders for consistent metrics,
+        mapping unknown paths to ``__unmatched__``.
 
         Args:
             path: The request path.
@@ -473,10 +537,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             Normalized endpoint pattern.
         """
         # Pattern: /ui/deliveries/{uuid} -> /ui/deliveries/{id}
-        import re
-
         uuid_pattern = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-        return re.sub(uuid_pattern, "{id}", path, flags=re.IGNORECASE)
+        normalized = re.sub(uuid_pattern, "{id}", path, flags=re.IGNORECASE)
+        return normalized if normalized in _KNOWN_UI_ENDPOINTS else "__unmatched__"
 
 
 def create_error_response_with_request_id(

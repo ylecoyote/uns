@@ -137,6 +137,15 @@ class SQLAlchemyPolicyLearningStore:
         finally:
             session.close()
 
+    def get_evidence_binding(self, delta_id: UUID) -> dict[str, Any]:
+        """Return the durable evidence binding payload for a delta."""
+        session = self._get_session()
+        try:
+            binding = session.get(PolicyEvidenceBinding, delta_id)
+            return dict(binding.payload) if binding is not None and binding.payload else {}
+        finally:
+            session.close()
+
     def transition_delta(
         self,
         delta_id: UUID,
@@ -145,6 +154,7 @@ class SQLAlchemyPolicyLearningStore:
         actor: str,
         reason: str | DeltaRejectionReason | None = None,
         guard_result: GuardResult | None = None,
+        binding_updates: dict[str, Any] | None = None,
     ) -> PolicyDelta:
         """Validate and persist a delta state transition."""
         session = self._get_session()
@@ -238,6 +248,7 @@ class SQLAlchemyPolicyLearningStore:
                     "guard_results": [
                         guard.model_dump(mode="json") for guard in transitioned.guard_results
                     ],
+                    **(binding_updates or {}),
                 }
             _apply_delta_to_row(row, transitioned)
             session.commit()

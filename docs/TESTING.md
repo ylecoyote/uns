@@ -63,7 +63,7 @@ Safe lockfile updates reduced the inherited advisory set. Remaining frontend rem
 
 The test count differs from the predecessor because obsolete documentation-layout assertions and the superseded Python UI tests were retired. Current runtime tests remain, with additional crash, concurrency, guard, transport, and audit regressions. One inherited SQLAlchemy JSON-operator deprecation warning remains.
 
-Machine-readable results and raw local receipts are in [verification/results.json](../verification/results.json). This evidence establishes local behavior only, not commercial or production acceptance.
+Machine-readable results and raw local receipts are in [verification/results.json](https://github.com/ylecoyote/uns/blob/main/verification/results.json). This evidence establishes local behavior only, not commercial or production acceptance.
 
 ## First adversarial remediation result (historical)
 
@@ -82,7 +82,7 @@ The remediation code target is `902300773d7ad41baefab8e007d0f37981ba6be9`. It pr
 
 New cases exercise failed-owner dedup, successor election, replay budgets, stale lease fallback/provider retries, queued SMTP effects, actual subprocess termination, isolated timeout processing, exact policy revision/activation ordering across processes, cold MCP hydration, override/metadata rejection, durable authenticated WebSocket ACKs, MCP idle recovery and signal shutdown, same/mixed-transport read isolation, and archive failure/cursor safety.
 
-Evidence is in [remediation results](../verification/remediation/results.json) and the [focused review record](../verification/remediation/review-findings.md). Original consolidation receipts remain unchanged under `verification/`; their broader acceptance wording was superseded by adversarial validation.
+Evidence is in [remediation results](https://github.com/ylecoyote/uns/blob/main/verification/remediation/results.json) and the [focused review record](https://github.com/ylecoyote/uns/blob/main/verification/remediation/review-findings.md). Original consolidation receipts remain unchanged under `verification/`; their broader acceptance wording was superseded by adversarial validation.
 
 Remaining limits: external-provider and human-receipt acceptance, live PostgreSQL operation, hosted CI and representative production load are unverified. Credentials confer operator access, not RBAC. External effects remain at least once. Historical information already lost by earlier versions cannot be reconstructed. Retention is explicit, SQLite-only and row-bounded, not byte/time-bounded or automatic compliance retention. Existing dependency/framework deprecation warnings are recorded in the test log.
 
@@ -103,7 +103,7 @@ Implementation target: `ba46a311d071736a6beca241a6e43a1407f29f3b`, base `3f6005f
 | Original reviewer file | Baseline 11 failed; final 5 passed / 6 expected contract/setup mismatches individually explained in the iteration report |
 | Frontend/dependencies | No frontend/dependency changes; frontend CI and advisory audits were not rerun. Prior 305 console tests and advisory snapshots remain historical evidence only. |
 
-Raw logs, the untouched reviewer reproduction, installed smoke script and SHA-256 manifest are in [iteration 2 receipts](../verification/iteration2/results.json). Validation used Python 3.12.9 and temporary SQLite databases. Two inherited framework deprecation warnings remain; Bandit also prints non-failing unmatched nosec warnings around the existing lease-clear annotation. No production data was modified. External acceptance limitations in the first report still apply.
+Raw logs, the untouched reviewer reproduction, installed smoke script and SHA-256 manifest are in [iteration 2 receipts](https://github.com/ylecoyote/uns/blob/main/verification/iteration2/results.json). Validation used Python 3.12.9 and temporary SQLite databases. Two inherited framework deprecation warnings remain; Bandit also prints non-failing unmatched nosec warnings around the existing lease-clear annotation. No production data was modified. External acceptance limitations in the first report still apply.
 
 Reproduce with the development environment and commands above. The reviewer file can be run separately with `python -m pytest verification/iteration2/reviewer_reproductions.py`; its expected residual failures are not the regression gate. Run the installed package smoke from outside the source tree with `python /path/to/repo/verification/iteration2/package_smoke.py /path/to/repo` after building/installing the full wheel.
 
@@ -112,17 +112,17 @@ Reproduce with the development environment and commands above. The reviewer file
 
 The canonical main branch fast-forwarded from `b508cc3` through `76fc43e`; application source is unchanged from `ba46a31`. Fresh verification in the canonical checkout passed 1,765 Python tests at 90.70% coverage, 305 console tests plus type/lint/build checks, Ruff, mypy (91 files), Bandit, UI boundary, wheel/source identity (90 modules), installed full-wheel delivery/ACK/repeated migration/no-write retention preview, and the recording demo. The console was freshly installed from its merged lockfile. Existing test/framework warnings are recorded. Advisory databases were not refreshed.
 
-[Consolidated baseline](CONSOLIDATED_BASELINE.md) and [fresh merge receipts](../verification/consolidated/results.json) supersede the iteration checkouts as the current working location. Prior receipts remain unchanged. No remote push, hosted CI, live database migration, real-provider acceptance or deployment occurred.
+[Consolidated baseline](CONSOLIDATED_BASELINE.md) and [fresh merge receipts](https://github.com/ylecoyote/uns/blob/main/verification/consolidated/results.json) supersede the iteration checkouts as the current working location. Prior receipts remain unchanged. No remote push, hosted CI, live database migration, real-provider acceptance or deployment occurred.
 
 
 ## Container deployment-candidate verification (current)
 
-The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/probe/WebSocket support fixes and browser-discovered audit context/UTC corrections after the consolidated baseline. Full Python verification: 1,776 passed at 90.76% coverage. The installed image passed 99 live HTTP/WebSocket/MCP/recovery checks, module identity and dependency consistency checks, authenticated Compose readiness, and copied-data archive verification. Functional browser flows were exercised in Brave. See [deployment smoke](DEPLOYMENT_SMOKE.md) and [receipts](../verification/deployment/results.json). The lasting target and real recipients remain unspecified; this is isolated recording-profile rehearsal evidence, not production deployment acceptance.
+The source target `07ef52a87b45128b77715f64c8b0e5f8f91387a9` adds packaging/probe/WebSocket support fixes and browser-discovered audit context/UTC corrections after the consolidated baseline. Full Python verification: 1,776 passed at 90.76% coverage. The installed image passed 99 live HTTP/WebSocket/MCP/recovery checks, module identity and dependency consistency checks, authenticated Compose readiness, and copied-data archive verification. Functional browser flows were exercised in Brave. See [deployment smoke](DEPLOYMENT_SMOKE.md) and [receipts](https://github.com/ylecoyote/uns/blob/main/verification/deployment/results.json). The lasting target and real recipients remain unspecified; this is isolated recording-profile rehearsal evidence, not production deployment acceptance.
 
 
 ## Persistent localhost deployment acceptance
 
-The user accepted localhost plus recording adapters. The pinned application image is unchanged from `07ef52a`; the permanent recording composition and fixed ingress are versioned under `deploy/local/`. All 62 persistent-deployment checks passed, including real network transports, local provider recordings, one-minute timeout, callbacks and restart recovery. App isolation, loopback-only ingress and a consistent SQLite backup were checked. [Runbook](LOCAL_DEPLOYMENT.md) and [receipts](../verification/local-deployment/results.json) record the running deployment. No real-provider or remote-production acceptance is implied.
+The user accepted localhost plus recording adapters. The pinned application image is unchanged from `07ef52a`; the permanent recording composition and fixed ingress are versioned under `deploy/local/`. All 62 persistent-deployment checks passed, including real network transports, local provider recordings, one-minute timeout, callbacks and restart recovery. App isolation, loopback-only ingress and a consistent SQLite backup were checked. [Runbook](LOCAL_DEPLOYMENT.md) and [receipts](https://github.com/ylecoyote/uns/blob/main/verification/local-deployment/results.json) record the running deployment. No real-provider or remote-production acceptance is implied.
 
 ## Review follow-up verification — 2026-10-24
 

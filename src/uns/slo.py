@@ -46,6 +46,8 @@ def compute_slo_report(
     window_days: float = 14.0,
     min_live_days_required: float = 14.0,
     max_error_rate_threshold: float = 0.05,
+    max_pending_age_seconds: float = 3600.0,
+    max_due_attempt_lateness_seconds: float = 300.0,
     now_epoch: float | None = None,
 ) -> dict[str, Any]:
     """Compute a deterministic, hash-verifiable SLO telemetry report from a UNS database."""
@@ -129,7 +131,7 @@ def compute_slo_report(
                     total_recording_only_attempts += 1
             else:
                 bucket["live_provider_attempts"] += 1
-                if is_persistent_external:
+                if is_persistent_external and success:
                     total_live_provider_attempts += 1
                     if earliest_live_attempt_at is None or evt_at < earliest_live_attempt_at:
                         earliest_live_attempt_at = evt_at
@@ -181,10 +183,25 @@ def compute_slo_report(
         default=0.0,
     )
 
+    oldest_pending_age = gauges.get("oldest_pending_age_seconds")
+    oldest_due_lateness = gauges.get("oldest_due_attempt_lateness_seconds")
+    oldest_callback_age = gauges.get("oldest_callback_retry_age_seconds")
     gates = {
         "zero_overdue_acks": gauges["overdue_ack_count"] == 0,
         "zero_unresolved_dead_letters": gauges["unresolved_failure_count"] == 0,
         "zero_unknown_attempts": gauges["unknown_attempt_count"] == 0,
+        "zero_stalled_pending_backlog": (
+            (oldest_pending_age is None or oldest_pending_age <= max_pending_age_seconds)
+            and (
+                oldest_due_lateness is None
+                or oldest_due_lateness <= max_due_attempt_lateness_seconds
+            )
+            and gauges.get("pending_callback_count", 0) == 0
+            and (
+                oldest_callback_age is None
+                or oldest_callback_age <= max_due_attempt_lateness_seconds
+            )
+        ),
         "provider_error_rate_within_budget": max_observed_error_rate <= max_error_rate_threshold,
         "live_external_delivery_observed": total_live_provider_attempts > 0,
         "multi_week_window_met": observed_live_span_days >= min_live_days_required,
@@ -237,7 +254,11 @@ def format_slo_markdown(report: dict[str, Any]) -> str:
     acks = report["acknowledgments"]
     lat = report["response_latency_seconds"]
     gates = report["slo_gates"]
-    status_label = "CERTIFIED (`v1.0` GATES PASSED)" if report["v1_0_certified"] else "REHEARSAL / PENDING LIVE PILOT"
+    status_label = (
+        "CERTIFIED (`v1.0` GATES PASSED)"
+        if report["v1_0_certified"]
+        else "REHEARSAL / PENDING LIVE PILOT"
+    )
 
     lines = [
         "# UNS Operational SLO Telemetry & Certification Receipt",

@@ -50,7 +50,9 @@ UNS_MCP_TOOL_NAMES = (
 
 
 def create_mcp_server(
-    runtime_config: MCPRuntimeConfig | None = None, *, runtime: Runtime | None = None,
+    runtime_config: MCPRuntimeConfig | None = None,
+    *,
+    runtime: Runtime | None = None,
 ) -> FastMCP:
     """Create the trusted local stdio server and own its recovery lifecycle.
 
@@ -66,9 +68,11 @@ def create_mcp_server(
         if config.require_delivery_confirmation and not config.delivery_confirmation_token:
             raise ValueError("Writable MCP requires a delivery confirmation token")
     from uns.config import build_runtime
+
     owns_runtime = runtime is None
     runtime = runtime or build_runtime()
     state = RuntimeState(runtime=runtime)
+
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncIterator[RuntimeState]:
         worker = None
@@ -102,7 +106,7 @@ def create_mcp_server(
     @mcp.tool(name="get_delivery_status")
     def get_delivery_status_tool(notification_id: str) -> dict[str, object]:
         """Return persisted delivery audit status for a notification."""
-        return get_delivery_status_impl(notification_id, runtime_state=state)
+        return get_delivery_status_impl(notification_id, runtime_state=state, config=config)
 
     @mcp.tool(name="ack_notification")
     async def ack_notification_tool(payload: AckNotificationInput) -> dict[str, object]:
@@ -117,12 +121,14 @@ def create_mcp_server(
     @mcp.tool(name="get_notification_status")
     async def get_notification_status_tool(notification_id: str) -> dict[str, object]:
         """Return notification status from the ACK runtime."""
-        return await get_notification_status_impl(notification_id, runtime_state=state)
+        return await get_notification_status_impl(
+            notification_id, runtime_state=state, config=config
+        )
 
     @mcp.tool(name="get_ack_status")
     async def get_ack_status_tool(notification_id: str) -> dict[str, object]:
         """Return ACK status for a notification."""
-        return await get_ack_status_impl(notification_id, runtime_state=state)
+        return await get_ack_status_impl(notification_id, runtime_state=state, config=config)
 
     @mcp.tool(name="list_deliveries")
     async def list_deliveries_tool(limit: int = 25) -> dict[str, object]:
@@ -132,7 +138,7 @@ def create_mcp_server(
     @mcp.tool(name="list_audit_events")
     async def list_audit_events_tool(limit: int = 25) -> dict[str, object]:
         """Return audit read-model entries."""
-        return await list_audit_events_impl(limit=limit, runtime_state=state)
+        return await list_audit_events_impl(limit=limit, runtime_state=state, config=config)
 
     @mcp.tool(name="get_effective_policy")
     async def get_effective_policy_tool(
@@ -164,7 +170,7 @@ def create_mcp_server(
     @mcp.tool(name="list_dlq")
     def list_dlq_tool() -> dict[str, object]:
         """List visible dead-lettered delivery failures."""
-        return list_dlq_impl(runtime_state=state)
+        return list_dlq_impl(runtime_state=state, config=config)
 
     @mcp.tool(name="get_channel_health")
     def get_channel_health_tool() -> dict[str, object]:

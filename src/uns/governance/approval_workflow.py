@@ -32,10 +32,40 @@ from notification.models import AutonomyMode, NotificationIntent
 from uns.governance.decision_record import Decision, DecisionRecord
 from uns.governance.errors import GovernanceError
 from uns.responses import SendNotificationRequest
-from uns.runtime import digest, work
+from uns.runtime import digest, events, work
 
 if TYPE_CHECKING:
     from uns.runtime import Runtime
+
+
+class ApprovalConflictError(GovernanceError):
+    """Raised when a decision_id is reused with different bound governance content."""
+
+
+def _approval_bound_fingerprint(record: DecisionRecord) -> str:
+    """Compute a canonical bound-content fingerprint for an approval decision."""
+    matched_rule_ids = [
+        r.rule_id for r in record.reasons if r.matched and r.then == record.decision
+    ]
+    matched_rule_id = (
+        matched_rule_ids[0] if matched_rule_ids else getattr(record, "matched_rule_id", None)
+    )
+    return digest(
+        {
+            "tenant_id": record.tenant_id or "",
+            "resource_type": record.resource_type or "",
+            "resource_id": record.resource_id or "",
+            "subject_id": record.subject_id or "",
+            "policy_config_hash": record.policy_config_hash,
+            "context_hash": record.context_hash,
+            "matched_rule_id": matched_rule_id or "",
+            "decision": (
+                record.decision.value
+                if isinstance(record.decision, Decision)
+                else str(record.decision)
+            ),
+        }
+    )
 
 
 class ApprovalStatus(str, Enum):
@@ -70,6 +100,15 @@ class ApprovalRequestRecord(BaseModel):
     def canonical_callback_bytes(self) -> bytes:
         """Return canonical UTF-8 JSON bytes for callback signing (with ``callback_headers=None``)."""
         return self.model_copy(update={"callback_headers": None}).model_dump_json().encode("utf-8")
+
+    @property
+    def is_terminal(self) -> bool:
+        """Return True if the approval request has reached a terminal decision state."""
+        return self.status in (
+            ApprovalStatus.APPROVED,
+            ApprovalStatus.REJECTED,
+            ApprovalStatus.TIMED_OUT,
+        )
 
 
 def sign_approval_callback(
@@ -160,6 +199,7 @@ class GovernanceApprovalBridge:
         self.on_settled = on_settled
         self._by_decision_id: dict[uuid.UUID, ApprovalRequestRecord] = {}
         self._by_notification_id: dict[str, uuid.UUID] = {}
+        self._callback_completed: set[str] = set()
 
     def request_approval(
         self,
@@ -175,11 +215,20 @@ class GovernanceApprovalBridge:
                 f"request_approval requires Decision.REQUIRE_APPROVAL, got {record.decision.value}"
             )
 
+        fingerprint = _approval_bound_fingerprint(record)
         existing = self._by_decision_id.get(record.decision_id)
         if existing is not None:
+            if _approval_bound_fingerprint(existing.decision_record) != fingerprint:
+                raise ApprovalConflictError(
+                    f"Decision ID {record.decision_id} is already bound to a different approval context"
+                )
             return existing
         recovered = self._recover_from_runtime(record.decision_id)
         if recovered is not None:
+            if _approval_bound_fingerprint(recovered.decision_record) != fingerprint:
+                raise ApprovalConflictError(
+                    f"Decision ID {record.decision_id} is already bound to a different approval context"
+                )
             return recovered
 
         approval_id = uuid.uuid4()
@@ -204,7 +253,7 @@ class GovernanceApprovalBridge:
                 source="uns.governance",
                 correlation_id=record.correlation_id or str(record.decision_id),
                 idempotency_key=f"gov-approval:{record.decision_id}",
-                dedup_key=f"gov-approval:{record.decision_id}",
+                dedup_key=f"gov-approval:{record.decision_id}:{fingerprint[:16]}",
                 autonomy_context={
                     "agent_id": agent_uuid,
                     "autonomy_mode": AutonomyMode.LIVE,
@@ -212,6 +261,7 @@ class GovernanceApprovalBridge:
                 },
                 metadata={
                     "decision_id": str(record.decision_id),
+                    "approval_fingerprint": fingerprint,
                     "policy_id": record.policy_id,
                     "policy_version": record.policy_version,
                     "policy_config_hash": record.policy_config_hash,
@@ -220,6 +270,7 @@ class GovernanceApprovalBridge:
                     "uns_governance_approval": {
                         "approval_id": str(approval_id),
                         "decision_id": str(record.decision_id),
+                        "approval_fingerprint": fingerprint,
                         "decision_record": record.model_dump(mode="json"),
                         "target_reviewer_role": target_reviewer_role,
                         "reason": reason,
@@ -289,11 +340,7 @@ class GovernanceApprovalBridge:
             return None
         key = digest([self.principal, "uns.governance", f"gov-approval:{decision_id}"])
         with contextlib.suppress(Exception), self.runtime.sessions() as session:
-            row = (
-                session.execute(select(work).where(work.c.key == key))
-                .mappings()
-                .first()
-            )
+            row = session.execute(select(work).where(work.c.key == key)).mappings().first()
             if row is None:
                 return None
             notif_payload: dict[str, Any] = (
@@ -307,17 +354,35 @@ class GovernanceApprovalBridge:
             )
             if envelope is None:
                 return None
+            recovered_decision = DecisionRecord.model_validate(envelope["decision_record"])
+            stored_fp = envelope.get("approval_fingerprint") or meta.get("approval_fingerprint")
+            if isinstance(stored_fp, str) and stored_fp != _approval_bound_fingerprint(
+                recovered_decision
+            ):
+                return None
             recovered = ApprovalRequestRecord(
                 approval_id=uuid.UUID(str(envelope["approval_id"])),
                 decision_id=uuid.UUID(str(envelope["decision_id"])),
                 notification_id=str(row["id"]),
                 status=ApprovalStatus.PENDING_APPROVAL,
-                decision_record=DecisionRecord.model_validate(envelope["decision_record"]),
+                decision_record=recovered_decision,
                 target_reviewer_role=envelope.get("target_reviewer_role"),
                 reason=envelope.get("reason"),
                 callback_url=envelope.get("callback_url"),
                 created_at=datetime.fromisoformat(str(envelope["created_at"])),
             )
+            cb_done = (
+                session.execute(
+                    select(events.c.id).where(
+                        events.c.notification_id == str(row["id"]),
+                        events.c.kind == "GOV_APPROVAL_CALLBACK_DELIVERED",
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if cb_done is not None:
+                self._callback_completed.add(str(decision_id))
             self._by_decision_id[decision_id] = recovered
             self._by_notification_id[str(row["id"])] = decision_id
             return recovered
@@ -325,7 +390,10 @@ class GovernanceApprovalBridge:
 
     def query_approval(self, decision_id: uuid.UUID) -> ApprovalRequestRecord | None:
         """Return the current approval state for ``decision_id``, syncing from Runtime if bound."""
-        if decision_id not in self._by_decision_id and self._recover_from_runtime(decision_id) is None:
+        if (
+            decision_id not in self._by_decision_id
+            and self._recover_from_runtime(decision_id) is None
+        ):
             return None
         return self.sync_from_runtime(decision_id)
 
@@ -340,6 +408,8 @@ class GovernanceApprovalBridge:
             or self.runtime is None
             or approval.notification_id is None
         ):
+            if approval.is_terminal:
+                self._deliver_settled_callback(approval)
             return approval
 
         with contextlib.suppress(Exception):
@@ -392,6 +462,8 @@ class GovernanceApprovalBridge:
         if approval is None:
             raise GovernanceError(f"Unknown approval decision_id: {decision_id}")
         if approval.status != ApprovalStatus.PENDING_APPROVAL:
+            if approval.is_terminal:
+                self._deliver_settled_callback(approval)
             return approval
 
         if self.runtime is not None and approval.notification_id is not None:
@@ -413,6 +485,21 @@ class GovernanceApprovalBridge:
             resolved_at=datetime.now(timezone.utc),
             note=note,
         )
+
+    def _deliver_settled_callback(self, approval: ApprovalRequestRecord) -> None:
+        key = str(approval.decision_id)
+        if self.on_settled is None or key in self._callback_completed:
+            return
+        self.on_settled(approval)
+        self._callback_completed.add(key)
+        if self.runtime is not None and approval.notification_id is not None:
+            with contextlib.suppress(Exception), self.runtime.sessions.begin() as session:
+                self.runtime._event(
+                    session,
+                    str(approval.notification_id),
+                    "GOV_APPROVAL_CALLBACK_DELIVERED",
+                    {"decision_id": key, "approval_id": str(approval.approval_id)},
+                )
 
     def _finalize(
         self,
@@ -437,6 +524,7 @@ class GovernanceApprovalBridge:
             updated = updated.model_copy(update={"callback_headers": headers})
 
         self._by_decision_id[approval.decision_id] = updated
-        if self.on_settled is not None:
-            self.on_settled(updated)
+        if updated.notification_id is not None:
+            self._by_notification_id[updated.notification_id] = approval.decision_id
+        self._deliver_settled_callback(updated)
         return updated

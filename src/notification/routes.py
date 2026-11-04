@@ -31,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from notification.audit import AuditPersistenceError, AuditRecord, AuditStore
 from notification.channel_health import ChannelHealthSummary, ChannelHealthTracker
-from notification.dlq import DLQService
+from notification.dlq import DLQEntry, DLQService
 from notification.policies import (
     PolicyRegistry,
     configure_policy_registry,
@@ -47,6 +47,7 @@ from notification.websocket_runtime import (
 )
 from uns.api.auth import (
     WritePrincipal,
+    principal_allows_record,
     require_admin_principal,
     require_producer_principal,
     require_read_principal,
@@ -76,8 +77,12 @@ from uns.signaling import simulate_signal as service_simulate_signal
 logger = logging.getLogger(__name__)
 _policy_reload_lock = RLock()
 
-router = APIRouter(prefix="/api/v1/notifications", tags=["signals"], dependencies=[Depends(require_read_principal)])
-ops_router = APIRouter(prefix="/api/v1", tags=["operations"], dependencies=[Depends(require_read_principal)])
+router = APIRouter(
+    prefix="/api/v1/notifications", tags=["signals"], dependencies=[Depends(require_read_principal)]
+)
+ops_router = APIRouter(
+    prefix="/api/v1", tags=["operations"], dependencies=[Depends(require_read_principal)]
+)
 
 
 @router.post(
@@ -109,6 +114,7 @@ async def send_notification(
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     if runtime is not None:
         from uns.runtime import Conflict
+
         try:
             return await runtime.send(request, principal=principal.subject)
         except Conflict as exc:
@@ -193,7 +199,8 @@ async def send_notification(
 
 @router.post("/simulate", response_model=SimulateNotificationResponse)
 async def simulate_notification(
-    request: SendNotificationRequest, http_request: Request,
+    request: SendNotificationRequest,
+    http_request: Request,
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> SimulateNotificationResponse:
     """HTTP adapter — delegates to uns.signaling.simulate_signal.
@@ -208,9 +215,11 @@ async def simulate_notification(
     )
     try:
         runtime = getattr(http_request.app.state, "runtime", None)
-        return await service_simulate_signal(request=request,
+        return await service_simulate_signal(
+            request=request,
             policy_runtime=runtime.policy_runtime if runtime is not None else None,
-            principal=principal.subject)
+            principal=principal.subject,
+        )
     except (ValidationError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -234,10 +243,107 @@ def _delivery_audit_item(record: AuditRecord) -> DeliveryAuditItem:
     )
 
 
+def _resolve_notification_bounds_from_request(
+    http_request: Request,
+    notification_id: UUID,
+    audits: list[AuditRecord] | None = None,
+) -> tuple[str | None, str | None]:
+    source: str | None = None
+    notification_type: str | None = None
+    if audits:
+        latest = audits[0]
+        source = getattr(latest, "source", None) or None
+        notification_type = getattr(latest, "notification_type", None) or None
+    runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
+    if (not source or not notification_type) and runtime is not None:
+        try:
+            row = runtime.get(notification_id)
+        except Exception:
+            row = None
+        if isinstance(row, dict):
+            raw_notif = row.get("notification")
+            notif: dict[str, object] = raw_notif if isinstance(raw_notif, dict) else {}
+            raw_src = source or notif.get("source") or row.get("source")
+            source = str(raw_src) if raw_src is not None else None
+            raw_nt = (
+                notification_type or notif.get("notification_type") or row.get("notification_type")
+            )
+            notification_type = str(raw_nt) if raw_nt is not None else None
+    if (not source or not notification_type) and audits is None:
+        audit_store = getattr(http_request.app.state, "audit_store", None)
+        if isinstance(audit_store, AuditStore):
+            try:
+                found_audits = audit_store.get_delivery_audits_for_notification(notification_id)
+            except Exception:
+                found_audits = []
+            if found_audits:
+                source = source or getattr(found_audits[0], "source", None)
+                notification_type = notification_type or getattr(
+                    found_audits[0], "notification_type", None
+                )
+    return (
+        str(source) if isinstance(source, str) and source else None,
+        str(notification_type)
+        if isinstance(notification_type, str) and notification_type
+        else None,
+    )
+
+
+def _extract_dlq_entry_bounds(
+    entry: object,
+    runtime: Runtime | None = None,
+) -> tuple[str | None, str | None]:
+    source = getattr(entry, "source", None)
+    notification_type = getattr(entry, "notification_type", None)
+    notif = getattr(entry, "notification", None)
+    if isinstance(notif, dict):
+        source = source or notif.get("source")
+        notification_type = notification_type or notif.get("notification_type")
+    elif notif is not None:
+        source = source or getattr(notif, "source", None)
+        notification_type = notification_type or getattr(notif, "notification_type", None)
+    if isinstance(entry, dict):
+        source = source or entry.get("source")
+        notification_type = notification_type or entry.get("notification_type")
+        raw_entry_notif = entry.get("notification")
+        row_notif: dict[str, object] = raw_entry_notif if isinstance(raw_entry_notif, dict) else {}
+        source = source or row_notif.get("source")
+        notification_type = notification_type or row_notif.get("notification_type")
+    if (not source or not notification_type) and runtime is not None:
+        nid = (
+            entry.get("notification_id")
+            if isinstance(entry, dict)
+            else getattr(entry, "notification_id", None)
+        )
+        if nid is not None:
+            try:
+                row = runtime.get(UUID(str(nid)))
+            except Exception:
+                row = None
+            if isinstance(row, dict):
+                raw_row_notif = row.get("notification")
+                row_notif_dict: dict[str, object] = (
+                    raw_row_notif if isinstance(raw_row_notif, dict) else {}
+                )
+                source = source or row_notif_dict.get("source") or row.get("source")
+                notification_type = (
+                    notification_type
+                    or row_notif_dict.get("notification_type")
+                    or row.get("notification_type")
+                )
+    return (
+        str(source) if isinstance(source, str) and source else None,
+        str(notification_type)
+        if isinstance(notification_type, str) and notification_type
+        else None,
+    )
+
+
 @router.get("/{notification_id}/delivery", response_model=DeliveryStatusResponse)
 async def get_delivery_status(
     http_request: Request,
     notification_id: UUID,
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> DeliveryStatusResponse:
     """Return persisted delivery status for a notification."""
     audit_store = getattr(http_request.app.state, "audit_store", None)
@@ -260,6 +366,17 @@ async def get_delivery_status(
             },
         )
 
+    source, notification_type = _resolve_notification_bounds_from_request(
+        http_request,
+        notification_id,
+        audits=audits,
+    )
+    require_source_and_namespace(
+        principal,
+        source=source,
+        notification_type=notification_type,
+    )
+
     latest = audits[0]
     return DeliveryStatusResponse(
         notification_id=notification_id,
@@ -275,29 +392,126 @@ async def get_delivery_status(
     )
 
 
+@router.get(
+    "/{notification_id}/audit",
+    response_model=DeliveryStatusResponse,
+    include_in_schema=False,
+)
+async def get_notification_audit(
+    http_request: Request,
+    notification_id: UUID,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> DeliveryStatusResponse:
+    """Return persisted audit records for a notification after scope validation."""
+    return await get_delivery_status(
+        http_request=http_request,
+        notification_id=notification_id,
+        principal=principal,
+    )
+
+
 @ops_router.get("/dlq", response_model=DLQListResponse)
-async def list_dlq(request: Request) -> DLQListResponse:
+async def list_dlq(
+    request: Request,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> DLQListResponse:
     """List visible dead-lettered delivery failures."""
     dlq_service: DLQService = request.app.state.dlq_service
+    runtime = cast("Runtime | None", getattr(request.app.state, "runtime", None))
+    entries = dlq_service.list_entries()
+    if principal is not None and (
+        not principal.has_wildcard_sources or not principal.has_wildcard_namespaces
+    ):
+        filtered = [
+            entry
+            for entry in entries
+            if principal_allows_record(
+                principal,
+                source=_extract_dlq_entry_bounds(entry, runtime)[0],
+                notification_type=_extract_dlq_entry_bounds(entry, runtime)[1],
+            )
+        ]
+        return DLQListResponse(
+            depth=len(filtered),
+            items=filtered,
+        )
     return DLQListResponse(
         depth=dlq_service.depth(),
-        items=dlq_service.list_entries(),
+        items=entries,
+    )
+
+
+@ops_router.get(
+    "/dlq/{entry_id}",
+    response_model=DLQEntry,
+    include_in_schema=False,
+)
+async def get_dlq_entry(
+    request: Request,
+    entry_id: UUID,
+    principal: WritePrincipal | None = Depends(require_read_principal),
+) -> DLQEntry:
+    """Return a single visible DLQ entry after scope verification."""
+    dlq_service: DLQService = request.app.state.dlq_service
+    runtime = cast("Runtime | None", getattr(request.app.state, "runtime", None))
+    for entry in dlq_service.list_entries():
+        if entry.entry_id == entry_id or entry.notification_id == entry_id:
+            source, notification_type = _extract_dlq_entry_bounds(entry, runtime)
+            require_source_and_namespace(
+                principal,
+                source=source,
+                notification_type=notification_type,
+            )
+            return entry
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "error": "dlq_entry_not_found",
+            "message": f"DLQ entry not found: {entry_id}",
+            "entry_id": str(entry_id),
+        },
     )
 
 
 @ops_router.delete("/dlq/{entry_id}", response_model=DLQRemoveResponse)
 async def remove_dlq_entry(
-    request: Request, entry_id: UUID,
+    request: Request,
+    entry_id: UUID,
     principal: WritePrincipal = Depends(require_admin_principal),
 ) -> DLQRemoveResponse:
     """Remove a visible DLQ entry after external remediation."""
-    runtime = getattr(request.app.state, "runtime", None)
+    runtime = cast("Runtime | None", getattr(request.app.state, "runtime", None))
+    dlq_service: DLQService | None = getattr(request.app.state, "dlq_service", None)
+    if principal is not None and (
+        not principal.has_wildcard_sources or not principal.has_wildcard_namespaces
+    ):
+        matched_entry: object | None = None
+        if dlq_service is not None:
+            for entry in dlq_service.list_entries():
+                if entry.entry_id == entry_id or entry.notification_id == entry_id:
+                    matched_entry = entry
+                    break
+        if matched_entry is None and runtime is not None:
+            for item in runtime.dead_letters():
+                if str(item.get("id")) == str(entry_id) or str(item.get("notification_id")) == str(
+                    entry_id
+                ):
+                    matched_entry = item
+                    break
+        if matched_entry is not None:
+            source, notification_type = _extract_dlq_entry_bounds(matched_entry, runtime)
+            require_source_and_namespace(
+                principal,
+                source=source,
+                notification_type=notification_type,
+            )
     if runtime is not None:
         removed = runtime.resolve_failure(entry_id, actor=principal.subject)
         if not removed:
             raise HTTPException(status_code=404, detail="Dead-letter entry not found")
         return DLQRemoveResponse(entry_id=entry_id, removed=True, depth=len(runtime.dead_letters()))
-    dlq_service: DLQService = request.app.state.dlq_service
+    if dlq_service is None:
+        raise HTTPException(status_code=503, detail="Dead-letter service unavailable")
     if not dlq_service.remove(entry_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -317,7 +531,16 @@ async def remove_dlq_entry(
 @ops_router.get("/channels/health", response_model=ChannelHealthSummary)
 async def get_channel_health(request: Request) -> ChannelHealthSummary:
     """Return runtime channel health without changing process readiness."""
-    tracker: ChannelHealthTracker = request.app.state.channel_health_tracker
+    runtime = cast("Runtime | None", getattr(request.app.state, "runtime", None))
+    tracker: ChannelHealthTracker = (
+        getattr(request.app.state, "channel_health", None)
+        or getattr(request.app.state, "channel_health_tracker", None)
+        or (getattr(runtime, "channel_health", None) if runtime is not None else None)
+        or ChannelHealthTracker()
+    )
+    sync_fn = getattr(tracker, "sync_from_runtime", None)
+    if callable(sync_fn) and runtime is not None:
+        sync_fn(runtime)
     return tracker.get_summary()
 
 
@@ -362,9 +585,7 @@ async def reload_policies(
             Path.cwd().resolve(),
             temp_base,
         ]
-        if not any(
-            resolved_dir == root or root in resolved_dir.parents for root in allowed_roots
-        ):
+        if not any(resolved_dir == root or root in resolved_dir.parents for root in allowed_roots):
             raise HTTPException(
                 status_code=422,
                 detail="policy_dir must reside within the configured UNS_POLICY_DIR",
@@ -384,19 +605,26 @@ async def reload_policies(
                 detail=f"Policy directory contains no YAML policy files: {policy_dir}",
             )
         from notification.policies import PolicyStatus
+
         runtime_registry = PolicyRegistry()
         for policy in registry.get_all().values():
             if policy.status == PolicyStatus.ACTIVE:
                 runtime_registry.register(policy)
         policy_store = getattr(http_request.app.state, "policy_store", None)
         try:
-            persisted_count = policy_store.save_snapshot(list(registry.get_all().values())) if policy_store else 0
+            persisted_count = (
+                policy_store.save_snapshot(list(registry.get_all().values())) if policy_store else 0
+            )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         if getattr(http_request.app.state, "runtime", None) is None:
             configure_policy_registry(registry=runtime_registry)
-        return PolicyReloadResponse(loaded_count=loaded_count, persisted_count=persisted_count,
-            policy_count=len(runtime_registry), notification_types=sorted(runtime_registry.list_notification_types()))
+        return PolicyReloadResponse(
+            loaded_count=loaded_count,
+            persisted_count=persisted_count,
+            policy_count=len(runtime_registry),
+            notification_types=sorted(runtime_registry.list_notification_types()),
+        )
 
 
 @ops_router.get("/policies/proposals", response_model=PolicyProposalListResponse)
@@ -411,7 +639,11 @@ async def list_policy_proposals_api(
     from notification.policy_learning import DeltaState
 
     if policy_type:
-        require_source_and_namespace(principal, notification_type=policy_type)
+        require_source_and_namespace(
+            principal,
+            notification_type=policy_type,
+            require_source=False,
+        )
     evaluator = resolve_shadow_evaluator(http_request.app.state)
     if evaluator is None:
         return PolicyProposalListResponse(items=[], total_count=0)
@@ -445,7 +677,11 @@ async def get_policy_proposal_api(
     delta = evaluator.learning_store.get_delta(delta_id)
     if delta is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=delta.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=delta.policy_type,
+        require_source=False,
+    )
     return evaluator.format_proposal_summary(delta, include_samples=True)
 
 
@@ -460,7 +696,19 @@ async def create_policy_proposal(
     principal: WritePrincipal = Depends(require_producer_principal),
 ) -> PolicyProposalSummary:
     """Create a governed PolicyDelta proposal and optionally promote to SHADOW (PREVIEW)."""
-    require_source_and_namespace(principal, notification_type=proposal.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=proposal.policy_type,
+        require_source=False,
+    )
+    if proposal.promote_to_shadow and "admin" not in principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "insufficient_scope",
+                "message": "Promoting a proposal to SHADOW requires admin capability.",
+            },
+        )
     evaluator = resolve_shadow_evaluator(http_request.app.state)
     if evaluator is None:
         raise HTTPException(
@@ -500,7 +748,11 @@ async def promote_proposal_to_shadow(
     existing = evaluator.learning_store.get_delta(delta_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=existing.policy_type,
+        require_source=False,
+    )
     try:
         promoted = evaluator.promote_to_shadow(
             delta_id,
@@ -529,7 +781,11 @@ async def approve_proposal_to_draft(
     existing = evaluator.learning_store.get_delta(delta_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=existing.policy_type,
+        require_source=False,
+    )
     try:
         approved, save_result, draft_policy = evaluator.approve_to_draft(
             delta_id,
@@ -569,7 +825,11 @@ async def activate_approved_proposal(
     existing = evaluator.learning_store.get_delta(delta_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=existing.policy_type,
+        require_source=False,
+    )
     try:
         save_result, active_policy, applied_delta = evaluator.activate_draft(
             actor=principal.subject,
@@ -613,7 +873,11 @@ async def reject_policy_proposal(
     existing = evaluator.learning_store.get_delta(delta_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=existing.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=existing.policy_type,
+        require_source=False,
+    )
     try:
         rejected = evaluator.reject_delta(
             delta_id,
@@ -642,7 +906,11 @@ async def activate_draft_policy_revision(
     found = evaluator.policy_store.get_policy_by_id(policy_id)
     if found is None:
         raise HTTPException(status_code=404, detail="Policy revision not found")
-    require_source_and_namespace(principal, notification_type=found[1].notification_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=found[1].notification_type,
+        require_source=False,
+    )
     try:
         save_result, active_policy, applied_delta = evaluator.activate_draft(
             actor=principal.subject,

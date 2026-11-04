@@ -520,6 +520,11 @@ class PagerDutyAdapter(BaseAdapter):
 
     def _get_dedup_key(self, notification: Notification) -> str:
         """Get deduplication key for PagerDuty incident."""
+        if isinstance(notification.metadata, dict):
+            obligation_key = notification.metadata.get("uns_obligation_dedup_key")
+            if isinstance(obligation_key, str) and obligation_key.strip():
+                return f"uns-{obligation_key.strip()}"
+
         # Use notification's dedup_key if available
         if notification.dedup_key:
             return f"uns-{notification.dedup_key}"
@@ -575,7 +580,8 @@ class PagerDutyAdapter(BaseAdapter):
             safe_metadata = {
                 k: v
                 for k, v in notification.metadata.items()
-                if not k.startswith("_") and k != "pagerduty_severity"
+                if not k.startswith("_")
+                and k not in ("pagerduty_severity", "uns_obligation_dedup_key")
             }
             if safe_metadata:
                 details["metadata"] = safe_metadata

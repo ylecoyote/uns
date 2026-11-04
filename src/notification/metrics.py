@@ -29,8 +29,11 @@ from prometheus_client import (
     generate_latest,
 )
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.routing import Match
 
 from uns.api.auth import require_write_principal
+
+_ALLOWED_HTTP_METHODS = frozenset({"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"})
 
 # ---------------------------------------------------------------------------
 # Metric definitions
@@ -86,17 +89,38 @@ def record_delivery(channel: str, status: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _normalize_http_method(method: str | None) -> str:
+    if not isinstance(method, str):
+        return "OTHER"
+    upper = method.upper()
+    return upper if upper in _ALLOWED_HTTP_METHODS else "OTHER"
+
+
 def _resolve_path_template(request: Request) -> str:
     """Return the FastAPI route template (parameterized) when available.
 
-    Falls back to the raw URL path. Using the route template prevents
-    high-cardinality labels on path-parameter values (e.g. notification UUIDs).
+    Returns ``"__unmatched__"`` when no route matches ``Match.FULL``, preventing
+    high-cardinality labels on path-parameter values or arbitrary 404 URLs.
     """
     route = request.scope.get("route")
     template = getattr(route, "path", None)
     if isinstance(template, str) and template:
         return template
-    return request.url.path
+    app = request.scope.get("app")
+    routes = getattr(app, "routes", None)
+    if routes is not None:
+        for candidate in routes:
+            matches = getattr(candidate, "matches", None)
+            if callable(matches):
+                try:
+                    match, _ = matches(request.scope)
+                except Exception:  # nosec B112
+                    continue
+                if match == Match.FULL:
+                    cand_path = getattr(candidate, "path", None)
+                    if isinstance(cand_path, str) and cand_path:
+                        return cand_path
+    return "__unmatched__"
 
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
@@ -110,32 +134,34 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         if request.url.path == "/metrics":
             return await call_next(request)
 
+        method = _normalize_http_method(request.method)
         start = time.monotonic()
         try:
             response = await call_next(request)
             status_code = response.status_code
         except Exception:
             duration = time.monotonic() - start
+            path_template = _resolve_path_template(request)
             http_requests_total.labels(
-                method=request.method,
-                path_template=_resolve_path_template(request),
+                method=method,
+                path_template=path_template,
                 status_code="500",
             ).inc()
             http_request_duration_seconds.labels(
-                method=request.method,
-                path_template=_resolve_path_template(request),
+                method=method,
+                path_template=path_template,
             ).observe(duration)
             raise
 
         duration = time.monotonic() - start
         path_template = _resolve_path_template(request)
         http_requests_total.labels(
-            method=request.method,
+            method=method,
             path_template=path_template,
             status_code=str(status_code),
         ).inc()
         http_request_duration_seconds.labels(
-            method=request.method,
+            method=method,
             path_template=path_template,
         ).observe(duration)
         return response
@@ -155,7 +181,9 @@ def install_metrics(app: FastAPI) -> None:
     """
     if not any(getattr(route, "path", None) == "/metrics" for route in app.routes):
 
-        @app.get("/metrics", include_in_schema=False, dependencies=[Depends(require_write_principal)])
+        @app.get(
+            "/metrics", include_in_schema=False, dependencies=[Depends(require_write_principal)]
+        )
         async def metrics() -> Response:  # pragma: no cover - thin shim, exercised in tests
             return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 

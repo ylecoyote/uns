@@ -86,6 +86,16 @@ class WritePrincipal:
             return True
         return matches_scope_patterns(notification_type, self.allowed_namespaces)
 
+    @property
+    def has_wildcard_sources(self) -> bool:
+        """Return True if this principal permits all sources (including None)."""
+        return self.allows_source(None)
+
+    @property
+    def has_wildcard_namespaces(self) -> bool:
+        """Return True if this principal permits all namespaces (including None)."""
+        return self.allows_namespace(None)
+
 
 @dataclass(frozen=True)
 class _CredentialSpec:
@@ -263,16 +273,30 @@ def require_principal_scope(principal: WritePrincipal, required_scope: str) -> W
     return principal
 
 
+def principal_allows_record(
+    principal: WritePrincipal | None,
+    *,
+    source: str | None,
+    notification_type: str | None,
+) -> bool:
+    """Return True if ``principal`` is authorized to access a record with ``source`` and ``notification_type``."""
+    if principal is None:
+        return True
+    return principal.allows_source(source) and principal.allows_namespace(notification_type)
+
+
 def require_source_and_namespace(
     principal: WritePrincipal | None,
     *,
     source: str | None = None,
     notification_type: str | None = None,
+    require_source: bool = True,
+    require_namespace: bool = True,
 ) -> None:
     """Enforce source and notification_type namespace restrictions for a scoped principal."""
     if principal is None:
         return
-    if source is not None and not principal.allows_source(source):
+    if require_source and not principal.allows_source(source):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -280,7 +304,7 @@ def require_source_and_namespace(
                 "message": f"Credential principal '{principal.subject}' is not authorized for source '{source}'.",
             },
         )
-    if notification_type is not None and not principal.allows_namespace(notification_type):
+    if require_namespace and not principal.allows_namespace(notification_type):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -300,7 +324,10 @@ def _authenticate(
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"error": "write_auth_not_configured", "message": "Set UNS_API_KEY before enabling API access."},
+            detail={
+                "error": "write_auth_not_configured",
+                "message": "Set UNS_API_KEY before enabling API access.",
+            },
         )
     if not supplied_key:
         raise HTTPException(
@@ -338,15 +365,16 @@ def _authenticate(
         subject=matched_subject,
         scopes=frozenset(matched_scopes),
         allowed_sources=frozenset() if unrestricted_sources else frozenset(matched_sources),
-        allowed_namespaces=frozenset() if unrestricted_namespaces else frozenset(matched_namespaces),
+        allowed_namespaces=frozenset()
+        if unrestricted_namespaces
+        else frozenset(matched_namespaces),
     )
     return require_principal_scope(principal, required_scope)
 
 
 def _header_key(connection: HTTPConnection) -> str | None:
-    return (
-        _bearer_token(connection.headers.get("authorization"))
-        or connection.headers.get("x-uns-api-key")
+    return _bearer_token(connection.headers.get("authorization")) or connection.headers.get(
+        "x-uns-api-key"
     )
 
 
@@ -381,7 +409,9 @@ def require_read_principal(request: Request) -> WritePrincipal | None:
     The compatibility flag applies only to GET/HEAD. It never permits writes or
     WebSocket establishment, even when a read dependency is reused accidentally.
     """
-    legacy = _state_or_env(request, "uns_allow_unauthenticated_reads", "UNS_ALLOW_UNAUTHENTICATED_READS")
+    legacy = _state_or_env(
+        request, "uns_allow_unauthenticated_reads", "UNS_ALLOW_UNAUTHENTICATED_READS"
+    )
     if request.method in {"GET", "HEAD"} and str(legacy).lower() in {"1", "true", "yes", "on"}:
         return None
     principal = _authenticate(request, _header_key(request), required_scope="observer")
@@ -401,7 +431,8 @@ def require_read_principal(request: Request) -> WritePrincipal | None:
 def allowed_origins() -> list[str]:
     raw = os.environ.get("UNS_ALLOWED_ORIGINS", "")
     return [origin.strip() for origin in raw.split(",") if origin.strip()] or [
-        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ]
 
 
@@ -414,21 +445,29 @@ def require_websocket_principal(websocket: WebSocket) -> tuple[WritePrincipal, s
     """
     origin = websocket.headers.get("origin")
     if origin is not None and origin not in allowed_origins():
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Origin is not allowed")
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION, reason="Origin is not allowed"
+        )
     protocols = websocket.scope.get("subprotocols", [])
     token = _header_key(websocket)
     if token is None and "uns.v1" in protocols:
-        credentials = [part.removeprefix("bearer.") for part in protocols if part.startswith("bearer.")]
+        credentials = [
+            part.removeprefix("bearer.") for part in protocols if part.startswith("bearer.")
+        ]
         if len(credentials) == 1:
             try:
                 encoded = credentials[0]
-                token = base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True).decode("utf-8")
+                token = base64.b64decode(
+                    encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True
+                ).decode("utf-8")
             except (ValueError, UnicodeError, binascii.Error):
                 token = None
     try:
         principal = _authenticate(websocket, token, required_scope="observer")
     except HTTPException as exc:
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required") from exc
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required"
+        ) from exc
     return principal, "uns.v1" if "uns.v1" in protocols else None
 
 
@@ -438,7 +477,10 @@ def resolve_requested_actor(principal: WritePrincipal, requested_actor: str | No
         return principal.subject
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail={"error": "principal_override_forbidden", "message": "acked_by/dismissed_by must match the authenticated principal."},
+        detail={
+            "error": "principal_override_forbidden",
+            "message": "acked_by/dismissed_by must match the authenticated principal.",
+        },
     )
 
 

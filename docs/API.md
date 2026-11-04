@@ -129,9 +129,9 @@ By default, all HTTP endpoints except `GET /health` and `GET /healthz` require a
 | `UNS_API_KEY` | All reads (including `/metrics`), producer operations, responses, and administration | `UNS_API_PRINCIPAL` |
 | `UNS_PRODUCER_API_KEY` | Send, simulate, and observer-protected reads; no ACK/DISMISS, `/metrics`, or administration | `UNS_PRODUCER_API_PRINCIPAL` |
 | `UNS_RESPONDER_API_KEY` | ACK/DISMISS and observer-protected reads; no send, `/metrics`, or administration | `UNS_RESPONDER_API_PRINCIPAL` |
-| `UNS_OBSERVER_API_KEY` | Observer-protected reads only, including Console, readiness, and runtime inspection; no `/metrics` | `UNS_OBSERVER_API_PRINCIPAL` |
+| `UNS_OBSERVER_API_KEY` | Observer-protected reads only (status, audit, health, policies, Console `/ui/*`, readiness, runtime inspection) within configured `allowed_sources` and `allowed_namespaces` bounds; no `/metrics` | `UNS_OBSERVER_API_PRINCIPAL` |
 
-Policy reload, DLQ resolution/replay, and `/metrics` require operator authority. These are capability scopes, not per-producer or tenant data isolation: an observer-capable credential can read the instance's records through observer-protected endpoints. Use distinct key values for distinct roles; reusing a value combines its configured capabilities. The verified credential's principal supplies response attribution. The optional legacy anonymous-read mode applies only to selected HTTP GET/HEAD reads; it never grants mutations, WebSockets, readiness, metrics, or runtime inspection. See [Security Model](SECURITY-MODEL.md).
+Policy reload, DLQ resolution/replay, and `/metrics` require operator authority. `observer` (`UNS_OBSERVER_API_KEY`) grants read-only access to status, audit, health, policies, and console read models within the credential's configured `allowed_sources` and `allowed_namespaces` bounds (defaulting to instance-wide `*` when unscoped, or restricted per `UNS_OBSERVER_ALLOWED_SOURCES` / `UNS_OBSERVER_ALLOWED_NAMESPACES` / `UNS_SCOPED_API_KEYS`). Use distinct key values for distinct roles; reusing a value combines its configured capabilities. The verified credential's principal supplies response attribution. The optional legacy anonymous-read mode applies only to selected HTTP GET/HEAD reads; it never grants mutations, WebSockets, readiness, metrics, or runtime inspection. See [Security Model](SECURITY-MODEL.md).
 
 | Status Code | Error Code / Detail | Cause |
 | :--- | :--- | :--- |
@@ -213,8 +213,20 @@ Validates all YAML policy files in `policy_dir`, enforces `PolicyDelta` transiti
 In addition, UNS `v0.5.0+` exposes governed policy delta proposal, shadow evaluation inspection, and promotion endpoints:
 - `GET /api/v1/policies/proposals` & `GET /ui/policies/proposals`: Lists durable `PolicyDelta` proposals (`?notification_type=...&status=...`) paired with `ShadowEvaluationSummaryItem` (`sample_count`, `matching_count`, `accuracy_rate`, `threshold`, `min_samples`, `meets_threshold`), guard check results (`BOUNDS`, `CONFLICT`, `INVARIANTS`), baseline hash drift state (`baseline_matches_current`), and promotion eligibility (`can_approve_to_draft`).
 - `GET /api/v1/policies/proposals/{delta_id}` & `GET /ui/policies/proposals/{delta_id}`: Returns a single proposal with its recent `shadow_samples` (`ShadowEvaluationSampleItem`) and `transitions` (`PolicyTransitionItem`).
-- `POST /api/v1/policies/proposals` (`admin` scope): Creates a `PROPOSED` (or immediately `SHADOW` when `start_shadow: true`) `PolicyDelta` against the current active/latest policy for `notification_type`, validating allow-listed field paths (`ALLOWED_POLICY_FIELD_PATHS`) and executing `PolicyChangeProposalService.evaluate_guards()`.
-- `POST /api/v1/policies/proposals/{delta_id}/shadow` (`admin` scope): Transitions a `PROPOSED` delta into `SHADOW` so `ShadowPolicyEvaluator` evaluates it asynchronously against live intake.
+- `POST /api/v1/policies/proposals` (`producer` or `admin` scope for `PROPOSED`; `admin` scope required when `promote_to_shadow: true`): Creates a `PROPOSED` `PolicyDelta` (`promote_to_shadow: false`, permitted with `UNS_PRODUCER_API_KEY` or `UNS_API_KEY`) or immediately promotes it to `SHADOW` (`promote_to_shadow: true`, requiring `admin` / `UNS_API_KEY` authority) against the current active/latest policy for `policy_type`, validating allow-listed field paths (`ALLOWED_POLICY_FIELD_PATHS`) and executing `PolicyChangeProposalService.evaluate_guards()`:
+  ```json
+  // POST /api/v1/policies/proposals Request Body (PolicyProposalCreateRequest)
+  {
+    "policy_type": "system.alert",
+    "field_path": "ack_timeout_minutes",
+    "proposed_value": 20,
+    "reasoning": "Extend responder window for lower-severity operational alerts",
+    "confidence": 0.9,
+    "evidence_count": 1,
+    "promote_to_shadow": false
+  }
+  ```
+- `POST /api/v1/policies/proposals/{delta_id}/shadow` (`admin` scope): Transitions a `PROPOSED` delta into `SHADOW` so `Runtime.accept()` invokes `ShadowPolicyEvaluator.evaluate_intake()` inline during intake (isolated in a non-blocking exception guard without external channel dispatch or obligation mutation; `evaluate_intake_async()` is also available for hosts that schedule background evaluation).
 - `POST /api/v1/policies/proposals/{delta_id}/approve` (`admin` scope): Verifies guard stages, baseline hash consistency (`409 policy_baseline_drift` on mismatch), and shadow sample/accuracy thresholds (`409 policy_promotion_conflict` if unmet), transitions the delta to `APPROVED`, and persists a `DRAFT` policy revision in `notification_policy_revisions`.
 - `POST /api/v1/policies/proposals/{delta_id}/activate` & `POST /api/v1/policies/revisions/{policy_id}/activate` (`admin` scope): Promotes a `DRAFT` revision to `ACTIVE` (retiring prior `ACTIVE`/`PREVIEW` revisions and broadcasting a cross-process policy reload notification) and marks the corresponding `APPROVED` delta `APPLIED`.
 - `POST /api/v1/policies/proposals/{delta_id}/reject` (`admin` scope): Transitions a `PROPOSED`, `SHADOW`, or `APPROVED` delta to `REJECTED` with operator attribution and audit trail.

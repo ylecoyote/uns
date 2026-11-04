@@ -32,7 +32,10 @@ Observability:
 
 from __future__ import annotations
 
+import base64
+import json
 from datetime import UTC, datetime
+from typing import TypeVar
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -48,6 +51,7 @@ from notification.policies import PolicyStatus
 from notification.policy_learning import DeltaState
 from uns.api.auth import (
     WritePrincipal,
+    principal_allows_record,
     require_authenticated_observer,
     require_read_principal,
     require_source_and_namespace,
@@ -119,11 +123,170 @@ logger = get_structured_logger(__name__)
 router = APIRouter(prefix="/ui", tags=["ui"], dependencies=[Depends(require_read_principal)])
 
 
+_TItem = TypeVar("_TItem")
+
+
 def _utc_opt(value: datetime | None) -> datetime | None:
     """Ensure persisted timestamps are timezone-aware UTC."""
     if value is None:
         return None
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+def _encode_cursor(offset: int) -> str:
+    return base64.b64encode(json.dumps({"offset": offset}).encode()).decode()
+
+
+def _decode_cursor(cursor: str | None) -> int:
+    if cursor is None:
+        return 0
+    try:
+        data = json.loads(base64.b64decode(cursor))
+        offset = data.get("offset", 0)
+        return min(max(int(offset), 0), 10_000) if offset is not None else 0
+    except Exception:
+        return 0
+
+
+def _principal_has_record_bounds(principal: WritePrincipal | None) -> bool:
+    return principal is not None and (
+        not principal.has_wildcard_sources or not principal.has_wildcard_namespaces
+    )
+
+
+def _resolve_ui_notification_bounds(
+    http_request: Request,
+    notification_id: UUID | None,
+    *,
+    item: object | None = None,
+    bounds_cache: dict[UUID, tuple[str | None, str | None]] | None = None,
+) -> tuple[str | None, str | None]:
+    source: str | None = None
+    notification_type: str | None = None
+    if item is not None:
+        raw_src = getattr(item, "source", None)
+        if isinstance(raw_src, str) and raw_src:
+            source = raw_src
+        raw_nt = getattr(item, "notification_type", None)
+        if isinstance(raw_nt, str) and raw_nt:
+            notification_type = raw_nt
+        meta = getattr(item, "metadata", None)
+        if isinstance(meta, dict):
+            if not source and isinstance(meta.get("source"), str):
+                source = meta["source"]
+            if not notification_type and isinstance(meta.get("notification_type"), str):
+                notification_type = meta["notification_type"]
+    if notification_id is None:
+        return source, notification_type
+    if bounds_cache is not None and notification_id in bounds_cache:
+        cached_src, cached_nt = bounds_cache[notification_id]
+        return source or cached_src, notification_type or cached_nt
+
+    runtime = getattr(http_request.app.state, "runtime", None)
+    if (not source or not notification_type) and runtime is not None:
+        try:
+            row = runtime.get(notification_id)
+        except Exception:
+            row = None
+        if isinstance(row, dict):
+            raw_notif = row.get("notification")
+            notif: dict[str, object] = raw_notif if isinstance(raw_notif, dict) else {}
+            n_src = notif.get("source")
+            r_src = row.get("source")
+            if not source and isinstance(n_src, str):
+                source = n_src
+            elif not source and isinstance(r_src, str):
+                source = r_src
+            n_nt = notif.get("notification_type")
+            r_nt = row.get("notification_type")
+            if not notification_type and isinstance(n_nt, str):
+                notification_type = n_nt
+            elif not notification_type and isinstance(r_nt, str):
+                notification_type = r_nt
+
+    from uns.api.read_models import get_read_model_adapter
+
+    read_adapter = (
+        getattr(http_request.app.state, "read_model_adapter", None) or get_read_model_adapter()
+    )
+    audit_store = getattr(http_request.app.state, "audit_store", None) or getattr(
+        read_adapter, "audit_store", None
+    )
+    if (not source or not notification_type) and audit_store is not None:
+        get_audits = getattr(audit_store, "get_delivery_audits_for_notification", None)
+        if callable(get_audits):
+            try:
+                audits = get_audits(notification_id)
+            except Exception:
+                audits = []
+            if audits:
+                first = audits[0]
+                if not source and isinstance(getattr(first, "source", None), str):
+                    source = first.source
+                if not notification_type and isinstance(
+                    getattr(first, "notification_type", None), str
+                ):
+                    notification_type = first.notification_type
+
+    if (not source or not notification_type) and read_adapter is not None:
+        get_session = getattr(read_adapter, "_get_session", None)
+        if callable(get_session):
+            session = get_session()
+            if session is not None:
+                try:
+                    from sqlalchemy import select
+
+                    from db.models import NotificationAuditRecord
+
+                    stmt = (
+                        select(
+                            NotificationAuditRecord.source,
+                            NotificationAuditRecord.notification_type,
+                        )
+                        .where(NotificationAuditRecord.notification_id == notification_id)
+                        .limit(1)
+                    )
+                    rec = session.execute(stmt).first()
+                    if rec is not None:
+                        if not source and isinstance(rec[0], str):
+                            source = rec[0]
+                        if not notification_type and isinstance(rec[1], str):
+                            notification_type = rec[1]
+                except Exception:  # nosec B110
+                    pass
+                finally:
+                    session.close()
+
+    if bounds_cache is not None:
+        bounds_cache[notification_id] = (source, notification_type)
+    return source, notification_type
+
+
+def _apply_source_and_namespace_bounds(
+    http_request: Request,
+    principal: WritePrincipal | None,
+    items: list[_TItem],
+) -> list[_TItem]:
+    if not _principal_has_record_bounds(principal):
+        return items
+    bounds_cache: dict[UUID, tuple[str | None, str | None]] = {}
+    filtered: list[_TItem] = []
+    for item in items:
+        raw_nid = getattr(item, "notification_id", None)
+        nid = raw_nid if isinstance(raw_nid, UUID) else None
+        source, notification_type = _resolve_ui_notification_bounds(
+            http_request,
+            nid,
+            item=item,
+            bounds_cache=bounds_cache,
+        )
+        if principal_allows_record(
+            principal,
+            source=source,
+            notification_type=notification_type,
+        ):
+            filtered.append(item)
+    return filtered
 
 
 # =============================================================================
@@ -184,7 +347,11 @@ async def list_deliveries(
 ) -> DeliveryTimelineListResponse:
     """HTTP adapter — delegates to uns.queries.list_deliveries."""
     if notification_type is not None:
-        require_source_and_namespace(principal, notification_type=notification_type)
+        require_source_and_namespace(
+            principal,
+            notification_type=notification_type,
+            require_source=False,
+        )
     log_endpoint_call(
         logger,
         "list_deliveries",
@@ -196,7 +363,41 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode.value if autonomy_mode else None,
     )
 
-    result = await _query_list_deliveries(
+    read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
+    if _principal_has_record_bounds(principal):
+        unpaged = await _query_list_deliveries(
+            cursor=None,
+            limit=10_000,
+            start_time=start_time,
+            end_time=end_time,
+            status=status,
+            intent=intent,
+            delivery_mode=delivery_mode,
+            agent_id=agent_id,
+            autonomy_mode=autonomy_mode,
+            notification_type=notification_type,
+            channel=channel,
+            read_adapter=read_adapter,
+        )
+        filtered = _apply_source_and_namespace_bounds(
+            http_request,
+            principal,
+            unpaged.items,
+        )
+        offset = _decode_cursor(cursor)
+        page_items = filtered[offset : offset + limit]
+        has_more = (offset + limit) < len(filtered)
+        next_cursor = _encode_cursor(offset + limit) if has_more else None
+        return DeliveryTimelineListResponse(
+            items=page_items,
+            pagination=PaginationInfo(
+                cursor=next_cursor,
+                has_more=has_more,
+                total_count=len(filtered),
+            ),
+        )
+
+    return await _query_list_deliveries(
         cursor=cursor,
         limit=limit,
         start_time=start_time,
@@ -208,16 +409,8 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode,
         notification_type=notification_type,
         channel=channel,
-        read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
+        read_adapter=read_adapter,
     )
-    if principal is not None and principal.allowed_namespaces:
-        filtered = [
-            item
-            for item in result.items
-            if principal.allows_namespace(item.notification_type)
-        ]
-        result = result.model_copy(update={"items": filtered})
-    return result
 
 
 @router.get(
@@ -271,11 +464,20 @@ async def get_delivery_timeline(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_response,
         ) from exc
+    source, resolved_ntype = _resolve_ui_notification_bounds(
+        http_request,
+        notification_id,
+        item=timeline,
+    )
     require_source_and_namespace(
         principal,
-        notification_type=timeline.notification_type,
+        source=source,
+        notification_type=timeline.notification_type or resolved_ntype,
     )
     return timeline
+
+
+get_delivery_detail = get_delivery_timeline
 
 
 @router.get(
@@ -300,7 +502,11 @@ async def get_effective_policy(
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> EffectivePolicyResponse:
     """HTTP adapter — delegates to uns.queries.get_effective_policy."""
-    require_source_and_namespace(principal, notification_type=notification_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=notification_type,
+        require_source=False,
+    )
     log_endpoint_call(
         logger,
         "get_effective_policy",
@@ -316,8 +522,11 @@ async def get_effective_policy(
             intent=intent,
             autonomy_mode=autonomy_mode,
             irreversible=irreversible,
-            policy_registry=(http_request.app.state.runtime.policy_runtime.registry()
-                             if getattr(http_request.app.state, "runtime", None) is not None else None),
+            policy_registry=(
+                http_request.app.state.runtime.policy_runtime.registry()
+                if getattr(http_request.app.state, "runtime", None) is not None
+                else None
+            ),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -338,11 +547,7 @@ async def list_active_policies(
 
     log_endpoint_call(logger, "list_active_policies")
     runtime = getattr(http_request.app.state, "runtime", None)
-    registry = (
-        runtime.policy_runtime.registry()
-        if runtime is not None
-        else get_policy_registry()
-    )
+    registry = runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()
     items: list[ActivePolicySummary] = []
     for policy in sorted(registry.get_all().values(), key=lambda p: p.notification_type):
         if principal is not None and not principal.allows_namespace(policy.notification_type):
@@ -362,9 +567,7 @@ async def list_active_policies(
             if policy.intent
             else policy.ack_timeout_minutes
         )
-        ack_timeout_seconds = (
-            ack_timeout_minutes * 60 if ack_timeout_minutes is not None else None
-        )
+        ack_timeout_seconds = ack_timeout_minutes * 60 if ack_timeout_minutes is not None else None
         dedup_window_seconds = (
             policy.dedup_window_seconds
             if policy.dedup_window_seconds is not None
@@ -395,15 +598,11 @@ async def list_active_policies(
 )
 async def list_policy_revisions(
     http_request: Request,
-    notification_type: str | None = Query(
-        default=None, description="Filter by notification_type"
-    ),
+    notification_type: str | None = Query(default=None, description="Filter by notification_type"),
     policy_status: PolicyStatus | None = Query(
         default=None, alias="status", description="Filter by policy lifecycle status"
     ),
-    limit: int = Query(
-        default=200, ge=1, le=500, description="Maximum revisions to return"
-    ),
+    limit: int = Query(default=200, ge=1, le=500, description="Maximum revisions to return"),
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> PolicyRevisionListResponse:
     """Return stored notification policy revisions across lifecycle statuses."""
@@ -411,7 +610,11 @@ async def list_policy_revisions(
     from notification.policy_loader import compute_policy_content_hash
 
     if notification_type:
-        require_source_and_namespace(principal, notification_type=notification_type)
+        require_source_and_namespace(
+            principal,
+            notification_type=notification_type,
+            require_source=False,
+        )
     log_endpoint_call(
         logger,
         "list_policy_revisions",
@@ -433,38 +636,34 @@ async def list_policy_revisions(
         )
         for row, policy in revisions:
             default_intent = policy.intent or NotificationIntent.OPERATIONAL
-            channels = policy.get_channels_for_mode(
-                AutonomyMode.LIVE, default_intent
-            ) or list(policy.channels)
+            channels = policy.get_channels_for_mode(AutonomyMode.LIVE, default_intent) or list(
+                policy.channels
+            )
             delivery_mode = (
-                policy.get_delivery_mode_for_mode(
-                    AutonomyMode.LIVE, default_intent
-                )
+                policy.get_delivery_mode_for_mode(AutonomyMode.LIVE, default_intent)
                 if policy.intent
                 else policy.delivery_mode
             )
-            require_ack = policy.get_require_ack_for_mode(
-                AutonomyMode.LIVE, policy.intent
-            )
+            require_ack = policy.get_require_ack_for_mode(AutonomyMode.LIVE, policy.intent)
             ack_timeout_minutes = (
-                policy.get_ack_timeout_minutes_for_mode(
-                    AutonomyMode.LIVE, default_intent
-                )
+                policy.get_ack_timeout_minutes_for_mode(AutonomyMode.LIVE, default_intent)
                 if policy.intent
                 else policy.ack_timeout_minutes
             )
             ack_timeout_seconds = (
-                ack_timeout_minutes * 60
-                if ack_timeout_minutes is not None
-                else None
+                ack_timeout_minutes * 60 if ack_timeout_minutes is not None else None
             )
             dedup_window_seconds = (
                 policy.dedup_window_seconds
                 if policy.dedup_window_seconds is not None
                 else DEFAULT_DEDUP_WINDOW_SECONDS
             )
-            config_hash = row.content_hash or policy.config_hash or compute_policy_content_hash(
-                policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+            config_hash = (
+                row.content_hash
+                or policy.config_hash
+                or compute_policy_content_hash(
+                    policy.model_dump(mode="json", exclude={"config_id", "config_hash"})
+                )
             )
             items.append(
                 PolicyRevisionSummary(
@@ -489,36 +688,28 @@ async def list_policy_revisions(
             )
     else:
         registry = (
-            runtime.policy_runtime.registry()
-            if runtime is not None
-            else get_policy_registry()
+            runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()
         )
         candidates = list(registry.get_all().values())
         if notification_type:
-            candidates = [
-                p for p in candidates if p.notification_type == notification_type
-            ]
+            candidates = [p for p in candidates if p.notification_type == notification_type]
         if policy_status is not None:
             candidates = [p for p in candidates if p.status == policy_status]
         candidates.sort(key=lambda p: p.version, reverse=True)
         candidates.sort(key=lambda p: p.notification_type)
         for policy in candidates[:limit]:
             default_intent = policy.intent or NotificationIntent.OPERATIONAL
-            channels = policy.get_channels_for_mode(
-                AutonomyMode.LIVE, default_intent
-            ) or list(policy.channels)
+            channels = policy.get_channels_for_mode(AutonomyMode.LIVE, default_intent) or list(
+                policy.channels
+            )
             delivery_mode = (
                 policy.get_delivery_mode_for_mode(AutonomyMode.LIVE, default_intent)
                 if policy.intent
                 else policy.delivery_mode
             )
-            require_ack = policy.get_require_ack_for_mode(
-                AutonomyMode.LIVE, policy.intent
-            )
+            require_ack = policy.get_require_ack_for_mode(AutonomyMode.LIVE, policy.intent)
             ack_timeout_minutes = (
-                policy.get_ack_timeout_minutes_for_mode(
-                    AutonomyMode.LIVE, default_intent
-                )
+                policy.get_ack_timeout_minutes_for_mode(AutonomyMode.LIVE, default_intent)
                 if policy.intent
                 else policy.ack_timeout_minutes
             )
@@ -551,11 +742,7 @@ async def list_policy_revisions(
                 )
             )
     if principal is not None and principal.allowed_namespaces:
-        items = [
-            item
-            for item in items
-            if principal.allows_namespace(item.notification_type)
-        ]
+        items = [item for item in items if principal.allows_namespace(item.notification_type)]
     return PolicyRevisionListResponse(items=items, total_count=len(items))
 
 
@@ -570,15 +757,17 @@ async def list_policy_proposals(
     policy_type: str | None = Query(
         default=None, description="Filter by notification_type / policy_type"
     ),
-    state: DeltaState | None = Query(
-        default=None, description="Filter by delta lifecycle state"
-    ),
+    state: DeltaState | None = Query(default=None, description="Filter by delta lifecycle state"),
     limit: int = Query(default=50, ge=1, le=200, description="Maximum proposals to return"),
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> PolicyProposalListResponse:
     """Return governed policy delta proposals and shadow evaluation summaries."""
     if policy_type:
-        require_source_and_namespace(principal, notification_type=policy_type)
+        require_source_and_namespace(
+            principal,
+            notification_type=policy_type,
+            require_source=False,
+        )
     log_endpoint_call(
         logger,
         "list_policy_proposals",
@@ -622,7 +811,11 @@ async def get_policy_proposal(
     delta = evaluator.learning_store.get_delta(delta_id)
     if delta is None:
         raise HTTPException(status_code=404, detail="Policy proposal not found")
-    require_source_and_namespace(principal, notification_type=delta.policy_type)
+    require_source_and_namespace(
+        principal,
+        notification_type=delta.policy_type,
+        require_source=False,
+    )
     return evaluator.format_proposal_summary(delta, include_samples=True)
 
 
@@ -707,6 +900,7 @@ async def list_audit_events(
     agent_id: UUID | None = Query(default=None, description="Filter by agent UUID"),
     autonomy_mode: AutonomyMode | None = Query(default=None, description="Filter by autonomy mode"),
     correlation_id: str | None = Query(default=None, description="Filter by correlation ID"),
+    principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> AuditEventListResponse:
     """HTTP adapter — delegates to uns.queries.list_audit_events."""
     log_endpoint_call(
@@ -721,6 +915,38 @@ async def list_audit_events(
         correlation_id=correlation_id,
     )
 
+    read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
+    if _principal_has_record_bounds(principal):
+        unpaged = await _query_list_audit_events(
+            cursor=None,
+            limit=10_000,
+            start_time=start_time,
+            end_time=end_time,
+            event_type=event_type,
+            notification_id=notification_id,
+            agent_id=agent_id,
+            autonomy_mode=autonomy_mode,
+            correlation_id=correlation_id,
+            read_adapter=read_adapter,
+        )
+        filtered = _apply_source_and_namespace_bounds(
+            http_request,
+            principal,
+            unpaged.items,
+        )
+        offset = _decode_cursor(cursor)
+        page_items = filtered[offset : offset + limit]
+        has_more = (offset + limit) < len(filtered)
+        next_cursor = _encode_cursor(offset + limit) if has_more else None
+        return AuditEventListResponse(
+            items=page_items,
+            pagination=PaginationInfo(
+                cursor=next_cursor,
+                has_more=has_more,
+                total_count=len(filtered),
+            ),
+        )
+
     return await _query_list_audit_events(
         cursor=cursor,
         limit=limit,
@@ -731,8 +957,11 @@ async def list_audit_events(
         agent_id=agent_id,
         autonomy_mode=autonomy_mode,
         correlation_id=correlation_id,
-        read_adapter=getattr(http_request.app.state, "read_model_adapter", None),
+        read_adapter=read_adapter,
     )
+
+
+get_audit_timeline = list_audit_events
 
 
 def create_ui_router() -> APIRouter:

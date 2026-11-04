@@ -1,14 +1,14 @@
 # UNS Roadmap (`v0.2.0` → `v1.0.0`)
 
-This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.6.0` releases toward `v1.0.0`.
+This document outlines the architectural direction and milestone boundaries for **UNS (Unified Notification Service)** from the `v0.2.0` through `v0.6.1` releases toward `v1.0.0`.
 
 Live execution progress and individual deliverables are tracked natively in [GitHub Milestones](https://github.com/ylecoyote/uns/milestones). To keep this document accurate without commit churn, task checklists live in the linked GitHub Milestones and Issues rather than in this file.
 
 ---
 
-## Current Baseline: `v0.2.0` – `v0.6.0` (Shipped)
+## Current Baseline: `v0.2.0` – `v0.6.1` (Shipped)
 
-Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0), [`v0.5.0`](https://github.com/ylecoyote/uns/releases/tag/v0.5.0), and [`v0.6.0`](https://github.com/ylecoyote/uns/releases/tag/v0.6.0) establish the consolidated, single-repository notification obligation control plane:
+Releases [`v0.2.0`](https://github.com/ylecoyote/uns/releases/tag/v0.2.0), [`v0.3.0`](https://github.com/ylecoyote/uns/releases/tag/v0.3.0), [`v0.4.0`](https://github.com/ylecoyote/uns/releases/tag/v0.4.0), [`v0.5.0`](https://github.com/ylecoyote/uns/releases/tag/v0.5.0), [`v0.6.0`](https://github.com/ylecoyote/uns/releases/tag/v0.6.0), and [`v0.6.1`](https://github.com/ylecoyote/uns/releases/tag/v0.6.1) establish the consolidated, single-repository notification obligation control plane:
 
 - **Durable Transactional Outbox & PostgreSQL Parity (`uns.Runtime` & `uns-maintain`):** Atomic policy resolution, notification acceptance, leader/follower deduplication ownership, audit provenance, and `uns-maintain` retention + SHA-256 verified archive-before-prune across both SQLite (WAL) and PostgreSQL 16 (`psycopg[binary]`).
 - **Lease-Fenced Channel Delivery & Bi-Directional Webhooks:** Outbound adapters for Slack (`SlackAdapter`), PagerDuty Events API v2 (`PagerDutyAdapter`), Email/SMTP (`EmailAdapter`), and WebSocket (`WebSocketDeliveryAdapter`) with provider-attempt lease guards (`guard_provider_attempt`), dead-letter replay (`RuntimeDLQ`), and signed inbound Slack (`POST /api/v1/webhooks/slack`) and PagerDuty v3 (`POST /api/v1/webhooks/pagerduty`) webhooks.
@@ -64,7 +64,7 @@ flowchart LR
 
 | Deliverable | Architectural Scope | Status & Tracking Issue |
 | :--- | :--- | :--- |
-| **Automated `PREVIEW` Shadow Evaluation Runner** | Evaluate `PREVIEW` candidate policies and `SHADOW` deltas asynchronously against live intake (`ShadowPolicyEvaluator`) without triggering external channel sends or mutating live obligation state, recording `ShadowEvaluationResult` samples automatically. | **Shipped (`v0.5.0`)** · [#46](https://github.com/ylecoyote/uns/issues/46) |
+| **Automated `PREVIEW` Shadow Evaluation Runner** | Invoke `ShadowPolicyEvaluator.evaluate_intake()` inline from `Runtime.accept()` inside a non-blocking exception guard (with `evaluate_intake_async()` available for host-scheduled background evaluation) without triggering external channel sends or mutating live obligation state, recording `ShadowEvaluationResult` samples automatically. | **Shipped (`v0.5.0`)** · [#46](https://github.com/ylecoyote/uns/issues/46) |
 | **Console `/policy` Promotion Workflow** | Add a `Proposals & Shadow Evidence` workspace in `/policy` (`PolicyInspectorPage.tsx`) and `/api/v1/policies/proposals/*` endpoints to inspect sample aggregates, verify guard stages, approve qualifying deltas into `DRAFT`, and explicitly activate `DRAFT -> ACTIVE`. | **Shipped (`v0.5.0`)** · [#47](https://github.com/ylecoyote/uns/issues/47) |
 
 ---
@@ -74,7 +74,7 @@ flowchart LR
 **Goal:** Certify production SLOs backed by sustained live-provider telemetry and resolve the long-term boundary of `uns.governance`.
 
 > [!IMPORTANT]
-> **Why `src/uns/governance/` is marked experimental in `v0.2.0`:** As documented in [PRODUCT.md](PRODUCT.md), UNS `v0.2.0` governs **notification obligations** (whether an event was delivered and whether a human responded), not **business-action authorization** (whether an agent is permitted to execute a side effect). The rule schemas, closed operator set, and `DecisionRecord` models in `src/uns/governance/` are preserved from the pre-consolidation control-plane design for `v1.0.0`.
+> **Governance boundary (`v0.2.0` → `main`):** As documented in [PRODUCT.md](PRODUCT.md), the core UNS runtime governs **notification obligations** (whether an event was delivered and whether a human responded), not **business-action authorization** (whether an agent is permitted to execute a side effect). In `main` ([#49](https://github.com/ylecoyote/uns/issues/49)), `src/uns/governance/` ships the opt-in pre-execution action gate (`decide()`, `DecisionEngine`, `ContextSchema`, and `GovernanceApprovalBridge`) layered on top of durable obligations, while legacy root-level action-authorization models in `notification.models` remain experimental compatibility types.
 
 | Deliverable | Architectural Scope | Status & Tracking Issue |
 | :--- | :--- | :--- |

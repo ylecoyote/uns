@@ -46,6 +46,7 @@ from db.models import Base
 from db.policy_learning_store import SQLAlchemyPolicyLearningStore
 from notification.adapters.base import DeliveryLeaseLostError, DeliveryResult
 from notification.audit import create_audit_record
+from notification.channel_health import ChannelHealthTracker
 from notification.models import (
     AckStatus,
     Channel,
@@ -158,6 +159,7 @@ class Runtime:
         shadow_evaluation_enabled: bool | None = None,
         shadow_min_samples: int | None = None,
         shadow_accuracy_threshold: float | None = None,
+        channel_health: ChannelHealthTracker | None = None,
     ) -> None:
         options: dict[str, Any] = {}
         is_in_memory = is_in_memory_database_url(database_url)
@@ -201,6 +203,9 @@ class Runtime:
         self.clock = clock
         self.callback = callback
         self.lease_seconds = 60.0
+        self.channel_health = (
+            channel_health if channel_health is not None else ChannelHealthTracker()
+        )
         self.delivery = DeliveryService(
             self.adapters, check_deduplication=False, check_rate_limit=False
         )
@@ -246,9 +251,7 @@ class Runtime:
                 return None, "CYCLE"
             seen.add(str(next_id))
             candidate = (
-                session.execute(select(work).where(work.c.id == str(next_id)))
-                .mappings()
-                .first()
+                session.execute(select(work).where(work.c.id == str(next_id))).mappings().first()
             )
             if candidate is None:
                 return None, "MISSING_TARGET"
@@ -272,7 +275,9 @@ class Runtime:
             result["effective_status"] = owner["status"] if owner is not None else result["status"]
             result["effective_ack_status"] = owner["ack_status"] if owner is not None else None
             result["ack_inherited"] = inherited
-            result["obligation_resolution_status"] = "RESOLVED" if owner is not None else "UNRESOLVED"
+            result["obligation_resolution_status"] = (
+                "RESOLVED" if owner is not None else "UNRESOLVED"
+            )
             result["obligation_resolution_error"] = resolution_error
             blocker = self._replay_blocker(session, result) if result.get("dead_letter") else None
             result["replay_blocked_by"] = blocker[0] if blocker else None
@@ -344,6 +349,18 @@ class Runtime:
                 n = self.policy_runtime.resolve(request, session=session, principal=principal)
                 provenance = n.metadata["uns_resolution"]
                 effective = provenance["effective"]
+                # Coalescing is scoped to the same effective delivery obligation.
+                dedup_key = digest(
+                    [principal, request.source, n.dedup_key, provenance["effective_hash"]]
+                )
+                n = n.model_copy(
+                    update={
+                        "metadata": {
+                            **n.metadata,
+                            "uns_obligation_dedup_key": dedup_key,
+                        }
+                    }
+                )
                 now = self.clock()
                 identifier = str(n.notification_id)
                 # Unique claim prevents concurrent intake from creating duplicate work.
@@ -364,10 +381,6 @@ class Runtime:
                         lease_until=0,
                         dead_letter=False,
                     )
-                )
-                # Coalescing is scoped to the same effective delivery obligation.
-                dedup_key = digest(
-                    [principal, request.source, n.dedup_key, provenance["effective_hash"]]
                 )
                 current = (
                     session.execute(select(dedup).where(dedup.c.key == dedup_key).with_for_update())
@@ -552,6 +565,16 @@ class Runtime:
                     else None,
                 },
             )
+        with contextlib.suppress(Exception):
+            ch = (
+                result.channel
+                if isinstance(result.channel, Channel)
+                else Channel(str(result.channel))
+            )
+            if result.success:
+                self.channel_health.record_success(ch)
+            else:
+                self.channel_health.record_failure(ch, result.error or "delivery_failed")
 
     def _current_owner(self, session: Session, claim: Any, now: float) -> Any:
         if not claim or not claim["owner_id"]:
@@ -981,8 +1004,24 @@ class Runtime:
         if not raw_dedup:
             raise KeyError("No matching PagerDuty notification found")
 
-        normalized_keys = {raw_dedup, f"uns-{stripped_dedup}"}
+        normalized_keys = {raw_dedup, stripped_dedup, f"uns-{stripped_dedup}"}
         with self.sessions() as session:
+            exact_owner = (
+                session.execute(
+                    select(work.c.id)
+                    .where(
+                        work.c.dedup_owner_id.is_(None),
+                        work.c.dedup_key == stripped_dedup,
+                    )
+                    .order_by(work.c.delivered_at.desc(), work.c.id)
+                    .limit(1)
+                )
+                .scalars()
+                .first()
+            )
+            if exact_owner is not None:
+                return self.get(exact_owner)
+
             event_rows = list(
                 session.execute(
                     select(events.c.notification_id, events.c.payload)
@@ -991,26 +1030,46 @@ class Runtime:
                     .limit(500)
                 ).mappings()
             )
+            matched_event_ids: list[str] = []
             for ev in event_rows:
                 payload = ev["payload"] or {}
                 if payload.get("channel") == Channel.PAGERDUTY.value and (
                     payload.get("message_id") in normalized_keys
                     or (payload.get("metadata") or {}).get("pagerduty_dedup_key") in normalized_keys
                 ):
-                    return self.get(ev["notification_id"])
+                    nid = str(ev["notification_id"])
+                    if nid not in matched_event_ids:
+                        matched_event_ids.append(nid)
+
+            if matched_event_ids:
+                matched_work = list(
+                    session.execute(
+                        select(work.c.id, work.c.dedup_key).where(work.c.id.in_(matched_event_ids))
+                    ).mappings()
+                )
+                groups = {str(w["dedup_key"] or w["id"]) for w in matched_work}
+                if len(groups) > 1:
+                    raise KeyError(raw_dedup)
+                return self.get(matched_event_ids[0])
 
             work_rows = list(
                 session.execute(
-                    select(work.c.id, work.c.notification)
+                    select(work.c.id, work.c.dedup_key, work.c.notification)
                     .where(work.c.dedup_owner_id.is_(None))
                     .order_by(work.c.delivered_at.desc(), work.c.id)
                     .limit(500)
                 ).mappings()
             )
-            for wr in work_rows:
-                notif_json = wr["notification"] or {}
-                if notif_json.get("dedup_key") == stripped_dedup:
-                    return self.get(wr["id"])
+            raw_matches = [
+                wr
+                for wr in work_rows
+                if (wr["notification"] or {}).get("dedup_key") == stripped_dedup
+            ]
+            if raw_matches:
+                raw_groups = {str(wr["dedup_key"] or wr["id"]) for wr in raw_matches}
+                if len(raw_groups) > 1:
+                    raise KeyError(raw_dedup)
+                return self.get(raw_matches[0]["id"])
 
         raise KeyError(raw_dedup)
 
@@ -1035,7 +1094,28 @@ class Runtime:
             if Channel.PAGERDUTY.value not in channels_succeeded:
                 return None
             notif = Notification.model_validate(row["notification"])
-            pd_dedup_key = f"uns-{notif.dedup_key}" if notif.dedup_key else f"uns-{notif.notification_id}"
+            pd_dedup_key: str | None = None
+            for ev in reversed(self.events(notification_id)):
+                if ev.get("kind") != "CHANNEL_ATTEMPT_RESULT":
+                    continue
+                payload = ev.get("payload") or {}
+                if payload.get("channel") == Channel.PAGERDUTY.value and payload.get("success"):
+                    msg_id = payload.get("message_id") or (payload.get("metadata") or {}).get(
+                        "pagerduty_dedup_key"
+                    )
+                    if isinstance(msg_id, str) and msg_id.strip():
+                        pd_dedup_key = msg_id.strip()
+                        break
+            if not pd_dedup_key:
+                get_key = getattr(adapter, "_get_dedup_key", None)
+                if callable(get_key):
+                    pd_dedup_key = str(get_key(notif))
+                else:
+                    pd_dedup_key = (
+                        f"uns-{notif.dedup_key}"
+                        if notif.dedup_key
+                        else f"uns-{notif.notification_id}"
+                    )
             result = await method(pd_dedup_key)
             with self.sessions.begin() as session:
                 self._event(
@@ -1340,31 +1420,47 @@ class Runtime:
             else_=work.c.next_attempt,
         )
         summary = select(
-            select(func.count()).select_from(work).where(*pending)
-            .scalar_subquery().label("pending_count"),
+            select(func.count())
+            .select_from(work)
+            .where(*pending)
+            .scalar_subquery()
+            .label("pending_count"),
             select(func.min(events.c.at))
             .select_from(work.join(events, work.c.id == events.c.notification_id))
             .where(*pending, events.c.kind == "ACCEPTED")
-            .scalar_subquery().label("oldest_accepted_at"),
+            .scalar_subquery()
+            .label("oldest_accepted_at"),
             select(func.min(attempt_available_at))
             .where(*pending, work.c.next_attempt <= now, work.c.lease_until <= now)
-            .scalar_subquery().label("oldest_due_attempt_at"),
-            select(func.count()).select_from(work)
+            .scalar_subquery()
+            .label("oldest_due_attempt_at"),
+            select(func.count())
+            .select_from(work)
             .where(work.c.ack_status == "PENDING", work.c.deadline <= now)
-            .scalar_subquery().label("overdue_ack_count"),
-            select(func.count()).select_from(events).where(*callbacks)
-            .scalar_subquery().label("pending_callback_count"),
+            .scalar_subquery()
+            .label("overdue_ack_count"),
+            select(func.count())
+            .select_from(events)
+            .where(*callbacks)
+            .scalar_subquery()
+            .label("pending_callback_count"),
             select(func.min(events.c.callback_until))
             .where(*callbacks, events.c.callback_until <= now)
-            .scalar_subquery().label("oldest_due_callback_at"),
-            select(func.count()).select_from(work).where(work.c.dead_letter.is_(True))
-            .scalar_subquery().label("unresolved_failure_count"),
-            select(func.count()).select_from(events)
+            .scalar_subquery()
+            .label("oldest_due_callback_at"),
+            select(func.count())
+            .select_from(work)
+            .where(work.c.dead_letter.is_(True))
+            .scalar_subquery()
+            .label("unresolved_failure_count"),
+            select(func.count())
+            .select_from(events)
             .where(
                 events.c.kind == "CHANNEL_ATTEMPT_RESULT",
                 events.c.payload["metadata"]["provider_outcome"].as_string() == "UNKNOWN",
             )
-            .scalar_subquery().label("unknown_attempt_count"),
+            .scalar_subquery()
+            .label("unknown_attempt_count"),
         )
         with self.sessions() as session:
             row = session.execute(summary).mappings().one()

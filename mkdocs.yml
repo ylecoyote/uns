@@ -12,7 +12,7 @@ validation:
     not_found: warn
     absolute_links: warn
   links:
-    not_found: info
+    not_found: warn
     anchors: warn
     unrecognized_links: warn
 

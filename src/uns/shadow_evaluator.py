@@ -128,9 +128,7 @@ def policy_to_config_dict(
     return {
         "notification_type": policy.notification_type,
         "intent": policy.intent.value if policy.intent is not None else None,
-        "delivery_mode": (
-            policy.delivery_mode.value if policy.delivery_mode is not None else None
-        ),
+        "delivery_mode": (policy.delivery_mode.value if policy.delivery_mode is not None else None),
         "channels": [ch.value for ch in policy.channels],
         "require_ack": policy.require_ack,
         "ack_timeout_minutes": policy.ack_timeout_minutes,
@@ -187,9 +185,10 @@ def config_dict_to_policy(
     raw_intent = config.get("intent")
     intent = NotificationIntent(str(raw_intent).upper()) if raw_intent else None
     raw_delivery_mode = config.get("delivery_mode")
-    delivery_mode = (
-        DeliveryMode(str(raw_delivery_mode).upper()) if raw_delivery_mode else None
-    )
+    delivery_mode = DeliveryMode(str(raw_delivery_mode).upper()) if raw_delivery_mode else None
+
+    raw_dedup = config.get("dedup_window_seconds")
+    dedup_window_seconds = 300 if raw_dedup is None else int(raw_dedup)
 
     return NotificationPolicy(
         notification_type=str(config["notification_type"]),
@@ -200,7 +199,7 @@ def config_dict_to_policy(
         channels=channels,
         require_ack=config.get("require_ack"),
         ack_timeout_minutes=config.get("ack_timeout_minutes"),
-        dedup_window_seconds=int(config.get("dedup_window_seconds") or 300),
+        dedup_window_seconds=dedup_window_seconds,
         priority_override=config.get("priority_override"),
         mode_overrides=mode_overrides or None,
     )
@@ -355,20 +354,14 @@ class ShadowPolicyEvaluator:
         self._has_any_candidates: bool = False
 
     def _check_has_any_candidates(self) -> bool:
-        seq = (
-            getattr(self.policy_store, "_write_seq", 0),
-            getattr(self.learning_store, "_write_seq", 0),
-        )
-        if self._checked_seq == seq:
-            return self._has_any_candidates
-        has_shadow_deltas = bool(
-            self.learning_store.list_deltas(state=DeltaState.SHADOW, limit=1)
-        )
+        has_shadow_deltas = bool(self.learning_store.list_deltas(state=DeltaState.SHADOW, limit=1))
+        if has_shadow_deltas:
+            self._has_any_candidates = True
+            return True
         has_preview_policies = bool(
             self.policy_store.list_revisions(status=PolicyStatus.PREVIEW, limit=1)
         )
-        self._has_any_candidates = has_shadow_deltas or has_preview_policies
-        self._checked_seq = seq
+        self._has_any_candidates = has_preview_policies
         return self._has_any_candidates
 
     def get_active_baseline(
@@ -493,15 +486,13 @@ class ShadowPolicyEvaluator:
             degraded_reason: str | None = None
             if not channels:
                 degraded_reason = "no_delivery_channels"
-            elif (
-                resolved.delivery_mode == DeliveryMode.GUARANTEED
-                and not any(ch != Channel.WEBSOCKET for ch in resolved.channels)
+            elif resolved.delivery_mode == DeliveryMode.GUARANTEED and not any(
+                ch != Channel.WEBSOCKET for ch in resolved.channels
             ):
                 degraded_reason = "guaranteed_without_persistent_channel"
             elif (
-                (request.intent == NotificationIntent.SAFETY or request.irreversible)
-                and resolved.delivery_mode != DeliveryMode.GUARANTEED
-            ):
+                request.intent == NotificationIntent.SAFETY or request.irreversible
+            ) and resolved.delivery_mode != DeliveryMode.GUARANTEED:
                 degraded_reason = "safety_floor_violated"
 
             return (
@@ -644,9 +635,7 @@ class ShadowPolicyEvaluator:
         non_degraded_rate = (total - degraded) / total if total > 0 else 0.0
 
         min_sample_met = total >= self.min_samples
-        accuracy_threshold_met = (
-            degraded == 0 and non_degraded_rate >= self.accuracy_threshold
-        )
+        accuracy_threshold_met = degraded == 0 and non_degraded_rate >= self.accuracy_threshold
 
         if degraded > 0 and non_degraded_rate < self.accuracy_threshold:
             status = ShadowStatus.FAILED
@@ -783,38 +772,62 @@ class ShadowPolicyEvaluator:
             candidate_hash=delta.candidate_hash,
             stage=GuardStage.PROMOTE_SHADOW,
             allowed=bounds_ok and baseline_fresh,
-            reason=None if (bounds_ok and baseline_fresh) else DeltaRejectionReason.DELTA_OUT_OF_BOUNDS,
+            reason=None
+            if (bounds_ok and baseline_fresh)
+            else DeltaRejectionReason.DELTA_OUT_OF_BOUNDS,
             checks=checks,
         )
-        transitioned = self.learning_store.transition_delta(
-            delta_id,
+        if guard.is_blocking:
+            raise ValueError("Blocking guard prevents transition")
+        if delta.required_guards and any(
+            guard.checks.get(g) is not True for g in delta.required_guards
+        ):
+            raise ValueError("Required guards must pass")
+
+        # Validate state transition in-memory before persisting PREVIEW policy
+        delta.transition_to(
             DeltaState.SHADOW,
             actor=actor,
             reason=reason or "Promoted to SHADOW for PREVIEW evaluation",
-            guard_result=guard,
+            guard_stage=guard.stage,
+            shadow_evaluation_id=delta.shadow_evaluation_id,
         )
 
-        # Persist PREVIEW candidate policy in SQLAlchemyPolicyStore
-        self.policy_store.save_policy(preview_policy)
+        # Persist PREVIEW candidate policy in SQLAlchemyPolicyStore first
+        save_result = self.policy_store.save_policy(preview_policy)
 
-        # Initialize PENDING shadow aggregate if none exists yet
-        if self.learning_store.get_shadow_aggregate(delta_id) is None:
-            initial_aggregate = ShadowEvaluationAggregate(
-                delta_id=delta_id,
-                baseline_hash=transitioned.baseline_hash,
-                candidate_hash=transitioned.candidate_hash,
-                evaluated_by=self.evaluator_id,
-                total_decisions=0,
-                improved_decisions=0,
-                degraded_decisions=0,
-                neutral_decisions=0,
-                win_rate=0.0,
-                min_sample_met=False,
-                accuracy_threshold_met=False,
-                status=ShadowStatus.PENDING,
+        try:
+            transitioned = self.learning_store.transition_delta(
+                delta_id,
+                DeltaState.SHADOW,
+                actor=actor,
+                reason=reason or "Promoted to SHADOW for PREVIEW evaluation",
+                guard_result=guard,
+                binding_updates={"preview_policy_id": str(save_result.policy_id)},
             )
-            self.learning_store.persist_shadow_aggregate(initial_aggregate)
-            transitioned = self.learning_store.get_delta(delta_id) or transitioned
+
+            # Initialize PENDING shadow aggregate if none exists yet
+            if self.learning_store.get_shadow_aggregate(delta_id) is None:
+                initial_aggregate = ShadowEvaluationAggregate(
+                    delta_id=delta_id,
+                    baseline_hash=transitioned.baseline_hash,
+                    candidate_hash=transitioned.candidate_hash,
+                    evaluated_by=self.evaluator_id,
+                    total_decisions=0,
+                    improved_decisions=0,
+                    degraded_decisions=0,
+                    neutral_decisions=0,
+                    win_rate=0.0,
+                    min_sample_met=False,
+                    accuracy_threshold_met=False,
+                    status=ShadowStatus.PENDING,
+                )
+                self.learning_store.persist_shadow_aggregate(initial_aggregate)
+                transitioned = self.learning_store.get_delta(delta_id) or transitioned
+        except Exception:
+            if save_result.created:
+                self.policy_store.retire_policy_by_id(save_result.policy_id)
+            raise
 
         return transitioned
 
@@ -842,6 +855,13 @@ class ShadowPolicyEvaluator:
         aggregate = self.learning_store.get_shadow_aggregate(delta_id)
         if aggregate is None or not aggregate.can_promote_to_approval:
             raise ValueError("Shadow evaluation must pass before approval")
+        if (
+            not delta.baseline_hash
+            or not aggregate.evaluated_by
+            or aggregate.baseline_hash != delta.baseline_hash
+            or aggregate.candidate_hash != delta.candidate_hash
+        ):
+            raise ValueError("Shadow candidate and baseline evidence must match the exact proposal")
 
         checks: dict[str, Any] = {
             "bounds": True,
@@ -858,17 +878,35 @@ class ShadowPolicyEvaluator:
             allowed=True,
             checks=checks,
         )
-        approved = self.learning_store.transition_delta(
-            delta_id,
+        approved_preview = delta.transition_to(
             DeltaState.APPROVED,
             actor=actor,
             reason=reason or "Shadow evaluation passed; approved into DRAFT",
-            guard_result=guard,
+            guard_stage=guard.stage,
+            shadow_evaluation_id=delta.shadow_evaluation_id,
         )
-
-        draft_envelope = apply_policy_delta(baseline_envelope, approved, actor=actor)
+        draft_envelope = apply_policy_delta(baseline_envelope, approved_preview, actor=actor)
         draft_policy = envelope_to_policy(draft_envelope, status=PolicyStatus.DRAFT)
         save_result = self.policy_store.save_policy(draft_policy)
+
+        try:
+            approved = self.learning_store.transition_delta(
+                delta_id,
+                DeltaState.APPROVED,
+                actor=actor,
+                reason=reason or "Shadow evaluation passed; approved into DRAFT",
+                guard_result=guard,
+                binding_updates={
+                    "draft_policy_id": str(save_result.policy_id),
+                    "draft_content_hash": save_result.content_hash,
+                    "approved_candidate_config": draft_envelope.config_json,
+                    "approved_candidate_version": draft_policy.version,
+                },
+            )
+        except Exception:
+            if save_result.created:
+                self.policy_store.retire_policy_by_id(save_result.policy_id)
+            raise
         return approved, save_result, draft_policy
 
     def activate_draft(
@@ -893,8 +931,52 @@ class ShadowPolicyEvaluator:
                     f"Only APPROVED deltas can be activated (current state: {linked_delta.state.value})"
                 )
             notification_type = linked_delta.policy_type
-
-        if policy_id is not None:
+            _, baseline_envelope = self.get_active_baseline(linked_delta.policy_type)
+            if (
+                linked_delta.baseline_hash != baseline_envelope.config_hash
+                or linked_delta.baseline_version != baseline_envelope.version
+            ):
+                raise ValueError(
+                    "Active baseline policy drifted after approval; cannot activate stale DRAFT"
+                )
+            expected_envelope = apply_policy_delta(baseline_envelope, linked_delta, actor=actor)
+            expected_policy = envelope_to_policy(expected_envelope, status=PolicyStatus.DRAFT)
+            expected_candidate_hash = compute_config_hash(
+                policy_to_config_dict(expected_policy, linked_delta.policy_type)
+            )
+            if policy_id is not None:
+                found = self.policy_store.get_policy_by_id(policy_id)
+                if found is None:
+                    raise KeyError(f"Policy revision {policy_id} not found")
+                row, hydrated = found
+                if row.status != PolicyStatus.DRAFT.value:
+                    raise ValueError(
+                        f"Only DRAFT policy revisions can be promoted to ACTIVE (current status: {row.status})"
+                    )
+                hydrated_hash = compute_config_hash(
+                    policy_to_config_dict(hydrated, linked_delta.policy_type)
+                )
+                if hydrated_hash != expected_candidate_hash:
+                    raise ValueError(
+                        "Specified DRAFT policy revision does not match the approved proposal candidate"
+                    )
+                target_policy = hydrated
+            else:
+                draft_revs = self.policy_store.list_revisions(
+                    notification_type=linked_delta.policy_type,
+                    status=PolicyStatus.DRAFT,
+                    limit=20,
+                )
+                for _row, hydrated in draft_revs:
+                    hydrated_hash = compute_config_hash(
+                        policy_to_config_dict(hydrated, linked_delta.policy_type)
+                    )
+                    if hydrated_hash == expected_candidate_hash:
+                        target_policy = hydrated
+                        break
+                if target_policy is None:
+                    target_policy = expected_policy
+        elif policy_id is not None:
             found = self.policy_store.get_policy_by_id(policy_id)
             if found is None:
                 raise KeyError(f"Policy revision {policy_id} not found")
@@ -913,28 +995,25 @@ class ShadowPolicyEvaluator:
             )
             if draft_revs:
                 target_policy = draft_revs[0][1]
-            elif linked_delta is not None:
-                # Re-materialize from the approved delta if DRAFT row was not found
-                _, baseline_envelope = self.get_active_baseline(linked_delta.policy_type)
-                draft_envelope = apply_policy_delta(
-                    baseline_envelope, linked_delta, actor=actor
-                )
-                target_policy = envelope_to_policy(
-                    draft_envelope, status=PolicyStatus.DRAFT
-                )
 
         if target_policy is None:
             raise ValueError("No DRAFT policy revision found to activate")
 
         if linked_delta is None and notification_type is not None:
+            target_candidate_hash = compute_config_hash(
+                policy_to_config_dict(target_policy, notification_type)
+            )
             approved_deltas = self.learning_store.list_deltas(
                 policy_type=notification_type,
                 state=DeltaState.APPROVED,
-                limit=1,
+                limit=50,
             )
-            if approved_deltas:
-                linked_delta = approved_deltas[0]
+            for candidate_delta in approved_deltas:
+                if candidate_delta.candidate_hash == target_candidate_hash:
+                    linked_delta = candidate_delta
+                    break
 
+        apply_guard: GuardResult | None = None
         if linked_delta is not None:
             _, baseline_envelope = self.get_active_baseline(linked_delta.policy_type)
             if (
@@ -944,13 +1023,7 @@ class ShadowPolicyEvaluator:
                 raise ValueError(
                     "Active baseline policy drifted after approval; cannot activate stale DRAFT"
                 )
-
-        active_policy = target_policy.model_copy(update={"status": PolicyStatus.ACTIVE})
-        save_result = self.policy_store.save_policy(active_policy)
-
-        applied_delta: PolicyDelta | None = None
-        if linked_delta is not None:
-            checks: dict[str, Any] = {
+            checks = {
                 "bounds": True,
                 "schema_valid": True,
                 "baseline_fresh": True,
@@ -964,12 +1037,31 @@ class ShadowPolicyEvaluator:
                 allowed=True,
                 checks=checks,
             )
+            linked_delta.transition_to(
+                DeltaState.APPLIED,
+                actor=actor,
+                reason=reason or f"Activated DRAFT revision v{target_policy.version} to ACTIVE",
+                guard_stage=apply_guard.stage,
+                shadow_evaluation_id=linked_delta.shadow_evaluation_id,
+            )
+
+        active_policy = target_policy.model_copy(update={"status": PolicyStatus.ACTIVE})
+        save_result = self.policy_store.save_policy(active_policy)
+        if notification_type is not None:
+            self.policy_store.retire_candidate_revisions(
+                notification_type,
+                statuses=(PolicyStatus.DRAFT,),
+            )
+
+        applied_delta: PolicyDelta | None = None
+        if linked_delta is not None and apply_guard is not None:
             applied_delta = self.learning_store.transition_delta(
                 linked_delta.delta_id,
                 DeltaState.APPLIED,
                 actor=actor,
                 reason=reason or f"Activated DRAFT revision v{active_policy.version} to ACTIVE",
                 guard_result=apply_guard,
+                binding_updates={"activated_policy_id": str(save_result.policy_id)},
             )
 
         return save_result, active_policy, applied_delta
@@ -1020,9 +1112,7 @@ class ShadowPolicyEvaluator:
             and aggregate.baseline_hash == delta.baseline_hash
             and aggregate.candidate_hash == candidate_hash
         )
-        can_promote_to_shadow = (
-            delta.state == DeltaState.PROPOSED and baseline_hash_matches
-        )
+        can_promote_to_shadow = delta.state == DeltaState.PROPOSED and baseline_hash_matches
         can_approve = (
             delta.state == DeltaState.SHADOW
             and baseline_hash_matches
@@ -1037,9 +1127,7 @@ class ShadowPolicyEvaluator:
         )
         draft_policy_id = str(draft_revs[0][0].policy_id) if draft_revs else None
         draft_version = draft_revs[0][0].version if draft_revs else None
-        can_activate = (
-            delta.state == DeltaState.APPROVED and baseline_hash_matches
-        )
+        can_activate = delta.state == DeltaState.APPROVED and baseline_hash_matches
         return {
             "current_active_hash": current_active_hash,
             "current_active_version": current_active_version,
@@ -1120,11 +1208,7 @@ class ShadowPolicyEvaluator:
                 from_state=t.from_state.value if t.from_state else None,
                 to_state=t.to_state.value,
                 actor=t.actor,
-                reason=(
-                    t.reason.value
-                    if isinstance(t.reason, DeltaRejectionReason)
-                    else t.reason
-                ),
+                reason=(t.reason.value if isinstance(t.reason, DeltaRejectionReason) else t.reason),
                 guard_stage=t.guard_stage.value if t.guard_stage else None,
                 transitioned_at=t.transitioned_at,
             )

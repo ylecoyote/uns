@@ -1,0 +1,10 @@
+============================================================
+UI Boundary Guardrail
+============================================================
+Checking: apps/ui
+
+All boundary rules satisfied.
+
+  TypeScript/TSX files: 3610
+  Python files: 27
+    (in legacy_flask_reference: 26)

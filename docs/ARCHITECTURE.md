@@ -32,4 +32,4 @@ Compatibility modules retain historical import/tool names. Explicit low-level fi
 
 `uns.schema` performs additive runtime migration and installs dispatch, response and callback scan indexes. `uns.maintenance` offers bounded, default-dry-run retention and optional verified archive-before-prune. It does not run automatically or vacuum the database.
 
-The unfinished action-authorization DSL remains experimental. UNS is ATP-agnostic; host integration is optional. See [Integration Modes](sections/integration-modes.md), [delivery semantics](sections/delivery-semantics.md), and [policy lifecycle](sections/policy-lifecycle.md).
+Pre-execution action gating is provided via the opt-in `uns.governance` package (`decide()`, `DecisionEngine`, `GovernanceApprovalBridge`), while legacy root-level action-authorization models in `notification.models` remain experimental compatibility types. UNS is ATP-agnostic; host integration is optional. See [Integration Modes](sections/integration-modes.md), [delivery semantics](sections/delivery-semantics.md), and [policy lifecycle](sections/policy-lifecycle.md).

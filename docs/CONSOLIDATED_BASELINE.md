@@ -16,6 +16,6 @@ Preserved checkpoints: `uns/consolidation` at `b508cc3`, `remediation/adversaria
 - Wheel/source distribution rebuilt; 90 shipped Python modules match source. Separate installed full-wheel delivery/ACK, repeated migration CLI and unchanged-byte maintenance preview passed.
 - Local recording-adapter delivery, restart and acknowledgment demo passed.
 
-See [merge receipts](../verification/consolidated/results.json), [testing](TESTING.md), [iteration-two decisions](REMEDIATION_ITERATION2.md), and [review brief](REVIEW_BRIEF.md). Previous receipt sets are immutable historical evidence; this merge does not reclassify the original reviewer assertions or claim every assertion should pass unchanged.
+See [merge receipts](https://github.com/ylecoyote/uns/blob/main/verification/consolidated/results.json), [testing](TESTING.md), [iteration-two decisions](REMEDIATION_ITERATION2.md), and [review brief](REVIEW_BRIEF.md). Previous receipt sets are immutable historical evidence; this merge does not reclassify the original reviewer assertions or claim every assertion should pass unchanged.
 
 No dependency advisory refresh, live-provider/human-receipt test, live PostgreSQL, representative load, hosted CI, publication or deployment was performed. This is a local integrated baseline, not production acceptance. External effects remain at least once; SMTP effects already in flight may complete after timeout.

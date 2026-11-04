@@ -9,6 +9,7 @@ Exposes the deterministic pre-execution governance primitives (`decide`, `Decisi
 from __future__ import annotations
 
 from uns.governance.approval_workflow import (
+    ApprovalConflictError,
     ApprovalRequestRecord,
     ApprovalStatus,
     GovernanceApprovalBridge,
@@ -64,6 +65,7 @@ from uns.governance.policy_loader import (
 __all__ = [
     "DECISION_RECORD_SCHEMA_VERSION",
     "REGEX_PATTERN_LENGTH_CAP",
+    "ApprovalConflictError",
     "ApprovalRequestRecord",
     "ApprovalStatus",
     "Condition",

@@ -72,7 +72,7 @@ Response deadlines begin at qualifying delivery. Same-actor/same-state replay re
 | Reviewer reproductions | Baseline 11 failures reproduced. Final untouched file: 5 pass / 6 documented contract/setup mismatches; replacement regression assertions verify the adopted semantics. |
 | Frontend/advisory evidence | Unchanged this iteration. Prior 305 console tests and zero-advisory snapshots were not rerun and are historical, not current audit claims. |
 
-[Current testing report](TESTING.md) and [machine-readable receipts](../verification/iteration2/results.json) contain commands, hashes and remaining limits. No publication, deployment or live-database pruning occurred. Independent reviews are focused engineering evidence, not production/security certification. Logs can contain private machine paths; distinguish sanitized sharing copies from original receipts.
+[Current testing report](TESTING.md) and [machine-readable receipts](https://github.com/ylecoyote/uns/blob/main/verification/iteration2/results.json) contain commands, hashes and remaining limits. No publication, deployment or live-database pruning occurred. Independent reviews are focused engineering evidence, not production/security certification. Logs can contain private machine paths; distinguish sanitized sharing copies from original receipts.
 
 ## Where to inspect
 

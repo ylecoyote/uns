@@ -9,7 +9,7 @@
 | Task | Document |
 |---|---|
 | Evaluate UNS | [Product](PRODUCT.md), [roadmap](ROADMAP.md), [architecture](ARCHITECTURE.md), [delivery semantics](sections/delivery-semantics.md) |
-| Quickstart: send a signal | [README](../README.md) |
+| Quickstart: send a signal | [README](https://github.com/ylecoyote/uns/blob/main/README.md) |
 | Configure policies | [Policy lifecycle](sections/policy-lifecycle.md) |
 | Integrate an app | [API](API.md), [integration modes](sections/integration-modes.md), [producer integration guide](user-guides/PRODUCER-INTEGRATION-GUIDE.md) |
 | Integrate an AI agent (MCP) | [Agent & MCP integration guide](user-guides/AGENT-MCP-GUIDE.md), [API (MCP)](API.md#mcp) |

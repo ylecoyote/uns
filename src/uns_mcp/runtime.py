@@ -52,6 +52,17 @@ class RuntimeState:
     idempotency_records: dict[str, SendNotificationResponse] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.runtime is not None:
+            existing_tracker = getattr(self.runtime, "channel_health", None) or getattr(
+                self.runtime, "channel_health_tracker", None
+            )
+            if (
+                isinstance(existing_tracker, ChannelHealthTracker)
+                and not self.channel_health_tracker._health
+            ):
+                self.channel_health_tracker = existing_tracker
+            self.runtime.channel_health = self.channel_health_tracker
+        self.channel_health = self.channel_health_tracker
         if self.audit_store is None:
             self.audit_store = (
                 self.runtime.audit_store if self.runtime is not None else InMemoryAuditStore()
@@ -60,5 +71,22 @@ class RuntimeState:
             from uns.api.read_models import SQLAlchemyReadModelAdapter
 
             self.read_model_adapter = SQLAlchemyReadModelAdapter(
-                self.runtime.sessions, runtime=self.runtime,
+                self.runtime.sessions,
+                runtime=self.runtime,
             )
+
+
+def create_runtime_state(
+    uns_runtime: Runtime | None = None,
+    *,
+    channel_health: ChannelHealthTracker | None = None,
+) -> RuntimeState:
+    """Create a RuntimeState bound to a shared ChannelHealthTracker instance."""
+    resolved_health = (
+        channel_health
+        or (getattr(uns_runtime, "channel_health", None) if uns_runtime is not None else None)
+        or ChannelHealthTracker()
+    )
+    if uns_runtime is not None:
+        uns_runtime.channel_health = resolved_health
+    return RuntimeState(runtime=uns_runtime, channel_health_tracker=resolved_health)

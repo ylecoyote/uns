@@ -27,7 +27,7 @@ Browser checks in Brave observed sign-in, invalid-key denial, deliveries, audit 
 
 ## Reproduction and handoff
 
-[Machine receipts](../verification/deployment/results.json) include source/image identities, raw outputs, the exact live smoke driver and recording profile. The original regression output establishes nine failing projection cases before repair; the additional summary-clock case also failed before repair.
+[Machine receipts](https://github.com/ylecoyote/uns/blob/main/verification/deployment/results.json) include source/image identities, raw outputs, the exact live smoke driver and recording profile. The original regression output establishes nine failing projection cases before repair; the additional summary-clock case also failed before repair.
 
 `verification/deployment/live_smoke.py` is the exact executed rehearsal driver, using `/private/tmp/uns-live-smoke`, localhost port 18080 and the named test container. Run it only with that isolated recording profile and a fresh synthetic store. It intentionally restarts its own container, toggles recorder failure and activates a smoke policy. It must not be pointed at a production database or provider configuration. The retention helper refuses to overwrite an existing backup and uses a synthetic future cutoff only on the copy.
 

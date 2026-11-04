@@ -55,6 +55,8 @@ class ChannelHealthTracker:
         self._failure_threshold = failure_threshold
         self._unavailable_threshold = max(unavailable_threshold, failure_threshold)
         self._health: dict[Channel, ChannelHealth] = {}
+        self._direct_updates: int = 0
+        self._synced_event_ids: set[int] = set()
 
     def get_channel_health(self, channel: Channel) -> ChannelHealth:
         """Return current health for a channel."""
@@ -62,6 +64,7 @@ class ChannelHealthTracker:
 
     def record_success(self, channel: Channel) -> ChannelHealth:
         """Record a successful channel operation and recover health."""
+        self._direct_updates += 1
         health = ChannelHealth(
             channel=channel,
             status=ChannelHealthStatus.HEALTHY,
@@ -73,6 +76,7 @@ class ChannelHealthTracker:
 
     def record_failure(self, channel: Channel, reason: str | None = None) -> ChannelHealth:
         """Record a failed channel operation and update degradation state."""
+        self._direct_updates += 1
         current = self.get_channel_health(channel)
         failures = current.consecutive_failures + 1
         if failures >= self._unavailable_threshold:
@@ -93,18 +97,60 @@ class ChannelHealthTracker:
         self._health[channel] = health
         return health
 
+    def sync_from_runtime(self, runtime: object) -> None:
+        """Synchronize channel health from durable Runtime attempt events when needed."""
+        if self._direct_updates > 0:
+            return
+        engine = getattr(runtime, "engine", None)
+        if engine is None:
+            return
+        try:
+            from sqlalchemy import select
+
+            from uns.runtime import events
+
+            with engine.connect() as conn:
+                rows = (
+                    conn.execute(
+                        select(events.c.id, events.c.detail)
+                        .where(events.c.kind == "CHANNEL_ATTEMPT_RESULT")
+                        .order_by(events.c.id.asc())
+                    )
+                    .mappings()
+                    .all()
+                )
+            for row in rows:
+                event_id = int(row["id"])
+                if event_id in self._synced_event_ids:
+                    continue
+                self._synced_event_ids.add(event_id)
+                detail = row["detail"] if isinstance(row["detail"], dict) else {}
+                raw_channel = detail.get("channel")
+                if not isinstance(raw_channel, str):
+                    continue
+                try:
+                    ch = Channel(raw_channel)
+                except ValueError:
+                    continue
+                status_str = str(detail.get("status", "")).upper()
+                if status_str == "SUCCESS":
+                    self.record_success(ch)
+                    self._direct_updates -= 1
+                elif status_str == "FAILED":
+                    reason = detail.get("error_message")
+                    self.record_failure(ch, str(reason) if reason is not None else None)
+                    self._direct_updates -= 1
+        except Exception:  # nosec B110
+            pass
+
     def get_summary(self) -> ChannelHealthSummary:
         """Return aggregate channel-health state."""
         channels = [self.get_channel_health(channel) for channel in Channel]
         healthy = [
-            health.channel
-            for health in channels
-            if health.status == ChannelHealthStatus.HEALTHY
+            health.channel for health in channels if health.status == ChannelHealthStatus.HEALTHY
         ]
         degraded = [
-            health.channel
-            for health in channels
-            if health.status == ChannelHealthStatus.DEGRADED
+            health.channel for health in channels if health.status == ChannelHealthStatus.DEGRADED
         ]
         unavailable = [
             health.channel

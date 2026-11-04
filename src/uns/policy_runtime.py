@@ -218,10 +218,7 @@ class PolicyRuntime:
 
     def refresh_snapshot(self, *, expected_revision: int | None = None) -> PolicySnapshot:
         """Reload committed snapshot from the database and notify local listeners."""
-        if (
-            expected_revision is not None
-            and self._warm_snapshot.revision >= expected_revision
-        ):
+        if expected_revision is not None and self._warm_snapshot.revision >= expected_revision:
             return self._warm_snapshot
         previous_rev = self._warm_snapshot.revision
         snapshot = self.store.load_snapshot()

@@ -117,17 +117,16 @@ def _deterministic_decision_id(
     policy_config_hash: str,
     context_hash: str,
     subject_id: str,
-    correlation_id: str | None,
-    parent_decision_id: str | None,
+    tenant_id: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    correlation_id: str | None = None,
+    parent_decision_id: str | None = None,
 ) -> uuid.UUID:
-    seed = "|".join(
-        [
-            policy_config_hash,
-            context_hash,
-            subject_id,
-            correlation_id or "",
-            parent_decision_id or "",
-        ]
+    seed = (
+        f"{policy_config_hash}:{context_hash}:{subject_id or ''}:"
+        f"{tenant_id or ''}:{resource_type or ''}:{resource_id or ''}:"
+        f"{correlation_id or ''}:{parent_decision_id or ''}"
     )
     digest = hashlib.sha256(seed.encode("utf-8")).digest()[:16]
     return uuid.UUID(bytes=digest, version=4)
@@ -205,6 +204,9 @@ def decide(
         policy_config_hash=resolved_policy_hash,
         context_hash=context_hash,
         subject_id=subject_id,
+        tenant_id=tenant_id,
+        resource_type=resource_type,
+        resource_id=resource_id,
         correlation_id=correlation_id,
         parent_decision_id=parent_decision_id,
     )
@@ -267,9 +269,7 @@ def decide(
         final_decision = Decision.ALLOW
     else:
         final_decision = (
-            policy.default_decision
-            if policy.default_decision is not None
-            else Decision.DENY
+            policy.default_decision if policy.default_decision is not None else Decision.DENY
         )
 
     return DecisionRecord(
@@ -320,7 +320,9 @@ class DecisionEngine:
             Decision.REQUIRE_APPROVAL,
             Decision.ALLOW,
         ):
-            raise PolicyLoadError(f"Invalid operational fail-mode decision: {operational_fail_mode_decision}")
+            raise PolicyLoadError(
+                f"Invalid operational fail-mode decision: {operational_fail_mode_decision}"
+            )
 
         self._schemas: dict[str, ContextSchema] = dict(context_schemas)
         self._bundles: dict[str, _LoadedPolicyBundle] = {}
@@ -599,7 +601,9 @@ class DecisionEngine:
         # Extract matched reviewer role and reason prose from winning rules
         matched_role: str | None = None
         matched_reason: str | None = None
-        matched_rule_ids = {r.rule_id for r in record.reasons if r.matched and r.then == record.decision}
+        matched_rule_ids = {
+            r.rule_id for r in record.reasons if r.matched and r.then == record.decision
+        }
         for rule in _ordered_rules(bundle.policy.rules):
             if rule.id in matched_rule_ids:
                 if matched_role is None and rule.then.target_reviewer_role:

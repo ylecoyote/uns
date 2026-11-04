@@ -24,10 +24,10 @@ No-handler SDK success, acceptance-only HTTP success, and the GUARANTEED/WebSock
 
 ## Historical documents
 
-- [Pre-consolidation README](archive/pre-consolidation/README.md)
-- [Earlier authorization PRD](archive/pre-consolidation/agent_governance_control_plane_prd.md)
-- [Original UNS README](archive/uns-original/README.md)
-- [UNS concept PRD](archive/uns-concepts/uns/uns-prd-general.md)
+- [Pre-consolidation README](https://github.com/ylecoyote/uns/blob/main/docs/archive/pre-consolidation/README.md)
+- [Earlier authorization PRD](https://github.com/ylecoyote/uns/blob/main/docs/archive/pre-consolidation/agent_governance_control_plane_prd.md)
+- [Original UNS README](https://github.com/ylecoyote/uns/blob/main/docs/archive/uns-original/README.md)
+- [UNS concept PRD](https://github.com/ylecoyote/uns/blob/main/docs/archive/uns-concepts/uns/uns-prd-general.md)
 
 Older broad authorization, commercial plugin, enforcement, market and licensing narratives are retained here for provenance. Current behavior and scope are defined by PRODUCT.md and the acceptance checks. Unique future work is limited to completing authorization separately, governed policy-evaluation orchestration, and deployment-specific assurance. None is silently started by this consolidation.
 

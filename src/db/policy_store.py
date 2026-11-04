@@ -77,9 +77,7 @@ class SQLAlchemyPolicyStore:
         self._schema_ensured: bool = False
         self._write_seq: int = 0
 
-    def register_activation_listener(
-        self, listener: Callable[[PolicySnapshot], None]
-    ) -> None:
+    def register_activation_listener(self, listener: Callable[[PolicySnapshot], None]) -> None:
         """Register a callback invoked after a new policy snapshot commits."""
         if listener not in self._activation_listeners:
             self._activation_listeners.append(listener)
@@ -266,7 +264,9 @@ class SQLAlchemyPolicyStore:
         )
 
     @classmethod
-    def _hydrate_policy(cls, session: Session, row: PersistedNotificationPolicy) -> NotificationPolicy:
+    def _hydrate_policy(
+        cls, session: Session, row: PersistedNotificationPolicy
+    ) -> NotificationPolicy:
         saved = session.get(NotificationPolicyContent, row.policy_id)
         return cls._hydrate_policy_row(row, saved)
 
@@ -283,9 +283,7 @@ class SQLAlchemyPolicyStore:
         status_value = status.value if isinstance(status, PolicyStatus) else status
         with self._get_session() as session:
             try:
-                stmt = select(
-                    PersistedNotificationPolicy, NotificationPolicyContent
-                ).outerjoin(
+                stmt = select(PersistedNotificationPolicy, NotificationPolicyContent).outerjoin(
                     NotificationPolicyContent,
                     NotificationPolicyContent.policy_id == PersistedNotificationPolicy.policy_id,
                 )
@@ -303,10 +301,7 @@ class SQLAlchemyPolicyStore:
                     PersistedNotificationPolicy.policy_id.desc(),
                 ).limit(limit)
                 joined_rows = session.execute(stmt).all()
-                return [
-                    (row, self._hydrate_policy_row(row, saved))
-                    for row, saved in joined_rows
-                ]
+                return [(row, self._hydrate_policy_row(row, saved)) for row, saved in joined_rows]
             except OperationalError:
                 session.rollback()
                 fallback_stmt = select(PersistedNotificationPolicy)
@@ -511,6 +506,22 @@ class SQLAlchemyPolicyStore:
             if row is None:
                 return None
             return row, self._hydrate_policy(session, row)
+
+    def retire_policy_by_id(self, policy_id: UUID) -> bool:
+        """Retire a single persisted policy revision by UUID."""
+        self.ensure_snapshot_schema()
+        now = datetime.now(UTC)
+        with self._session_factory.begin() as session:
+            row = session.get(PersistedNotificationPolicy, policy_id)
+            if row is None or row.status == PolicyStatus.RETIRED.value:
+                return False
+            row.status = PolicyStatus.RETIRED.value
+            row.is_active = False
+            row.retired_at = now
+            row.updated_at = now
+            session.flush()
+            self._write_seq += 1
+            return True
 
     def retire_candidate_revisions(
         self,

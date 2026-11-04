@@ -87,14 +87,18 @@ def _policy_dir_from_env() -> Path | None:
 
 def _channel_readiness(runtime: Any = None) -> dict[str, bool]:
     config = get_notification_config()
-    slack_ready = config.slack_webhook_url is not None or bool(os.environ.get("UNS_SLACK_BOT_TOKEN"))
+    slack_ready = config.slack_webhook_url is not None or bool(
+        os.environ.get("UNS_SLACK_BOT_TOKEN")
+    )
     pagerduty_ready = config.pagerduty_routing_key is not None
     email_ready = config.smtp_host is not None
     if runtime is not None and hasattr(runtime, "adapters"):
         from notification.models import Channel
 
         slack_ready = slack_ready or runtime.adapters.get_adapter(Channel.SLACK) is not None
-        pagerduty_ready = pagerduty_ready or runtime.adapters.get_adapter(Channel.PAGERDUTY) is not None
+        pagerduty_ready = (
+            pagerduty_ready or runtime.adapters.get_adapter(Channel.PAGERDUTY) is not None
+        )
         email_ready = email_ready or runtime.adapters.get_adapter(Channel.EMAIL) is not None
     return {
         "slack": slack_ready,
@@ -105,6 +109,7 @@ def _channel_readiness(runtime: Any = None) -> dict[str, bool]:
 
 def _create_redis_client(redis_url: str) -> RedisWebSocketClient:
     from redis import Redis
+
     return Redis.from_url(redis_url)
 
 
@@ -123,6 +128,7 @@ def _configure_persistence() -> None:
         create_sqlalchemy_adapter,
     )
     from uns.config import value
+
     database_url = value("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
     create_tables = os.environ.get("UNS_CREATE_TABLES", "false").lower() == "true"
 
@@ -210,19 +216,46 @@ def create_app(
     owns_runtime = runtime is None and not skip_persistence_config
     if runtime is None and not skip_persistence_config:
         from uns.config import build_runtime
+
         # This factory also serves direct ASGI/Uvicorn and container startup,
         # which do not pass through the CLI's validation in main().
         runtime = build_runtime(require_persistent=True)
     elif runtime is not None:
         from uns.config import configure_runtime_policies
+
         configure_runtime_policies(runtime)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        async def _policy_reload_worker() -> None:
+            while True:
+                await asyncio.sleep(1.0)
+                policy_rt = getattr(app.state, "policy_runtime", None) or (
+                    getattr(runtime, "policy_runtime", None) if runtime is not None else None
+                )
+                subscriber = getattr(app.state, "policy_reload_subscriber", None)
+                pg_listener = getattr(app.state, "policy_postgres_listener", None)
+                with suppress(Exception):
+                    if subscriber is not None and hasattr(subscriber, "poll"):
+                        subscriber.poll()
+                    if pg_listener is not None and hasattr(pg_listener, "poll"):
+                        pg_listener.poll()
+                    if policy_rt is not None and hasattr(policy_rt, "refresh_snapshot"):
+                        policy_rt.refresh_snapshot()
+
         task = asyncio.create_task(runtime.worker()) if runtime is not None else None
+        reload_task = asyncio.create_task(
+            _policy_reload_worker(),
+            name="uns-policy-reload-worker",
+        )
+        app.state.policy_reload_task = reload_task
         try:
             yield
         finally:
+            reload_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await reload_task
+            app.state.policy_reload_task = None
             if task is not None:
                 task.cancel()
                 with suppress(asyncio.CancelledError):
@@ -247,21 +280,37 @@ def create_app(
     app.add_middleware(ObservabilityMiddleware, ui_prefix="/ui")
 
     from notification.metrics import install_metrics
+
     install_metrics(app)
 
     from notification.rate_limiter import install_rate_limiter
+
     install_rate_limiter(app)
 
     config = get_notification_config()
     app.state.dlq_service = dlq_service or DLQService(redis_client=InMemoryRedisList())
     app.state.policy_store = policy_store
     app.state.runtime = runtime
-    app.state.audit_store = runtime.audit_store if runtime is not None else (audit_store or InMemoryAuditStore())
+    app.state.policy_runtime = runtime.policy_runtime if runtime is not None else None
+    app.state.policy_reload_task = None
+    app.state.audit_store = (
+        runtime.audit_store if runtime is not None else (audit_store or InMemoryAuditStore())
+    )
     app.state.read_model_adapter = None  # Explicit legacy fixture composition only.
     if runtime is not None:
         from uns.api.read_models import SQLAlchemyReadModelAdapter
+
         app.state.read_model_adapter = SQLAlchemyReadModelAdapter(runtime.sessions, runtime=runtime)
-    tracker = channel_health_tracker or ChannelHealthTracker()
+    tracker = (
+        channel_health_tracker
+        or (getattr(runtime, "channel_health", None) if runtime is not None else None)
+        or (getattr(runtime, "channel_health_tracker", None) if runtime is not None else None)
+        or ChannelHealthTracker()
+    )
+    if runtime is not None:
+        runtime.channel_health = tracker
+        runtime.channel_health_tracker = tracker
+    app.state.channel_health = tracker
     app.state.channel_health_tracker = tracker
     app.state.http_idempotency_records = {}
 
@@ -304,11 +353,14 @@ def create_app(
 
     if runtime is not None:
         from uns.dlq import RuntimeDLQ
+
         app.state.dlq_service = RuntimeDLQ(runtime)
         from uns.routes import router as runtime_router
         from uns.websocket import WebSocketDeliveryAdapter
+
         app.include_router(runtime_router)
         from notification.models import Channel
+
         if runtime.adapters.get_adapter(Channel.WEBSOCKET) is None:
             runtime.adapters.register(WebSocketDeliveryAdapter(app))
         app.state.policy_store = runtime.policy_runtime.store
@@ -328,11 +380,11 @@ def create_app(
                 origin_id=broadcaster.instance_id,
             )
     # Mount routers
-    app.include_router(notification_router)              # /api/v1/notifications/*
-    app.include_router(ops_router)                       # /api/v1/dlq, /policies/*, /ops/*
-    app.include_router(ack_router, prefix="/api")        # /api/v1/notifications/{id}/ack, /dismiss
-    app.include_router(webhooks_router)                  # /api/v1/webhooks/slack, /pagerduty
-    app.include_router(ui_router)                        # /ui/*
+    app.include_router(notification_router)  # /api/v1/notifications/*
+    app.include_router(ops_router)  # /api/v1/dlq, /policies/*, /ops/*
+    app.include_router(ack_router, prefix="/api")  # /api/v1/notifications/{id}/ack, /dismiss
+    app.include_router(webhooks_router)  # /api/v1/webhooks/slack, /pagerduty
+    app.include_router(ui_router)  # /ui/*
 
     # Websocket
     app.websocket("/ws/agents/{agent_id}")(websocket_endpoint)
@@ -349,12 +401,16 @@ def create_app(
 
     @app.get("/ready", tags=["system"], dependencies=[Depends(require_authenticated_observer)])
     @app.get("/readyz", tags=["system"], dependencies=[Depends(require_authenticated_observer)])
-    async def ready() -> dict[str, Any]:
+    async def ready() -> Any:
+        from fastapi.responses import JSONResponse
+
         from notification.audit import get_audit_logger
         from uns.api.read_models import get_read_model_adapter
+
         try:
             if runtime is not None:
                 from sqlalchemy import select
+
                 with runtime.engine.connect() as connection:
                     connection.execute(select(1))
             if runtime is not None:
@@ -368,19 +424,22 @@ def create_app(
                 persistence_mode = "in_memory"
                 operational_progress = None
         except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
-            return {
+            error_payload = {
                 "status": "not_ready",
                 "service": "uns",
                 "version": __version__,
                 "error": str(exc),
             }
+            return JSONResponse(status_code=503, content=error_payload)
         payload: dict[str, Any] = {
             "status": "ready",
             "service": "uns",
             "version": __version__,
             "persistence_mode": persistence_mode,
             "channels_configured": _channel_readiness(runtime),
-            "policy_count": len(runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()),
+            "policy_count": len(
+                runtime.policy_runtime.registry() if runtime is not None else get_policy_registry()
+            ),
             "dlq_depth": (
                 operational_progress["unresolved_failure_count"]
                 if operational_progress is not None
@@ -391,6 +450,8 @@ def create_app(
         }
         if operational_progress is not None:
             payload["operational_progress"] = operational_progress
+        if payload.get("status") != "ready":
+            return JSONResponse(status_code=503, content=payload)
         return payload
 
     return app
@@ -401,6 +462,7 @@ def main(argv: list[str] | None = None) -> None:
     import argparse
 
     from uns.config import ensure_daemon_persistence_configured, value
+
     parser = argparse.ArgumentParser(description="UNS notification and acknowledgment service")
     parser.add_argument("--host", default=value("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(value("PORT", "8000")))

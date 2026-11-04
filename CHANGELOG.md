@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-03
+
+### Added
+- **UNS Brand System (Variant `4a`) & Complete Console Screenshot Gallery:**
+  - Added clean SVG brand marks (`docs/assets/logo/uns-mark.svg`, `uns-mark-on-dark.svg`, `uns-mark-mono.svg`, `uns-lockup.svg`, `uns-lockup-dark.svg`, `apps/ui/public/favicon.svg`) and GitHub social preview card (`docs/assets/logo/uns-social-preview.png`).
+  - Integrated `UnsLogoMark` (`apps/ui/src/components/UnsLogoMark.tsx`) into the UNS Console top navigation bar and sign-in header, configured MkDocs theme logo/favicon (`mkdocs.yml`), and expanded the documentation screenshot gallery to 8 high-DPI views including `console-policy-inspector.png` and `console-docs.png`.
+
+### Fixed
+- **MPDD v2.5 Security & Functionality Audit Remediations (`F01`–`F15`):**
+  - **`F01` (Scoped Read & MCP Tenant Isolation):** Enforced fail-closed record-level and collection-level `allowed_sources` + `allowed_namespaces` bounds across `/api/v1/runtime/notifications/{id}`, `/api/v1/runtime/dead-letters`, `/api/v1/notifications/{id}/delivery`, `/api/v1/notifications/{id}/audit`, `/api/v1/dlq*`, `/ui/deliveries*`, `/ui/audit`, and all registered `uns-mcp` read/list tools before pagination and counts.
+  - **`F02` & `F09` (Governance Approval Identity & Durable Settlement Callbacks):** Included `tenant_id`, `resource_type`, and `resource_id` in `_deterministic_decision_id()`, enforced bound-content fingerprint matching (`ApprovalConflictError`) in `GovernanceApprovalBridge.request_approval()`, and decoupled terminal approval status from `on_settled` callback completion so failed resume callbacks retry across subsequent resolution and runtime sync calls.
+  - **`F03`, `F07`, `F08`, `F10` (Policy Evolution Atomicity, Exact Draft Binding & Shared-DB Cache):** Bound exact `draft_policy_id` and `candidate_hash` to `APPROVE_DRAFT` evidence and verified/materialized the exact approved candidate in `activate_draft()`; made `promote_to_shadow()`, `approve_to_draft()`, and `activate_draft()` rollback-safe across policy and learning stores; removed the process-local negative candidate cache so warm workers immediately evaluate peer-created `SHADOW`/`PREVIEW` candidates; preserved explicit `dedup_window_seconds=0` in `config_dict_to_policy()`.
+  - **`F04` (PagerDuty Provider Incident Key Isolation):** Scoped PagerDuty `dedup_key` generation and webhook target resolution to the obligation's isolated runtime `dedup_key` (`uns_obligation_dedup_key`) and persisted `CHANNEL_ATTEMPT_RESULT` `message_id`, rejecting ambiguous raw producer keys across isolated tenants.
+  - **`F05` (Bounded Unmatched Route Metric Cardinality):** Mapped unmatched HTTP 404 paths to `"__unmatched__"` and normalized HTTP methods in `src/notification/metrics.py` and `src/uns/api/observability.py`.
+  - **`F06` (Admin Gate on `promote_to_shadow` Proposal Creation):** Required `admin` scope when `promote_to_shadow: true` is passed to `POST /api/v1/policies/proposals`.
+  - **`F11`, `F12`, `F13`, `F14`, `F15` (SLO Stalled-Backlog Gate, Shared Channel Health, `/readyz` HTTP 503, Lifespan Reload Worker & Docs Contracts):** Added `zero_stalled_pending_backlog` gate to `compute_slo_report()`, wired `Runtime._channel_result()` into the shared `ChannelHealthTracker` across HTTP and MCP, returned HTTP `503` on `/readyz` failure, started a background policy reload worker in `app.py:lifespan`, and resolved all 39 MkDocs link diagnostics (`validation.links.not_found: warn`).
+
 ## [0.6.0] - 2026-11-03
 
 ### Added
