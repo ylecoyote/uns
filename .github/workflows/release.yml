@@ -1,90 +1,101 @@
 name: Release Publish (PyPI & GHCR)
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      publish_pypi:
-        description: "Attempt PyPI publish (requires PYPI_TRUSTED_PUBLISHING=true variable or PYPI_API_TOKEN secret)"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-python-dist:
     name: Build & Verify Python Distribution
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
+      checks: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      - name: Require a version-matching tag on main with successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci/release.py verify
       - name: Build wheel and sdist
         run: uv build
-
       - name: Smoke-test built wheel in isolated venv
         run: |
           uv venv /tmp/release-smoke-venv
-          WHEEL_PATH=$(ls dist/uns-*.whl | head -n 1)
+          WHEEL_PATH=$(ls dist/uns-*.whl)
           uv pip install --python /tmp/release-smoke-venv/bin/python "${WHEEL_PATH}[full]"
           /tmp/release-smoke-venv/bin/python -c "import uns, uns_mcp, notification; assert uns.__version__ == notification.__version__; print('Verified wheel version:', uns.__version__)"
-
-      - name: Upload distribution artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: python-dist
           path: dist/*
           if-no-files-found: error
 
-      - name: Attach wheel and sdist to GitHub Release
-        if: github.event_name == 'release'
+  stage-release:
+    name: Stage Draft Release Assets
+    needs: build-python-dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: python-dist
+          path: dist/
+      - name: Attach distributions before the release becomes immutable
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ github.event.release.tag_name }}" dist/*.whl dist/*.tar.gz --clobber
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci/release.py stage
 
   publish-ghcr:
     name: Publish Multi-Arch Image to GHCR
-    needs: build-python-dist
+    needs: stage-release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
     permissions:
       contents: read
       packages: write
       id-token: write
       attestations: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry (GHCR)
-        uses: docker/login-action@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract OCI metadata and tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
@@ -92,10 +103,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
             type=raw,value=latest
-
       - name: Build and push multi-arch container image
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -104,9 +114,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -114,35 +123,48 @@ jobs:
 
   publish-pypi:
     name: Publish Package to PyPI
-    needs: build-python-dist
-    if: github.event_name == 'release' || inputs.publish_pypi == true
+    needs: stage-release
+    if: vars.PYPI_TRUSTED_PUBLISHING == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Download distribution artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: python-dist
           path: dist/
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Publish to PyPI (OIDC Trusted Publishing)
-        if: vars.PYPI_TRUSTED_PUBLISHING == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish to PyPI through the configured trusted publisher
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           packages-dir: dist/
 
-      - name: Publish to PyPI (API Token fallback)
-        if: vars.PYPI_TRUSTED_PUBLISHING != 'true'
+  publish-release:
+    name: Publish Immutable GitHub Release
+    needs: [stage-release, publish-ghcr, publish-pypi]
+    if: >-
+      always() && needs.stage-release.result == 'success' &&
+      needs.publish-ghcr.result == 'success' &&
+      (needs.publish-pypi.result == 'success' || needs.publish-pypi.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: python-dist
+          path: dist/
+      - name: Verify asset digests and publish the prepared draft
         env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          if [ -n "${UV_PUBLISH_TOKEN}" ]; then
-            uv publish dist/*
-          else
-            echo "::notice::Skipping PyPI upload: neither vars.PYPI_TRUSTED_PUBLISHING=true nor secrets.PYPI_API_TOKEN is configured yet."
-          fi
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci/release.py publish
