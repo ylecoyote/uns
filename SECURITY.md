@@ -2,12 +2,13 @@
 
 ## Supported Versions
 
-UNS (Unified Notification Service, package `uns` / `uns`) is pre-1.0 software. Security fixes are provided for the latest `0.1.x` release line on `main`.
+UNS (Unified Notification Service, package `uns`) is pre-1.0 software. Security fixes are provided for the latest published release and the current `main` branch. Older release lines are not maintained separately; upgrade to the latest release to receive fixes.
 
 | Version | Supported |
 | :--- | :--- |
-| `0.1.x` | Yes |
-| `< 0.1.0` | No |
+| Latest published release | Yes |
+| Current `main` | Yes |
+| Older releases | No |
 
 ## Threat Model & Security Boundaries
 

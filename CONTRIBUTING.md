@@ -178,6 +178,48 @@ If your pull request introduces or modifies any system invariant:
 2. If touching `apps/ui` or `/ui/*` contracts, run `python scripts/ci/check_ui_boundary.py --strict` and `npm --prefix apps/ui run ci`.
 3. Follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
 
+## Repository Protections and Releases
+
+Changes to `main` go through pull requests with successful, up-to-date `CI` and
+`Build MkDocs Site` checks from GitHub Actions, and resolved review conversations.
+Mandatory approvals remain at zero while the repository has a single code owner.
+Release tags matching `v*` cannot be moved or deleted. Workflow tokens default to
+read-only and cannot approve pull requests. External contributor workflow runs
+require approval. Third-party actions are allow-listed and pinned to full commit
+SHAs; Dependabot maintains those pins. CodeQL scans Actions, Python, and
+JavaScript/TypeScript on pull requests, main pushes, and weekly schedules.
+
+To release a stable version:
+
+1. Update `pyproject.toml` and the existing version declarations, then merge the
+   version change through a pull request. Wait for `CI` and `Build MkDocs Site` to
+   pass on the exact commit on `main`.
+2. Create a matching `vMAJOR.MINOR.PATCH` tag on that commit and push the tag.
+   Do not publish an empty GitHub release manually. The release workflow verifies
+   the version, main ancestry, and latest successful checks before building.
+3. The workflow uploads the validated wheel and sdist to a draft, publishes the
+   container and optional PyPI package through the tag-restricted `release`
+   environment, verifies the draft asset digests, then publishes the immutable
+   GitHub release. Failed package jobs leave the GitHub release as a draft.
+   Rerun failed jobs before publishing; an already published release cannot be
+   overwritten by the workflow.
+
+The workflow can also be dispatched against an existing release tag to recover a
+failed run. Dispatching it against a branch cannot publish. A release job requires
+the `release` environment to permit the tag pattern `v*` and no branches.
+
+PyPI publishing is disabled until a maintainer registers a trusted publisher on
+PyPI for owner `ylecoyote`, repository `uns`, workflow `release.yml`, and environment
+`release`, then sets the GitHub repository variable `PYPI_TRUSTED_PUBLISHING=true`.
+GitHub settings cannot create that external PyPI trust registration. The workflow
+uses short-lived OIDC credentials rather than a persistent PyPI API token.
+
+Repository settings also enable Dependabot vulnerability alerts and security
+updates, secret scanning, push protection, private vulnerability reporting, and
+immutable releases. Pages stays restricted to `main` with HTTPS enforced. Settings
+are separate from source-controlled workflows and should be checked after any
+repository migration.
+
 ## Getting Help
 
 - Browse the documentation index in [`docs/README.md`](docs/README.md).
