@@ -8,9 +8,9 @@
 
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 
-**Durable notifications with policy provenance and response history.**
+**Governed notification obligations, immutable policy provenance, and human-in-the-loop supervision for autonomous agents and high-trust backend workflows.**
 
-When several autonomous applications or background jobs emit operational alerts, ordinary fire-and-forget webhooks leave operators guessing: *Which policy governed this alert? Did a provider accept it? Was it coalesced with an earlier incident? Did anyone actually respond before the deadline?*
+When autonomous agents, MCP tools, or background workflows emit operational signals or request high-stakes actions, ordinary fire-and-forget webhooks leave operators guessing: *Which policy revision governed this signal? Did a prompt-injected payload try to weaken its routing? Did a provider accept it? Was it coalesced with an earlier incident? Did an authorized responder actually acknowledge it before the deadline?*
 
 UNS treats an important notification as a **recoverable obligation** backed by a transactional SQLite or PostgreSQL outbox (`uns.Runtime`). Policy resolution, acceptance, deduplication ownership, and audit provenance commit together at intake so accepted work retains the exact policy revision that governed it, even across process restarts, provider timeouts, or later policy updates.
 
@@ -24,13 +24,53 @@ UNS treats an important notification as a **recoverable obligation** backed by a
 
 ## Core Capabilities & Boundaries
 
-- **Policy Authority at Intake:** Producer payloads cannot weaken an `ACTIVE` notification policy's delivery mode, channels, acknowledgment requirement, or timeout. Proposed policy changes carry shadow evaluation evidence and explicit approval before activation.
-- **Scoped Credential Authority:** Supports least-privilege API keys for independent callers (`UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`) alongside the full operator key (`UNS_API_KEY`).
-- **Failure-Aware Deduplication:** Pending ownership survives window expiry, owner failure promotes a follower or hands off to a successor (`dedup_successor_id`), and status responses expose `obligation_owner_id` and `effective_ack_status` directly.
-- **Delivery Fallback vs. Post-Silence Escalation:** `GUARANTEED` mode performs bounded durable retries across selected persistent channels (`Slack → Email → PagerDuty`), stopping at the first channel that accepts the message, or surfacing a visible dead-letter entry on exhaustion. If a channel accepts the message but no human responds before the deadline, UNS records `TIMED_OUT` and invokes the host callback; multi-step human on-call paging belongs to your incident responder (such as PagerDuty escalation policies) or host callback.
-- **Explicit Scope Boundary:** UNS core governs notification obligations and response evidence; a standalone acknowledgment records human receipt, not comprehension or permission to execute an action. Pre-execution action gating (`ALLOW / REQUIRE_APPROVAL / DENY`) is provided via the opt-in `uns.governance` package (`decide()`, `DecisionEngine`, `GovernanceApprovalBridge`), while legacy root-level action-authorization models in `notification.models` remain experimental compatibility types.
+- **Agent-Native Intake & Prompt-Injection Protection:** `SendNotificationRequest` binds `autonomy_context` (`LIVE`, `SHADOW`, `PREVIEW`, `SUPERVISED`, `AUTONOMOUS`, `agent_id`, `plan_id`, `step_id`, `run_id`), `intent` (`SAFETY`, `GOVERNANCE`, `OPERATIONAL`, `INFORMATIONAL`), and `irreversible: bool`. Producer payloads cannot weaken an `ACTIVE` policy's delivery mode, channels, acknowledgment requirement, or timeout (`422`), and caller-supplied routing overrides (`slack_channel`, `email_to`, `pagerduty_routing_key`) are rejected at intake so a compromised or misconfigured agent cannot downgrade a `SAFETY` alert or reroute an obligation.
+- **Scoped Credential & Multi-Team Namespace Isolation:** Supports least-privilege API keys (`UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`) and multi-team JSON credentials (`UNS_SCOPED_API_KEYS`) alongside the full operator key (`UNS_API_KEY`), with fail-closed `allowed_sources` (`ci-*`, `agent-*`) and `allowed_namespaces` (`deploy.*`, `security.*`) isolation across HTTP REST, Console (`/ui/*`), WebSocket streams, and `uns-mcp`.
+- **Simulation-First MCP (`uns-mcp`):** Defaults to read-only stdio, provides dry-run `simulate_signal`, and requires explicit `--enable-writes`, `operator_intent="deliver"`, and `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` before emitting real external signals.
+- **Bi-Directional Signed Provider Sync & Failure-Aware Deduplication:** Inbound HMAC-SHA256 signed Slack Block Kit interactivity (`POST /api/v1/webhooks/slack`) and PagerDuty v3 (`POST /api/v1/webhooks/pagerduty`) webhooks resolve follower notifications to their canonical `obligation_owner_id`, update Slack messages in place, and synchronize outbound PagerDuty incidents (`uns-pd-<obligation_owner_id>`). Pending dedup ownership survives TTL expiry and promotes followers or hands off to a successor (`dedup_successor_id`) on failure.
+- **Governed Self-Tuning Policies (`PolicyDelta` + Shadow Evaluation):** `producer` credentials can propose `PolicyDelta` adjustments (`promote_to_shadow=false`), while `SHADOW -> DRAFT -> ACTIVE` promotion requires `admin` authority, `BOUNDS`/`CONFLICT`/`INVARIANTS` guard checks, matching `baseline_config_hash`, exact `draft_policy_id`/`draft_content_hash` binding, and inline `ShadowPolicyEvaluator` sample/accuracy gates (`UNS_SHADOW_MIN_SAMPLES`, `UNS_SHADOW_ACCURACY_THRESHOLD`).
+- **Pre-Execution Action Gating (`uns.governance`) & Explicit Scope Boundary:** Core notification acknowledgments record human receipt, not action authorization, unless the host explicitly integrates the opt-in `uns.governance` pre-execution gate (`decide()`, `DecisionEngine`, `GovernanceApprovalBridge`). `uns.governance` evaluates deterministic rules (`DENY > REQUIRE_APPROVAL > ALLOW`) with per-intent fail modes, binds `REQUIRE_APPROVAL` decisions to durable `uns.Runtime` obligations with content-fingerprint verification, and emits HMAC-SHA256 signed resume callbacks (`X-UNS-Signature`, `X-UNS-Timestamp`). Legacy root-level action-authorization models in `notification.models` remain experimental compatibility types.
+- **Delivery Fallback & Tamper-Evident SLO Receipts (`uns-slo-certify`):** `GUARANTEED` mode performs bounded durable retries across selected persistent channels (`Slack → Email → PagerDuty`), surfacing a visible dead-letter entry on exhaustion. `uns-slo-certify` computes deterministic SHA-256 readiness receipts (`receipt_sha256`) across backlog gauges, response latency percentiles (`p50`, `p95`, `max`), and provider error budgets.
 
-## Local quickstart
+## Quickstart & Python Example
+
+```python
+from uuid import uuid4
+from uns import Client, Runtime
+from uns.governance import DecisionEngine, GovernanceApprovalBridge, load_policy_from_yaml
+from uns.responses import SendNotificationRequest
+
+runtime = Runtime("sqlite:///uns.db", create_tables=True)
+client = Client(runtime, principal="agent-supervisor")
+
+# 1. Durable notification obligation with agent autonomy provenance
+result = await client.send(
+    SendNotificationRequest(
+        notification_type="deploy.production",
+        intent="GOVERNANCE",
+        title="Approve production rollout v2.4.0",
+        message="Canary error rate is 0.01% over 30m window; awaiting operator sign-off.",
+        source="release-agent",
+        irreversible=True,
+        autonomy_context={"agent_id": str(uuid4()), "autonomy_mode": "SUPERVISED", "run_id": "run-42"},
+        idempotency_key="deploy-v2.4.0-prod",
+    )
+)
+
+# 2. Opt-in pre-execution action gate bound to a durable UNS approval obligation
+bridge = GovernanceApprovalBridge(runtime=runtime, callback_secret="hmac-resume-secret")
+engine = DecisionEngine(policy=load_policy_from_yaml(policy_yaml), approval_bridge=bridge)
+outcome = await engine.evaluate(
+    context={"environment": "prod", "blast_radius": "high"},
+    principal_id="release-agent",
+    action="k8s.rollout.promote",
+    intent="GOVERNANCE",
+    tenant_id="platform",
+    resource_type="deployment",
+    resource_id="payments-api",
+)
+# outcome.record.decision == Decision.REQUIRE_APPROVAL -> backed by runtime obligation
+```
 
 From this repository, with Python 3.12:
 
