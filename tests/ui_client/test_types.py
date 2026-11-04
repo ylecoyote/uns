@@ -1,6 +1,6 @@
 """Tests for UI API client types."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from notification.models import (
@@ -89,7 +89,7 @@ class TestDeliveryTypes:
 
     def test_delivery_attempt(self):
         """Test DeliveryAttempt model."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         attempt = DeliveryAttempt(
             attempt_id=uuid4(),
             channel=Channel.SLACK,
@@ -119,7 +119,7 @@ class TestDeliveryTypes:
 
     def test_delivery_timeline_summary(self):
         """Test DeliveryTimelineSummary model."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         agent_id = uuid4()
         notification_id = uuid4()
 
@@ -144,7 +144,7 @@ class TestDeliveryTypes:
 
     def test_delivery_timeline_response(self):
         """Test DeliveryTimelineResponse model."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         agent_id = uuid4()
         notification_id = uuid4()
 
@@ -346,7 +346,7 @@ class TestAuditTypes:
 
     def test_audit_event(self):
         """Test AuditEvent model."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         agent_id = uuid4()
         notification_id = uuid4()
 

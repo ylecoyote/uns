@@ -18,19 +18,22 @@ The read model adapters provide an abstraction layer between the HTTP endpoints 
 
 ## Quick Start
 
-**For local demo (no database required):**
+**For local demo (explicit in-memory opt-in required):**
 ```bash
-# In-memory storage, data lost on restart
-uvicorn uns.app:app --reload
+# In-memory storage (data lost on restart; requires explicit opt-in)
+UNS_ALLOW_IN_MEMORY=true uvicorn uns.app:app --reload
+# or via the unified CLI:
+uns --in-memory
 ```
 
 **For production (with database persistence):**
 ```bash
-export DATABASE_URL="postgresql://user:pass@localhost/uns"
+export UNS_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/uns"
+uns-migrate --database-url "$UNS_DATABASE_URL"
 uvicorn uns.app:app
 ```
 
-The application automatically configures the appropriate storage backend at startup based on the `DATABASE_URL` environment variable. See [Configuration](#configuration) for details.
+By default, `uns` and `uns.app:app` refuse to start without a persistent `UNS_DATABASE_URL` (or `DATABASE_URL` fallback) unless `UNS_ALLOW_IN_MEMORY=true` or `--in-memory` is explicitly supplied. See [Configuration](#configuration) for details.
 
 ## Architecture
 
@@ -172,21 +175,21 @@ The application automatically configures persistence at startup via `configure_p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | SQLAlchemy database URL | Not set (uses in-memory) |
-| `UNS_CREATE_TABLES` | Create tables on startup (`UNS_CREATE_TABLES` compatibility alias is also supported) | `true` |
+| `UNS_DATABASE_URL` (`DATABASE_URL` fallback) | SQLAlchemy database URL (`sqlite:////path/to/uns.db` or `postgresql+psycopg://...`) | Required unless `UNS_ALLOW_IN_MEMORY=true` |
+| `UNS_ALLOW_IN_MEMORY` | Explicit opt-in for volatile in-memory HTTP demo mode (`true`/`1`/`yes`/`on`) | `false` |
+| `UNS_CREATE_TABLES` | Create tables automatically on startup (prefer `uns-migrate` in production) | `false` |
 
-**Local Demo Mode (no DATABASE_URL):**
+**Local Demo Mode (explicit in-memory opt-in):**
 ```bash
-# Uses shared in-memory storage
-# Data is NOT persisted across restarts
-uvicorn uns.app:app --reload
+# Uses shared in-memory storage (data is NOT persisted across restarts)
+UNS_ALLOW_IN_MEMORY=true uvicorn uns.app:app --reload
 ```
 
-**Production Mode (DATABASE_URL set):**
+**Production Mode (`UNS_DATABASE_URL` set):**
 ```bash
-# Uses SQLAlchemy with PostgreSQL
-export DATABASE_URL="postgresql://user:pass@localhost/uns"
-export UNS_CREATE_TABLES="true"
+# Uses SQLAlchemy with PostgreSQL (psycopg v3)
+export UNS_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/uns"
+uns-migrate --database-url "$UNS_DATABASE_URL"
 uvicorn uns.app:app
 ```
 
@@ -381,11 +384,10 @@ To migrate from in-memory to database-backed storage:
 - Single process only
 
 ### SQLAlchemy Adapter
-- Requires database setup
-- JSON contains queries may vary by database dialect
-- Ack records don't store full autonomy context
+- Requires a migrated SQLite or PostgreSQL database (`uns-migrate`)
+- Channel-containment queries use dialect-aware JSON functions (`json_each` on SQLite and `JSONB.contains` on PostgreSQL)
+- ACK audit events join the latest `NotificationAuditRecord` for the notification to populate `autonomy_mode`, `agent_id`, `plan_id`, snapshot IDs, and `correlation_id` (marking `payload.context_unavailable = true` only when no delivery audit row exists)
 
-### General
-- Attempt-level timing not captured (uses delivery timestamp)
-- Generated attempt IDs (not stored in audit records)
-- Ack audit events have limited context fields
+### Canonical Runtime Projections vs. Legacy Adapter Fallback
+- When `uns.Runtime` is attached to `app.state.runtime` (the standard unified service path), `/ui/deliveries` and `/ui/deliveries/{id}` project directly from durable runtime records (`uns.queries`), including per-channel attempt timing (`started_at`, `completed_at`, `duration_ms`), `runtime_state`, and obligation lineage
+- When running against standalone legacy `ReadModelAdapter` fixtures without a `Runtime` instance, `get_delivery_timeline` synthesizes per-channel attempt entries from the audit record's `channels_attempted` and `channels_succeeded` arrays

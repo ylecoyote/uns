@@ -2,7 +2,7 @@
   "name": "uns-console",
   "version": "0.6.1",
   "private": true,
-  "description": "Read-only UNS Console dashboard",
+  "description": "UNS Console operator and governance dashboard",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -21,7 +21,7 @@ import os
 import sys
 import time
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -211,7 +211,7 @@ def compute_slo_report(
     report_body: dict[str, Any] = {
         "service": "uns",
         "version": uns_version,
-        "generated_at": datetime.fromtimestamp(now_val, tz=timezone.utc).isoformat(),
+        "generated_at": datetime.fromtimestamp(now_val, tz=UTC).isoformat(),
         "window_days": window_days,
         "min_live_days_required": min_live_days_required,
         "observed_span_days": observed_span_days,

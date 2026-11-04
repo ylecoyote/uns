@@ -53,7 +53,7 @@ services:
     build: .
     image: uns:dev
     environment:
-      DATABASE_URL: postgresql+psycopg2://uns:uns-dev-only@db:5432/uns
+      DATABASE_URL: postgresql+psycopg://uns:uns-dev-only@db:5432/uns
       UNS_REDIS_URL: redis://redis:6379/0
       UNS_API_KEY: dev-only-key-rotate-before-real-use
       UNS_API_PRINCIPAL: dev-operator

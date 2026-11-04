@@ -13,9 +13,9 @@
 ### 2.1 `uns-mcp` Security & Lifecycle Model (`src/uns_mcp/`)
 1. **Read-Only by Default:** Running `uns-mcp` without `--enable-writes` starts in `mode="stdio-local"` with `read_only=True`. In this mode, `simulate_signal` and read tools (`list_deliveries`, `list_dlq`, `get_notification_status`, etc.) work, while `send_signal(deliver=True)`, `ack_notification`, and `dismiss_notification` are blocked.
 2. **Runtime-Bound Read Helpers (`F-07`):**
-   - Both the FastMCP server tools and direct Python helpers in `uns_mcp.tools` accept `runtime_state=RuntimeState(runtime=runtime)` and read directly from that runtime's durable SQLite outbox and audit stores.
+   - Both the FastMCP server tools and direct Python helpers in `uns_mcp.tools` accept `runtime_state=RuntimeState(runtime=runtime)` and read directly from that runtime's durable SQLite or PostgreSQL outbox and audit stores.
 3. **Write-Enabled Requirements (`uns-mcp --enable-writes`):**
-   - `UNS_DATABASE_URL` must point to a file-backed SQLite database (in-memory `sqlite://` and `:memory:` are rejected).
+   - `UNS_DATABASE_URL` must point to a persistent SQLite file (`sqlite:////path/to/uns.db`) or PostgreSQL database (`postgresql+psycopg://...`); volatile in-memory URLs (`sqlite://` and `:memory:`) are rejected.
    - `UNS_API_PRINCIPAL` must be set to a non-empty actor identifier.
    - `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` must be set to a non-empty secret.
    - Every `send_signal` call with `deliver=true` must also supply `operator_intent="deliver"` and `operator_confirmation_token` matching `UNS_MCP_DELIVERY_CONFIRMATION_TOKEN` (verified via constant-time `hmac.compare_digest`).

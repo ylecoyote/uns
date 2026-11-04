@@ -130,6 +130,6 @@ Adversarial remediation adds durable policy revision checks, explicit dedup owne
 
 The [deployment smoke report](docs/DEPLOYMENT_SMOKE.md) records the latest container and live HTTP/WebSocket/MCP/browser checks. It distinguishes the local recording-only rehearsal from a lasting deployment and real-provider acceptance. The selected [localhost recording service](docs/LOCAL_DEPLOYMENT.md) is deployed with persistent storage and a private API key. It is explicitly a recording profile, with no real Slack, email or PagerDuty messages.
 
-Release `v0.2.0` establishes hosted GitHub Actions CI across Python 3.11–3.13, live PostgreSQL 16 operational acceptance and sustained concurrency/load validation (`tests/uns/test_postgres_and_load.py`), and the 6-surface React 19 + TypeScript 5.9 + ESLint 9 UNS Console (`344` UI tests).
+Release `v0.6.1` validates hosted GitHub Actions CI across Python 3.11-3.13, `1,964` Python tests, `52` SQLite + PostgreSQL 16 adversarial regression tests (`tests/uns/test_mpdd_2026_11_03_remediations.py`), `23` live PostgreSQL 16 operational acceptance and sustained concurrency/load tests (`tests/uns/test_postgres_and_load.py`), the `uns.governance` authorization and approval bridge (`tests/governance/`), and the 6-surface React 19 + TypeScript 5.9 + ESLint 9 UNS Console (`346` UI tests).
 
 Apache License 2.0 - see [LICENSE](LICENSE). Local validation is recorded in docs/TESTING.md; real-channel receipt is a separate opt-in smoke check.

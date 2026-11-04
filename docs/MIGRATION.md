@@ -43,7 +43,7 @@ The follow-up preserves notification/audit history while adding owner/generation
 
 Behavior intentionally tightens: ACTIVE policy is authoritative; producer and adapter-metadata bypasses are rejected; reads/WS/readiness/metrics require auth by default; cross-actor terminal retries conflict. `UNS_ALLOW_UNAUTHENTICATED_READS` is a narrow explicit HTTP-read compatibility flag, not a write/WS bypass. No privileged producer override path was added.
 
-Write-enabled MCP owns its recovery lifecycle. Runtime policy and transport read adapters are instance-scoped. A read-only console uses a memory-only operator key. Node requirements changed with vulnerability remediation to `^20.19.0 || ^22.12.0 || >=24.0.0`; React stays on18. The original tests remain, with additional adversarial and migration cases rather than a test-suite reduction.
+Write-enabled MCP owns its recovery lifecycle. Runtime policy and transport read adapters are instance-scoped. A read-only console uses a memory-only operator key. Node requirements changed with vulnerability remediation to `^20.19.0 || ^22.12.0 || >=24.0.0`; React stayed on 18 in that initial remediation snapshot (and subsequently upgraded to React 19 in `v0.2.0+`). The original tests remain, with additional adversarial and migration cases rather than a test-suite reduction.
 
 `uns-maintain` adds explicit dry-run, apply and archive modes. It never runs automatically and does not vacuum or choose a compliance retention duration. Follow the current deployment guide before pruning data.
 

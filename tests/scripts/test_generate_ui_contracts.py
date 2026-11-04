@@ -223,10 +223,10 @@ class TestEndpoints:
         with open(CONTRACTS_PATH) as f:
             return json.load(f)
 
-    def test_has_six_endpoints(self, contract_data: dict) -> None:
-        """Verify all six /ui endpoints are defined."""
+    def test_has_eleven_endpoints(self, contract_data: dict) -> None:
+        """Verify all eleven /ui endpoints are defined."""
         endpoints = contract_data["endpoints"]
-        assert len(endpoints) == 6
+        assert len(endpoints) == 11
 
     def test_all_endpoints_are_get(self, contract_data: dict) -> None:
         """Verify all /ui endpoints use GET method (read-only)."""
@@ -251,6 +251,16 @@ class TestEndpoints:
         endpoints = contract_data["endpoints"]
         paths = [e["path"] for e in endpoints]
         assert "/ui/policies/effective" in paths
+
+    def test_has_session_and_policy_lifecycle_endpoints(self, contract_data: dict) -> None:
+        """Verify /ui/session and /ui/policies/* lifecycle endpoints are defined."""
+        endpoints = contract_data["endpoints"]
+        paths = [e["path"] for e in endpoints]
+        assert "/ui/session" in paths
+        assert "/ui/policies/active" in paths
+        assert "/ui/policies/revisions" in paths
+        assert "/ui/policies/proposals" in paths
+        assert "/ui/policies/proposals/{delta_id}" in paths
 
     def test_has_invariants_endpoint(self, contract_data: dict) -> None:
         """Verify /ui/invariants endpoint is defined."""
@@ -343,9 +353,14 @@ class TestContractDrift:
         """Verify snapshot schemas include all response models from routes_ui."""
         # These are the response models used in routes_ui.py endpoints
         expected_models = [
+            "ConsoleSessionResponse",
             "DeliveryTimelineListResponse",
             "DeliveryTimelineResponse",
             "EffectivePolicyResponse",
+            "ActivePolicyListResponse",
+            "PolicyRevisionListResponse",
+            "PolicyProposalListResponse",
+            "PolicyProposalSummary",
             "InvariantListResponse",
             "InvariantSummaryResponse",
             "AuditEventListResponse",

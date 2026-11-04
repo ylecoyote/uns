@@ -45,6 +45,8 @@ def get_enum_definitions() -> dict[str, list[str]]:
         NotificationIntent,
         Priority,
     )
+    from notification.policies import PolicyStatus
+    from notification.policy_learning import DeltaState
     from uns.responses import (
         AuditEventType,
         EnforcementType,
@@ -61,6 +63,8 @@ def get_enum_definitions() -> dict[str, list[str]]:
         "DeliveryStatus": [e.value for e in DeliveryStatus],
         "AckStatus": [e.value for e in AckStatus],
         "Priority": [e.value for e in Priority],
+        "PolicyStatus": [e.value for e in PolicyStatus],
+        "DeltaState": [e.value for e in DeltaState],
         "AuditEventType": [e.value for e in AuditEventType],
         "EnforcementType": [e.value for e in EnforcementType],
         "InvariantSeverity": [e.value for e in InvariantSeverity],
@@ -75,9 +79,12 @@ def get_enum_definitions() -> dict[str, list[str]]:
 def get_response_schemas() -> dict[str, dict[str, Any]]:
     """Extract JSON schemas from Pydantic response models."""
     from uns.responses import (
+        ActivePolicyListResponse,
+        ActivePolicySummary,
         AuditEvent,
         AuditEventListResponse,
         AutonomyContextResponse,
+        ConsoleSessionResponse,
         DeliveryAttempt,
         DeliveryTimelineListResponse,
         DeliveryTimelineResponse,
@@ -91,8 +98,16 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         InvariantListResponse,
         InvariantSummaryResponse,
         PaginationInfo,
+        PolicyGuardResultItem,
+        PolicyProposalListResponse,
+        PolicyProposalSummary,
+        PolicyRevisionListResponse,
+        PolicyRevisionSummary,
+        PolicyTransitionItem,
         ResolutionContext,
         ResolutionStep,
+        ShadowEvaluationSampleItem,
+        ShadowEvaluationSummaryItem,
     )
     from uns.responses import (
         UIErrorResponse as ErrorResponse,
@@ -104,17 +119,28 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
         PaginationInfo,
         ErrorDetail,
         ErrorResponse,
+        ConsoleSessionResponse,
         # Delivery timeline
         DeliveryAttempt,
         AutonomyContextResponse,
         DeliveryTimelineResponse,
         DeliveryTimelineSummary,
         DeliveryTimelineListResponse,
-        # Policy resolution
+        # Policy resolution & lifecycle read models
         ResolutionStep,
         EffectivePolicyValues,
         ResolutionContext,
         EffectivePolicyResponse,
+        ActivePolicySummary,
+        ActivePolicyListResponse,
+        PolicyRevisionSummary,
+        PolicyRevisionListResponse,
+        ShadowEvaluationSummaryItem,
+        ShadowEvaluationSampleItem,
+        PolicyGuardResultItem,
+        PolicyTransitionItem,
+        PolicyProposalSummary,
+        PolicyProposalListResponse,
         # Invariants
         EvidenceLink,
         InvariantEnforcement,
@@ -141,6 +167,15 @@ def get_response_schemas() -> dict[str, dict[str, Any]]:
 def get_endpoint_definitions() -> list[dict[str, Any]]:
     """Define endpoint metadata for /ui routes."""
     endpoints = [
+        {
+            "method": "GET",
+            "path": "/ui/session",
+            "summary": "Get console session capabilities",
+            "description": "Return the authenticated principal subject and capability scopes.",
+            "response_model": "ConsoleSessionResponse",
+            "query_params": [],
+            "error_codes": ["unauthorized", "forbidden"],
+        },
         {
             "method": "GET",
             "path": "/ui/deliveries",
@@ -188,11 +223,71 @@ def get_endpoint_definitions() -> list[dict[str, Any]]:
             "response_model": "EffectivePolicyResponse",
             "query_params": [
                 {"name": "notification_type", "type": "string", "required": True},
-                {"name": "intent", "type": "NotificationIntent", "required": True},
+                {"name": "intent", "type": "NotificationIntent", "required": False},
                 {"name": "autonomy_mode", "type": "AutonomyMode", "required": True},
                 {"name": "irreversible", "type": "boolean", "required": False, "default": False},
             ],
             "error_codes": ["invalid_parameter"],
+        },
+        {
+            "method": "GET",
+            "path": "/ui/policies/active",
+            "summary": "List active notification policies",
+            "description": "Return the catalog of currently active notification routing policies.",
+            "response_model": "ActivePolicyListResponse",
+            "query_params": [],
+            "error_codes": [],
+        },
+        {
+            "method": "GET",
+            "path": "/ui/policies/revisions",
+            "summary": "List notification policy revisions",
+            "description": "Return stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).",
+            "response_model": "PolicyRevisionListResponse",
+            "query_params": [
+                {"name": "notification_type", "type": "string", "required": False},
+                {"name": "status", "type": "PolicyStatus", "required": False},
+                {
+                    "name": "limit",
+                    "type": "integer",
+                    "required": False,
+                    "default": 200,
+                    "min": 1,
+                    "max": 500,
+                },
+            ],
+            "error_codes": ["invalid_parameter"],
+        },
+        {
+            "method": "GET",
+            "path": "/ui/policies/proposals",
+            "summary": "List policy delta proposals and shadow evaluation evidence",
+            "description": "Return governed policy delta proposals, shadow evaluation aggregates, and guard results.",
+            "response_model": "PolicyProposalListResponse",
+            "query_params": [
+                {"name": "policy_type", "type": "string", "required": False},
+                {"name": "state", "type": "DeltaState", "required": False},
+                {
+                    "name": "limit",
+                    "type": "integer",
+                    "required": False,
+                    "default": 50,
+                    "min": 1,
+                    "max": 200,
+                },
+            ],
+            "error_codes": ["invalid_parameter"],
+        },
+        {
+            "method": "GET",
+            "path": "/ui/policies/proposals/{delta_id}",
+            "summary": "Inspect a policy delta proposal and shadow evaluation samples",
+            "description": "Return full detail for a policy delta proposal, including shadow decision samples and guard history.",
+            "response_model": "PolicyProposalSummary",
+            "path_params": [
+                {"name": "delta_id", "type": "uuid", "required": True},
+            ],
+            "error_codes": ["not_found"],
         },
         {
             "method": "GET",

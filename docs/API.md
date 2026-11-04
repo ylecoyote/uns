@@ -81,21 +81,21 @@ When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_stat
 | `title` | `str` | **Yes** | `None` | Human-readable summary (1–200 chars). |
 | `message` | `str` | **Yes** | `None` | Full notification body. |
 | `source` | `str` | **Yes** | `None` | Originating subsystem name. Scopes idempotency and deduplication keys. |
-| `autonomy_context` | `AutonomyContextRequest` | **Yes** | `None` | Contains `autonomy_mode` (`"LIVE"`, `"SHADOW"`, `"PREVIEW"`, `"SUPERVISED"`, `"AUTONOMOUS"`), `agent_id` (`UUID`), optional `plan_id`, `step_id`, `run_id`. |
+| `autonomy_context` | `AutonomyContextRequest` | **Yes** | `None` | Contains `autonomy_mode` (`"LIVE"`, `"SHADOW"`, `"PREVIEW"`), `agent_id` (`UUID`), and optional `plan_id`, `decision_snapshot_id`, `execution_snapshot_id`, `skip_snapshot_id`. |
 | `irreversible` | `bool` | No | `False` | Whether the triggering agent action is irreversible. |
 | `idempotency_key` | `str \| None` | No | `None` | Producer retry key (`1..255` chars). Scoped by `(principal, source, idempotency_key)`. |
 | `dedup_key` | `str \| None` | No | `None` | Explicit coalescing key. Defaults to content-derived hash if omitted. |
 | `correlation_id` | `str \| None` | No | `None` | Cross-service trace/correlation identifier. |
 | `delivery_mode` | `DeliveryMode \| None` | No | `None` | Producer override (`"GUARANTEED"` or `"BEST_EFFORT"`). Rejected with `422` if it contradicts an `ACTIVE` policy. |
 | `require_ack` | `bool \| None` | No | `None` | Producer override for acknowledgment requirement. Rejected with `422` if it contradicts an `ACTIVE` policy. |
-| `priority` | `Priority \| None` | No | `None` | `"CRITICAL"`, `"HIGH"`, `"NORMAL"`, or `"LOW"`. Rejected with `422` if it contradicts an `ACTIVE` policy. |
+| `priority` | `Priority \| None` | No | `None` | `"HIGH"`, `"NORMAL"`, or `"LOW"`. Rejected with `422` if it contradicts an `ACTIVE` policy. |
 | `metadata` | `dict[str, Any]` | No | `{}` | Arbitrary context dictionary. Protected adapter keys (`email_to`, `slack_channel`, `pagerduty_routing_key`, `uns_resolution`, etc.) are rejected at intake. |
 
 ---
 
 ## HTTP
 
-`uns.app:app` and `uns.app:app` mount the same service. Configure an operator or scoped credential from the matrix below; send `Authorization: Bearer ...` for protected API requests. Existing `UNS_*` aliases remain usable.
+`uns.app:app` and the `uns` CLI entrypoint mount the same unified service. Configure an operator or scoped credential from the matrix below; send `Authorization: Bearer ...` for protected API requests. Existing `UNS_*` aliases remain usable.
 
 | Method and path | Meaning |
 |---|---|
@@ -111,7 +111,7 @@ When lineage is `UNRESOLVED`, both `obligation_owner_id` and `effective_ack_stat
 | GET `/api/v1/runtime/notifications/{id}` | Full state, policy provenance and recovery events |
 | GET `/api/v1/runtime/dead-letters` | Durable exhausted failures |
 | POST `/api/v1/runtime/notifications/{id}/replay` | Attributable replay request |
-| GET `/ui/deliveries`, `/ui/audit`, `/ui/policies/effective` | Read-first console models |
+| GET `/ui/session`, `/ui/deliveries`, `/ui/audit`, `/ui/policies/*`, `/ui/invariants*` | Strictly read-only console read models (`INV-UI-001`) |
 | GET `/health`, `/healthz`, `/ready`, `/readyz`, `/metrics` | Process and operator probes |
 
 Idempotency scope is authenticated principal plus source plus key. Same content replays the original notification; different content is a conflict (409). Invalid delivery configuration is 422. Storage failures do not return a successful unrecorded mutation. An ACK body cannot claim another principal. Same-actor replay returns the original result; a different actor conflicts. Only minimal liveness endpoints remain public by default.
@@ -121,7 +121,6 @@ Idempotency scope is authenticated principal plus source plus key. Same content 
 By default, all HTTP endpoints except `GET /health` and `GET /healthz` require an authenticated credential with the capability required by the endpoint. Supply it through one of these headers:
 
 - `Authorization: Bearer <credential>` (recommended)
-- `X-UNS-API-Key: <credential>`
 - `X-UNS-API-Key: <credential>`
 
 | Configured credential | Capabilities | Principal configuration |

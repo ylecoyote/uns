@@ -3,7 +3,7 @@
   "title": "UNS Console Contracts",
   "description": "Machine-readable contract snapshot for UNS Console /ui endpoints",
   "version": "1.0.0",
-  "generated_at": "2026-11-04T19:37:31.248858+00:00",
+  "generated_at": "2026-11-04T22:32:05.711173+00:00",
   "source": "scripts/generate_ui_contracts.py",
   "enums": {
     "AckStatus": [
@@ -49,6 +49,13 @@
       "RATE_LIMITED",
       "SUCCESS"
     ],
+    "DeltaState": [
+      "APPLIED",
+      "APPROVED",
+      "PROPOSED",
+      "REJECTED",
+      "SHADOW"
+    ],
     "EnforcementType": [
       "exception",
       "guard",
@@ -70,6 +77,12 @@
       "OPERATIONAL",
       "SAFETY"
     ],
+    "PolicyStatus": [
+      "ACTIVE",
+      "DRAFT",
+      "PREVIEW",
+      "RETIRED"
+    ],
     "Priority": [
       "HIGH",
       "LOW",
@@ -89,6 +102,302 @@
     "PAGINATION_MAX_LIMIT": 100
   },
   "schemas": {
+    "ActivePolicyListResponse": {
+      "$defs": {
+        "ActivePolicySummary": {
+          "description": "Summary of an active notification routing policy for the console catalog.",
+          "properties": {
+            "notification_type": {
+              "description": "Policy notification_type identifier",
+              "title": "Notification Type",
+              "type": "string"
+            },
+            "version": {
+              "description": "Policy version",
+              "title": "Version",
+              "type": "string"
+            },
+            "status": {
+              "description": "Lifecycle status (e.g., ACTIVE)",
+              "title": "Status",
+              "type": "string"
+            },
+            "intent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NotificationIntent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default notification intent"
+            },
+            "channels": {
+              "description": "Default LIVE channels",
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "title": "Channels",
+              "type": "array"
+            },
+            "delivery_mode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DeliveryMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE delivery mode"
+            },
+            "require_ack": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack requirement",
+              "title": "Require Ack"
+            },
+            "ack_timeout_minutes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack timeout in minutes",
+              "title": "Ack Timeout Minutes"
+            },
+            "ack_timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack timeout in seconds",
+              "title": "Ack Timeout Seconds"
+            },
+            "dedup_window_seconds": {
+              "description": "Deduplication window in seconds",
+              "title": "Dedup Window Seconds",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "notification_type",
+            "version",
+            "status",
+            "dedup_window_seconds"
+          ],
+          "title": "ActivePolicySummary",
+          "type": "object"
+        },
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Catalog of active notification routing policies.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ActivePolicySummary"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total_count": {
+          "description": "Total number of active policies",
+          "title": "Total Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_count"
+      ],
+      "title": "ActivePolicyListResponse",
+      "type": "object"
+    },
+    "ActivePolicySummary": {
+      "$defs": {
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Summary of an active notification routing policy for the console catalog.",
+      "properties": {
+        "notification_type": {
+          "description": "Policy notification_type identifier",
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "version": {
+          "description": "Policy version",
+          "title": "Version",
+          "type": "string"
+        },
+        "status": {
+          "description": "Lifecycle status (e.g., ACTIVE)",
+          "title": "Status",
+          "type": "string"
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationIntent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default notification intent"
+        },
+        "channels": {
+          "description": "Default LIVE channels",
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels",
+          "type": "array"
+        },
+        "delivery_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE delivery mode"
+        },
+        "require_ack": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack requirement",
+          "title": "Require Ack"
+        },
+        "ack_timeout_minutes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack timeout in minutes",
+          "title": "Ack Timeout Minutes"
+        },
+        "ack_timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack timeout in seconds",
+          "title": "Ack Timeout Seconds"
+        },
+        "dedup_window_seconds": {
+          "description": "Deduplication window in seconds",
+          "title": "Dedup Window Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "notification_type",
+        "version",
+        "status",
+        "dedup_window_seconds"
+      ],
+      "title": "ActivePolicySummary",
+      "type": "object"
+    },
     "AuditEvent": {
       "$defs": {
         "AuditEventType": {
@@ -547,6 +856,39 @@
         "agent_id"
       ],
       "title": "AutonomyContextResponse",
+      "type": "object"
+    },
+    "ConsoleSessionResponse": {
+      "description": "Authenticated console principal and capability scopes.",
+      "properties": {
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        },
+        "persistence_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Persistence Mode"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "title": "ConsoleSessionResponse",
       "type": "object"
     },
     "DeliveryAttempt": {
@@ -2084,6 +2426,1780 @@
       "title": "PaginationInfo",
       "type": "object"
     },
+    "PolicyGuardResultItem": {
+      "description": "Guard check evidence for a policy delta transition.",
+      "properties": {
+        "candidate_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Hash"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "reason_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Detail"
+        },
+        "checks": {
+          "additionalProperties": true,
+          "title": "Checks",
+          "type": "object"
+        },
+        "checked_at": {
+          "format": "date-time",
+          "title": "Checked At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "allowed",
+        "checked_at"
+      ],
+      "title": "PolicyGuardResultItem",
+      "type": "object"
+    },
+    "PolicyProposalListResponse": {
+      "$defs": {
+        "PolicyGuardResultItem": {
+          "description": "Guard check evidence for a policy delta transition.",
+          "properties": {
+            "candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidate Hash"
+            },
+            "stage": {
+              "title": "Stage",
+              "type": "string"
+            },
+            "allowed": {
+              "title": "Allowed",
+              "type": "boolean"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason"
+            },
+            "reason_detail": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason Detail"
+            },
+            "checks": {
+              "additionalProperties": true,
+              "title": "Checks",
+              "type": "object"
+            },
+            "checked_at": {
+              "format": "date-time",
+              "title": "Checked At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stage",
+            "allowed",
+            "checked_at"
+          ],
+          "title": "PolicyGuardResultItem",
+          "type": "object"
+        },
+        "PolicyProposalSummary": {
+          "description": "Full representation of a PolicyDelta proposal, shadow evidence, and guard status.",
+          "properties": {
+            "delta_id": {
+              "format": "uuid",
+              "title": "Delta Id",
+              "type": "string"
+            },
+            "policy_type": {
+              "title": "Policy Type",
+              "type": "string"
+            },
+            "field_path": {
+              "title": "Field Path",
+              "type": "string"
+            },
+            "current_value": {
+              "title": "Current Value"
+            },
+            "proposed_value": {
+              "title": "Proposed Value"
+            },
+            "reasoning": {
+              "title": "Reasoning",
+              "type": "string"
+            },
+            "confidence": {
+              "title": "Confidence",
+              "type": "number"
+            },
+            "evidence_count": {
+              "title": "Evidence Count",
+              "type": "integer"
+            },
+            "state": {
+              "title": "State",
+              "type": "string"
+            },
+            "baseline_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Baseline Hash"
+            },
+            "baseline_version": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Baseline Version"
+            },
+            "candidate_hash": {
+              "title": "Candidate Hash",
+              "type": "string"
+            },
+            "approval_candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Approval Candidate Hash"
+            },
+            "current_active_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Current Active Hash"
+            },
+            "current_active_version": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Current Active Version"
+            },
+            "baseline_hash_matches": {
+              "default": false,
+              "title": "Baseline Hash Matches",
+              "type": "boolean"
+            },
+            "evidence_hash_matches": {
+              "default": false,
+              "title": "Evidence Hash Matches",
+              "type": "boolean"
+            },
+            "can_promote_to_shadow": {
+              "default": false,
+              "title": "Can Promote To Shadow",
+              "type": "boolean"
+            },
+            "can_approve": {
+              "default": false,
+              "title": "Can Approve",
+              "type": "boolean"
+            },
+            "can_activate": {
+              "default": false,
+              "title": "Can Activate",
+              "type": "boolean"
+            },
+            "draft_policy_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Draft Policy Id"
+            },
+            "draft_version": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Draft Version"
+            },
+            "required_guards": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Required Guards",
+              "type": "array"
+            },
+            "guard_results": {
+              "items": {
+                "$ref": "#/$defs/PolicyGuardResultItem"
+              },
+              "title": "Guard Results",
+              "type": "array"
+            },
+            "transition_history": {
+              "items": {
+                "$ref": "#/$defs/PolicyTransitionItem"
+              },
+              "title": "Transition History",
+              "type": "array"
+            },
+            "shadow_aggregate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ShadowEvaluationSummaryItem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "shadow_results": {
+              "items": {
+                "$ref": "#/$defs/ShadowEvaluationSampleItem"
+              },
+              "title": "Shadow Results",
+              "type": "array"
+            },
+            "proposed_by": {
+              "title": "Proposed By",
+              "type": "string"
+            },
+            "approved_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Approved By"
+            },
+            "rejected_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rejected By"
+            },
+            "rejection_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rejection Reason"
+            },
+            "applied_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Applied At"
+            },
+            "created_at": {
+              "format": "date-time",
+              "title": "Created At",
+              "type": "string"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "title": "Updated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "delta_id",
+            "policy_type",
+            "field_path",
+            "current_value",
+            "proposed_value",
+            "reasoning",
+            "confidence",
+            "evidence_count",
+            "state",
+            "candidate_hash",
+            "proposed_by",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "PolicyProposalSummary",
+          "type": "object"
+        },
+        "PolicyTransitionItem": {
+          "description": "Audit entry for a policy delta state transition.",
+          "properties": {
+            "from_state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "From State"
+            },
+            "to_state": {
+              "title": "To State",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason"
+            },
+            "guard_stage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guard Stage"
+            },
+            "transitioned_at": {
+              "format": "date-time",
+              "title": "Transitioned At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "to_state",
+            "actor",
+            "transitioned_at"
+          ],
+          "title": "PolicyTransitionItem",
+          "type": "object"
+        },
+        "ShadowEvaluationSampleItem": {
+          "description": "Individual shadow evaluation decision sample.",
+          "properties": {
+            "result_id": {
+              "format": "uuid",
+              "title": "Result Id",
+              "type": "string"
+            },
+            "delta_id": {
+              "format": "uuid",
+              "title": "Delta Id",
+              "type": "string"
+            },
+            "decision_id": {
+              "title": "Decision Id",
+              "type": "string"
+            },
+            "original_outcome": {
+              "additionalProperties": true,
+              "title": "Original Outcome",
+              "type": "object"
+            },
+            "shadow_outcome": {
+              "additionalProperties": true,
+              "title": "Shadow Outcome",
+              "type": "object"
+            },
+            "changed": {
+              "title": "Changed",
+              "type": "boolean"
+            },
+            "improvement_score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Improvement Score"
+            },
+            "evaluated_at": {
+              "format": "date-time",
+              "title": "Evaluated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "result_id",
+            "delta_id",
+            "decision_id",
+            "changed",
+            "evaluated_at"
+          ],
+          "title": "ShadowEvaluationSampleItem",
+          "type": "object"
+        },
+        "ShadowEvaluationSummaryItem": {
+          "description": "Aggregate shadow evaluation summary for a policy delta.",
+          "properties": {
+            "aggregate_id": {
+              "format": "uuid",
+              "title": "Aggregate Id",
+              "type": "string"
+            },
+            "delta_id": {
+              "format": "uuid",
+              "title": "Delta Id",
+              "type": "string"
+            },
+            "baseline_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Baseline Hash"
+            },
+            "candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidate Hash"
+            },
+            "evaluated_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evaluated By"
+            },
+            "total_decisions": {
+              "title": "Total Decisions",
+              "type": "integer"
+            },
+            "improved_decisions": {
+              "title": "Improved Decisions",
+              "type": "integer"
+            },
+            "degraded_decisions": {
+              "title": "Degraded Decisions",
+              "type": "integer"
+            },
+            "neutral_decisions": {
+              "title": "Neutral Decisions",
+              "type": "integer"
+            },
+            "win_rate": {
+              "title": "Win Rate",
+              "type": "number"
+            },
+            "min_sample_met": {
+              "title": "Min Sample Met",
+              "type": "boolean"
+            },
+            "accuracy_threshold_met": {
+              "title": "Accuracy Threshold Met",
+              "type": "boolean"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "can_promote_to_approval": {
+              "title": "Can Promote To Approval",
+              "type": "boolean"
+            },
+            "computed_at": {
+              "format": "date-time",
+              "title": "Computed At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "aggregate_id",
+            "delta_id",
+            "total_decisions",
+            "improved_decisions",
+            "degraded_decisions",
+            "neutral_decisions",
+            "win_rate",
+            "min_sample_met",
+            "accuracy_threshold_met",
+            "status",
+            "can_promote_to_approval",
+            "computed_at"
+          ],
+          "title": "ShadowEvaluationSummaryItem",
+          "type": "object"
+        }
+      },
+      "description": "List of governed policy delta proposals and shadow evidence.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/PolicyProposalSummary"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total_count": {
+          "title": "Total Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_count"
+      ],
+      "title": "PolicyProposalListResponse",
+      "type": "object"
+    },
+    "PolicyProposalSummary": {
+      "$defs": {
+        "PolicyGuardResultItem": {
+          "description": "Guard check evidence for a policy delta transition.",
+          "properties": {
+            "candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidate Hash"
+            },
+            "stage": {
+              "title": "Stage",
+              "type": "string"
+            },
+            "allowed": {
+              "title": "Allowed",
+              "type": "boolean"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason"
+            },
+            "reason_detail": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason Detail"
+            },
+            "checks": {
+              "additionalProperties": true,
+              "title": "Checks",
+              "type": "object"
+            },
+            "checked_at": {
+              "format": "date-time",
+              "title": "Checked At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stage",
+            "allowed",
+            "checked_at"
+          ],
+          "title": "PolicyGuardResultItem",
+          "type": "object"
+        },
+        "PolicyTransitionItem": {
+          "description": "Audit entry for a policy delta state transition.",
+          "properties": {
+            "from_state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "From State"
+            },
+            "to_state": {
+              "title": "To State",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reason"
+            },
+            "guard_stage": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guard Stage"
+            },
+            "transitioned_at": {
+              "format": "date-time",
+              "title": "Transitioned At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "to_state",
+            "actor",
+            "transitioned_at"
+          ],
+          "title": "PolicyTransitionItem",
+          "type": "object"
+        },
+        "ShadowEvaluationSampleItem": {
+          "description": "Individual shadow evaluation decision sample.",
+          "properties": {
+            "result_id": {
+              "format": "uuid",
+              "title": "Result Id",
+              "type": "string"
+            },
+            "delta_id": {
+              "format": "uuid",
+              "title": "Delta Id",
+              "type": "string"
+            },
+            "decision_id": {
+              "title": "Decision Id",
+              "type": "string"
+            },
+            "original_outcome": {
+              "additionalProperties": true,
+              "title": "Original Outcome",
+              "type": "object"
+            },
+            "shadow_outcome": {
+              "additionalProperties": true,
+              "title": "Shadow Outcome",
+              "type": "object"
+            },
+            "changed": {
+              "title": "Changed",
+              "type": "boolean"
+            },
+            "improvement_score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Improvement Score"
+            },
+            "evaluated_at": {
+              "format": "date-time",
+              "title": "Evaluated At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "result_id",
+            "delta_id",
+            "decision_id",
+            "changed",
+            "evaluated_at"
+          ],
+          "title": "ShadowEvaluationSampleItem",
+          "type": "object"
+        },
+        "ShadowEvaluationSummaryItem": {
+          "description": "Aggregate shadow evaluation summary for a policy delta.",
+          "properties": {
+            "aggregate_id": {
+              "format": "uuid",
+              "title": "Aggregate Id",
+              "type": "string"
+            },
+            "delta_id": {
+              "format": "uuid",
+              "title": "Delta Id",
+              "type": "string"
+            },
+            "baseline_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Baseline Hash"
+            },
+            "candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidate Hash"
+            },
+            "evaluated_by": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evaluated By"
+            },
+            "total_decisions": {
+              "title": "Total Decisions",
+              "type": "integer"
+            },
+            "improved_decisions": {
+              "title": "Improved Decisions",
+              "type": "integer"
+            },
+            "degraded_decisions": {
+              "title": "Degraded Decisions",
+              "type": "integer"
+            },
+            "neutral_decisions": {
+              "title": "Neutral Decisions",
+              "type": "integer"
+            },
+            "win_rate": {
+              "title": "Win Rate",
+              "type": "number"
+            },
+            "min_sample_met": {
+              "title": "Min Sample Met",
+              "type": "boolean"
+            },
+            "accuracy_threshold_met": {
+              "title": "Accuracy Threshold Met",
+              "type": "boolean"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "can_promote_to_approval": {
+              "title": "Can Promote To Approval",
+              "type": "boolean"
+            },
+            "computed_at": {
+              "format": "date-time",
+              "title": "Computed At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "aggregate_id",
+            "delta_id",
+            "total_decisions",
+            "improved_decisions",
+            "degraded_decisions",
+            "neutral_decisions",
+            "win_rate",
+            "min_sample_met",
+            "accuracy_threshold_met",
+            "status",
+            "can_promote_to_approval",
+            "computed_at"
+          ],
+          "title": "ShadowEvaluationSummaryItem",
+          "type": "object"
+        }
+      },
+      "description": "Full representation of a PolicyDelta proposal, shadow evidence, and guard status.",
+      "properties": {
+        "delta_id": {
+          "format": "uuid",
+          "title": "Delta Id",
+          "type": "string"
+        },
+        "policy_type": {
+          "title": "Policy Type",
+          "type": "string"
+        },
+        "field_path": {
+          "title": "Field Path",
+          "type": "string"
+        },
+        "current_value": {
+          "title": "Current Value"
+        },
+        "proposed_value": {
+          "title": "Proposed Value"
+        },
+        "reasoning": {
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence_count": {
+          "title": "Evidence Count",
+          "type": "integer"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "baseline_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Hash"
+        },
+        "baseline_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Version"
+        },
+        "candidate_hash": {
+          "title": "Candidate Hash",
+          "type": "string"
+        },
+        "approval_candidate_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Candidate Hash"
+        },
+        "current_active_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Active Hash"
+        },
+        "current_active_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Active Version"
+        },
+        "baseline_hash_matches": {
+          "default": false,
+          "title": "Baseline Hash Matches",
+          "type": "boolean"
+        },
+        "evidence_hash_matches": {
+          "default": false,
+          "title": "Evidence Hash Matches",
+          "type": "boolean"
+        },
+        "can_promote_to_shadow": {
+          "default": false,
+          "title": "Can Promote To Shadow",
+          "type": "boolean"
+        },
+        "can_approve": {
+          "default": false,
+          "title": "Can Approve",
+          "type": "boolean"
+        },
+        "can_activate": {
+          "default": false,
+          "title": "Can Activate",
+          "type": "boolean"
+        },
+        "draft_policy_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Draft Policy Id"
+        },
+        "draft_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Draft Version"
+        },
+        "required_guards": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Guards",
+          "type": "array"
+        },
+        "guard_results": {
+          "items": {
+            "$ref": "#/$defs/PolicyGuardResultItem"
+          },
+          "title": "Guard Results",
+          "type": "array"
+        },
+        "transition_history": {
+          "items": {
+            "$ref": "#/$defs/PolicyTransitionItem"
+          },
+          "title": "Transition History",
+          "type": "array"
+        },
+        "shadow_aggregate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowEvaluationSummaryItem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "shadow_results": {
+          "items": {
+            "$ref": "#/$defs/ShadowEvaluationSampleItem"
+          },
+          "title": "Shadow Results",
+          "type": "array"
+        },
+        "proposed_by": {
+          "title": "Proposed By",
+          "type": "string"
+        },
+        "approved_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved By"
+        },
+        "rejected_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejected By"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "applied_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Applied At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "delta_id",
+        "policy_type",
+        "field_path",
+        "current_value",
+        "proposed_value",
+        "reasoning",
+        "confidence",
+        "evidence_count",
+        "state",
+        "candidate_hash",
+        "proposed_by",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "PolicyProposalSummary",
+      "type": "object"
+    },
+    "PolicyRevisionListResponse": {
+      "$defs": {
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        },
+        "PolicyRevisionSummary": {
+          "description": "Summary of a persisted notification routing policy revision for governance and lineage.",
+          "properties": {
+            "policy_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Persisted policy revision identifier",
+              "title": "Policy Id"
+            },
+            "notification_type": {
+              "description": "Policy notification_type identifier",
+              "title": "Notification Type",
+              "type": "string"
+            },
+            "version": {
+              "description": "Policy version",
+              "title": "Version",
+              "type": "string"
+            },
+            "status": {
+              "description": "Lifecycle status (ACTIVE, DRAFT, PREVIEW, RETIRED)",
+              "title": "Status",
+              "type": "string"
+            },
+            "config_hash": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Semantic policy content hash",
+              "title": "Config Hash"
+            },
+            "previous_version_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Previous policy version ID in lifecycle lineage",
+              "title": "Previous Version Id"
+            },
+            "intent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NotificationIntent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default notification intent"
+            },
+            "channels": {
+              "description": "Default LIVE channels",
+              "items": {
+                "$ref": "#/$defs/Channel"
+              },
+              "title": "Channels",
+              "type": "array"
+            },
+            "delivery_mode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DeliveryMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE delivery mode"
+            },
+            "require_ack": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack requirement",
+              "title": "Require Ack"
+            },
+            "ack_timeout_minutes": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack timeout in minutes",
+              "title": "Ack Timeout Minutes"
+            },
+            "ack_timeout_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Default LIVE ack timeout in seconds",
+              "title": "Ack Timeout Seconds"
+            },
+            "dedup_window_seconds": {
+              "description": "Deduplication window in seconds",
+              "title": "Dedup Window Seconds",
+              "type": "integer"
+            },
+            "created_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the policy revision was created",
+              "title": "Created At"
+            },
+            "updated_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the policy revision was last updated",
+              "title": "Updated At"
+            },
+            "activated_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the policy revision became ACTIVE",
+              "title": "Activated At"
+            },
+            "retired_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "When the policy revision was retired",
+              "title": "Retired At"
+            }
+          },
+          "required": [
+            "notification_type",
+            "version",
+            "status",
+            "dedup_window_seconds"
+          ],
+          "title": "PolicyRevisionSummary",
+          "type": "object"
+        }
+      },
+      "description": "Catalog of notification routing policy revisions across lifecycle statuses.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/PolicyRevisionSummary"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "total_count": {
+          "description": "Total number of policy revisions",
+          "title": "Total Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_count"
+      ],
+      "title": "PolicyRevisionListResponse",
+      "type": "object"
+    },
+    "PolicyRevisionSummary": {
+      "$defs": {
+        "Channel": {
+          "description": "Supported delivery channels for notifications.",
+          "enum": [
+            "SLACK",
+            "EMAIL",
+            "WEBSOCKET",
+            "PAGERDUTY"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "DeliveryMode": {
+          "description": "Delivery reliability semantics.\n\nGUARANTEED: Must raise error if all persistent channels fail.\nBEST_EFFORT: May fail silently but must log failure.\n\nInvariants:\n- SAFETY -> GUARANTEED\n- GOVERNANCE -> GUARANTEED\n- OPERATIONAL -> BEST_EFFORT\n- INFORMATIONAL -> BEST_EFFORT",
+          "enum": [
+            "GUARANTEED",
+            "BEST_EFFORT"
+          ],
+          "title": "DeliveryMode",
+          "type": "string"
+        },
+        "NotificationIntent": {
+          "description": "Classification of notification urgency and handling requirements.\n\nInvariants:\n- SAFETY and GOVERNANCE imply elevated delivery guarantees (GUARANTEED mode)\n- OPERATIONAL and INFORMATIONAL use BEST_EFFORT mode by default",
+          "enum": [
+            "SAFETY",
+            "GOVERNANCE",
+            "OPERATIONAL",
+            "INFORMATIONAL"
+          ],
+          "title": "NotificationIntent",
+          "type": "string"
+        }
+      },
+      "description": "Summary of a persisted notification routing policy revision for governance and lineage.",
+      "properties": {
+        "policy_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Persisted policy revision identifier",
+          "title": "Policy Id"
+        },
+        "notification_type": {
+          "description": "Policy notification_type identifier",
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "version": {
+          "description": "Policy version",
+          "title": "Version",
+          "type": "string"
+        },
+        "status": {
+          "description": "Lifecycle status (ACTIVE, DRAFT, PREVIEW, RETIRED)",
+          "title": "Status",
+          "type": "string"
+        },
+        "config_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Semantic policy content hash",
+          "title": "Config Hash"
+        },
+        "previous_version_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Previous policy version ID in lifecycle lineage",
+          "title": "Previous Version Id"
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationIntent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default notification intent"
+        },
+        "channels": {
+          "description": "Default LIVE channels",
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "title": "Channels",
+          "type": "array"
+        },
+        "delivery_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE delivery mode"
+        },
+        "require_ack": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack requirement",
+          "title": "Require Ack"
+        },
+        "ack_timeout_minutes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack timeout in minutes",
+          "title": "Ack Timeout Minutes"
+        },
+        "ack_timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default LIVE ack timeout in seconds",
+          "title": "Ack Timeout Seconds"
+        },
+        "dedup_window_seconds": {
+          "description": "Deduplication window in seconds",
+          "title": "Dedup Window Seconds",
+          "type": "integer"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the policy revision was created",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the policy revision was last updated",
+          "title": "Updated At"
+        },
+        "activated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the policy revision became ACTIVE",
+          "title": "Activated At"
+        },
+        "retired_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the policy revision was retired",
+          "title": "Retired At"
+        }
+      },
+      "required": [
+        "notification_type",
+        "version",
+        "status",
+        "dedup_window_seconds"
+      ],
+      "title": "PolicyRevisionSummary",
+      "type": "object"
+    },
+    "PolicyTransitionItem": {
+      "description": "Audit entry for a policy delta state transition.",
+      "properties": {
+        "from_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From State"
+        },
+        "to_state": {
+          "title": "To State",
+          "type": "string"
+        },
+        "actor": {
+          "title": "Actor",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "guard_stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guard Stage"
+        },
+        "transitioned_at": {
+          "format": "date-time",
+          "title": "Transitioned At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "to_state",
+        "actor",
+        "transitioned_at"
+      ],
+      "title": "PolicyTransitionItem",
+      "type": "object"
+    },
     "ResolutionContext": {
       "$defs": {
         "AutonomyMode": {
@@ -2194,6 +4310,173 @@
         "applied"
       ],
       "title": "ResolutionStep",
+      "type": "object"
+    },
+    "ShadowEvaluationSampleItem": {
+      "description": "Individual shadow evaluation decision sample.",
+      "properties": {
+        "result_id": {
+          "format": "uuid",
+          "title": "Result Id",
+          "type": "string"
+        },
+        "delta_id": {
+          "format": "uuid",
+          "title": "Delta Id",
+          "type": "string"
+        },
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "original_outcome": {
+          "additionalProperties": true,
+          "title": "Original Outcome",
+          "type": "object"
+        },
+        "shadow_outcome": {
+          "additionalProperties": true,
+          "title": "Shadow Outcome",
+          "type": "object"
+        },
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "improvement_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Improvement Score"
+        },
+        "evaluated_at": {
+          "format": "date-time",
+          "title": "Evaluated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result_id",
+        "delta_id",
+        "decision_id",
+        "changed",
+        "evaluated_at"
+      ],
+      "title": "ShadowEvaluationSampleItem",
+      "type": "object"
+    },
+    "ShadowEvaluationSummaryItem": {
+      "description": "Aggregate shadow evaluation summary for a policy delta.",
+      "properties": {
+        "aggregate_id": {
+          "format": "uuid",
+          "title": "Aggregate Id",
+          "type": "string"
+        },
+        "delta_id": {
+          "format": "uuid",
+          "title": "Delta Id",
+          "type": "string"
+        },
+        "baseline_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Hash"
+        },
+        "candidate_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Hash"
+        },
+        "evaluated_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluated By"
+        },
+        "total_decisions": {
+          "title": "Total Decisions",
+          "type": "integer"
+        },
+        "improved_decisions": {
+          "title": "Improved Decisions",
+          "type": "integer"
+        },
+        "degraded_decisions": {
+          "title": "Degraded Decisions",
+          "type": "integer"
+        },
+        "neutral_decisions": {
+          "title": "Neutral Decisions",
+          "type": "integer"
+        },
+        "win_rate": {
+          "title": "Win Rate",
+          "type": "number"
+        },
+        "min_sample_met": {
+          "title": "Min Sample Met",
+          "type": "boolean"
+        },
+        "accuracy_threshold_met": {
+          "title": "Accuracy Threshold Met",
+          "type": "boolean"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "can_promote_to_approval": {
+          "title": "Can Promote To Approval",
+          "type": "boolean"
+        },
+        "computed_at": {
+          "format": "date-time",
+          "title": "Computed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "aggregate_id",
+        "delta_id",
+        "total_decisions",
+        "improved_decisions",
+        "degraded_decisions",
+        "neutral_decisions",
+        "win_rate",
+        "min_sample_met",
+        "accuracy_threshold_met",
+        "status",
+        "can_promote_to_approval",
+        "computed_at"
+      ],
+      "title": "ShadowEvaluationSummaryItem",
       "type": "object"
     },
     "UIErrorResponse": {
@@ -2458,6 +4741,15 @@
     },
     {
       "method": "GET",
+      "path": "/ui/policies/active",
+      "summary": "List active notification policies",
+      "description": "Return the catalog of currently active notification routing policies.",
+      "response_model": "ActivePolicyListResponse",
+      "query_params": [],
+      "error_codes": []
+    },
+    {
+      "method": "GET",
       "path": "/ui/policies/effective",
       "summary": "Get effective policy",
       "description": "Get effective policy resolution for a notification type. Read-only endpoint.",
@@ -2471,7 +4763,7 @@
         {
           "name": "intent",
           "type": "NotificationIntent",
-          "required": true
+          "required": false
         },
         {
           "name": "autonomy_mode",
@@ -2487,6 +4779,95 @@
       ],
       "error_codes": [
         "invalid_parameter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/policies/proposals",
+      "summary": "List policy delta proposals and shadow evaluation evidence",
+      "description": "Return governed policy delta proposals, shadow evaluation aggregates, and guard results.",
+      "response_model": "PolicyProposalListResponse",
+      "query_params": [
+        {
+          "name": "policy_type",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "state",
+          "type": "DeltaState",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 50,
+          "min": 1,
+          "max": 200
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/policies/proposals/{delta_id}",
+      "summary": "Inspect a policy delta proposal and shadow evaluation samples",
+      "description": "Return full detail for a policy delta proposal, including shadow decision samples and guard history.",
+      "response_model": "PolicyProposalSummary",
+      "path_params": [
+        {
+          "name": "delta_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "error_codes": [
+        "not_found"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/policies/revisions",
+      "summary": "List notification policy revisions",
+      "description": "Return stored notification policy revisions across lifecycle statuses (ACTIVE, DRAFT, PREVIEW, RETIRED).",
+      "response_model": "PolicyRevisionListResponse",
+      "query_params": [
+        {
+          "name": "notification_type",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "PolicyStatus",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 200,
+          "min": 1,
+          "max": 500
+        }
+      ],
+      "error_codes": [
+        "invalid_parameter"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ui/session",
+      "summary": "Get console session capabilities",
+      "description": "Return the authenticated principal subject and capability scopes.",
+      "response_model": "ConsoleSessionResponse",
+      "query_params": [],
+      "error_codes": [
+        "unauthorized",
+        "forbidden"
       ]
     }
   ]

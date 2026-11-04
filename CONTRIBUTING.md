@@ -64,7 +64,7 @@ bandit -q -r src
 
 ### UNS Console Development (`apps/ui`)
 
-The **UNS Console** is a read-only React 19 + TypeScript 5.9 + ESLint 9 flat config (`eslint.config.js`) + Vite 8 Single Page Application across the 6 console surfaces (`/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, `/docs`) in `apps/ui/`.
+The **UNS Console** is a React 19 + TypeScript 5.9 + ESLint 9 flat config (`eslint.config.js`) + Vite 8 Single Page Application across the 6 console surfaces (`/deliveries`, `/policy`, `/operations`, `/invariants`, `/audit`, `/docs`) in `apps/ui/`. All `/ui/*` endpoints are strictly read-only (`INV-UI-001`), while capability-gated operator and responder mutations in the console call `/api/v1/*` endpoints.
 
 ```bash
 cd apps/ui
