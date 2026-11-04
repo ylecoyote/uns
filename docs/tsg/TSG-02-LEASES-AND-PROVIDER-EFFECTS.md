@@ -88,7 +88,7 @@ sqlite3 "$UNS_DB_FILE" "
 
 ### Step 4.1: When a notification with `LEASE_LOST` lands in the DLQ
 1. **Inspect `CHANNEL_ATTEMPT_RESULT` events and provider logs first** before calling `/replay` (3-way decision branch):
-   - **Branch 1 (`"success": true` with `message_id`):** The external provider accepted the message even though the worker lost its lease before aggregate settlement. Do **not** replay — resolve the DLQ entry via `DELETE /api/v1/dlq/$ENTRY_ID`:
+   - **Branch 1 (`"success": true` with `message_id`):** The external provider accepted the message even though the worker lost its lease before aggregate settlement. Do **not** replay - resolve the DLQ entry via `DELETE /api/v1/dlq/$ENTRY_ID`:
      ```sh
      ENTRY_ID="$NOTIF_ID" # In RuntimeDLQ, entry_id === notification_id
      curl -sS -X DELETE -H "Authorization: Bearer $UNS_API_KEY" \

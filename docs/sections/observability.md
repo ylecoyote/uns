@@ -110,7 +110,7 @@ async def health() -> dict[str, str]:
 
 ### Endpoint Semantics
 
-Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}`. In the unified UNS service it returns `{"status": "alive", "service": "uns", "version": ...}` as a lightweight liveness stub. The `/health` endpoint is intentionally unauthenticated for load-balancer liveness probes and does NOT invoke database queries or adapter health checks—those live at the authenticated `/ready` and `/readyz` endpoints.
+Pre-Phase-3 the `/health` endpoint returned a static stub `{"status": "healthy"}`. In the unified UNS service it returns `{"status": "alive", "service": "uns", "version": ...}` as a lightweight liveness stub. The `/health` endpoint is intentionally unauthenticated for load-balancer liveness probes and does NOT invoke database queries or adapter health checks; those live at the authenticated `/ready` and `/readyz` endpoints.
 
 `/health` does NOT:
 - Query the database or invoke adapter health checks (use `/readyz` instead)

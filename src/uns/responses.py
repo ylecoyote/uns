@@ -13,7 +13,7 @@ The 40 types relocated here include 23 top-level Pydantic Request/Response
 classes plus 17 supporting types (12 sub-DTOs + 5 string enums) that the
 Response classes reference structurally. The two ``ErrorResponse`` classes
 that previously coexisted at ``routes_notification`` and ``routes_ui`` are
-renamed here to ``NotificationErrorResponse`` and ``UIErrorResponse`` —
+renamed here to ``NotificationErrorResponse`` and ``UIErrorResponse`` -
 they were structurally incompatible and could not consolidate.
 """
 

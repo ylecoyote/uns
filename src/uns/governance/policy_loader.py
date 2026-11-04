@@ -6,7 +6,7 @@ MUST produce identical policy_config_hash.
 Per PRD M1.5 / M3.4: at load time we validate (a) operators are in the closed
 allowlist, (b) regex patterns fit the length cap (defense in depth), (c) field
 references will be checked against the registered ContextSchema (in
-context_schema.py / decision_engine.py — load-time field-ref validation lives
+context_schema.py / decision_engine.py - load-time field-ref validation lives
 where the schema is registered, not here).
 
 This module raises PolicyLoadError for any structural / operator / regex

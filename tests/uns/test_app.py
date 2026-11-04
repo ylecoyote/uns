@@ -40,7 +40,7 @@ def test_ready_responds_with_unified_payload(client: TestClient) -> None:
 def test_metrics_endpoint_responds(client: TestClient) -> None:
     response = client.get("/metrics")
     assert response.status_code == 200
-    # Prometheus format check — contains at least one HELP/TYPE line
+    # Prometheus format check - contains at least one HELP/TYPE line
     assert "# HELP" in response.text or "# TYPE" in response.text
 
 
@@ -59,7 +59,7 @@ def test_write_surface_is_mounted(client: TestClient) -> None:
         json=payload,
         headers={"X-Agent-ID": "a"},
     )
-    # Either succeeds (200) or returns auth error (401/403) — what matters
+    # Either succeeds (200) or returns auth error (401/403) - what matters
     # is the route is NOT 404 (which would mean the router isn't mounted).
     assert response.status_code != 404, (
         f"Write surface unreachable: {response.status_code}"
@@ -83,7 +83,7 @@ def test_ack_surface_is_mounted(client: TestClient) -> None:
     )
     # 404 here would mean the ack router isn't mounted under /api.
     # We expect 401/403/422/404-not-found-notification but NOT 404-route-missing.
-    # Distinguish by checking the response body — the route exists if we get
+    # Distinguish by checking the response body - the route exists if we get
     # a JSON error envelope rather than the FastAPI default "Not Found" string.
     assert response.status_code != 404 or response.json().get("detail") != "Not Found"
 
@@ -92,7 +92,7 @@ def test_websocket_endpoint_is_mounted(client: TestClient) -> None:
     """WebSocket connect to /ws/agents/{agent_id} succeeds the handshake.
 
     CORRECTED FROM PLAN V1: the route signature is
-    `websocket_endpoint(websocket: WebSocket, agent_id: UUID)` — FastAPI
+    `websocket_endpoint(websocket: WebSocket, agent_id: UUID)` - FastAPI
     will reject a non-UUID path param at handshake. Use a real UUID.
     """
     from uuid import uuid4

@@ -7,7 +7,7 @@ without entangling with the structured-logging :class:`ObservabilityMiddleware`.
 Instrumentation is intentionally narrow:
 
 - HTTP layer: every request is counted and timed by route template
-  (the route's ``path`` attribute, not the raw URL — preventing cardinality
+  (the route's ``path`` attribute, not the raw URL - preventing cardinality
   explosion on path parameters like notification UUIDs).
 - Domain layer: signals and deliveries are counted at their canonical entry
   points (see ``notification.routes`` and ``uns.signaling``).
@@ -176,7 +176,7 @@ def install_metrics(app: FastAPI) -> None:
     """Wire Prometheus metrics into a FastAPI app.
 
     Adds the ``/metrics`` endpoint and the request-recording middleware.
-    Idempotent — if called twice on the same app, the route is only mounted
+    Idempotent - if called twice on the same app, the route is only mounted
     once. The middleware is added as-is; double-installation will double-count.
     """
     if not any(getattr(route, "path", None) == "/metrics" for route in app.routes):

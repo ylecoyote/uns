@@ -31,7 +31,7 @@ flowchart LR
     v05 --> v10["v1.0.0\nSLO Certification & Action Gate"]
 ```
 
-### 1. [`v0.3.0` — Bi-Directional Webhooks & Registry Publishing](https://github.com/ylecoyote/uns/milestone/1) *(Shipped)*
+### 1. [`v0.3.0` - Bi-Directional Webhooks & Registry Publishing](https://github.com/ylecoyote/uns/milestone/1) *(Shipped)*
 
 **Goal:** Enable signed bi-directional Slack and PagerDuty response settlement and automate public package/container registry publishing.
 
@@ -43,7 +43,7 @@ flowchart LR
 
 ---
 
-### 2. [`v0.4.0` — Multi-Node Operations, PostgreSQL Maintenance & Scoped RBAC](https://github.com/ylecoyote/uns/milestone/2) *(Shipped)*
+### 2. [`v0.4.0` - Multi-Node Operations, PostgreSQL Maintenance & Scoped RBAC](https://github.com/ylecoyote/uns/milestone/2) *(Shipped)*
 
 **Goal:** Provide full operational parity between SQLite and PostgreSQL 16 across multi-worker fleet deployments and multi-tenant producer/responder teams.
 
@@ -55,7 +55,7 @@ flowchart LR
 
 ---
 
-### 3. [`v0.5.0` — Governed Policy Evolution & Shadow Evaluation Workspace](https://github.com/ylecoyote/uns/milestone/3) *(Shipped)*
+### 3. [`v0.5.0` - Governed Policy Evolution & Shadow Evaluation Workspace](https://github.com/ylecoyote/uns/milestone/3) *(Shipped)*
 
 **Goal:** Turn the in-tree `policy_learning` and `policy_learning_store` foundations into an end-to-end shadow evaluation and promotion workflow.
 
@@ -69,7 +69,7 @@ flowchart LR
 
 ---
 
-### 4. [`v1.0.0` — Production SLO Certification & Action-Authorization Engine](https://github.com/ylecoyote/uns/milestone/4)
+### 4. [`v1.0.0` - Production SLO Certification & Action-Authorization Engine](https://github.com/ylecoyote/uns/milestone/4)
 
 **Goal:** Certify production SLOs backed by sustained live-provider telemetry and resolve the long-term boundary of `uns.governance`.
 

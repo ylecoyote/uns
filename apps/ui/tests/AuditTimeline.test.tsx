@@ -206,7 +206,7 @@ describe('AuditTimeline', () => {
       expect(screen.getByTestId('audit-event-list')).not.toHaveClass('audit-stream-hidden');
     });
 
-    it('renders Prior to window and — duration for partial-page ack.received slices, sorts equal timestamps by lifecycle phase rank, and filters internal timeout worker actor', async () => {
+    it('renders Prior to window and - duration for partial-page ack.received slices, sorts equal timestamps by lifecycle phase rank, and filters internal timeout worker actor', async () => {
       const partialPagePayload = {
         items: [
           // 1. Only ack.received in window (no started or delivered events in slice)
@@ -289,8 +289,8 @@ describe('AuditTimeline', () => {
       // Started and Delivered columns both show "Prior to window", not "Pending" or "Acknowledged"
       expect(ackOnlyRow).toHaveTextContent('Prior to window');
       expect(ackOnlyRow).not.toHaveTextContent('Pending');
-      // Time to respond is '—' rather than a fabricated '0s'
-      expect(ackOnlyRow).toHaveTextContent('—');
+      // Time to respond is '-' rather than a fabricated '0s'
+      expect(ackOnlyRow).toHaveTextContent('-');
       expect(ackOnlyRow).not.toHaveTextContent('0s');
 
       const sameTsRow = screen.getByTestId('audit-lifecycle-row-notif-same-ts');

@@ -25,7 +25,7 @@ from uns.responses import (
 
 
 def test_send_notification_request_round_trip() -> None:
-    """Notification write Request — confirms field set + extra='forbid'."""
+    """Notification write Request - confirms field set + extra='forbid'."""
     payload = {
         "notification_type": "test.signal",
         "intent": "INFORMATIONAL",
@@ -78,14 +78,14 @@ def test_autonomy_context_request_to_domain_method_preserved() -> None:
 
 
 def test_ack_request_round_trip() -> None:
-    """Acknowledgment family — Request shape."""
+    """Acknowledgment family - Request shape."""
     request = AckRequest.model_validate({"acked_by": "operator", "metadata": {}})
     serialized = request.model_dump(mode="json")
     AckRequest.model_validate(serialized)
 
 
 def test_delivery_timeline_response_with_nested_attempt() -> None:
-    """Console / read family — composite Response with sub-DTO."""
+    """Console / read family - composite Response with sub-DTO."""
     attempt = DeliveryAttempt.model_validate(
         {
             "attempt_id": "00000000-0000-0000-0000-000000000010",

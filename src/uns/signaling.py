@@ -1,7 +1,7 @@
 """UNS write-side service layer.
 
 Async orchestration functions for governance-signal mutations: send_signal,
-acknowledge, dismiss, simulate_signal. Async — no FastAPI imports. HTTP
+acknowledge, dismiss, simulate_signal. Async - no FastAPI imports. HTTP
 route handlers and MCP tools both call these. There is no other source
 of truth for the write path.
 """
@@ -56,7 +56,7 @@ async def acknowledge(
 
     The audit row is written before the engine state mutates. If audit
     persistence fails, the engine state is not advanced and the caller
-    receives :class:`AuditPersistenceError` — no HTTPException; the route
+    receives :class:`AuditPersistenceError` - no HTTPException; the route
     layer translates to 503. ``KeyError`` (notification not found) is
     similarly raised as the typed domain error; the route translates to
     404. :class:`InvalidAckTransitionError` propagates unchanged for the
@@ -208,7 +208,7 @@ async def send_signal(
     The ``transport_metadata`` argument is the verbatim ``audit_metadata``
     dict written into the delivery audit record. Operator audit forensics
     rely on the distinction between ``{"runtime": "standalone_http"}`` and
-    ``{"runtime": "uns_mcp"}`` — the function does not unify the tags,
+    ``{"runtime": "uns_mcp"}`` - the function does not unify the tags,
     only round-trips what the caller supplies.
 
     The route-layer ``send_notification`` additionally performs websocket

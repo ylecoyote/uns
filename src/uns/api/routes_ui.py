@@ -3,12 +3,12 @@
 This module provides the HTTP endpoints for the UI dashboard per
 ``docs/ui/ui-data-contracts.md``:
 
-- GET /ui/deliveries — List delivery timelines with filtering
-- GET /ui/deliveries/{id} — Get single delivery timeline
-- GET /ui/policies/effective — Get effective policy resolution
-- GET /ui/invariants — List system invariants
-- GET /ui/invariants/summary — Aggregate invariant summary
-- GET /ui/audit — List audit events with filtering
+- GET /ui/deliveries - List delivery timelines with filtering
+- GET /ui/deliveries/{id} - Get single delivery timeline
+- GET /ui/policies/effective - Get effective policy resolution
+- GET /ui/invariants - List system invariants
+- GET /ui/invariants/summary - Aggregate invariant summary
+- GET /ui/audit - List audit events with filtering
 
 All endpoints are READ-ONLY. No mutating actions are permitted.
 
@@ -345,7 +345,7 @@ async def list_deliveries(
     channel: Channel | None = Query(default=None, description="Filter by channel attempted"),
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> DeliveryTimelineListResponse:
-    """HTTP adapter — delegates to uns.queries.list_deliveries."""
+    """HTTP adapter - delegates to uns.queries.list_deliveries."""
     if notification_type is not None:
         require_source_and_namespace(
             principal,
@@ -428,7 +428,7 @@ async def get_delivery_timeline(
     http_request: Request,
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> DeliveryTimelineResponse:
-    """HTTP adapter — delegates to uns.queries.get_delivery_timeline.
+    """HTTP adapter - delegates to uns.queries.get_delivery_timeline.
 
     Translates the typed :class:`uns.errors.NotFoundError` raised by
     the service layer to an HTTP 404 response with the standard error
@@ -501,7 +501,7 @@ async def get_effective_policy(
     irreversible: bool = Query(default=False, description="Whether the action is irreversible"),
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> EffectivePolicyResponse:
-    """HTTP adapter — delegates to uns.queries.get_effective_policy."""
+    """HTTP adapter - delegates to uns.queries.get_effective_policy."""
     require_source_and_namespace(
         principal,
         notification_type=notification_type,
@@ -841,7 +841,7 @@ async def list_invariants(
     ),
     search: str | None = Query(default=None, description="Full-text search on statement"),
 ) -> InvariantListResponse:
-    """HTTP adapter — delegates to uns.queries.list_invariants."""
+    """HTTP adapter - delegates to uns.queries.list_invariants."""
     log_endpoint_call(
         logger,
         "list_invariants",
@@ -873,7 +873,7 @@ async def list_invariants(
     description="Get summary statistics for system invariants. Read-only endpoint.",
 )
 async def get_invariants_summary() -> InvariantSummaryResponse:
-    """HTTP adapter — delegates to uns.queries.get_invariants_summary."""
+    """HTTP adapter - delegates to uns.queries.get_invariants_summary."""
     log_endpoint_call(logger, "get_invariants_summary")
 
     return await _query_invariants_summary()
@@ -902,7 +902,7 @@ async def list_audit_events(
     correlation_id: str | None = Query(default=None, description="Filter by correlation ID"),
     principal: WritePrincipal | None = Depends(require_read_principal),
 ) -> AuditEventListResponse:
-    """HTTP adapter — delegates to uns.queries.list_audit_events."""
+    """HTTP adapter - delegates to uns.queries.list_audit_events."""
     log_endpoint_call(
         logger,
         "list_audit_events",

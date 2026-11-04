@@ -204,6 +204,6 @@ Connected agents can also send JSON commands over the authenticated WebSocket co
 
 ## Related Documentation
 
-- [API Reference — MCP & WebSocket](../API.md)
+- [API Reference - MCP & WebSocket](../API.md)
 - [TSG-05: MCP Process Lifecycle & Agent WebSocket Recovery](../tsg/TSG-05-MCP-AND-AGENT-RECOVERY.md)
 - [Security Model](../SECURITY-MODEL.md)

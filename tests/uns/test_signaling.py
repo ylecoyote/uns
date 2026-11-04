@@ -48,7 +48,7 @@ async def test_acknowledge_marks_notification_as_acked_and_persists_audit() -> N
     engine = configure_ack_engine(storage=InMemoryAckStorage())
 
     # Register the notification with the ack engine first so it's ackable.
-    # The route layer does this via send_signal — when we test acknowledge in
+    # The route layer does this via send_signal - when we test acknowledge in
     # isolation, the test must establish the precondition.
     notification_id = uuid4()
     engine.register_notification(
@@ -72,7 +72,7 @@ async def test_acknowledge_marks_notification_as_acked_and_persists_audit() -> N
     assert response.acked_by == "ops-rotation@example.com"
 
     # Audit row was persisted. InMemoryAuditStore exposes ack audits via
-    # get_ack_audits_for_notification(notification_id) — see
+    # get_ack_audits_for_notification(notification_id) - see
     # src/notification/audit.py:281.
     rows = audit_store.get_ack_audits_for_notification(notification_id)
     assert rows, "audit row not persisted"

@@ -2,7 +2,7 @@
 
 Phase 3 Task 7 added the four service-layer write functions to the
 ``from uns import …`` surface (``send_signal``, ``simulate_signal``,
-``acknowledge``, ``dismiss``) — they parallel the ``SignalClient`` SDK
+``acknowledge``, ``dismiss``) - they parallel the ``SignalClient`` SDK
 affordance. Read functions stay scoped to ``uns.queries.X`` by design;
 exporting them at the top level would clutter the SDK surface without
 parallel SDK affordance.
@@ -45,7 +45,7 @@ def test_public_api_excludes_service_layer_read_functions() -> None:
     )
     for name in read_functions:
         assert not hasattr(uns, name), (
-            f"{name!r} unexpectedly exported from uns top level — "
+            f"{name!r} unexpectedly exported from uns top level - "
             "read functions are scoped to uns.queries by design"
         )
         assert name not in uns.__all__

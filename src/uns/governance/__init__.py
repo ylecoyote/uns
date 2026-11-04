@@ -1,4 +1,4 @@
-"""UNS governance — Opt-in Pre-Execution Decision Engine, Policy DSL, ContextSchema & Approval Bridge.
+"""UNS governance - Opt-in Pre-Execution Decision Engine, Policy DSL, ContextSchema & Approval Bridge.
 
 Exposes the deterministic pre-execution governance primitives (`decide`, `DecisionEngine`,
 `ContextSchema`, `Policy`, `DecisionRecord`) and the obligation-backed

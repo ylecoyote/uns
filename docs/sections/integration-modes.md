@@ -18,7 +18,7 @@ UNS provides two layers of integration:
    - Background worker loops (`await runtime.worker()`) handle leased retries, acknowledgment timeout sweeps (`TIMED_OUT`), and at-least-once terminal callback delivery (`deliver_callbacks`).
 2. **Low-Level In-Process Pipeline (`notification.sdk.NotificationSDK` / `uns.SignalClient`):**
    - Provides protocol-based in-process policy resolution and adapter orchestration.
-   - **Important Remediation Contract:** Calling `NotificationSDK()` without configuring a `delivery_handler` only evaluates policy and returns `DeliveryStatus.PENDING`—it does **not** perform external channel delivery. For durable delivery, use `uns.Runtime` and `uns.Client`.
+   - **Important Remediation Contract:** Calling `NotificationSDK()` without configuring a `delivery_handler` only evaluates policy and returns `DeliveryStatus.PENDING`; it does **not** perform external channel delivery. For durable delivery, use `uns.Runtime` and `uns.Client`.
 
 ## Architecture Separation
 
@@ -509,7 +509,7 @@ This pattern ensures:
 | **WebSocket Connections** | Built-in `/ws/agents/{id}` or injected | External manager owned by integrator |
 | **Agent State** | - | Owned by integrator |
 
-**UNS / UNS Core is a self-contained notification and acknowledgment service.** Integration with ATP or other platforms is achieved through `uns.Runtime` / `uns.Client`, HTTP/MCP transports, or protocol-based dependency injection—never hard platform dependencies.
+**UNS / UNS Core is a self-contained notification and acknowledgment service.** Integration with ATP or other platforms is achieved through `uns.Runtime` / `uns.Client`, HTTP/MCP transports, or protocol-based dependency injection, never hard platform dependencies.
 
 ## Related Documentation
 

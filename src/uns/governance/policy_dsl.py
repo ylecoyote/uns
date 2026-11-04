@@ -1,4 +1,4 @@
-"""Policy DSL Pydantic models — Policy, Rule, Condition, ThenClause.
+"""Policy DSL Pydantic models - Policy, Rule, Condition, ThenClause.
 
 Per ADR Decision Engine Internal Shape:
 - Multiple `when` conditions are AND-joined (implicit AND)

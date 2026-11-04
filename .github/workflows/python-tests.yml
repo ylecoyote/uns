@@ -92,7 +92,7 @@ jobs:
         run: uv build
 
       # ---------- Minimal install: SDK-only consumer ----------
-      - name: Create isolated venv (minimal install — no extras)
+      - name: Create isolated venv (minimal install - no extras)
         run: uv venv --python 3.12 /tmp/sdk-only
 
       - name: Install wheel with NO extras
@@ -111,7 +111,7 @@ jobs:
           from uns_mcp import MCPRuntimeConfig
           assert MCPRuntimeConfig().read_only is True, "read_only must default True"
           # Server modules MUST raise ImportError without the [server] extra.
-          # This is the contract — minimal install does not pull in fastapi.
+          # This is the contract - minimal install does not pull in fastapi.
           for module in ("notification.routes",):
               try:
                   __import__(module)

@@ -77,7 +77,7 @@ class MissingFieldError(ContextSchemaViolation):
     declared in the schema but missing from the evaluation-time context capsule.
 
     Distinct from "field not in schema" (which is also ContextSchemaViolation
-    but a different category — that one is a policy-load error; this one is
+    but a different category - that one is a policy-load error; this one is
     evaluate-time).
     """
 

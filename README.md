@@ -3,7 +3,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup-dark.svg" />
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup.svg" />
-  <img alt="UNS — Unified Notification Service" src="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup.svg" height="56" />
+  <img alt="UNS: Unified Notification Service" src="https://raw.githubusercontent.com/ylecoyote/uns/main/docs/assets/logo/uns-lockup.svg" height="56" />
 </picture>
 
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
@@ -12,7 +12,7 @@
 
 When several autonomous applications or background jobs emit operational alerts, ordinary fire-and-forget webhooks leave operators guessing: *Which policy governed this alert? Did a provider accept it? Was it coalesced with an earlier incident? Did anyone actually respond before the deadline?*
 
-UNS treats an important notification as a **recoverable obligation** backed by a transactional SQLite or PostgreSQL outbox (`uns.Runtime`). Policy resolution, acceptance, deduplication ownership, and audit provenance commit together at intake so accepted work retains the exact policy revision that governed it—even across process restarts, provider timeouts, or later policy updates.
+UNS treats an important notification as a **recoverable obligation** backed by a transactional SQLite or PostgreSQL outbox (`uns.Runtime`). Policy resolution, acceptance, deduplication ownership, and audit provenance commit together at intake so accepted work retains the exact policy revision that governed it, even across process restarts, provider timeouts, or later policy updates.
 
 | Lifecycle Event | What UNS Establishes |
 | :--- | :--- |
@@ -27,7 +27,7 @@ UNS treats an important notification as a **recoverable obligation** backed by a
 - **Policy Authority at Intake:** Producer payloads cannot weaken an `ACTIVE` notification policy's delivery mode, channels, acknowledgment requirement, or timeout. Proposed policy changes carry shadow evaluation evidence and explicit approval before activation.
 - **Scoped Credential Authority:** Supports least-privilege API keys for independent callers (`UNS_PRODUCER_API_KEY`, `UNS_RESPONDER_API_KEY`, `UNS_OBSERVER_API_KEY`) alongside the full operator key (`UNS_API_KEY`).
 - **Failure-Aware Deduplication:** Pending ownership survives window expiry, owner failure promotes a follower or hands off to a successor (`dedup_successor_id`), and status responses expose `obligation_owner_id` and `effective_ack_status` directly.
-- **Delivery Fallback vs. Post-Silence Escalation:** `GUARANTEED` mode performs bounded durable retries across selected persistent channels (`Slack → Email → PagerDuty`), stopping at the first channel that accepts the message, or surfacing a visible dead-letter entry on exhaustion. If a channel accepts the message but no human responds before the deadline, UNS records `TIMED_OUT` and invokes the host callback—multi-step human on-call paging belongs to your incident responder (such as PagerDuty escalation policies) or host callback.
+- **Delivery Fallback vs. Post-Silence Escalation:** `GUARANTEED` mode performs bounded durable retries across selected persistent channels (`Slack → Email → PagerDuty`), stopping at the first channel that accepts the message, or surfacing a visible dead-letter entry on exhaustion. If a channel accepts the message but no human responds before the deadline, UNS records `TIMED_OUT` and invokes the host callback; multi-step human on-call paging belongs to your incident responder (such as PagerDuty escalation policies) or host callback.
 - **Explicit Scope Boundary:** UNS core governs notification obligations and response evidence; a standalone acknowledgment records human receipt, not comprehension or permission to execute an action. Pre-execution action gating (`ALLOW / REQUIRE_APPROVAL / DENY`) is provided via the opt-in `uns.governance` package (`decide()`, `DecisionEngine`, `GovernanceApprovalBridge`), while legacy root-level action-authorization models in `notification.models` remain experimental compatibility types.
 
 ## Local quickstart

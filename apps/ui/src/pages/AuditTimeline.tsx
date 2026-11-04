@@ -1,5 +1,5 @@
 /**
- * AuditTimeline page — displays the filtered audit event stream (/audit).
+ * AuditTimeline page - displays the filtered audit event stream (/audit).
  *
  * Implements the Modernist restyle with:
  * - Architectural 2-column header + Delivery (filled) vs. Response (outlined) legend

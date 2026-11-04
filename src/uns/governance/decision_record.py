@@ -99,5 +99,5 @@ class DecisionRecord(BaseModel):
     resource_type: str | None = Field(None, description="Taxonomy of resource_id")
     parent_decision_id: str | None = Field(None, description="Replay/re-evaluation chain (NOT correlation_id; semantically distinct)")
     request_origin: RequestOrigin | None = Field(None, description="Structured: ip, hostname, region, jurisdiction")
-    model_id: str | None = Field(None, description="AI provenance — model identifier (when agent provenance is recorded)")
+    model_id: str | None = Field(None, description="AI provenance - model identifier (when agent provenance is recorded)")
     model_version: str | None = Field(None, description="Paired with model_id")

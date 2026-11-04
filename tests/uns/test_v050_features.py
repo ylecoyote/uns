@@ -122,7 +122,7 @@ async def test_shadow_evaluator_evaluates_preview_policy_without_side_effects(
     resp1 = await runtime.send(_make_request(title="Order #1"), principal="producer-1")
     resp2 = await runtime.send(_make_request(title="Order #2"), principal="producer-1")
 
-    # Live obligations must use ONLY the ACTIVE policy (SLACK) — PagerDuty is NEVER called!
+    # Live obligations must use ONLY the ACTIVE policy (SLACK) - PagerDuty is NEVER called!
     assert resp1.channels_attempted == [Channel.SLACK]
     assert resp2.channels_attempted == [Channel.SLACK]
     assert len(slack_adapter.sent) >= 1

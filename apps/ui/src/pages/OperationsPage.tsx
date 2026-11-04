@@ -1,5 +1,5 @@
 /**
- * OperationsPage — Operator Telemetry & Joined Dead-Letter Recovery (/operations).
+ * OperationsPage - Operator Telemetry & Joined Dead-Letter Recovery (/operations).
  *
  * Surface 3 of the UNS Console Responder & Operator Workflows specification.
  * Coordinates fault-isolated polling across:

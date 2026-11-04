@@ -1,5 +1,5 @@
 /**
- * AuditFilters component — Modernist 4-Column Modular Filter Grid (1d / 1e)
+ * AuditFilters component - Modernist 4-Column Modular Filter Grid (1d / 1e)
  *
  * Provides filter controls for the audit event stream plus the segmented
  * view toggle ("By notification" lifecycle view vs. "All events" stream).

@@ -423,7 +423,7 @@ def create_app(
                 audit_logger_type = type(get_audit_logger()).__name__
                 persistence_mode = "in_memory"
                 operational_progress = None
-        except Exception as exc:  # noqa: BLE001 — readiness probe surfaces all failures
+        except Exception as exc:  # noqa: BLE001 - readiness probe surfaces all failures
             error_payload = {
                 "status": "not_ready",
                 "service": "uns",
