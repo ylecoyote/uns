@@ -1,8 +1,10 @@
 # Deployment candidate and local smoke
 
+> **Note:** This document is the immutable verification receipt from the `v0.2.0` pre-deployment container and browser smoke rehearsal (`07ef52a`). See [LOCAL_DEPLOYMENT.md](LOCAL_DEPLOYMENT.md) for the persistent localhost recording stack and [TESTING.md](TESTING.md) for current release verification metrics.
+
 Tested code: `07ef52a87b45128b77715f64c8b0e5f8f91387a9`. Base: `ca43bea`. Image: `uns:07ef52a`, image ID `sha256:15544fa7893287e391331f46b069e4dba0c38a158594405b4bcd7f41a0bd8e0d`. Application code and dependency changes were built into the image; all 90 installed modules matched source.
 
-The user subsequently accepted localhost plus recording adapters. See [the completed persistent deployment](LOCAL_DEPLOYMENT.md) for the current service and runbook. The receipt below preserves the earlier rehearsal scope.
+The operator subsequently selected the persistent localhost recording profile. See [the completed persistent deployment](LOCAL_DEPLOYMENT.md) for the running service and runbook. The receipt below preserves the initial rehearsal scope.
 
 ## Deployment status at the rehearsal checkpoint
 

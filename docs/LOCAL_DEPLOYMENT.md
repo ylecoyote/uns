@@ -1,6 +1,8 @@
 # Persistent localhost recording deployment
 
-The user selected localhost with recording adapters. The service is deployed at **http://127.0.0.1:18080** and remains available while Docker Desktop is running. This resolves the target/provider questions in the earlier rehearsal report.
+> **Note:** This runbook and verification receipt document the persistent localhost recording deployment at **http://127.0.0.1:18080** (initially established at `v0.2.0` / `aeb7cca` and updated through `v0.6.1`).
+
+The persistent localhost stack runs with local recording adapters at **http://127.0.0.1:18080** and remains available while Docker Desktop is running. This resolves the target and provider selection from the initial [deployment smoke rehearsal](DEPLOYMENT_SMOKE.md).
 
 ## Sign in
 

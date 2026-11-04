@@ -6,6 +6,8 @@
   <img alt="UNS - Unified Notification Service" src="assets/logo/uns-lockup.svg" height="56" />
 </picture>
 
+**Governed notification obligations, immutable policy provenance, and human-in-the-loop supervision for autonomous agents and high-trust backend workflows.**
+
 | Task | Document |
 |---|---|
 | Evaluate UNS | [Product](PRODUCT.md), [roadmap](ROADMAP.md), [architecture](ARCHITECTURE.md), [delivery semantics](sections/delivery-semantics.md) |

@@ -1,5 +1,7 @@
 # UNS remediation review brief
 
+> **Note:** This document is a preserved historical review brief from the `v0.2.0` remediation cycle (`2026-10-20`). For current `v0.6.1+` capabilities (including `uns.governance`, source/namespace-scoped credentials, signed Slack/PagerDuty webhooks, governed `PolicyDelta` shadow evaluation, and `uns-slo-certify`), see [PRODUCT.md](PRODUCT.md), [API.md](API.md), and [SECURITY-MODEL.md](SECURITY-MODEL.md).
+
 Updated 2026-10-20 (local date). Historical independently reviewed target: **`ba46a311d071736a6beca241a6e43a1407f29f3b`**. Current deployment candidate: **`07ef52a87b45128b77715f64c8b0e5f8f91387a9`**, described below. Iteration 2 base: `3f6005fa2907c1ecdac2e34eb97987ac2ab6af9a`; original remediation base: `b508cc367f9eccdec5a1cbec2b1c691d16d84132`. Subsequent documentation/receipt commits preserve this application code.
 
 Both iterations are now integrated on **main** through `76fc43e`, with the same reviewed application source. [Consolidated baseline](CONSOLIDATED_BASELINE.md) records the local merge and fresh Python/console/package verification; use main for the current handoff.
@@ -8,13 +10,13 @@ This is an author-prepared handoff, not a production certification. An Astra/ult
 
 ## Subsequent deployment-candidate correction
 
-The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b45128b77715f64c8b0e5f8f91387a9`, which supersedes the earlier application target for current code. Container execution found distribution/probe/WebSocket packaging gaps; browser smoke found ACK context and UTC projection defects. They are fixed with 11 added regressions, 1,776 passing Python tests and 99 passing live checks. The earlier independent review applies to its frozen target; it is not retroactively claimed for these new corrections. The user subsequently chose the [persistent localhost recording deployment](LOCAL_DEPLOYMENT.md), now verified. Real external recipients remain outside that chosen scope.
+The [deployment smoke report](DEPLOYMENT_SMOKE.md) records source `07ef52a87b45128b77715f64c8b0e5f8f91387a9`, which supersedes the earlier application target for current code. Container execution found distribution/probe/WebSocket packaging gaps; browser smoke found ACK context and UTC projection defects. They are fixed with 11 added regressions, 1,776 passing Python tests and 99 passing live checks. The earlier independent review applies to its frozen target; it is not retroactively claimed for these new corrections. The operator subsequently chose the [persistent localhost recording deployment](LOCAL_DEPLOYMENT.md), now verified. Real external recipients remain outside that chosen scope.
 
 ## Product boundary
 
-UNS resolves notification obligations, accepts recoverable work, delivers through configured adapters, and records explicit actor responses or timeouts. It also preserves policy versions and controlled policy-change evidence. It does not execute business actions, authorize them through a complete action-policy engine, intercept traffic or provide cryptographic non-repudiation.
+UNS resolves notification obligations, accepts recoverable work, delivers through configured adapters, and records explicit actor responses or timeouts. It also preserves policy versions and controlled policy-change evidence. Core notification intake does not execute business actions, intercept network traffic, or provide cryptographic non-repudiation.
 
-An acknowledgment records an actor response, not human comprehension or permission to execute. Policy approval concerns a configuration proposal. The action-authorization models under `uns.governance` remain experimental.
+A standalone notification acknowledgment records an actor response, not human comprehension or permission to execute. Policy approval concerns a configuration proposal. Pre-execution action gating (`ALLOW` / `REQUIRE_APPROVAL` / `DENY`) is provided via the opt-in `uns.governance` package (`decide()`, `DecisionEngine`, `GovernanceApprovalBridge`), while legacy root-level action-authorization models in `notification.models` remain experimental compatibility types.
 
 ## What changed after adversarial feedback
 
@@ -53,7 +55,7 @@ Response deadlines begin at qualifying delivery. Same-actor/same-state replay re
 
 ## Trust and deployment limits
 
-- The API credential is an operator credential. There is no RBAC or tenant authorization claim. A read-only console does not make that credential read-only.
+- The primary `UNS_API_KEY` is an operator credential; `v0.4.0+` adds optional capability-scoped (`producer`, `responder`, `observer`) and source/namespace-scoped (`allowed_sources`, `allowed_namespaces`) credentials (`UNS_SCOPED_API_KEYS`), though shared keys still identify configured principals rather than end-user SSO identities. A read-only console does not make an operator credential read-only.
 - Embedded Python and local MCP launch configuration are trusted host boundaries. MCP defaults to read-only; CLI writes require explicit opt-in, a principal, persistent DB and confirmation token.
 - The compatibility flag for anonymous legacy HTTP reads is explicit and limited. It never permits WS, mutations, runtime inspection, readiness or metrics.
 - Callbacks and custom adapters are trusted code. Custom retrying adapters must obey the provider-attempt guard contract; arbitrary blocking host code can still block an event loop.
