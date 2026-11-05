@@ -764,8 +764,7 @@ async def list_deliveries(
     Delegates to ``uns.queries.list_deliveries``.
     """
     read_adapter = runtime_state.read_model_adapter if runtime_state is not None else None
-    if _mcp_has_record_bounds(config):
-        assert config is not None
+    if config is not None and _mcp_has_record_bounds(config):
         response = await query_list_deliveries(
             cursor=None,
             limit=limit,
@@ -822,8 +821,7 @@ async def list_audit_events(
     Delegates to ``uns.queries.list_audit_events``.
     """
     read_adapter = runtime_state.read_model_adapter if runtime_state is not None else None
-    if _mcp_has_record_bounds(config):
-        assert config is not None
+    if config is not None and _mcp_has_record_bounds(config):
         response = await query_list_audit_events(
             cursor=None,
             limit=limit,

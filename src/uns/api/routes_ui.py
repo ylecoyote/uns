@@ -364,8 +364,7 @@ async def list_deliveries(
     )
 
     read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
-    if _principal_has_record_bounds(principal):
-        assert principal is not None
+    if principal is not None and _principal_has_record_bounds(principal):
         return await _query_list_deliveries(
             cursor=cursor,
             limit=limit,
@@ -929,8 +928,7 @@ async def list_audit_events(
     )
 
     read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
-    if _principal_has_record_bounds(principal):
-        assert principal is not None
+    if principal is not None and _principal_has_record_bounds(principal):
         return await _query_list_audit_events(
             cursor=cursor,
             limit=limit,
