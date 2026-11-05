@@ -6,7 +6,7 @@
   <img alt="UNS - Unified Notification Service" src="assets/logo/uns-lockup.svg" height="56" />
 </picture>
 
-**Governed notification obligations, immutable policy provenance, and human-in-the-loop supervision for autonomous agents and high-trust backend workflows.**
+**Durable human-response obligations, immutable policy provenance, and bounded pre-execution governance for autonomous agents and high-trust backend workflows.**
 
 | Task | Document |
 |---|---|
@@ -27,7 +27,7 @@
 1. **Architecture & Product Contract**
    - [Product Contract](PRODUCT.md) - Core boundaries, obligation semantics, and safety posture
    - [Roadmap (`v0.2.0` → `v1.0.0`)](ROADMAP.md) - Milestone horizons (`v0.3.0`–`v1.0.0`), in-tree scaffolding rationale, and live GitHub Milestones
-   - [Architecture](ARCHITECTURE.md) - Durable SQLite outbox (`uns.Runtime`), policy engine, and transport topology
+   - [Architecture](ARCHITECTURE.md) - Durable SQLite & PostgreSQL outbox (`uns.Runtime`), policy engine, and transport topology
    - [Delivery Semantics](sections/delivery-semantics.md) - Idempotency, deduplication windows, fallback, and ACK lifecycles
    - [Policy Lifecycle](sections/policy-lifecycle.md) - Policy version states (`DRAFT`, `PREVIEW`, `ACTIVE`, `RETIRED`), autonomy modes (`PREVIEW`, `SHADOW`, `LIVE`), and change proposals (`PROPOSED`, `APPROVED`, `APPLIED`)
    - [Security Model](SECURITY-MODEL.md) - Authentication, principal binding, and Console/MCP security boundaries
@@ -36,7 +36,7 @@
    - [Deployment Guide](DEPLOYMENT.md) - Complete environment variable matrix, process topology, reverse-proxy/TLS setup, `uns-migrate`, backups, and `uns-maintain`
    - [Local Deployment Runbook](LOCAL_DEPLOYMENT.md) - Persistent localhost recording stack (`127.0.0.1:8000` and `127.0.0.1:5173`)
    - [Deployment Smoke Report](DEPLOYMENT_SMOKE.md) - Container, socket, and browser verification evidence
-   - [Observability & Probes](sections/observability.md) - Health/readiness checks, `/metrics`, structured logs, and SQLite audit queries
+   - [Observability & Probes](sections/observability.md) - Health/readiness checks, `/metrics`, structured logs, and SQLite/PostgreSQL audit queries
 
 3. **Support Reference & Troubleshooting Guides (TSGs)**
    - [State Machine & Schema Reference](support/STATE-MACHINE-AND-SCHEMA.md) - Entity-Relationship diagram, state transition diagrams, and complete column/event reference
@@ -49,7 +49,7 @@
      - [TSG-06: Database Maintenance (`uns-maintain`), Retention & Archival](tsg/TSG-06-MAINTENANCE-AND-ARCHIVAL.md)
 
 4. **End-User & Integrator Guides**
-   - [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md) - Screen-by-screen walkthrough of the read-only React **UNS Console**
+   - [Operator Console Guide](user-guides/OPERATOR-CONSOLE-GUIDE.md) - Screen-by-screen walkthrough of the React **UNS Console** (`/ui/*` read models and capability-gated `/api/v1/*` actions)
    - [Producer Integration Guide](user-guides/PRODUCER-INTEGRATION-GUIDE.md) - End-to-end recipes for Python (`uns.Client`), HTTP REST, and WebSockets
    - [Agent & MCP Integration Guide](user-guides/AGENT-MCP-GUIDE.md) - Safe MCP host setup, tool catalog, and simulation-first agent workflows
 
