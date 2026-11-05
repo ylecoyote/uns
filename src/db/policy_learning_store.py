@@ -323,6 +323,39 @@ class SQLAlchemyPolicyLearningStore:
         finally:
             session.close()
 
+    def get_shadow_result_counts(self, delta_id: UUID) -> tuple[int, int, int]:
+        """Return ``(total, improved, degraded)`` counts for a delta using SQL aggregates."""
+        from sqlalchemy import case, func
+
+        session = self._get_session()
+        try:
+            row = session.execute(
+                select(
+                    func.count(PersistedShadowEvaluationResult.result_id),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (PersistedShadowEvaluationResult.improvement_score > 0.0, 1),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (PersistedShadowEvaluationResult.improvement_score < 0.0, 1),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                ).where(PersistedShadowEvaluationResult.delta_id == delta_id)
+            ).one()
+            return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
+        finally:
+            session.close()
+
     def persist_shadow_aggregate(self, aggregate: ShadowEvaluationAggregate) -> UUID:
         """Insert or update the single shadow aggregate for a delta."""
         session = self._get_session()

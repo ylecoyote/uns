@@ -365,9 +365,10 @@ async def list_deliveries(
 
     read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
     if _principal_has_record_bounds(principal):
-        unpaged = await _query_list_deliveries(
-            cursor=None,
-            limit=10_000,
+        assert principal is not None
+        return await _query_list_deliveries(
+            cursor=cursor,
+            limit=limit,
             start_time=start_time,
             end_time=end_time,
             status=status,
@@ -378,22 +379,11 @@ async def list_deliveries(
             notification_type=notification_type,
             channel=channel,
             read_adapter=read_adapter,
-        )
-        filtered = _apply_source_and_namespace_bounds(
-            http_request,
-            principal,
-            unpaged.items,
-        )
-        offset = _decode_cursor(cursor)
-        page_items = filtered[offset : offset + limit]
-        has_more = (offset + limit) < len(filtered)
-        next_cursor = _encode_cursor(offset + limit) if has_more else None
-        return DeliveryTimelineListResponse(
-            items=page_items,
-            pagination=PaginationInfo(
-                next_cursor=next_cursor,
-                has_more=has_more,
-                total_count=len(filtered),
+            allowed_sources=(
+                None if principal.has_wildcard_sources else principal.allowed_sources
+            ),
+            allowed_namespaces=(
+                None if principal.has_wildcard_namespaces else principal.allowed_namespaces
             ),
         )
 
@@ -940,9 +930,10 @@ async def list_audit_events(
 
     read_adapter = getattr(http_request.app.state, "read_model_adapter", None)
     if _principal_has_record_bounds(principal):
-        unpaged = await _query_list_audit_events(
-            cursor=None,
-            limit=10_000,
+        assert principal is not None
+        return await _query_list_audit_events(
+            cursor=cursor,
+            limit=limit,
             start_time=start_time,
             end_time=end_time,
             event_type=event_type,
@@ -951,22 +942,11 @@ async def list_audit_events(
             autonomy_mode=autonomy_mode,
             correlation_id=correlation_id,
             read_adapter=read_adapter,
-        )
-        filtered = _apply_source_and_namespace_bounds(
-            http_request,
-            principal,
-            unpaged.items,
-        )
-        offset = _decode_cursor(cursor)
-        page_items = filtered[offset : offset + limit]
-        has_more = (offset + limit) < len(filtered)
-        next_cursor = _encode_cursor(offset + limit) if has_more else None
-        return AuditEventListResponse(
-            items=page_items,
-            pagination=PaginationInfo(
-                next_cursor=next_cursor,
-                has_more=has_more,
-                total_count=len(filtered),
+            allowed_sources=(
+                None if principal.has_wildcard_sources else principal.allowed_sources
+            ),
+            allowed_namespaces=(
+                None if principal.has_wildcard_namespaces else principal.allowed_namespaces
             ),
         )
 

@@ -857,11 +857,20 @@ async def test_f20_scoped_ui_pagination_next_cursor_and_proposal_shadow_results_
 
     client, headers = scoped_client(runtime)
 
-    # Scoped /ui/deliveries and /ui/audit return non-null pagination.next_cursor
+    # Scoped /ui/deliveries and /ui/audit return non-null pagination.next_cursor via SQL pushdown
     deliv_page = client.get("/ui/deliveries?limit=1", headers=headers)
     assert deliv_page.status_code == 200
+    assert deliv_page.json()["pagination"]["total_count"] == 3
     assert deliv_page.json()["pagination"]["has_more"] is True
-    assert deliv_page.json()["pagination"]["next_cursor"] is not None
+    next_cursor = deliv_page.json()["pagination"]["next_cursor"]
+    assert next_cursor is not None
+
+    deliv_page_2 = client.get(f"/ui/deliveries?limit=1&cursor={next_cursor}", headers=headers)
+    assert deliv_page_2.status_code == 200
+    assert (
+        deliv_page_2.json()["items"][0]["notification_id"]
+        != deliv_page.json()["items"][0]["notification_id"]
+    )
 
     audit_page = client.get("/ui/audit?limit=1", headers=headers)
     assert audit_page.status_code == 200
@@ -922,12 +931,34 @@ def test_f21_shadow_evaluator_degraded_fails_gate_and_reconstructs_all_allowed_f
             intent=NotificationIntent.SAFETY,
         )
     )
+    assert runtime.learning_store.get_shadow_result_counts(delta.delta_id) == (2, 1, 1)
     summary = evaluator.format_proposal_summary(delta)
     assert summary.shadow_aggregate is not None
     assert summary.shadow_aggregate.degraded_decisions >= 1
     assert summary.shadow_aggregate.status == "FAILED"
     with pytest.raises(ValueError, match="Shadow evaluation must pass before approval"):
         evaluator.approve_to_draft(delta.delta_id, actor="operator")
+
+    # Direct PREVIEW policy differing only on priority_override is auto-bound across all 19 allowed fields
+    seed_baseline(runtime)
+    runtime.policy_runtime.store.save_policy(
+        NotificationPolicy(
+            notification_type="tenant-a.alert",
+            version="2",
+            status=PolicyStatus.PREVIEW,
+            channels=[Channel.SLACK],
+            delivery_mode=DeliveryMode.GUARANTEED,
+            require_ack=True,
+            ack_timeout_minutes=10,
+            dedup_window_seconds=60,
+            priority_override="HIGH",
+        )
+    )
+    preview_samples = evaluator.evaluate_intake(
+        make_request(kind="tenant-a.alert", source="team-a")
+    )
+    assert len(preview_samples) == 1
+    assert preview_samples[0].shadow_outcome["priority"] == "HIGH"
 
 
 def test_f22_rejected_preview_policy_can_be_reproposed_while_retired_active_cannot(

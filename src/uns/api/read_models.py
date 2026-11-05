@@ -62,6 +62,8 @@ class DeliveryFilter:
     autonomy_mode: AutonomyMode | None = None
     notification_type: str | None = None
     channel: Channel | None = None
+    allowed_sources: frozenset[str] | None = None
+    allowed_namespaces: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,95 @@ class AuditEventFilter:
     agent_id: UUID | None = None
     autonomy_mode: AutonomyMode | None = None
     correlation_id: str | None = None
+    allowed_sources: frozenset[str] | None = None
+    allowed_namespaces: frozenset[str] | None = None
+
+
+def _matches_scope_patterns_in_memory(
+    value: str | None,
+    patterns: frozenset[str] | None,
+) -> bool:
+    """Return True if value satisfies patterns (or patterns is None)."""
+    if patterns is None:
+        return True
+    if not patterns:
+        return False
+    if "*" in patterns:
+        return True
+    if value is None:
+        return False
+    target = value.strip()
+    if not target:
+        return False
+    for raw_pattern in patterns:
+        pat = raw_pattern.strip()
+        if not pat:
+            continue
+        if pat == "*":
+            return True
+        if pat.endswith(".*"):
+            prefix = pat[:-2]
+            if target == prefix or target.startswith(f"{prefix}."):
+                return True
+        elif pat.endswith("*"):
+            prefix = pat[:-1]
+            if target.startswith(prefix):
+                return True
+        elif pat.endswith("."):
+            prefix = pat[:-1]
+            if target == prefix or target.startswith(pat):
+                return True
+        else:
+            if target == pat or target.startswith(f"{pat}."):
+                return True
+    return False
+
+
+def _escape_sql_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _sql_scope_pattern_clause(
+    column: Any,
+    patterns: frozenset[str] | None,
+) -> Any:
+    """Build a SQLAlchemy WHERE clause matching WritePrincipal scope patterns."""
+    from sqlalchemy import and_, false, or_
+
+    if patterns is None:
+        return None
+    if not patterns:
+        return false()
+    if "*" in patterns:
+        return None
+    clauses: list[Any] = []
+    for raw_pattern in sorted(patterns):
+        pat = raw_pattern.strip()
+        if not pat:
+            continue
+        if pat == "*":
+            return None
+        if pat.endswith(".*"):
+            prefix = pat[:-2]
+            escaped = _escape_sql_like(prefix)
+            clauses.append(column == prefix)
+            clauses.append(column.like(f"{escaped}.%", escape="\\"))
+        elif pat.endswith("*"):
+            prefix = pat[:-1]
+            escaped = _escape_sql_like(prefix)
+            clauses.append(column.like(f"{escaped}%", escape="\\"))
+        elif pat.endswith("."):
+            prefix = pat[:-1]
+            escaped = _escape_sql_like(pat)
+            clauses.append(column == prefix)
+            clauses.append(column.like(f"{escaped}%", escape="\\"))
+        else:
+            escaped = _escape_sql_like(pat)
+            clauses.append(column == pat)
+            clauses.append(column.like(f"{escaped}.%", escape="\\"))
+    if not clauses:
+        return false()
+    return and_(column.is_not(None), or_(*clauses))
 
 
 @dataclass
@@ -340,6 +431,12 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             and record.notification_type != filter_criteria.notification_type
         ):
             return False
+        if not _matches_scope_patterns_in_memory(record.source, filter_criteria.allowed_sources):
+            return False
+        if not _matches_scope_patterns_in_memory(
+            record.notification_type, filter_criteria.allowed_namespaces
+        ):
+            return False
         return not (
             filter_criteria.channel and filter_criteria.channel not in record.channels_attempted
         )
@@ -360,6 +457,12 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
         if (
             filter_criteria.autonomy_mode
             and record.autonomy_mode != filter_criteria.autonomy_mode.value
+        ):
+            return False
+        if not _matches_scope_patterns_in_memory(record.source, filter_criteria.allowed_sources):
+            return False
+        if not _matches_scope_patterns_in_memory(
+            record.notification_type, filter_criteria.allowed_namespaces
         ):
             return False
         # event_type filtering is handled separately as we derive it from status
@@ -607,6 +710,14 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                     continue
                 if filter_criteria.event_type and event.event_type != filter_criteria.event_type:
                     continue
+                if not _matches_scope_patterns_in_memory(
+                    event.source, filter_criteria.allowed_sources
+                ):
+                    continue
+                if not _matches_scope_patterns_in_memory(
+                    event.notification_type, filter_criteria.allowed_namespaces
+                ):
+                    continue
                 all_events.append(event)
 
         # Sort by event_time descending with deterministic lifecycle stage tie-breaker
@@ -697,26 +808,38 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 (NotificationAuditRecord.status == "PENDING", 0),
                 else_=1,
             )
-            ranked = (
-                select(
-                    NotificationAuditRecord.id.label("latest_id"),
-                    func.row_number()
-                    .over(
-                        partition_by=NotificationAuditRecord.notification_id,
-                        order_by=(
-                            NotificationAuditRecord.created_at.desc(),
-                            status_rank.desc(),
-                            NotificationAuditRecord.id.desc(),
-                        ),
-                    )
-                    .label("rn"),
+            ranked_base = select(
+                NotificationAuditRecord.id.label("latest_id"),
+                func.row_number()
+                .over(
+                    partition_by=NotificationAuditRecord.notification_id,
+                    order_by=(
+                        NotificationAuditRecord.created_at.desc(),
+                        status_rank.desc(),
+                        NotificationAuditRecord.id.desc(),
+                    ),
                 )
-                .subquery("ranked_delivery_audits")
+                .label("rn"),
             )
+            source_clause = _sql_scope_pattern_clause(
+                NotificationAuditRecord.source, filter_criteria.allowed_sources
+            )
+            namespace_clause = _sql_scope_pattern_clause(
+                NotificationAuditRecord.notification_type, filter_criteria.allowed_namespaces
+            )
+            if source_clause is not None:
+                ranked_base = ranked_base.where(source_clause)
+            if namespace_clause is not None:
+                ranked_base = ranked_base.where(namespace_clause)
+            ranked = ranked_base.subquery("ranked_delivery_audits")
             stmt = select(NotificationAuditRecord).join(
                 ranked,
                 (NotificationAuditRecord.id == ranked.c.latest_id) & (ranked.c.rn == 1),
             )
+            if source_clause is not None:
+                stmt = stmt.where(source_clause)
+            if namespace_clause is not None:
+                stmt = stmt.where(namespace_clause)
 
             # Apply filters on the latest row per notification_id
             if filter_criteria.start_time:
@@ -892,6 +1015,16 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
 
             # Query delivery audits
             delivery_stmt = select(NotificationAuditRecord)
+            source_clause = _sql_scope_pattern_clause(
+                NotificationAuditRecord.source, filter_criteria.allowed_sources
+            )
+            namespace_clause = _sql_scope_pattern_clause(
+                NotificationAuditRecord.notification_type, filter_criteria.allowed_namespaces
+            )
+            if source_clause is not None:
+                delivery_stmt = delivery_stmt.where(source_clause)
+            if namespace_clause is not None:
+                delivery_stmt = delivery_stmt.where(namespace_clause)
 
             if filter_criteria.start_time:
                 delivery_stmt = delivery_stmt.where(
@@ -1001,6 +1134,10 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 ack_stmt = select(AckAuditRecordDB, NotificationAuditRecord).outerjoin(
                     NotificationAuditRecord, NotificationAuditRecord.id == latest_context
                 )
+                if source_clause is not None:
+                    ack_stmt = ack_stmt.where(source_clause)
+                if namespace_clause is not None:
+                    ack_stmt = ack_stmt.where(namespace_clause)
                 if filter_criteria.agent_id:
                     ack_stmt = ack_stmt.where(NotificationAuditRecord.agent_id == filter_criteria.agent_id)
                 if filter_criteria.autonomy_mode:
