@@ -11,6 +11,7 @@ Implements Milestone v0.5.0:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import logging
 import os
@@ -414,21 +415,10 @@ class ShadowPolicyEvaluator:
         preview_config = policy_to_config_dict(preview_policy, notification_type)
         baseline_config = baseline_envelope.config_json
 
-        diff_field = "channels"
-        current_val: Any = baseline_config.get("channels")
-        proposed_val: Any = preview_config.get("channels")
-        for candidate_field in (
-            "channels",
-            "delivery_mode",
-            "require_ack",
-            "ack_timeout_minutes",
-            "dedup_window_seconds",
-            "intent",
-            "priority_override",
-            "mode_overrides.LIVE.channels",
-            "mode_overrides.LIVE.require_ack",
-            "mode_overrides.LIVE.delivery_mode",
-        ):
+        diff_field: str | None = None
+        current_val: Any = None
+        proposed_val: Any = None
+        for candidate_field in sorted(ALLOWED_POLICY_FIELD_PATHS):
             cur = get_nested_field(baseline_config, candidate_field)
             prop = get_nested_field(preview_config, candidate_field)
             if cur != prop:
@@ -436,6 +426,8 @@ class ShadowPolicyEvaluator:
                 current_val = cur
                 proposed_val = prop
                 break
+        if diff_field is None:
+            return []
 
         delta = PolicyDelta(
             policy_type=notification_type,
@@ -498,6 +490,7 @@ class ShadowPolicyEvaluator:
             return (
                 {
                     "notification_type": resolved.notification_type,
+                    "source": request.source,
                     "channels": channels,
                     "delivery_mode": delivery_mode,
                     "require_ack": require_ack,
@@ -513,6 +506,7 @@ class ShadowPolicyEvaluator:
             return (
                 {
                     "notification_type": request.notification_type,
+                    "source": request.source,
                     "error": str(exc),
                 },
                 True,
@@ -637,7 +631,7 @@ class ShadowPolicyEvaluator:
         min_sample_met = total >= self.min_samples
         accuracy_threshold_met = degraded == 0 and non_degraded_rate >= self.accuracy_threshold
 
-        if degraded > 0 and non_degraded_rate < self.accuracy_threshold:
+        if degraded > 0 and (min_sample_met or non_degraded_rate < self.accuracy_threshold):
             status = ShadowStatus.FAILED
         elif min_sample_met and accuracy_threshold_met:
             status = ShadowStatus.PASSED
@@ -1009,9 +1003,44 @@ class ShadowPolicyEvaluator:
                 limit=50,
             )
             for candidate_delta in approved_deltas:
+                binding = self.learning_store.get_evidence_binding(candidate_delta.delta_id)
+                if policy_id is not None and binding.get("draft_policy_id") == str(policy_id):
+                    linked_delta = candidate_delta
+                    break
+                approved_cfg = binding.get("approved_candidate_config")
+                if (
+                    isinstance(approved_cfg, dict)
+                    and compute_config_hash(approved_cfg) == target_candidate_hash
+                ):
+                    linked_delta = candidate_delta
+                    break
+                with contextlib.suppress(Exception):
+                    candidate_policy = self.build_candidate_policy(candidate_delta)
+                    candidate_policy_hash = compute_config_hash(
+                        policy_to_config_dict(candidate_policy, notification_type)
+                    )
+                    if candidate_policy_hash == target_candidate_hash:
+                        linked_delta = candidate_delta
+                        break
                 if candidate_delta.candidate_hash == target_candidate_hash:
                     linked_delta = candidate_delta
                     break
+            if linked_delta is None:
+                for unapproved_delta in self.learning_store.list_deltas(
+                    policy_type=notification_type,
+                    limit=50,
+                ):
+                    if unapproved_delta.state in (DeltaState.APPROVED, DeltaState.APPLIED):
+                        continue
+                    with contextlib.suppress(Exception):
+                        unapproved_policy = self.build_candidate_policy(unapproved_delta)
+                        unapproved_hash = compute_config_hash(
+                            policy_to_config_dict(unapproved_policy, notification_type)
+                        )
+                        if unapproved_hash == target_candidate_hash:
+                            raise ValueError(
+                                f"Cannot activate DRAFT revision linked to unapproved proposal {unapproved_delta.delta_id} (state: {unapproved_delta.state.value})"
+                            )
 
         apply_guard: GuardResult | None = None
         if linked_delta is not None:
@@ -1047,6 +1076,9 @@ class ShadowPolicyEvaluator:
 
         active_policy = target_policy.model_copy(update={"status": PolicyStatus.ACTIVE})
         save_result = self.policy_store.save_policy(active_policy)
+        active_policy = active_policy.model_copy(
+            update={"config_id": save_result.policy_id, "config_hash": save_result.content_hash}
+        )
         if notification_type is not None:
             self.policy_store.retire_candidate_revisions(
                 notification_type,

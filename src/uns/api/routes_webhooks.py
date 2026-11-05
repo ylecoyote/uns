@@ -20,11 +20,12 @@ import logging
 import os
 import re
 import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 
 from notification.acknowledgment import InvalidAckTransitionError
 from notification.audit import AuditStore
@@ -299,7 +300,10 @@ def _build_slack_settled_blocks(
 
 
 @router.post("/slack")
-async def slack_interactivity_webhook(http_request: Request) -> dict[str, Any]:
+async def slack_interactivity_webhook(
+    http_request: Request,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
     """Handle signed Slack interactivity callbacks (Block Kit Acknowledge/Dismiss)."""
     runtime = cast("Runtime | None", getattr(http_request.app.state, "runtime", None))
     raw_body = await _read_bounded_body(http_request)
@@ -372,6 +376,24 @@ async def slack_interactivity_webhook(http_request: Request) -> dict[str, Any]:
 
         owner_raw = row.get("obligation_owner_id")
         target_id = UUID(str(owner_raw)) if owner_raw else notification_id
+        owner_row = runtime.get(target_id) if str(target_id) != str(row["id"]) else row
+        existing_ack = owner_row.get("ack_status")
+        if existing_ack in {AckStatus.ACKED.value, AckStatus.DISMISSED.value}:
+            raw_responded_at = owner_row.get("responded_at")
+            acked_at_iso = (
+                datetime.fromtimestamp(float(raw_responded_at), UTC).isoformat()
+                if raw_responded_at is not None
+                else ""
+            )
+            blocks = _build_slack_settled_blocks(
+                notification_id=notification_id,
+                obligation_owner_id=target_id,
+                ack_status=AckStatus(existing_ack),
+                actor=str(owner_row.get("actor") or actor),
+                acked_at_iso=acked_at_iso,
+            )
+            blocks["already_settled"] = True
+            return blocks
         try:
             ack_resp = runtime.acknowledge(
                 target_id,
@@ -385,14 +407,16 @@ async def slack_interactivity_webhook(http_request: Request) -> dict[str, Any]:
                 detail=str(exc),
             ) from exc
 
-        await runtime.sync_pagerduty_incident(target_id, resolve=is_dismiss)
-        return _build_slack_settled_blocks(
+        background_tasks.add_task(runtime.sync_pagerduty_incident, target_id, resolve=is_dismiss)
+        blocks = _build_slack_settled_blocks(
             notification_id=notification_id,
             obligation_owner_id=target_id,
             ack_status=ack_resp.ack_status,
             actor=ack_resp.acked_by or actor,
             acked_at_iso=ack_resp.acked_at.isoformat() if ack_resp.acked_at else "",
         )
+        blocks["already_settled"] = False
+        return blocks
 
     audit_store = getattr(http_request.app.state, "audit_store", None)
     try:
@@ -529,24 +553,26 @@ async def pagerduty_v3_webhook(http_request: Request) -> dict[str, Any]:
         target_id = UUID(str(owner_raw)) if owner_raw else UUID(str(row["id"]))
         owner_row = runtime.get(target_id) if str(target_id) != str(row["id"]) else row
 
-        # If the obligation was already ACKED (e.g., incident.acknowledged followed
-        # by incident.resolved, or ACKed in UNS Console first), return 200 idempotently.
-        if owner_row.get("ack_status") == AckStatus.ACKED.value:
+        # If the obligation was already ACKED or DISMISSED (e.g., incident.acknowledged
+        # followed by incident.resolved, or settled in UNS Console first), return 200 idempotently.
+        current_ack = owner_row.get("ack_status")
+        if current_ack in {AckStatus.ACKED.value, AckStatus.DISMISSED.value}:
             return {
                 "status": "settled",
                 "already_settled": True,
                 "event_type": event_type,
                 "notification_id": str(row["id"]),
                 "obligation_owner_id": str(target_id),
-                "ack_status": AckStatus.ACKED.value,
+                "ack_status": current_ack,
                 "acked_by": owner_row.get("actor"),
             }
 
+        is_resolve_unacked = event_type == "incident.resolved"
         try:
             ack_resp = runtime.acknowledge(
                 target_id,
                 actor=actor,
-                dismiss=False,
+                dismiss=is_resolve_unacked,
                 metadata=metadata,
             )
         except Conflict as exc:
@@ -579,26 +605,34 @@ async def pagerduty_v3_webhook(http_request: Request) -> dict[str, Any]:
 
     audit_store = getattr(http_request.app.state, "audit_store", None)
     try:
-        ack_resp = await signaling_acknowledge(
-            notification_id=target_id,
-            acked_by=actor,
-            metadata=metadata,
-            audit_store=cast(AuditStore, audit_store),
-        )
+        if event_type == "incident.resolved":
+            ack_resp = await signaling_dismiss(
+                notification_id=target_id,
+                dismissed_by=actor,
+                metadata=metadata,
+                audit_store=cast(AuditStore, audit_store),
+            )
+        else:
+            ack_resp = await signaling_acknowledge(
+                notification_id=target_id,
+                acked_by=actor,
+                metadata=metadata,
+                audit_store=cast(AuditStore, audit_store),
+            )
     except KeyError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Matching UNS notification not found for PagerDuty incident",
         ) from exc
     except InvalidAckTransitionError as exc:
-        if exc.current_status == AckStatus.ACKED:
+        if exc.current_status in {AckStatus.ACKED, AckStatus.DISMISSED}:
             return {
                 "status": "settled",
                 "already_settled": True,
                 "event_type": event_type,
                 "notification_id": str(target_id),
                 "obligation_owner_id": str(target_id),
-                "ack_status": AckStatus.ACKED.value,
+                "ack_status": exc.current_status.value,
             }
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

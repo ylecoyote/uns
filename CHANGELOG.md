@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Policy Authority, Obligation Lineage, Webhook Idempotency & Scoped Read Hardening (`F16`-`F24`):**
+  - **Policy Activation Authority & Shadow Accuracy Gate (`F16`, `F21`, `F22`):** Verified `GuardStage.APPLY` baseline freshness, matched `APPROVED` `PolicyDelta` records, and transitioned matched proposals to `DeltaState.APPLIED` across all `ShadowPolicyEvaluator.activate_draft()` invocation paths (`delta_id`, `policy_id`, and `notification_type`); marked `ShadowEvaluationAggregate` as `FAILED` whenever `degraded_decisions > 0` once `min_samples` is reached; reconstructed multi-field `PREVIEW` policy diffs across all 19 `ALLOWED_POLICY_FIELD_PATHS`; allowed retired unactivated `PREVIEW`/`DRAFT` candidates (`activated_at is None`) to be re-proposed while preserving the reactivation tombstone for retired `ACTIVE` policies.
+  - **Canonical Obligation Owner Settlement & Inherited Projection (`F17`):** Resolved `_resolve_obligation_owner()` inside `Runtime._respond()` and `Runtime.sync_pagerduty_incident()` so acknowledging, dismissing, or timing out a deduplicated follower or failed replay predecessor settles the canonical owner obligation and propagates `actor`, `responded_at`, and `response_metadata` across `Runtime.get()`.
+  - **PagerDuty & Slack Webhook Settlement Semantics (`F18`, `F23`):** Mapped PagerDuty `incident.resolved` on unacknowledged `PENDING` obligations to `DISMISSED` (`ApprovalStatus.REJECTED`) rather than `ACKED` (`ApprovalStatus.APPROVED`), treated already-`DISMISSED` obligations as `already_settled=True` (`HTTP 200`), resolved `uns-pd-<uuid>` incident keys in O(1), made Slack interactivity button clicks idempotent after settlement (`HTTP 200` with settled blocks), and moved outbound PagerDuty sync in the Slack webhook onto FastAPI `BackgroundTasks`.
+  - **Governance Approval Bridge Pre-Dispatch, Timeout & Deterministic Recovery (`F19`):** Allowed `Runtime._respond()` to settle pre-dispatch `PENDING` obligations with `require_ack=True` (without `Runtime.dispatch()` overwriting `ack_status` back to `PENDING`), persisted `ApprovalStatus.TIMED_OUT` transitions to `Runtime`, and bound `sign_approval_callback()` to `int(resolved_at.timestamp())` so recovered approval records produce deterministic `X-UNS-Timestamp` and `X-UNS-Signature` headers across restarts.
+  - **Scoped UI/MCP Pagination, Proposal Sample Filtering & PostgreSQL Shared Snapshot Reads (`F20`, `F23`, `F24`):** Enforced `extra="forbid"` on `PaginationInfo`, fixed `PaginationInfo(next_cursor=...)` in `/ui/deliveries` and `/ui/audit`, filtered `shadow_results` by `principal.allows_source` in `GET /ui/policies/proposals/{delta_id}`, eliminated N+1 `runtime.get()` calls during scoped delivery/audit list filtering, switched `SQLAlchemyPolicyStore.lock_snapshot(for_write=False)` to `SELECT ... FOR SHARE` on PostgreSQL, protected followers of active owners in `uns-maintain`, and cleared replayed `UNKNOWN` attempts in `compute_slo_report()`.
+
 ## [0.6.1] - 2026-11-03
 
 ### Added
@@ -15,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrated `UnsLogoMark` (`apps/ui/src/components/UnsLogoMark.tsx`) into the UNS Console top navigation bar and sign-in header, configured MkDocs theme logo/favicon (`mkdocs.yml`), and expanded the documentation screenshot gallery to 8 high-DPI views including `console-policy-inspector.png` and `console-docs.png`.
 
 ### Fixed
-- **MPDD v2.5 Security & Functionality Audit Remediations (`F01`–`F15`):**
+- **Security & Functionality Audit Remediations (`F01`-`F15`):**
   - **`F01` (Scoped Read & MCP Tenant Isolation):** Enforced fail-closed record-level and collection-level `allowed_sources` + `allowed_namespaces` bounds across `/api/v1/runtime/notifications/{id}`, `/api/v1/runtime/dead-letters`, `/api/v1/notifications/{id}/delivery`, `/api/v1/notifications/{id}/audit`, `/api/v1/dlq*`, `/ui/deliveries*`, `/ui/audit`, and all registered `uns-mcp` read/list tools before pagination and counts.
   - **`F02` & `F09` (Governance Approval Identity & Durable Settlement Callbacks):** Included `tenant_id`, `resource_type`, and `resource_id` in `_deterministic_decision_id()`, enforced bound-content fingerprint matching (`ApprovalConflictError`) in `GovernanceApprovalBridge.request_approval()`, and decoupled terminal approval status from `on_settled` callback completion so failed resume callbacks retry across subsequent resolution and runtime sync calls.
   - **`F03`, `F07`, `F08`, `F10` (Policy Evolution Atomicity, Exact Draft Binding & Shared-DB Cache):** Bound exact `draft_policy_id` and `candidate_hash` to `APPROVE_DRAFT` evidence and verified/materialized the exact approved candidate in `activate_draft()`; made `promote_to_shadow()`, `approve_to_draft()`, and `activate_draft()` rollback-safe across policy and learning stores; removed the process-local negative candidate cache so warm workers immediately evaluate peer-created `SHADOW`/`PREVIEW` candidates; preserved explicit `dedup_window_seconds=0` in `config_dict_to_policy()`.
@@ -35,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `compute_slo_report()`, `format_slo_markdown()`, and the `uns-slo-certify` console script entry point to compute SHA-256 hash-verifiable operational SLO receipts (`receipt_sha256` / `receipt_hash`), human response latency percentiles (`p50`, `p95`, `max`), persistent external provider error rates, `recording_only` vs. live external provider classification (`observed_live_span_days`), and 6-gate `v1.0` certification checks.
 
 ### Fixed
-- **MPDD v2.5 Post-Milestone 4 Hardening:**
+- **Post-Milestone 4 Security & Lifecycle Hardening:**
   - Enforced upfront `Content-Length` check and streaming `MAX_WEBHOOK_BODY_BYTES` (`262,144`) cap in `src/uns/api/routes_webhooks.py:_read_bounded_body()`.
   - Added `SQLAlchemyPolicyStore.retire_candidate_revisions()` and wired `ShadowPolicyEvaluator.reject_delta()` to retire `PREVIEW`/`DRAFT` revisions on rejection so rejected proposals cannot resurrect on subsequent intakes.
   - Replaced deprecated `HTTP_422_UNPROCESSABLE_ENTITY` status constant with `HTTP_422_UNPROCESSABLE_CONTENT` in `src/notification/routes.py`.

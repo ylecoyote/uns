@@ -28,11 +28,13 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    and_,
     case,
     create_engine,
     event,
     func,
     insert,
+    or_,
     select,
     update,
 )
@@ -274,6 +276,10 @@ class Runtime:
             result["obligation_owner_id"] = str(owner["id"]) if owner is not None else None
             result["effective_status"] = owner["status"] if owner is not None else result["status"]
             result["effective_ack_status"] = owner["ack_status"] if owner is not None else None
+            if inherited and owner is not None and not result.get("actor"):
+                result["actor"] = owner.get("actor")
+                result["responded_at"] = owner.get("responded_at")
+                result["response_metadata"] = owner.get("response_metadata")
             result["ack_inherited"] = inherited
             result["obligation_resolution_status"] = (
                 "RESOLVED" if owner is not None else "UNRESOLVED"
@@ -848,7 +854,10 @@ class Runtime:
             }
             if succeeded:
                 changes["delivered_at"] = now
-                if n.require_ack:
+                current_ack = session.execute(
+                    select(work.c.ack_status).where(work.c.id == identifier)
+                ).scalar_one_or_none()
+                if n.require_ack and current_ack is None:
                     changes.update(
                         ack_status="PENDING", deadline=now + 60 * (n.ack_timeout_minutes or 15)
                     )
@@ -935,13 +944,43 @@ class Runtime:
         actor: str,
         metadata: dict[str, Any],
         now: float | None = None,
+        *,
+        force_timeout: bool = False,
     ) -> AckResponse:
         now = self.clock() if now is None else now
         with self.sessions.begin() as session:
-            condition = [work.c.id == identifier, work.c.ack_status == "PENDING"]
-            condition.append(
-                work.c.deadline <= now if target == "TIMED_OUT" else work.c.deadline > now
+            initial_row = (
+                session.execute(select(work).where(work.c.id == identifier)).mappings().first()
             )
+            if initial_row is None:
+                raise KeyError(identifier)
+            owner, resolution_error = self._resolve_obligation_owner(session, dict(initial_row))
+            if owner is None:
+                raise Conflict(f"Obligation lineage unresolved ({resolution_error})")
+            target_id = str(owner["id"])
+            owner_notif = Notification.model_validate(owner["notification"])
+            condition: list[Any] = [work.c.id == target_id]
+            if target == "TIMED_OUT" and not force_timeout:
+                condition.append(and_(work.c.ack_status == "PENDING", work.c.deadline <= now))
+            elif force_timeout:
+                if owner_notif.require_ack:
+                    condition.append(
+                        or_(
+                            work.c.ack_status == "PENDING",
+                            and_(work.c.status == "PENDING", work.c.ack_status.is_(None)),
+                        )
+                    )
+                else:
+                    condition.append(work.c.ack_status == "PENDING")
+            elif owner_notif.require_ack:
+                condition.append(
+                    or_(
+                        and_(work.c.ack_status == "PENDING", work.c.deadline > now),
+                        and_(work.c.status == "PENDING", work.c.ack_status.is_(None)),
+                    )
+                )
+            else:
+                condition.append(and_(work.c.ack_status == "PENDING", work.c.deadline > now))
             changed = (
                 session.connection()
                 .execute(
@@ -953,7 +992,7 @@ class Runtime:
                 )
                 .rowcount
             )
-            row = session.execute(select(work).where(work.c.id == identifier)).mappings().first()
+            row = session.execute(select(work).where(work.c.id == target_id)).mappings().first()
             if row is None:
                 raise KeyError(identifier)
             if not changed and row["ack_status"] != target:
@@ -963,7 +1002,7 @@ class Runtime:
             if changed:
                 session.add(
                     AckRow(
-                        notification_id=UUID(identifier),
+                        notification_id=UUID(target_id),
                         old_status="PENDING",
                         new_status=target,
                         acked_by=actor,
@@ -972,7 +1011,7 @@ class Runtime:
                         created_at=datetime.fromtimestamp(now, UTC),
                     )
                 )
-                self._event(session, identifier, target, {"actor": actor, "metadata": metadata})
+                self._event(session, target_id, target, {"actor": actor, "metadata": metadata})
             return AckResponse(
                 notification_id=UUID(identifier),
                 ack_status=AckStatus(target),
@@ -995,6 +1034,10 @@ class Runtime:
         stripped_dedup = raw_dedup[4:] if raw_dedup.startswith("uns-") else raw_dedup
         if stripped_dedup and stripped_dedup not in candidates:
             candidates.append(stripped_dedup)
+        if stripped_dedup.startswith("pd-"):
+            pd_uuid = stripped_dedup[3:]
+            if pd_uuid and pd_uuid not in candidates:
+                candidates.append(pd_uuid)
 
         for candidate in candidates:
             with contextlib.suppress(ValueError, KeyError):
@@ -1089,13 +1132,15 @@ class Runtime:
             return None
         try:
             row = self.get(notification_id)
-            outcome = row.get("outcome") or {}
+            owner_id = str(row.get("obligation_owner_id") or row["id"])
+            owner_row = self.get(owner_id) if owner_id != str(row["id"]) else row
+            outcome = owner_row.get("outcome") or {}
             channels_succeeded = outcome.get("channels_succeeded") or []
             if Channel.PAGERDUTY.value not in channels_succeeded:
                 return None
-            notif = Notification.model_validate(row["notification"])
+            notif = Notification.model_validate(owner_row["notification"])
             pd_dedup_key: str | None = None
-            for ev in reversed(self.events(notification_id)):
+            for ev in reversed(self.events(owner_id)):
                 if ev.get("kind") != "CHANNEL_ATTEMPT_RESULT":
                     continue
                 payload = ev.get("payload") or {}
@@ -1120,7 +1165,7 @@ class Runtime:
             with self.sessions.begin() as session:
                 self._event(
                     session,
-                    str(notification_id),
+                    owner_id,
                     "PAGERDUTY_OUTBOUND_SYNC",
                     {
                         "action": "resolve" if resolve else "acknowledge",
