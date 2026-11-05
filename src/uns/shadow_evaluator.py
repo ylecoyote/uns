@@ -540,13 +540,18 @@ class ShadowPolicyEvaluator:
         emitted: list[ShadowEvaluationResult] = []
 
         for delta in deltas:
-            try:
-                candidate_policy = self.build_candidate_policy(delta)
-            except Exception:
-                if persisted_preview is not None:
-                    candidate_policy = persisted_preview
-                else:
-                    continue
+            if persisted_preview is not None and delta.reasoning.startswith(
+                "Auto-bound from PREVIEW policy version"
+            ):
+                candidate_policy = persisted_preview
+            else:
+                try:
+                    candidate_policy = self.build_candidate_policy(delta)
+                except Exception:
+                    if persisted_preview is not None:
+                        candidate_policy = persisted_preview
+                    else:
+                        continue
 
             candidate_registry = PolicyRegistry(runtime_only=False)
             for pol in runtime_registry.get_all().values():
@@ -606,13 +611,10 @@ class ShadowPolicyEvaluator:
         delta: PolicyDelta,
         latest_result: ShadowEvaluationResult,
     ) -> ShadowEvaluationAggregate:
-        """Recompute and persist rolling ShadowEvaluationAggregate for delta from persisted samples."""
+        """Recompute and persist rolling ShadowEvaluationAggregate for delta using SQL counts."""
         existing = self.learning_store.get_shadow_aggregate(delta.delta_id)
-        samples = self.learning_store.list_shadow_results(delta.delta_id, limit=10_000)
-        if samples:
-            total = len(samples)
-            improved = sum(1 for s in samples if (s.improvement_score or 0.0) > 0)
-            degraded = sum(1 for s in samples if (s.improvement_score or 0.0) < 0)
+        total, improved, degraded = self.learning_store.get_shadow_result_counts(delta.delta_id)
+        if total > 0:
             neutral = total - improved - degraded
         else:
             score = latest_result.improvement_score or 0.0

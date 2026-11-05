@@ -228,9 +228,9 @@ def maintain(
     skipping that range, use next_after_id. A null next_after_id ends this pass.
     Cursors are ordered ids, not snapshots: start a new pass without after_id to
     revisit oversized, newly eligible, or newly inserted earlier notifications.
-    Apply holds SQLite BEGIN IMMEDIATE through selection, archive I/O and commit.
-    The archive parent directory must be trusted and already exist. PostgreSQL
-    retention is deliberately unsupported until its locking path is validated.
+    Apply holds SQLite BEGIN IMMEDIATE (or PostgreSQL pg_advisory_xact_lock with
+    row-level FOR UPDATE on eligible candidates) through selection, archive I/O,
+    and commit. The archive parent directory must be trusted and already exist.
     """
     now = time.time() if now is None else now
     dialect_name = engine.dialect.name

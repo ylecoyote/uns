@@ -134,6 +134,8 @@ async def list_deliveries(
     channel: Channel | None = None,
     *,
     read_adapter: ReadModelAdapter | None = None,
+    allowed_sources: frozenset[str] | None = None,
+    allowed_namespaces: frozenset[str] | None = None,
 ) -> DeliveryTimelineListResponse:
     """List delivery timelines with filtering.
 
@@ -160,6 +162,8 @@ async def list_deliveries(
         autonomy_mode=autonomy_mode,
         notification_type=notification_type,
         channel=channel,
+        allowed_sources=allowed_sources,
+        allowed_namespaces=allowed_namespaces,
     )
 
     # Query read model adapter
@@ -607,6 +611,8 @@ async def list_audit_events(
     correlation_id: str | None = None,
     *,
     read_adapter: ReadModelAdapter | None = None,
+    allowed_sources: frozenset[str] | None = None,
+    allowed_namespaces: frozenset[str] | None = None,
 ) -> AuditEventListResponse:
     """List audit events with filtering.
 
@@ -631,6 +637,8 @@ async def list_audit_events(
         agent_id=agent_id,
         autonomy_mode=autonomy_mode,
         correlation_id=correlation_id,
+        allowed_sources=allowed_sources,
+        allowed_namespaces=allowed_namespaces,
     )
 
     # Query read model adapter

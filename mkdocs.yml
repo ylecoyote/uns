@@ -1,5 +1,5 @@
 site_name: "UNS: Unified Notification Service"
-site_description: Governed notification obligations, immutable policy provenance, and human-in-the-loop supervision for autonomous agents and critical backend workflows
+site_description: Durable human-response coordination for agent workflows, immutable policy provenance, and opt-in approval obligation bridges
 site_url: https://ylecoyote.github.io/uns/
 repo_url: https://github.com/ylecoyote/uns
 repo_name: ylecoyote/uns

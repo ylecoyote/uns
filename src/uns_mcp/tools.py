@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import base64
 import hmac
-import json
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -765,10 +763,36 @@ async def list_deliveries(
 
     Delegates to ``uns.queries.list_deliveries``.
     """
-    query_limit = 10_000 if _mcp_has_record_bounds(config) else limit
+    read_adapter = runtime_state.read_model_adapter if runtime_state is not None else None
+    if config is not None and _mcp_has_record_bounds(config):
+        response = await query_list_deliveries(
+            cursor=None,
+            limit=limit,
+            start_time=None,
+            end_time=None,
+            status=None,
+            intent=None,
+            delivery_mode=None,
+            agent_id=None,
+            autonomy_mode=None,
+            notification_type=None,
+            channel=None,
+            read_adapter=read_adapter,
+            allowed_sources=(
+                config.allowed_sources
+                if config.allowed_sources and "*" not in config.allowed_sources
+                else None
+            ),
+            allowed_namespaces=(
+                config.allowed_namespaces
+                if config.allowed_namespaces and "*" not in config.allowed_namespaces
+                else None
+            ),
+        )
+        return cast(dict[str, Any], _json_safe(response.model_dump()))
     response = await query_list_deliveries(
         cursor=None,
-        limit=query_limit,
+        limit=limit,
         start_time=None,
         end_time=None,
         status=None,
@@ -778,37 +802,8 @@ async def list_deliveries(
         autonomy_mode=None,
         notification_type=None,
         channel=None,
-        read_adapter=runtime_state.read_model_adapter if runtime_state is not None else None,
+        read_adapter=read_adapter,
     )
-    if _mcp_has_record_bounds(config):
-        filtered = []
-        for item in response.items:
-            source, ntype = _resolve_mcp_notification_bounds(
-                item.notification_id,
-                runtime_state,
-                item=item,
-            )
-            if _mcp_allows_record(
-                config,
-                source=source,
-                notification_type=ntype or item.notification_type,
-            ):
-                filtered.append(item)
-        page = filtered[:limit]
-        has_more = len(filtered) > limit
-        next_cursor = (
-            base64.b64encode(json.dumps({"offset": limit}).encode()).decode()
-            if has_more
-            else None
-        )
-        pagination = response.pagination.model_copy(
-            update={
-                "total_count": len(filtered),
-                "has_more": has_more,
-                "next_cursor": next_cursor,
-            }
-        )
-        response = response.model_copy(update={"items": page, "pagination": pagination})
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 
@@ -825,10 +820,34 @@ async def list_audit_events(
 
     Delegates to ``uns.queries.list_audit_events``.
     """
-    query_limit = 10_000 if _mcp_has_record_bounds(config) else limit
+    read_adapter = runtime_state.read_model_adapter if runtime_state is not None else None
+    if config is not None and _mcp_has_record_bounds(config):
+        response = await query_list_audit_events(
+            cursor=None,
+            limit=limit,
+            start_time=None,
+            end_time=None,
+            event_type=None,
+            notification_id=None,
+            agent_id=None,
+            autonomy_mode=None,
+            correlation_id=None,
+            read_adapter=read_adapter,
+            allowed_sources=(
+                config.allowed_sources
+                if config.allowed_sources and "*" not in config.allowed_sources
+                else None
+            ),
+            allowed_namespaces=(
+                config.allowed_namespaces
+                if config.allowed_namespaces and "*" not in config.allowed_namespaces
+                else None
+            ),
+        )
+        return cast(dict[str, Any], _json_safe(response.model_dump()))
     response = await query_list_audit_events(
         cursor=None,
-        limit=query_limit,
+        limit=limit,
         start_time=None,
         end_time=None,
         event_type=None,
@@ -836,37 +855,8 @@ async def list_audit_events(
         agent_id=None,
         autonomy_mode=None,
         correlation_id=None,
-        read_adapter=runtime_state.read_model_adapter if runtime_state is not None else None,
+        read_adapter=read_adapter,
     )
-    if _mcp_has_record_bounds(config):
-        filtered = []
-        for item in response.items:
-            source, ntype = _resolve_mcp_notification_bounds(
-                item.notification_id,
-                runtime_state,
-                item=item,
-            )
-            if _mcp_allows_record(
-                config,
-                source=source,
-                notification_type=ntype,
-            ):
-                filtered.append(item)
-        page = filtered[:limit]
-        has_more = len(filtered) > limit
-        next_cursor = (
-            base64.b64encode(json.dumps({"offset": limit}).encode()).decode()
-            if has_more
-            else None
-        )
-        pagination = response.pagination.model_copy(
-            update={
-                "total_count": len(filtered),
-                "has_more": has_more,
-                "next_cursor": next_cursor,
-            }
-        )
-        response = response.model_copy(update={"items": page, "pagination": pagination})
     return cast(dict[str, Any], _json_safe(response.model_dump()))
 
 

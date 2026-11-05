@@ -6,7 +6,7 @@
   <img alt="UNS - Unified Notification Service" src="assets/logo/uns-lockup.svg" height="56" />
 </picture>
 
-**Durable human-response obligations, immutable policy provenance, and bounded pre-execution governance for autonomous agents and high-trust backend workflows.**
+**Durable human-response coordination for agent workflows and high-trust backend operations.**
 
 | Task | Document |
 |---|---|

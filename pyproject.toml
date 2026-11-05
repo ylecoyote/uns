@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "uns"
 version = "0.6.1"
-description = "UNS - Unified Notification Service for governed notification obligations, immutable policy provenance, and human-in-the-loop supervision of autonomous agents"
+description = "UNS - Unified Notification Service for durable human-response coordination in agent workflows, immutable policy provenance, and opt-in approval obligation bridges"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
