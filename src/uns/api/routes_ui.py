@@ -391,7 +391,7 @@ async def list_deliveries(
         return DeliveryTimelineListResponse(
             items=page_items,
             pagination=PaginationInfo(
-                cursor=next_cursor,
+                next_cursor=next_cursor,
                 has_more=has_more,
                 total_count=len(filtered),
             ),
@@ -816,7 +816,30 @@ async def get_policy_proposal(
         notification_type=delta.policy_type,
         require_source=False,
     )
-    return evaluator.format_proposal_summary(delta, include_samples=True)
+    summary = evaluator.format_proposal_summary(delta, include_samples=True)
+    if principal is not None and not principal.has_wildcard_sources and summary.shadow_results:
+        filtered_samples = []
+        bounds_cache: dict[UUID, tuple[str | None, str | None]] = {}
+        for sample in summary.shadow_results:
+            src = (
+                sample.original_outcome.get("source")
+                if isinstance(sample.original_outcome, dict)
+                else None
+            )
+            if src is None:
+                try:
+                    sample_uuid: UUID | None = UUID(str(sample.decision_id))
+                except (ValueError, TypeError):
+                    sample_uuid = None
+                src, _ = _resolve_ui_notification_bounds(
+                    http_request,
+                    sample_uuid,
+                    bounds_cache=bounds_cache,
+                )
+            if principal.allows_source(src):
+                filtered_samples.append(sample)
+        summary = summary.model_copy(update={"shadow_results": filtered_samples})
+    return summary
 
 
 @router.get(
@@ -941,7 +964,7 @@ async def list_audit_events(
         return AuditEventListResponse(
             items=page_items,
             pagination=PaginationInfo(
-                cursor=next_cursor,
+                next_cursor=next_cursor,
                 has_more=has_more,
                 total_count=len(filtered),
             ),

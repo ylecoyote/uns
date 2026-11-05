@@ -1,4 +1,4 @@
-"""Regression suite for the 2026-11-03 MPDD v2.5 audit findings (F01-F15)."""
+"""Regression suite for security boundary, runtime lineage, and policy governance invariants."""
 
 from __future__ import annotations
 
@@ -55,10 +55,11 @@ class SyntheticAdapter(BaseAdapter):
 def make_request(
     kind: str = "tenant-b.alert", source: str = "team-b", **kwargs
 ) -> SendNotificationRequest:
+    intent = kwargs.pop("intent", NotificationIntent.OPERATIONAL)
     return SendNotificationRequest(
         notification_type=kind,
         source=source,
-        intent=NotificationIntent.OPERATIONAL,
+        intent=intent,
         title="Synthetic private event",
         message="synthetic-team-b-marker",
         autonomy_context={"agent_id": uuid4(), "autonomy_mode": "LIVE"},
@@ -596,3 +597,488 @@ async def test_f12_channel_health_reflects_repeated_runtime_delivery_failures(ru
     slack = next(item for item in result.json()["channels"] if item["channel"] == "SLACK")
     assert slack["status"] != "HEALTHY"
     assert slack["consecutive_failures"] >= 5
+
+
+# ---------------------------------------------------------------------------
+# F16-F24: Post-v0.6.1 Policy Authority, Lineage, Webhook & Read Invariants
+# ---------------------------------------------------------------------------
+
+
+def test_f16_activate_draft_by_policy_id_or_type_enforces_apply_guard_and_applies_delta(
+    runtime: Runtime,
+):
+    seed_baseline(runtime)
+    evaluator = runtime.shadow_evaluator
+
+    # Propose and approve candidate A
+    delta_a = evaluator.propose_delta(
+        policy_type="tenant-a.alert",
+        field_path="ack_timeout_minutes",
+        proposed_value=25,
+        reasoning="Candidate A for policy_id activation",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    evaluator.evaluate_intake(make_request(kind="tenant-a.alert"))
+    approved_a, draft_a, _ = evaluator.approve_to_draft(delta_a.delta_id, actor="operator")
+    assert approved_a.state == DeltaState.APPROVED
+
+    # Activating via policy_id (not delta_id) matches approved_a and marks it APPLIED
+    save_res_a, activated_a, applied_a = evaluator.activate_draft(
+        policy_id=draft_a.policy_id, actor="operator"
+    )
+    assert activated_a.config_id == save_res_a.policy_id
+    assert activated_a.ack_timeout_minutes == 25
+    assert applied_a is not None
+    assert applied_a.delta_id == delta_a.delta_id
+    assert evaluator.learning_store.get_delta(delta_a.delta_id).state == DeltaState.APPLIED
+
+    # Propose and approve candidate B against v2 baseline, then mutate baseline out-of-band
+    delta_b = evaluator.propose_delta(
+        policy_type="tenant-a.alert",
+        field_path="ack_timeout_minutes",
+        proposed_value=35,
+        reasoning="Candidate B before baseline drift",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    evaluator.evaluate_intake(make_request(kind="tenant-a.alert"))
+    _, draft_b, _ = evaluator.approve_to_draft(delta_b.delta_id, actor="operator")
+
+    # Out-of-band active policy save changes baseline config hash
+    runtime.policy_runtime.store.save_policy(
+        NotificationPolicy(
+            notification_type="tenant-a.alert",
+            version="99",
+            channels=[Channel.SLACK],
+            delivery_mode=DeliveryMode.GUARANTEED,
+            require_ack=True,
+            ack_timeout_minutes=45,
+            dedup_window_seconds=60,
+        )
+    )
+
+    # Activating draft_b by policy_id or notification_type must reject stale baseline
+    with pytest.raises(ValueError, match="Active baseline policy drifted after approval"):
+        evaluator.activate_draft(policy_id=draft_b.policy_id, actor="operator")
+    with pytest.raises(ValueError, match="Active baseline policy drifted after approval"):
+        evaluator.activate_draft(notification_type="tenant-a.alert", actor="operator")
+
+
+@pytest.mark.asyncio
+async def test_f17_follower_and_failed_predecessor_settlement_routes_to_canonical_owner(
+    runtime: Runtime,
+):
+    seed_baseline(runtime)
+    first = await runtime.send(
+        make_request(kind="tenant-a.alert", source="team-a", dedup_key="lineage-ack"),
+        principal="tenant-a",
+    )
+    follower = await runtime.send(
+        make_request(kind="tenant-a.alert", source="team-a", dedup_key="lineage-ack"),
+        principal="tenant-a",
+    )
+    assert follower.status.value == "DEDUPLICATED"
+
+    # Acknowledging the deduplicated follower ID settles the canonical owner
+    ack_resp = runtime.acknowledge(
+        follower.notification_id,
+        actor="follower-operator",
+        metadata={"via": "follower-id"},
+    )
+    assert ack_resp.ack_status.value == "ACKED"
+
+    owner_row = runtime.get(first.notification_id)
+    follower_row = runtime.get(follower.notification_id)
+    assert owner_row["ack_status"] == "ACKED"
+    assert owner_row["actor"] == "follower-operator"
+    assert follower_row["effective_ack_status"] == "ACKED"
+    assert follower_row["actor"] == "follower-operator"
+    assert follower_row["responded_at"] == owner_row["responded_at"]
+    assert follower_row["response_metadata"] == {"via": "follower-id"}
+
+
+@pytest.mark.asyncio
+async def test_f18_pagerduty_webhook_resolved_after_dismiss_and_unacked_resolve_maps_to_dismiss(
+    runtime: Runtime, monkeypatch
+):
+    secret = "synthetic-webhook-secret"
+    monkeypatch.setenv("UNS_PAGERDUTY_WEBHOOK_SECRET", secret)
+    adapter = PagerDutyAdapter(PagerDutyConfig(routing_key="synthetic-no-network"))
+
+    async def local_provider(**kwargs):
+        return {"status": "success", "dedup_key": kwargs["dedup_key"]}
+
+    monkeypatch.setattr(adapter._client, "send_event", local_provider)
+    runtime.adapters.register(adapter)
+    runtime.policy_runtime.store.save_policy(
+        NotificationPolicy(
+            notification_type="tenant-a.pd",
+            channels=[Channel.PAGERDUTY],
+            delivery_mode=DeliveryMode.GUARANTEED,
+            require_ack=True,
+            ack_timeout_minutes=15,
+        )
+    )
+
+    bridge = GovernanceApprovalBridge(runtime=runtime)
+    record = approval_decision()
+    approval = bridge.request_approval(record)
+    await runtime.dispatch(approval.notification_id)
+
+    app = create_app(runtime=runtime, skip_persistence_config=True)
+    client = TestClient(app)
+
+    # Unacknowledged incident.resolved via uns-pd-<uuid> key maps to DISMISSED / REJECTED
+    resolve_body = json.dumps(
+        {
+            "event": {
+                "event_type": "incident.resolved",
+                "agent": {"id": "pd-auto-resolver"},
+                "data": {"incident_key": f"uns-pd-{approval.notification_id}"},
+            }
+        }
+    ).encode()
+    sig = "v1=" + hmac.new(secret.encode(), resolve_body, hashlib.sha256).hexdigest()
+    res = client.post(
+        "/api/v1/webhooks/pagerduty",
+        content=resolve_body,
+        headers={"Content-Type": "application/json", "X-PagerDuty-Signature": sig},
+    )
+    assert res.status_code == 200
+    assert res.json()["ack_status"] == "DISMISSED"
+    assert runtime.get(approval.notification_id)["ack_status"] == "DISMISSED"
+    assert bridge.sync_from_runtime(record.decision_id).status == ApprovalStatus.REJECTED
+
+    # Subsequent incident.resolved after DISMISSED returns HTTP 200 already_settled=True
+    res_repeat = client.post(
+        "/api/v1/webhooks/pagerduty",
+        content=resolve_body,
+        headers={"Content-Type": "application/json", "X-PagerDuty-Signature": sig},
+    )
+    assert res_repeat.status_code == 200
+    assert res_repeat.json()["already_settled"] is True
+
+
+def test_f19_governance_approval_pre_dispatch_timeout_and_restart_signature_determinism(
+    runtime: Runtime,
+):
+    secret = "deterministic-signing-secret"
+    bridge1 = GovernanceApprovalBridge(runtime=runtime, signing_secret=secret)
+    rec1 = approval_decision(tenant_id="tenant-a", resource_id="res-1")
+    created1 = bridge1.request_approval(rec1)
+
+    # Pre-dispatch resolve_approval succeeds before runtime.dispatch() runs
+    settled1 = bridge1.resolve_approval(
+        rec1.decision_id,
+        status=ApprovalStatus.APPROVED,
+        actor="early-operator",
+    )
+    assert settled1.status == ApprovalStatus.APPROVED
+    assert settled1.callback_headers is not None
+    assert settled1.callback_headers["X-UNS-Signature"]
+
+    # Dispatching afterwards does not overwrite ACKED back to PENDING
+    asyncio.run(runtime.dispatch(created1.notification_id))
+    assert runtime.get(created1.notification_id)["ack_status"] == "ACKED"
+
+    # Cold bridge recovery produces identical canonical bytes and HMAC signature
+    bridge2 = GovernanceApprovalBridge(runtime=runtime, signing_secret=secret)
+    recovered1 = bridge2.query_approval(rec1.decision_id)
+    assert recovered1 is not None
+    assert recovered1.status == ApprovalStatus.APPROVED
+    assert recovered1.resolved_at == settled1.resolved_at
+    assert recovered1.callback_headers is not None
+    assert (
+        recovered1.callback_headers["X-UNS-Timestamp"]
+        == settled1.callback_headers["X-UNS-Timestamp"]
+    )
+    assert (
+        recovered1.callback_headers["X-UNS-Signature"]
+        == settled1.callback_headers["X-UNS-Signature"]
+    )
+
+    # TIMED_OUT resolution persists to Runtime and rejects subsequent approval
+    rec2 = approval_decision(tenant_id="tenant-a", resource_id="res-timeout")
+    created2 = bridge1.request_approval(rec2)
+    timed_out = bridge1.resolve_approval(
+        rec2.decision_id,
+        status=ApprovalStatus.TIMED_OUT,
+        actor="watchdog",
+    )
+    assert timed_out.status == ApprovalStatus.TIMED_OUT
+    assert runtime.get(created2.notification_id)["ack_status"] == "TIMED_OUT"
+    with pytest.raises(ApprovalConflictError):
+        bridge1.resolve_approval(
+            rec2.decision_id,
+            status=ApprovalStatus.APPROVED,
+            actor="late-operator",
+        )
+
+
+@pytest.mark.asyncio
+async def test_f20_scoped_ui_pagination_next_cursor_and_proposal_shadow_results_filtering(
+    runtime: Runtime,
+):
+    from pydantic import ValidationError
+
+    from uns.responses import PaginationInfo
+
+    # PaginationInfo rejects unknown kwargs such as cursor=...
+    with pytest.raises(ValidationError):
+        PaginationInfo(limit=10, has_more=True, cursor="bad-kwarg")  # type: ignore[call-arg]
+
+    seed_baseline(runtime)
+    for i in range(3):
+        await runtime.send(
+            make_request(kind="tenant-a.alert", source="team-a", dedup_key=f"page-{i}"),
+            principal="tenant-a",
+        )
+    await runtime.send(
+        make_request(kind="tenant-a.alert", source="team-b", dedup_key="foreign-source"),
+        principal="tenant-b",
+    )
+
+    # Propose a shadow policy and evaluate both team-a and team-b traffic
+    delta = runtime.shadow_evaluator.propose_delta(
+        policy_type="tenant-a.alert",
+        field_path="ack_timeout_minutes",
+        proposed_value=20,
+        reasoning="Scoped shadow test",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    runtime.shadow_evaluator.evaluate_intake(
+        make_request(kind="tenant-a.alert", source="team-a")
+    )
+    runtime.shadow_evaluator.evaluate_intake(
+        make_request(kind="tenant-a.alert", source="team-b")
+    )
+
+    client, headers = scoped_client(runtime)
+
+    # Scoped /ui/deliveries and /ui/audit return non-null pagination.next_cursor
+    deliv_page = client.get("/ui/deliveries?limit=1", headers=headers)
+    assert deliv_page.status_code == 200
+    assert deliv_page.json()["pagination"]["has_more"] is True
+    assert deliv_page.json()["pagination"]["next_cursor"] is not None
+
+    audit_page = client.get("/ui/audit?limit=1", headers=headers)
+    assert audit_page.status_code == 200
+    assert audit_page.json()["pagination"]["has_more"] is True
+    assert audit_page.json()["pagination"]["next_cursor"] is not None
+
+    # Scoped proposal detail filters out shadow_results from team-b
+    prop_res = client.get(
+        f"/ui/policies/proposals/{delta.delta_id}",
+        headers=headers,
+    )
+    assert prop_res.status_code == 200
+    shadow_results = prop_res.json()["shadow_results"]
+    assert len(shadow_results) == 1
+    assert all(r["original_outcome"].get("source") == "team-a" for r in shadow_results)
+
+
+def test_f21_shadow_evaluator_degraded_fails_gate_and_reconstructs_all_allowed_fields(
+    runtime: Runtime,
+):
+    runtime.policy_runtime.store.save_policy(
+        NotificationPolicy(
+            notification_type="tenant-a.safety",
+            version="1",
+            channels=[Channel.SLACK],
+            delivery_mode=DeliveryMode.GUARANTEED,
+            require_ack=True,
+            ack_timeout_minutes=5,
+            dedup_window_seconds=60,
+        )
+    )
+    evaluator = runtime.shadow_evaluator
+    evaluator.min_samples = 2
+    evaluator.accuracy_threshold = 0.5
+
+    # Proposal that weakens delivery_mode to BEST_EFFORT produces DEGRADED on SAFETY intent
+    delta = evaluator.propose_delta(
+        policy_type="tenant-a.safety",
+        field_path="delivery_mode",
+        proposed_value="BEST_EFFORT",
+        reasoning="Weaken delivery mode",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    # 1st sample: OPERATIONAL intent -> IMPROVED (changed=True, is_degraded=False)
+    evaluator.evaluate_intake(
+        make_request(
+            kind="tenant-a.safety",
+            source="team-a",
+            intent=NotificationIntent.OPERATIONAL,
+        )
+    )
+    # 2nd sample: SAFETY intent -> DEGRADED (safety_floor_violated)
+    evaluator.evaluate_intake(
+        make_request(
+            kind="tenant-a.safety",
+            source="team-a",
+            intent=NotificationIntent.SAFETY,
+        )
+    )
+    summary = evaluator.format_proposal_summary(delta)
+    assert summary.shadow_aggregate is not None
+    assert summary.shadow_aggregate.degraded_decisions >= 1
+    assert summary.shadow_aggregate.status == "FAILED"
+    with pytest.raises(ValueError, match="Shadow evaluation must pass before approval"):
+        evaluator.approve_to_draft(delta.delta_id, actor="operator")
+
+
+def test_f22_rejected_preview_policy_can_be_reproposed_while_retired_active_cannot(
+    runtime: Runtime,
+):
+    seed_baseline(runtime)
+    evaluator = runtime.shadow_evaluator
+
+    delta1 = evaluator.propose_delta(
+        policy_type="tenant-a.alert",
+        field_path="ack_timeout_minutes",
+        proposed_value=25,
+        reasoning="First attempt",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    evaluator.reject_delta(delta1.delta_id, actor="operator", reason="Try again later")
+
+    # Re-proposing the exact same change succeeds because the retired PREVIEW was never ACTIVE
+    delta2 = evaluator.propose_delta(
+        policy_type="tenant-a.alert",
+        field_path="ack_timeout_minutes",
+        proposed_value=25,
+        reasoning="Second attempt with identical config",
+        actor="operator",
+        promote_to_shadow=True,
+    )
+    assert delta2.state == DeltaState.SHADOW
+
+    # However, retiring an ACTIVE policy still forbids reactivating the retired version
+    evaluator.evaluate_intake(make_request(kind="tenant-a.alert"))
+    evaluator.approve_to_draft(delta2.delta_id, actor="operator")
+    evaluator.activate_draft(delta_id=delta2.delta_id, actor="operator")
+    with pytest.raises(
+        ValueError, match="A retired policy version cannot be reactivated; publish a new version"
+    ):
+        runtime.policy_runtime.store.save_policy(
+            NotificationPolicy(
+                notification_type="tenant-a.alert",
+                version="1",
+                channels=[Channel.SLACK],
+                delivery_mode=DeliveryMode.GUARANTEED,
+                require_ack=True,
+                ack_timeout_minutes=10,
+                dedup_window_seconds=60,
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_f23_slack_interactivity_webhook_is_idempotent_after_settlement(
+    runtime: Runtime, monkeypatch
+):
+    from urllib.parse import urlencode
+
+    secret = "slack-signing-secret"
+    monkeypatch.setenv("UNS_SLACK_SIGNING_SECRET", secret)
+    seed_baseline(runtime)
+    sent = await runtime.send(
+        make_request(kind="tenant-a.alert", source="team-a", dedup_key="slack-dup"),
+        principal="tenant-a",
+    )
+
+    client = TestClient(create_app(runtime=runtime, skip_persistence_config=True))
+    payload = {
+        "type": "block_actions",
+        "user": {"id": "U999", "username": "slack-operator"},
+        "actions": [
+            {
+                "action_id": f"ack_{sent.notification_id}",
+                "value": str(sent.notification_id),
+            }
+        ],
+    }
+    raw_body = urlencode({"payload": json.dumps(payload)}).encode()
+    ts = str(int(runtime.clock()))
+    sig = (
+        "v0="
+        + hmac.new(secret.encode(), f"v0:{ts}:".encode() + raw_body, hashlib.sha256).hexdigest()
+    )
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Slack-Request-Timestamp": ts,
+        "X-Slack-Signature": sig,
+    }
+
+    first_res = client.post("/api/v1/webhooks/slack", content=raw_body, headers=headers)
+    assert first_res.status_code == 200
+    assert runtime.get(sent.notification_id)["ack_status"] == "ACKED"
+
+    # Duplicate Slack button click returns HTTP 200 settled card instead of 409
+    second_res = client.post("/api/v1/webhooks/slack", content=raw_body, headers=headers)
+    assert second_res.status_code == 200
+    assert second_res.json()["replace_original"] is True
+
+
+@pytest.mark.asyncio
+async def test_f24_maintenance_retains_follower_of_active_owner_and_slo_clears_replayed_unknown(
+    tmp_path,
+):
+    from uns.maintenance import maintain
+    from uns.slo import compute_slo_report
+
+    now = 1_800_000_000.0
+    current = [now - 10 * 86400]
+    url = f"sqlite:///{tmp_path / 'maint_slo.db'}"
+    adapters = SimpleAdapterRegistry()
+    adapters.register(SyntheticAdapter())
+    rt = Runtime(url, create_tables=True, adapters=adapters, clock=lambda: current[0])
+    try:
+        rt.policy_runtime.store.save_policy(
+            NotificationPolicy(
+                notification_type="tenant-a.alert",
+                version="1",
+                channels=[Channel.SLACK],
+                delivery_mode=DeliveryMode.GUARANTEED,
+                require_ack=True,
+                ack_timeout_minutes=1440,
+                dedup_window_seconds=60,
+            )
+        )
+        current[0] = now - 72000
+        # Accept owner and deduplicated follower 20 hours ago; dispatch owner so ack_status='PENDING'
+        owner = await rt.send(
+            make_request(kind="tenant-a.alert", source="team-a", dedup_key="active-owner"),
+            principal="tenant-a",
+        )
+        follower = await rt.send(
+            make_request(kind="tenant-a.alert", source="team-a", dedup_key="active-owner"),
+            principal="tenant-a",
+        )
+        assert follower.status.value == "DEDUPLICATED"
+
+        # Running maintain with cutoff=now - 3600 must retain both owner and follower while owner is unsettled
+        summary = maintain(
+            rt.engine,
+            cutoff=now - 3600,
+            idempotency_seconds=3600,
+            apply=True,
+            operator="ops",
+            now=now,
+        )
+        assert summary["deleted_rows"] == 0
+        assert rt.get(owner.notification_id) is not None
+        assert rt.get(follower.notification_id) is not None
+
+        # Settle owner inside the window and verify SLO certification
+        current[0] = now - 60
+        rt.acknowledge(owner.notification_id, actor="operator")
+        report = compute_slo_report(url, now_epoch=now)
+        assert report["slo_gates"]["zero_unknown_attempts"] is True
+    finally:
+        rt.engine.dispose()
+

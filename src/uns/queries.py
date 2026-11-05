@@ -169,8 +169,9 @@ async def list_deliveries(
     result = adapter.get_deliveries(filter_criteria, cursor, limit)
 
     # Convert to response model
-    items = [
-        DeliveryTimelineSummary(
+    items = []
+    for item in result.items:
+        summary = DeliveryTimelineSummary(
             notification_id=item.notification_id,
             notification_type=item.notification_type,
             intent=item.intent,
@@ -183,8 +184,8 @@ async def list_deliveries(
             autonomy_mode=item.autonomy_mode,
             agent_id=item.agent_id,
         )
-        for item in result.items
-    ]
+        summary._source = getattr(item, "source", None)
+        items.append(summary)
 
     return DeliveryTimelineListResponse(
         items=items,
@@ -639,8 +640,9 @@ async def list_audit_events(
     result = adapter.get_audit_events(filter_criteria, cursor, limit)
 
     # Convert to response model
-    items = [
-        AuditEvent(
+    items = []
+    for item in result.items:
+        event = AuditEvent(
             audit_id=item.audit_id,
             event_type=AuditEventType(item.event_type),
             event_time=item.event_time,
@@ -657,8 +659,8 @@ async def list_audit_events(
             payload=item.payload,
             correlation_id=item.correlation_id,
         )
-        for item in result.items
-    ]
+        event._source = getattr(item, "source", None)
+        items.append(event)
 
     return AuditEventListResponse(
         items=items,

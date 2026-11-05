@@ -222,7 +222,11 @@ class GovernanceApprovalBridge:
                 raise ApprovalConflictError(
                     f"Decision ID {record.decision_id} is already bound to a different approval context"
                 )
-            return existing
+            return (
+                self.sync_from_runtime(record.decision_id)
+                if self.runtime is not None
+                else existing
+            )
         recovered = self._recover_from_runtime(record.decision_id)
         if recovered is not None:
             if _approval_bound_fingerprint(recovered.decision_record) != fingerprint:
@@ -385,7 +389,8 @@ class GovernanceApprovalBridge:
                 self._callback_completed.add(str(decision_id))
             self._by_decision_id[decision_id] = recovered
             self._by_notification_id[str(row["id"])] = decision_id
-            return recovered
+        if decision_id in self._by_decision_id:
+            return self.sync_from_runtime(decision_id)
         return None
 
     def query_approval(self, decision_id: uuid.UUID) -> ApprovalRequestRecord | None:
@@ -432,11 +437,17 @@ class GovernanceApprovalBridge:
         else:
             return approval
 
+        raw_responded_at = status_row.get("responded_at")
+        resolved_at = (
+            datetime.fromtimestamp(float(raw_responded_at), UTC)
+            if raw_responded_at is not None
+            else datetime.now(UTC)
+        )
         return self._finalize(
             approval,
             status=new_status,
             actor=status_row.get("actor"),
-            resolved_at=datetime.now(UTC),
+            resolved_at=resolved_at,
             note=(status_row.get("response_metadata") or {}).get("note")
             if isinstance(status_row.get("response_metadata"), dict)
             else None,
@@ -461,28 +472,48 @@ class GovernanceApprovalBridge:
         approval = self._by_decision_id.get(decision_id) or self._recover_from_runtime(decision_id)
         if approval is None:
             raise GovernanceError(f"Unknown approval decision_id: {decision_id}")
+        if self.runtime is not None and approval.status == ApprovalStatus.PENDING_APPROVAL:
+            approval = self.sync_from_runtime(decision_id)
         if approval.status != ApprovalStatus.PENDING_APPROVAL:
+            if approval.status != status:
+                raise ApprovalConflictError(
+                    f"Approval {decision_id} is already settled as {approval.status.value}"
+                )
             if approval.is_terminal:
                 self._deliver_settled_callback(approval)
             return approval
 
+        resolved_at = datetime.now(UTC)
         if self.runtime is not None and approval.notification_id is not None:
+            from uns.runtime import Conflict
+
             meta = {"note": note} if note else {}
-            if status == ApprovalStatus.APPROVED:
-                self.runtime.acknowledge(approval.notification_id, actor=actor, metadata=meta)
-            elif status == ApprovalStatus.REJECTED:
-                self.runtime.acknowledge(
-                    approval.notification_id, actor=actor, dismiss=True, metadata=meta
-                )
-            elif status == ApprovalStatus.TIMED_OUT:
-                with contextlib.suppress(Exception):
-                    self.runtime.expire()
+            try:
+                if status == ApprovalStatus.APPROVED:
+                    ack_resp = self.runtime.acknowledge(
+                        approval.notification_id, actor=actor, metadata=meta
+                    )
+                elif status == ApprovalStatus.REJECTED:
+                    ack_resp = self.runtime.acknowledge(
+                        approval.notification_id, actor=actor, dismiss=True, metadata=meta
+                    )
+                else:
+                    ack_resp = self.runtime._respond(
+                        str(approval.notification_id),
+                        "TIMED_OUT",
+                        actor,
+                        meta,
+                        force_timeout=True,
+                    )
+                resolved_at = ack_resp.acked_at
+            except Conflict as exc:
+                raise ApprovalConflictError(str(exc)) from exc
 
         return self._finalize(
             approval,
             status=status,
             actor=actor,
-            resolved_at=datetime.now(UTC),
+            resolved_at=resolved_at,
             note=note,
         )
 
@@ -520,7 +551,8 @@ class GovernanceApprovalBridge:
         )
         if self.signing_secret:
             payload_bytes = updated.canonical_callback_bytes()
-            headers = sign_approval_callback(payload_bytes, self.signing_secret)
+            ts = int(updated.resolved_at.timestamp()) if updated.resolved_at is not None else None
+            headers = sign_approval_callback(payload_bytes, self.signing_secret, timestamp=ts)
             updated = updated.model_copy(update={"callback_headers": headers})
 
         self._by_decision_id[approval.decision_id] = updated

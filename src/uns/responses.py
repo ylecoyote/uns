@@ -25,7 +25,7 @@ from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 from notification.dlq import DLQEntry
 from notification.models import (
@@ -448,6 +448,8 @@ class NotificationErrorResponse(BaseModel):
 class PaginationInfo(BaseModel):
     """Pagination metadata for list responses."""
 
+    model_config = ConfigDict(extra="forbid")
+
     next_cursor: str | None = Field(
         default=None, description="Opaque cursor for next page, null if no more pages"
     )
@@ -523,6 +525,8 @@ class DeliveryTimelineResponse(BaseModel):
 class DeliveryTimelineSummary(BaseModel):
     """Summary view of delivery timeline for list responses."""
 
+    _source: str | None = PrivateAttr(default=None)
+
     notification_id: UUID
     notification_type: str
     intent: NotificationIntent
@@ -534,6 +538,10 @@ class DeliveryTimelineSummary(BaseModel):
     channels_succeeded: list[Channel] = Field(default_factory=list)
     autonomy_mode: AutonomyMode
     agent_id: UUID
+
+    @property
+    def source(self) -> str | None:
+        return self._source
 
 
 class DeliveryTimelineListResponse(BaseModel):
@@ -828,6 +836,8 @@ class InvariantSummaryResponse(BaseModel):
 class AuditEvent(BaseModel):
     """Single audit event."""
 
+    _source: str | None = PrivateAttr(default=None)
+
     audit_id: UUID
     event_type: AuditEventType
     event_time: datetime
@@ -836,6 +846,10 @@ class AuditEvent(BaseModel):
     autonomy_context: AutonomyContextResponse
     payload: dict[str, Any] = Field(default_factory=dict)
     correlation_id: str | None = None
+
+    @property
+    def source(self) -> str | None:
+        return self._source
 
 
 class AuditEventListResponse(BaseModel):

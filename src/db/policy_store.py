@@ -140,42 +140,51 @@ class SQLAlchemyPolicyStore:
             self._cached_snapshot = snapshot
             return snapshot
 
-    def lock_snapshot(self, session: Session) -> PolicySnapshot:
+    def lock_snapshot(self, session: Session, *, for_write: bool = False) -> PolicySnapshot:
         """Lock the revision until caller commit, then read its immutable content.
 
-        Activation takes the same row lock. The no-op UPDATE is deliberate: it
-        reserves SQLite's writer before any policy read, and row-locks PostgreSQL.
-        A cache check outside the acceptance transaction is not sufficient.
+        Activation takes an exclusive row lock; on PostgreSQL, intake acquires
+        a shared row lock (`FOR SHARE`) when the snapshot revision is already
+        initialized so concurrent intake transactions do not serialize against
+        each other while still blocking concurrent policy activation.
         """
-        changed = (
-            session.connection()
-            .execute(
-                update(NotificationPolicyRevision)
+        conn = session.connection()
+        revision: int | None = None
+        if not for_write and conn.dialect.name == "postgresql":
+            revision = session.execute(
+                select(NotificationPolicyRevision.revision)
                 .where(NotificationPolicyRevision.singleton == 1)
-                .values(revision=NotificationPolicyRevision.revision)
+                .with_for_update(read=True)
+            ).scalar_one_or_none()
+        if revision is None or revision == -1:
+            changed = (
+                conn.execute(
+                    update(NotificationPolicyRevision)
+                    .where(NotificationPolicyRevision.singleton == 1)
+                    .values(revision=NotificationPolicyRevision.revision)
+                )
+                .rowcount
             )
-            .rowcount
-        )
-        if not changed:
-            # A concurrent first initializer can win on PostgreSQL; a savepoint
-            # preserves our outer transaction when its singleton insert wins.
-            try:
-                with session.begin_nested():
-                    session.execute(
-                        insert(NotificationPolicyRevision).values(singleton=1, revision=-1)
-                    )
-            except IntegrityError:
-                pass
-            session.execute(
-                update(NotificationPolicyRevision)
-                .where(NotificationPolicyRevision.singleton == 1)
-                .values(revision=NotificationPolicyRevision.revision)
-            )
-        revision = session.execute(
-            select(NotificationPolicyRevision.revision).where(
-                NotificationPolicyRevision.singleton == 1
-            )
-        ).scalar_one()
+            if not changed:
+                # A concurrent first initializer can win on PostgreSQL; a savepoint
+                # preserves our outer transaction when its singleton insert wins.
+                try:
+                    with session.begin_nested():
+                        session.execute(
+                            insert(NotificationPolicyRevision).values(singleton=1, revision=-1)
+                        )
+                except IntegrityError:
+                    pass
+                session.execute(
+                    update(NotificationPolicyRevision)
+                    .where(NotificationPolicyRevision.singleton == 1)
+                    .values(revision=NotificationPolicyRevision.revision)
+                )
+            revision = session.execute(
+                select(NotificationPolicyRevision.revision).where(
+                    NotificationPolicyRevision.singleton == 1
+                )
+            ).scalar_one()
         if revision == -1:
             # One-time migration of already deployed policy rows. This is done
             # under the same lock, so another process cannot accept an empty
@@ -328,7 +337,7 @@ class SQLAlchemyPolicyStore:
         self.ensure_snapshot_schema()
         activated: PolicySnapshot | None = None
         with self._session_factory.begin() as session:
-            previous = self.lock_snapshot(session)
+            previous = self.lock_snapshot(session, for_write=True)
             result = self._save_policy(session, policy)
             if policy.status == PolicyStatus.ACTIVE:
                 current = previous.registry().get_all()
@@ -349,7 +358,7 @@ class SQLAlchemyPolicyStore:
         self.ensure_snapshot_schema()
         activated: PolicySnapshot | None = None
         with self._session_factory.begin() as session:
-            previous = self.lock_snapshot(session)
+            previous = self.lock_snapshot(session, for_write=True)
             results = [self._save_policy(session, policy) for policy in policies]
             active = [
                 policy.model_copy(
@@ -402,9 +411,24 @@ class SQLAlchemyPolicyStore:
                 duplicate.status == PolicyStatus.RETIRED.value
                 and policy.status != PolicyStatus.RETIRED
             ):
-                raise ValueError(
-                    "A retired policy version cannot be reactivated; publish a new version"
-                )
+                if duplicate.activated_at is not None:
+                    raise ValueError(
+                        "A retired policy version cannot be reactivated; publish a new version"
+                    )
+                now = datetime.now(UTC)
+                previous_version_id = self._retire_current_policy(session, policy, now)
+                duplicate.version = policy.version
+                duplicate.status = policy.status.value
+                duplicate.previous_version_id = previous_version_id
+                duplicate.is_active = policy.status in (PolicyStatus.ACTIVE, PolicyStatus.PREVIEW)
+                duplicate.retired_at = None
+                duplicate.updated_at = now
+                if policy.status == PolicyStatus.ACTIVE:
+                    duplicate.activated_at = now
+                saved_content = session.get(NotificationPolicyContent, duplicate.policy_id)
+                if saved_content is not None:
+                    saved_content.content = policy.model_dump(mode="json")
+                session.flush()
             return PolicySaveResult(
                 policy_id=duplicate.policy_id,
                 content_hash=content_hash,

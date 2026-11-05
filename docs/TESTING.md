@@ -185,8 +185,8 @@ Release `v0.6.1` extends the verification suite across `v0.3.0`-`v0.6.1` capabil
 
 | Suite / Gate | Target / Command | Status |
 |---|---|---|
-| Full Python Test Matrix | `pytest` (Python 3.11, 3.12, 3.13) | **1,964 passed**, 0 failed |
-| Adversarial Remediation Regression (`F01`-`F15`) | `pytest tests/uns/test_mpdd_2026_11_03_remediations.py` (SQLite + PostgreSQL 16) | **52 passed** (26 SQLite + 26 PostgreSQL 16) |
+| Full Python Test Matrix | `pytest` (Python 3.11, 3.12, 3.13) | **1,973 passed**, 0 failed |
+| Adversarial Remediation Regression (`F01`-`F24`) | `pytest tests/uns/test_security_and_runtime_remediations.py` (SQLite + PostgreSQL 16) | **71 passed** (36 SQLite + 35 PostgreSQL 16) |
 | PostgreSQL 16 & Sustained Load | `pytest tests/uns/test_postgres_and_load.py` (`postgres:16-alpine` + SQLite WAL) | **23 passed** (including `LISTEN/NOTIFY` cross-process invalidation and PostgreSQL `uns-maintain`) |
 | Pre-Execution Action Governance | `pytest tests/governance/` | **48 passed** (`decide()`, fail-closed/fail-open semantics, RFC 8785 context hashes, `GovernanceApprovalBridge`) |
 | UNS Console Test Suite (`apps/ui`) | `npm --prefix apps/ui run ci` (Vitest 5.x / React 19.3 / TypeScript 5.9 / Vite 8.3) | **346 passed** across all 6 console surfaces |

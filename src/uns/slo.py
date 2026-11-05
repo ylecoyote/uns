@@ -56,7 +56,7 @@ def compute_slo_report(
     now_val = float(now_epoch if now_epoch is not None else time.time())
     cutoff_epoch = now_val - (window_days * 86400.0)
 
-    runtime = Runtime(database, create_tables=True, clock=lambda: now_val)
+    runtime = Runtime(database, create_tables=database.endswith(":memory:"), clock=lambda: now_val)
     try:
         gauges = runtime.operational_progress()
 
@@ -67,10 +67,35 @@ def compute_slo_report(
                     select(events).where(events.c.at >= cutoff_epoch).order_by(events.c.at.asc())
                 ).mappings()
             )
+            settled_ids_in_window = {
+                str(evt["notification_id"])
+                for evt in event_rows
+                if str(evt["kind"]) in ("ACKED", "DISMISSED")
+            }
+            accepted_ids_in_window = {
+                str(evt["notification_id"])
+                for evt in event_rows
+                if str(evt["kind"]) == "ACCEPTED"
+            }
+            missing_accepted_ids = list(settled_ids_in_window - accepted_ids_in_window)
+            pre_window_accepted_rows = (
+                list(
+                    session.execute(
+                        select(events.c.notification_id, events.c.at).where(
+                            events.c.kind == "ACCEPTED",
+                            events.c.notification_id.in_(missing_accepted_ids),
+                        )
+                    ).mappings()
+                )
+                if missing_accepted_ids
+                else []
+            )
     finally:
         runtime.engine.dispose()
 
-    accepted_at_by_id: dict[str, float] = {}
+    accepted_at_by_id: dict[str, float] = {
+        str(row["notification_id"]): float(row["at"]) for row in pre_window_accepted_rows
+    }
     settled_at_by_id: dict[str, float] = {}
     channel_stats: dict[str, dict[str, Any]] = {}
     earliest_event_at: float | None = None
@@ -143,7 +168,7 @@ def compute_slo_report(
         bucket["error_rate"] = round(bucket["failed_attempts"] / total, 4) if total > 0 else 0.0
 
     # Filter notifications strictly accepted within the observation window
-    window_notif_ids = set(accepted_at_by_id.keys())
+    window_notif_ids = accepted_ids_in_window
     scoped_notifs = [r for r in notif_rows if str(r["id"]) in window_notif_ids]
 
     status_counts = {
@@ -183,13 +208,27 @@ def compute_slo_report(
         default=0.0,
     )
 
+    notif_by_id: dict[str, dict[str, Any]] = {str(r["id"]): dict(r) for r in notif_rows}
+    unresolved_unknown_count = 0
+    for evt in event_rows:
+        if str(evt["kind"]) != "CHANNEL_ATTEMPT_RESULT":
+            continue
+        evt_payload = evt["payload"] if isinstance(evt["payload"], dict) else {}
+        raw_meta = evt_payload.get("metadata")
+        evt_meta = raw_meta if isinstance(raw_meta, dict) else {}
+        if str(evt_meta.get("provider_outcome") or "").upper() != "UNKNOWN":
+            continue
+        n_row = notif_by_id.get(str(evt["notification_id"]))
+        if n_row is None or n_row.get("status") not in ("DELIVERED", "DEDUPLICATED") or bool(n_row.get("dead_letter")):
+            unresolved_unknown_count += 1
+
     oldest_pending_age = gauges.get("oldest_pending_age_seconds")
     oldest_due_lateness = gauges.get("oldest_due_attempt_lateness_seconds")
     oldest_callback_age = gauges.get("oldest_callback_retry_age_seconds")
     gates = {
         "zero_overdue_acks": gauges["overdue_ack_count"] == 0,
         "zero_unresolved_dead_letters": gauges["unresolved_failure_count"] == 0,
-        "zero_unknown_attempts": gauges["unknown_attempt_count"] == 0,
+        "zero_unknown_attempts": unresolved_unknown_count == 0,
         "zero_stalled_pending_backlog": (
             (oldest_pending_age is None or oldest_pending_age <= max_pending_age_seconds)
             and (

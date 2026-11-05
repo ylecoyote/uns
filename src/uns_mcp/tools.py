@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import hmac
+import json
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -391,6 +393,7 @@ async def ack_notification(
             dismiss=False,
             metadata=payload.metadata,
         )
+        await state.runtime.sync_pagerduty_incident(payload.notification_id, resolve=False)
         return response.model_dump(mode="json")
     if not state.legacy_fixture_mode:
         raise ValueError("A durable runtime is required for MCP mutations")
@@ -441,6 +444,7 @@ async def dismiss_notification(
             dismiss=True,
             metadata=payload.metadata,
         )
+        await state.runtime.sync_pagerduty_incident(payload.notification_id, resolve=True)
         return response.model_dump(mode="json")
     if not state.legacy_fixture_mode:
         raise ValueError("A durable runtime is required for MCP mutations")
@@ -791,11 +795,17 @@ async def list_deliveries(
             ):
                 filtered.append(item)
         page = filtered[:limit]
+        has_more = len(filtered) > limit
+        next_cursor = (
+            base64.b64encode(json.dumps({"offset": limit}).encode()).decode()
+            if has_more
+            else None
+        )
         pagination = response.pagination.model_copy(
             update={
                 "total_count": len(filtered),
-                "has_more": len(filtered) > limit,
-                "next_cursor": None if len(filtered) <= limit else response.pagination.next_cursor,
+                "has_more": has_more,
+                "next_cursor": next_cursor,
             }
         )
         response = response.model_copy(update={"items": page, "pagination": pagination})
@@ -843,11 +853,17 @@ async def list_audit_events(
             ):
                 filtered.append(item)
         page = filtered[:limit]
+        has_more = len(filtered) > limit
+        next_cursor = (
+            base64.b64encode(json.dumps({"offset": limit}).encode()).decode()
+            if has_more
+            else None
+        )
         pagination = response.pagination.model_copy(
             update={
                 "total_count": len(filtered),
-                "has_more": len(filtered) > limit,
-                "next_cursor": None if len(filtered) <= limit else response.pagination.next_cursor,
+                "has_more": has_more,
+                "next_cursor": next_cursor,
             }
         )
         response = response.model_copy(update={"items": page, "pagination": pagination})

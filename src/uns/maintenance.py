@@ -31,6 +31,7 @@ from sqlalchemy import (
     Engine,
     Table,
     Uuid,
+    and_,
     create_engine,
     event,
     exists,
@@ -55,6 +56,7 @@ _ACK = cast(Table, AckAuditRecord.__table__)
 
 def _eligible(cutoff: float, now: float, *, dialect_name: str = "sqlite") -> list[Any]:
     follower = work.alias("retained_follower")
+    target = work.alias("retained_target")
     audit_id: Any = (
         sa_cast(work.c.id, Uuid)
         if dialect_name == "postgresql"
@@ -99,6 +101,27 @@ def _eligible(cutoff: float, now: float, *, dialect_name: str = "sqlite") -> lis
                     follower.c.dedup_owner_id == work.c.id,
                     follower.c.dedup_successor_id == work.c.id,
                 )
+            )
+        ),
+        ~exists(
+            select(1).where(
+                or_(
+                    target.c.id == work.c.dedup_owner_id,
+                    target.c.id == work.c.dedup_successor_id,
+                ),
+                or_(
+                    target.c.status.not_in(("DELIVERED", "SUCCESS", "DEDUPLICATED", "FAILED")),
+                    and_(
+                        target.c.ack_status.is_not(None),
+                        target.c.ack_status.not_in(("ACKED", "DISMISSED", "TIMED_OUT")),
+                    ),
+                    target.c.dead_letter.is_(True),
+                    target.c.lease_token.is_not(None),
+                    target.c.lease_until > now,
+                    target.c.next_attempt >= cutoff,
+                    and_(target.c.delivered_at.is_not(None), target.c.delivered_at >= cutoff),
+                    and_(target.c.responded_at.is_not(None), target.c.responded_at >= cutoff),
+                ),
             )
         ),
     ]

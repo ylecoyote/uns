@@ -102,6 +102,7 @@ class DeliverySummary:
     channels_succeeded: list[Channel]
     autonomy_mode: AutonomyMode
     agent_id: UUID
+    source: str | None = None
 
 
 @dataclass
@@ -140,6 +141,7 @@ class DeliveryTimeline:
     decision_snapshot_id: UUID | None = None
     execution_snapshot_id: UUID | None = None
     skip_snapshot_id: UUID | None = None
+    source: str | None = None
 
 
 @dataclass
@@ -159,6 +161,7 @@ class AuditEvent:
     skip_snapshot_id: UUID | None = None
     payload: dict[str, Any] = field(default_factory=dict)
     correlation_id: str | None = None
+    source: str | None = None
 
 
 # =============================================================================
@@ -379,6 +382,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             channels_succeeded=list(record.channels_succeeded),
             autonomy_mode=AutonomyMode(record.autonomy_mode),
             agent_id=record.agent_id,
+            source=record.source,
         )
 
     def _audit_record_to_delivery_timeline(self, record: AuditRecord) -> DeliveryTimeline:
@@ -421,6 +425,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             decision_snapshot_id=record.decision_snapshot_id,
             execution_snapshot_id=record.execution_snapshot_id,
             skip_snapshot_id=record.skip_snapshot_id,
+            source=record.source,
         )
 
     def _derive_event_type(self, record: AuditRecord) -> str:
@@ -457,6 +462,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
                 "error_message": record.error_message,
             },
             correlation_id=record.correlation_id,
+            source=record.source,
         )
 
     def _ack_record_to_event(self, record: AckAuditRecord) -> AuditEvent:
@@ -484,6 +490,7 @@ class InMemoryReadModelAdapter(ReadModelAdapter):
             execution_snapshot_id=context.execution_snapshot_id if context else None,
             skip_snapshot_id=context.skip_snapshot_id if context else None,
             correlation_id=context.correlation_id if context else None,
+            source=context.source if context else None,
             payload={
                 "old_status": record.old_status.value if record.old_status else None,
                 "new_status": record.new_status.value,
@@ -774,6 +781,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                     channels_succeeded=[Channel(c) for c in r.channels_succeeded],
                     autonomy_mode=AutonomyMode(r.autonomy_mode),
                     agent_id=r.agent_id,
+                    source=r.source,
                 )
                 for r in results
             ]
@@ -856,6 +864,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                 decision_snapshot_id=result.decision_snapshot_id,
                 execution_snapshot_id=result.execution_snapshot_id,
                 skip_snapshot_id=result.skip_snapshot_id,
+                source=result.source,
             )
         finally:
             session.close()
@@ -977,6 +986,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                                 "error_message": r.error_message,
                             },
                             correlation_id=r.correlation_id,
+                            source=r.source,
                         )
                     )
 
@@ -1068,6 +1078,7 @@ class SQLAlchemyReadModelAdapter(ReadModelAdapter):
                             execution_snapshot_id=context.execution_snapshot_id if context else None,
                             skip_snapshot_id=context.skip_snapshot_id if context else None,
                             correlation_id=context.correlation_id if context else None,
+                            source=context.source if context else None,
                             payload={
                                 **(r.ack_metadata if isinstance(r.ack_metadata, dict) else {}),
                                 "old_status": r.old_status,
