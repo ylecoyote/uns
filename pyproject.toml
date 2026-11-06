@@ -84,7 +84,7 @@ dev = [
 ]
 # Documentation build tooling.
 docs = [
-    "mkdocs>=1.6.0",
+    "mkdocs>=1.6.1",
     "mkdocs-material>=9.5.0",
     "mkdocs-callouts>=1.12.0",
 ]
