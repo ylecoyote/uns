@@ -6,6 +6,10 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     versioning-strategy: widen
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
     ignore:
       # uns_mcp targets the FastMCP 1.x runtime API (mcp[cli]>=1.0.0,<2)
       - dependency-name: "mcp"
@@ -25,10 +29,25 @@ updates:
         patterns:
           - "vite"
           - "@vitejs/*"
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+      npm-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "vite"
+          - "@vitejs/*"
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
     ignore:
-      # Keep ESLint 9.x until ESLint 10 is adopted across plugins
-      - dependency-name: "eslint"
-        versions: [">= 10.0.0"]
       # Keep TypeScript 5.x until @typescript-eslint/parser supports TypeScript 6+/7+
       - dependency-name: "typescript"
         versions: [">= 6.0.0"]
@@ -38,3 +57,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
