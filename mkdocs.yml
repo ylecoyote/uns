@@ -115,5 +115,6 @@ nav:
   - Console Specifications:
       - UI Scope: ui/ui-scope.md
       - UI Data Contracts: ui/ui-data-contracts.md
+      - UI Verification Checks: verification/verify-ui-checks.md
       - UI Read Models: ui/ui-read-models.md
       - UI Observability: ui/ui-observability.md
