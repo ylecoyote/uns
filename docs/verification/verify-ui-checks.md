@@ -37,8 +37,8 @@ Enforcement evidence to seek:
 ### Related documentation
 
 - [UI Scope v1](../ui/ui-scope.md): authoritative scope definition
-- [Apps UI README](../../apps/ui/README.md): design principles and constraints
-- [Phase verification reports](../reports/ui/): bounded verification reports
+- `apps/ui/README.md`: design principles and constraints
+- `docs/reports/ui/`: bounded phase verification reports
 
 ## Contract checks (`--contracts`)
 
