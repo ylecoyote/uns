@@ -36,7 +36,7 @@ dependencies = [
     "google-re2>=1.1.20251105,<2",
     # Core SDK only needs the data model + YAML policy loader. Everything
     # else (HTTP, persistence, channel adapters, MCP) is opt-in via extras.
-    "pydantic>=2.0.0",
+    "pydantic>=2.14.3",
     "PyYAML>=6.0.0",
 ]
 
